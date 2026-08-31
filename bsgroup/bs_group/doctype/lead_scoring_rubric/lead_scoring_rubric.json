@@ -1,0 +1,227 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-06-25 09:57:04.541960",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sb_meta",
+  "rubric_version",
+  "last_updated_by",
+  "cb_s1",
+  "last_updated_on",
+  "is_active",
+  "sb_weights",
+  "weight_geo",
+  "weight_vertical",
+  "weight_partner",
+  "weight_rfq_size",
+  "cb_s2",
+  "weight_urgency",
+  "weight_repeat",
+  "weight_signal",
+  "weight_total_check",
+  "sb_thresholds",
+  "threshold_apply",
+  "threshold_review",
+  "cb_s3",
+  "high_score_min",
+  "low_score_max",
+  "sb_rules",
+  "scoring_guidance"
+ ],
+ "fields": [
+  {
+   "fieldname": "sb_meta",
+   "fieldtype": "Section Break",
+   "label": "Rubric Metadata"
+  },
+  {
+   "default": "1.0",
+   "fieldname": "rubric_version",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Rubric Version",
+   "reqd": 1
+  },
+  {
+   "fieldname": "last_updated_by",
+   "fieldtype": "Link",
+   "label": "Last Updated By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb_s1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "last_updated_on",
+   "fieldtype": "Datetime",
+   "label": "Last Updated On",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Active"
+  },
+  {
+   "fieldname": "sb_weights",
+   "fieldtype": "Section Break",
+   "label": "Score Component Weights (must sum to 100)"
+  },
+  {
+   "default": "15",
+   "description": "How much geo alignment matters",
+   "fieldname": "weight_geo",
+   "fieldtype": "Int",
+   "label": "Geo Match Weight"
+  },
+  {
+   "default": "20",
+   "fieldname": "weight_vertical",
+   "fieldtype": "Int",
+   "label": "Vertical Match Weight"
+  },
+  {
+   "default": "15",
+   "fieldname": "weight_partner",
+   "fieldtype": "Int",
+   "label": "Partner / Brand Match Weight"
+  },
+  {
+   "default": "15",
+   "fieldname": "weight_rfq_size",
+   "fieldtype": "Int",
+   "label": "RFQ Size Weight"
+  },
+  {
+   "fieldname": "cb_s2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "10",
+   "fieldname": "weight_urgency",
+   "fieldtype": "Int",
+   "label": "Urgency Weight"
+  },
+  {
+   "default": "15",
+   "fieldname": "weight_repeat",
+   "fieldtype": "Int",
+   "label": "Repeat Customer Weight"
+  },
+  {
+   "default": "10",
+   "fieldname": "weight_signal",
+   "fieldtype": "Int",
+   "label": "Signal Strength Weight"
+  },
+  {
+   "description": "Should equal 100",
+   "fieldname": "weight_total_check",
+   "fieldtype": "Int",
+   "label": "Total (auto)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sb_thresholds",
+   "fieldtype": "Section Break",
+   "label": "Confidence Thresholds"
+  },
+  {
+   "default": "70",
+   "description": "AI fields are written to Lead only when AI confidence \u2265 this value",
+   "fieldname": "threshold_apply",
+   "fieldtype": "Percent",
+   "label": "Apply Threshold (%)"
+  },
+  {
+   "default": "40",
+   "description": "Below this, mark Lead.bsi_ai_status=Low Confidence and notify reviewer",
+   "fieldname": "threshold_review",
+   "fieldtype": "Percent",
+   "label": "Review Threshold (%)"
+  },
+  {
+   "fieldname": "cb_s3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "80",
+   "description": "Score \u2265 this value flags lead for high-priority attention",
+   "fieldname": "high_score_min",
+   "fieldtype": "Int",
+   "label": "Hot Lead Score Min"
+  },
+  {
+   "default": "30",
+   "description": "Score \u2264 this value flags lead for review/disqualification",
+   "fieldname": "low_score_max",
+   "fieldtype": "Int",
+   "label": "Cold Lead Score Max"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sb_rules",
+   "fieldtype": "Section Break",
+   "label": "Scoring Rules (free-form for AI)"
+  },
+  {
+   "description": "Free-form text fed into AI prompt explaining how to score 0\u2013100",
+   "fieldname": "scoring_guidance",
+   "fieldtype": "Text Editor",
+   "label": "Scoring Guidance for AI"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-06-25 09:57:09.427894",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "Lead Scoring Rubric",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Sales Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Sales User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

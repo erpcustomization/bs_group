@@ -1,0 +1,338 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "PR-.{customer}-.#####",
+ "creation": "2026-02-02 21:04:54.283697",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "opportunity_qualification_mandatory_section",
+  "decision_maker_known",
+  "competition_known",
+  "budget_confirmed",
+  "column_break_xrzr",
+  "timeline_defined",
+  "site_visit_required",
+  "section_break_nztj",
+  "opportunity",
+  "customer",
+  "is_new_customer",
+  "subject",
+  "column_break_eflw",
+  "status",
+  "company",
+  "priority",
+  "estimated_value",
+  "site_visit",
+  "section_break_btny",
+  "request_date",
+  "due_date",
+  "expected_close_date",
+  "start_date",
+  "completion_date",
+  "column_break_zsqi",
+  "overdue",
+  "delay_days",
+  "actual_hours",
+  "estimated_hours",
+  "available_hours",
+  "section_break_bqcf",
+  "presales_owner",
+  "requested_by",
+  "amended_from",
+  "column_break_lflm",
+  "quality_band",
+  "quality_score",
+  "section_break_sbkv",
+  "solution_summary",
+  "scope_details",
+  "upload_scope_details",
+  "assumptions"
+ ],
+ "fields": [
+  {
+   "fieldname": "opportunity_qualification_mandatory_section",
+   "fieldtype": "Section Break",
+   "label": "Opportunity Qualification (Mandatory)"
+  },
+  {
+   "default": "0",
+   "fieldname": "decision_maker_known",
+   "fieldtype": "Check",
+   "label": "Decision Maker Known",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "competition_known",
+   "fieldtype": "Check",
+   "label": "Competition Known",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "budget_confirmed",
+   "fieldtype": "Check",
+   "label": "Budget Confirmed"
+  },
+  {
+   "fieldname": "column_break_xrzr",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "timeline_defined",
+   "fieldtype": "Check",
+   "label": "Timeline Defined",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "site_visit_required",
+   "fieldtype": "Check",
+   "label": "Site Visit Required"
+  },
+  {
+   "fieldname": "section_break_nztj",
+   "fieldtype": "Section Break",
+   "label": "Deal Context"
+  },
+  {
+   "fieldname": "opportunity",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Opportunity",
+   "options": "Opportunity",
+   "reqd": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Customer",
+   "options": "Customer",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "is_new_customer",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "New Customer",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_eflw",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "estimated_value",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Estimated Deal Value",
+   "reqd": 1
+  },
+  {
+   "fieldname": "expected_close_date",
+   "fieldtype": "Date",
+   "label": "Expected Close Date"
+  },
+  {
+   "fieldname": "section_break_bqcf",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "presales_owner",
+   "fieldtype": "Link",
+   "label": "Presales Owner",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "requested_by",
+   "fieldtype": "Link",
+   "label": "Requested By",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Presales Request",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_lflm",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Low / Medium / High",
+   "fieldname": "quality_band",
+   "fieldtype": "Data",
+   "label": "Quality Band",
+   "read_only": 1
+  },
+  {
+   "description": "Auto-calculated qualification score",
+   "fieldname": "quality_score",
+   "fieldtype": "Percent",
+   "label": "Opportunity Quality Score",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_sbkv",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "solution_summary",
+   "fieldtype": "Small Text",
+   "label": "Solution Summary",
+   "reqd": 1
+  },
+  {
+   "fieldname": "scope_details",
+   "fieldtype": "Text Editor",
+   "label": "Scope Details",
+   "reqd": 1
+  },
+  {
+   "fieldname": "assumptions",
+   "fieldtype": "Long Text",
+   "label": "Assumptions / Constraints"
+  },
+  {
+   "fieldname": "section_break_btny",
+   "fieldtype": "Section Break",
+   "label": "Timeline and Effort"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Draft\nOpen\nAssigned\nIn Progress\nAwaiting Sales Input\nAwaiting Customer Input\nCosting in Progress\nReady for Quotation\nSubmitted to Sales\nCompleted\nOn Hold\nWon\nLost\nCancelled",
+   "reqd": 1
+  },
+  {
+   "fieldname": "priority",
+   "fieldtype": "Select",
+   "label": "Priority",
+   "options": "\nLow\nMedium\nHigh\nCritical",
+   "reqd": 1
+  },
+  {
+   "fieldname": "request_date",
+   "fieldtype": "Date",
+   "label": "Request Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "due_date",
+   "fieldtype": "Date",
+   "label": "Due Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "Start Date"
+  },
+  {
+   "fieldname": "completion_date",
+   "fieldtype": "Date",
+   "label": "Completion Date"
+  },
+  {
+   "fieldname": "column_break_zsqi",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "estimated_hours",
+   "fieldtype": "Float",
+   "label": "Estimated Hours"
+  },
+  {
+   "fieldname": "actual_hours",
+   "fieldtype": "Float",
+   "label": "Actual Hours"
+  },
+  {
+   "default": "0",
+   "fieldname": "overdue",
+   "fieldtype": "Check",
+   "label": "Overdue",
+   "read_only": 1
+  },
+  {
+   "fieldname": "delay_days",
+   "fieldtype": "Int",
+   "label": "Delay Days",
+   "read_only": 1
+  },
+  {
+   "fieldname": "available_hours",
+   "fieldtype": "Float",
+   "label": "Available Hours"
+  },
+  {
+   "fieldname": "subject",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Subject",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "upload_scope_details",
+   "fieldtype": "Attach",
+   "label": "Upload Scope Details"
+  },
+  {
+   "fieldname": "site_visit",
+   "fieldtype": "Link",
+   "label": "Site Visit",
+   "options": "Site Visit"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-08-27 14:28:25.876905",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "Presales Request",
+ "naming_rule": "By script",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

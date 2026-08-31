@@ -1,0 +1,170 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-05-31 16:16:08.773441",
+  "name": "Submit for Finance Approval",
+  "workflow_action_name": "Submit for Finance Approval"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-05-31 16:16:09.537989",
+  "name": "Finance Approve",
+  "workflow_action_name": "Finance Approve"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-05-31 16:16:12.540967",
+  "name": "Mark as Cheque Prepared",
+  "workflow_action_name": "Mark as Cheque Prepared"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-05-31 16:16:16.540543",
+  "name": "Issue / Release Cheque",
+  "workflow_action_name": "Issue / Release Cheque"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-05-31 16:16:18.536204",
+  "name": "Revise and Resubmit",
+  "workflow_action_name": "Revise and Resubmit"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2025-12-06 15:05:50.810459",
+  "name": "Approve",
+  "workflow_action_name": "Approve"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2025-12-06 15:05:50.811947",
+  "name": "Reject",
+  "workflow_action_name": "Reject"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2025-12-06 15:05:50.812760",
+  "name": "Review",
+  "workflow_action_name": "Review"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-01-27 19:12:04.675725",
+  "name": "Submit",
+  "workflow_action_name": "Submit"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-03-30 15:07:57.470754",
+  "name": "Send for Approval",
+  "workflow_action_name": "Send for Approval"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-04-06 10:36:41.799720",
+  "name": "Sent for Rework",
+  "workflow_action_name": "Sent for Rework"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-04-06 11:37:45.203397",
+  "name": "Send to Project Manager",
+  "workflow_action_name": "Send to Project Manager"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-04-16 12:50:40.598961",
+  "name": "Send for Pre-Approval",
+  "workflow_action_name": "Send for Pre-Approval"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-04-16 12:51:46.485857",
+  "name": "Pre-Approve",
+  "workflow_action_name": "Pre-Approve"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-04-16 12:53:38.962647",
+  "name": "Mark as Prepared",
+  "workflow_action_name": "Mark as Prepared"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-04-16 12:54:21.782077",
+  "name": "Mark as Signed",
+  "workflow_action_name": "Mark as Signed"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-04-16 12:54:51.906797",
+  "name": "Mark as Issued",
+  "workflow_action_name": "Mark as Issued"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-04-16 14:18:39.495596",
+  "name": "Cancel",
+  "workflow_action_name": "Cancel"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-04-16 14:20:01.259945",
+  "name": "Send Back",
+  "workflow_action_name": "Send Back"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-04-16 14:20:10.882511",
+  "name": "Send for Signing",
+  "workflow_action_name": "Send for Signing"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-04-16 14:20:19.417996",
+  "name": "Reject Signing",
+  "workflow_action_name": "Reject Signing"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-04-16 14:20:26.685913",
+  "name": "Resubmit",
+  "workflow_action_name": "Resubmit"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-05-31 16:16:11.533207",
+  "name": "Send Back to Draft",
+  "workflow_action_name": "Send Back to Draft"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-05-31 16:16:17.536180",
+  "name": "Put on Hold",
+  "workflow_action_name": "Put on Hold"
+ }
+]

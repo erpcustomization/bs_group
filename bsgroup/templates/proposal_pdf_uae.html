@@ -1,0 +1,729 @@
+<!-- ================================================================
+  BITS SECURE IT – ERPNext Quotation Print Format (Jinja2) v4
+  Paste into: Print Format → HTML field
+  Custom Format = Yes | Standard = No
+  
+  - NO logo here — handled by Letterhead (header)
+  - NO footer here — handled by Letterhead (footer)
+  - padding-top on .page clears the letterhead logo on every page
+================================================================ -->
+
+<style>
+    /* ── Mandatory Hiding ─────────────────────────────────────────── */
+    [document-status] {
+        display: none;
+    }
+
+    .print-heading {
+        display: none;
+    }
+
+    /* ── Reset ───────────────────────────────────────────────────── */
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-size: 11pt !important;
+        /* font-family: "Times New Roman", Times, serif !important; */
+    }
+
+    body,
+    p,
+    td,
+    th,
+    div,
+    span,
+    li {
+        /* font-family: "Times New Roman", Times, serif; */
+        font-size: 11pt;
+        color: #1a1a1a;
+        line-height: 1.6;
+    }
+
+    /* ── Page Wrapper ─────────────────────────────────────────────── */
+    .page {
+        width: 100%;
+        /* padding: 28mm 18mm 8mm 18mm; */
+        min-height: 220mm;
+        display: block;
+        page-break-after: always;
+    }
+    .page-number  {     
+          display: none!important;     
+    }
+
+    .page:last-child {
+        page-break-after: auto;
+    }
+
+    /* ── Cover Letter ────────────────────────────────────────────── */
+    .cover-body {
+        flex: 1;
+    }
+
+    .cover-date {
+        font-weight: 700;
+        font-size: 9.5pt;
+        margin-bottom: 18px;
+    }
+
+    .cover-recipient {
+        margin-bottom: 20px;
+    }
+
+    .cust-name {
+        font-weight: 700;
+        font-size: 9.5pt;
+    }
+
+    .cust-contact {
+        font-size: 9.5pt;
+    }
+
+    .cover-subject {
+        font-weight: 700;
+        font-size: 9.5pt;
+        margin-bottom: 20px;
+    }
+
+    .cover-salute {
+        font-weight: 700;
+        font-size: 9.5pt;
+        margin-bottom: 14px;
+    }
+
+    .cover-para {
+        font-size: 9.5pt;
+        margin-bottom: 11px;
+        text-align: justify;
+    }
+
+    .cover-closing {
+        margin-top: 20px;
+        margin-bottom: 24px;
+        font-size: 9.5pt;
+    }
+
+    .sig-name {
+        font-weight: 700;
+        font-size: 9.5pt;
+    }
+
+    .sig-title {
+        font-size: 9.5pt;
+    }
+
+    /* ── Quotation Page Header ───────────────────────────────────── */
+    .qt-page-head {
+        display: flex;
+        justify-content: flex-end;
+        /* reference only, no logo */
+        align-items: flex-start;
+        margin-bottom: 14px;
+        border-bottom: 1.5px solid #2e80b7;
+        padding-bottom: 10px;
+    }
+
+    .qt-ref-label {
+        font-size: 8.5pt;
+        color: #555;
+        display: block;
+        text-align: right;
+    }
+
+    .qt-ref-title {
+        font-size: 15pt;
+        font-weight: 700;
+        color: #1a1a1a;
+        line-height: 1.2;
+        text-align: right;
+    }
+
+    /* ── Meta Bar ────────────────────────────────────────────────── */
+    .qt-meta {
+        display: flex;
+        justify-content: space-between;
+        background: #f2f5fa;
+        border-left: 3px solid #2e80b7;
+        padding: 7px 11px;
+        margin-bottom: 14px;
+        font-size: 8.5pt;
+    }
+
+    .qt-meta-lbl {
+        font-weight: 700;
+        color: #2c70ba;
+        margin-right: 4px;
+    }
+
+    /* ── Items Table ─────────────────────────────────────────────── */
+    .items-tbl {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: auto;
+    }
+
+    .items-tbl tr.items-header-row th {
+        background: #2c70ba;
+        color: #fff;
+        padding: 7px 9px;
+        font-size: 8.5pt;
+        font-weight: 700;
+        text-align: left;
+        border: 1px solid #2c70ba;
+    }
+
+    .items-tbl tr.items-header-row th.r {
+        text-align: right;
+    }
+
+    .items-tbl tbody tr.section-row td {
+        background: #d6e4f0;
+        color: #2e80b7;
+        font-weight: 700;
+        text-align: left;
+        font-size: 8.5pt;
+        padding: 10px 9px 6px 9px;
+        border: 1px solid #b0c8dc;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+    }
+
+    .items-tbl tbody tr.item-row td {
+        padding: 7px 9px;
+        border-top: none;
+        border-bottom: none;
+        border-left: none;
+        border-right: none;
+        vertical-align: top;
+        font-size: 9pt;
+    }
+
+    .items-tbl tbody tr.item-row.row-top td {
+        border-top: 1px solid #dde3eb;
+    }
+
+    .items-tbl tbody tr.item-row.row-bottom td {
+        border-bottom: 1px solid #dde3eb;
+    }
+
+    /* .items-tbl tbody tr.item-row:nth-child(even) td {
+        background: #f8f9fb;
+    } */
+
+    .item-no {
+        text-align: center;
+        color: #555;
+        width: 4%;
+    }
+
+    .item-desc {
+        width: 56%;
+        overflow-wrap: break-word;
+        word-break: break-word;
+    }
+
+    /* Item descriptions can contain pasted rich-text HTML (tables/divs)
+       with inline overflow/width/height that force a scrollbar to render
+       in the PDF. Strip those out so content always flows and wraps. */
+    .item-desc *,
+    .item-name *,
+    .item-sub *,
+    .terms-body * {
+        overflow: visible !important;
+        max-height: none !important;
+        max-width: 100% !important;
+    }
+
+    .item-desc table,
+    .item-name table,
+    .item-sub table,
+    .terms-body table {
+        width: 100% !important;
+        table-layout: auto !important;
+    }
+
+    .item-name {
+        font-weight: 600;
+        font-size: 8.5pt;
+        overflow-wrap: break-word;
+        word-break: break-word;
+    }
+
+    .item-sub {
+        font-size: 8pt;
+        color: #555;
+        margin-top: 2px;
+        line-height: 1.4;
+        overflow-wrap: break-word;
+        word-break: break-word;
+    }
+
+    .item-qty,
+    .item-rate,
+    .item-amt {
+        text-align: right;
+        white-space: nowrap;
+        font-size: 9pt;
+    }
+
+    .item-qty {
+        width: 8%;
+    }
+
+    .item-rate {
+        width: 14%;
+    }
+
+    .item-amt {
+        width: 16%;
+    }
+
+    /* The column header is a normal (non-repeating) row inside <tbody>
+       — not a <thead> — by design. wkhtmltopdf automatically repeats a
+       real <thead> on every page a table spans, and when a row has to
+       split because it doesn't fit in the remaining space, the split
+       portion renders underneath/overlapping that repeating header, and
+       also leaves phantom blank space where the row's box continues past
+       its actual text. Using a plain header row (no thead) plus
+       page-break-inside:avoid on every row keeps each item and section
+       heading intact as a whole block that moves to the next page. */
+    .items-tbl tr.item-row,
+    .items-tbl tr.section-row {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+
+    /* ── Totals ──────────────────────────────────────────────────── */
+    .totals-wrap {
+        display: block;
+        width: 100%;
+        margin-top: 4px;
+        margin-bottom: 18px;
+    }
+
+    .totals-tbl {
+        border-collapse: collapse;
+        min-width: 260px;
+        margin-left: auto;
+    }
+
+    .totals-tbl td {
+        padding: 5px 11px;
+        font-size: 9pt;
+        border-bottom: 1px solid #e2e6ec;
+    }
+
+    .totals-tbl .lbl {
+        text-align: left;
+        color: #1a1a1a;
+        min-width: 140px;
+    }
+
+    .totals-tbl .amt {
+        text-align: right;
+        padding-right: 20px;
+        min-width: 110px;
+        color: #1a1a1a;
+    }
+
+    .totals-tbl tr.grand td {
+        border-top: 2px solid #2e80b7; 
+        background: #2c70ba;
+        color: #fff;
+        font-weight: 700;
+        font-size: 9.5pt;
+    }
+
+    /* ── Commercial Summary ──────────────────────────────────────── */
+    .comm-summary {
+        margin-bottom: 16px;
+    }
+
+    .comm-summary h3 {
+        font-size: 9.5pt;
+        font-weight: bold;
+        color: #1a1a1a;
+        margin-bottom: 6px;
+    }
+
+    .comm-tbl {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .comm-tbl thead tr th {
+        background: #2c70ba;
+        color: #fff;
+        padding: 6px 10px;
+        font-size: 8.5pt;
+        font-weight: 700;
+        text-align: left;
+        border: 1px solid #2c70ba;
+    }
+
+    .comm-tbl thead tr th.r {
+        text-align: right;
+    }
+
+    .comm-tbl tbody tr td {
+        padding: 6px 10px;
+        font-size: 9pt;
+        border-bottom: 1px solid #dde3eb;
+    }
+
+    .comm-tbl tbody tr.comm-data td.r {
+        text-align: right;
+    }
+
+    .comm-tbl tbody tr.comm-total {
+        border-top: 2px solid #2c70ba;
+    }
+
+    .comm-tbl tbody tr.comm-total td {
+        font-weight: 700;
+        font-size: 9.5pt;
+        background: #f2f5fa;
+        color: #2c70ba;
+    }
+
+    .comm-tbl tbody tr.comm-total td.r {
+        text-align: right;
+    }
+
+    /* ── Notes ───────────────────────────────────────────────────── */
+    .notes-box {
+        margin-top: 12px;
+        padding: 9px 12px;
+        background: #fffbec;
+        border-left: 3px solid #c8a800;
+    }
+
+    .notes-hdr {
+        font-weight: 700;
+        font-size: 8.5pt;
+        color: #7a6300;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        margin-bottom: 4px;
+    }
+
+    .notes-txt {
+        font-size: 8.5pt;
+        color: #444;
+    }
+
+    /* ── Terms ───────────────────────────────────────────────────── */
+    .terms-wrap {
+        /* padding: 28mm 18mm 8mm 18mm; */
+        orphans: 3;
+        widows: 3;
+        margin-top: 10px;
+    }
+
+    .terms-title {
+        font-size: 18pt;
+        font-weight: 700;
+        color: #1a1a1a;
+        margin-bottom: 25px;
+    }
+
+    .terms-body {
+        font-size: 10pt;
+        line-height: 1.6;
+    }
+
+    .terms-body p {
+        margin-bottom: 15px;
+    }
+
+    .terms-body ul,
+    .terms-body ol {
+        margin-left: 18px;
+        margin-bottom: 8px;
+    }
+
+    .terms-body li {
+        margin-bottom: 4px;
+    }
+
+    .terms-body h1,
+    .terms-body h2,
+    .terms-body h3,
+    .terms-body h4 {
+        page-break-after: avoid;
+        margin-bottom: 10px;
+    }
+
+    /* ── Print ───────────────────────────────────────────────────── */
+    @media print {
+        .page {
+            page-break-after: always;
+        }
+
+        .page:last-child {
+            page-break-after: auto;
+        }
+
+        .terms-body h1,
+        .terms-body h2,
+        .terms-body h3,
+        .terms-body h4 {
+            page-break-after: avoid;
+        }
+    }
+</style>
+
+<!-- <div style="width: 100%;float: left;">
+    <img src="/files/BITS_logo_High%20Resolution.png" alt="" style="width: 30%;">
+</div> -->
+
+{# COVER LETTER #}
+<div class="page" style="min-height: 850px;">
+    <!-- <img src="/files/BITS_logo_High%20Resolution.png" alt="" style="width: 30%;margin-bottom: 21px !important;"> -->
+    <div class="cover-body">
+        <p class="cover-date" style="margin-top: 30px;">
+            Date: {{ frappe.utils.formatdate(doc.transaction_date, "dd MMM yyyy") }}
+        </p>
+        <div class="cover-recipient">
+            <p class="cust-name" style="margin-top: 30px;">
+                {{ doc.custom_organization_name }}
+            </p>
+            {% if doc.custom_organization_name == doc.party_name %}
+                {% if doc.contact_person %}
+                    <p class="cust-contact">
+                        {{ frappe.db.get_value("Contact", doc.contact_person, "first_name") or doc.contact_person }}
+                    </p>
+                {% endif %}
+            {% else %}
+                <p class="cust-name">
+                    {{ doc.custom_contact_person_name or doc.party_name }}
+                </p>
+            {% endif %}
+        </div>
+        <p class="cover-subject" style="margin-top: 30px;">Subject: {{ doc.custom_subject }}
+        </p>
+        <p class="cover-subject" style="margin-top: 30px;">Reference#: {{ doc.name }}
+        </p>
+        <p class="cover-salute" style="margin-top: 30px;">
+            Dear {{ doc.custom_contact_person_name or doc.contact_person or "Sir / Madam" }},
+        </p>
+        <!-- <p class="cover-para" style="margin-top: 30px;">Thank you for considering us in the BID.</p> -->
+        <p class="cover-para" style="margin-top: 20px;">
+            We thank you for the opportunity to respond to your enquiry and are pleased to submit our proposal for your kind consideration.<br><br>
+            Our submission has been carefully prepared to align with your stated requirements. Our team offers the requisite technical expertise, professional capability, and local market knowledge to support the successful execution of the assignment at every stage.
+            We would welcome the opportunity to present our proposal in greater detail at your convenience and to discuss how our proposed approach may best support your objectives.<br><br>
+            We appreciate your consideration and remain at your disposal should you require any further information or clarification.
+        </p>
+        <!-- <p class="cover-para" style="margin-top: 20px;">Thank you again for your consideration of our proposal.</p> -->
+        <div class="cover-closing" style="margin-top: 30px;">With Regards,</div>
+        {% set emp = frappe.db.get_value("Employee", {"user_id": doc.owner}, ["employee_name"], as_dict=1) %}
+        <p class="sig-name" style="margin-top: 30px;">
+            {{ emp.employee_name if emp else doc.owner }}
+        </p>
+        <p class="sig-title">
+            {{ doc.custom_designation or "" }}
+        </p>
+        {% if doc.custom_phone__no %}
+        <p class="sig-title">
+            {{ doc.custom_phone__no }}
+        </p>
+        {% endif %}
+    </div>
+</div>
+
+{# QUOTATION DETAILS #}
+<div class="page" style="margin-top: 0px !important;">
+    <!-- <div class="qt-page-head">
+        <div>
+            <span class="qt-ref-label">Reference# : {{ doc.name }}</span>
+        </div>
+    </div> -->
+
+    <!-- <div class="qt-meta">
+        <div>
+            <span class="qt-meta-lbl">QT No:</span>{{ doc.name }}
+            &nbsp;&nbsp;
+            <span class="qt-meta-lbl">Bill To:</span>{{ doc.customer_name or doc.party_name }}
+        </div>
+        <div style="text-align:right;">
+            <span class="qt-meta-lbl">Date:</span>{{ frappe.utils.formatdate(doc.transaction_date, "dd MMM yyyy") }}
+            {% if doc.valid_till %}
+            &nbsp;&nbsp;
+            <span class="qt-meta-lbl">Valid Till:</span>{{ frappe.utils.formatdate(doc.valid_till, "dd MMM yyyy") }}
+            {% endif %}
+        </div>
+    </div> -->
+
+    <table class="items-tbl">
+        <colgroup>
+            <col style="width: 4%;">
+            <col style="width: 58%;">
+            <col style="width: 8%;">
+            <col style="width: 14%;">
+            <col style="width: 16%;">
+        </colgroup>
+        <tbody>
+            <tr class="items-header-row">
+                <th>#</th>
+                <th>Item &amp; Description</th>
+                <th class="r">Qty</th>
+                <th class="r">Rate</th>
+                <th class="r">Amount</th>
+            </tr>
+            {% for item in doc.items %}
+            {% set item_no = loop.index %}
+            {% if item.custom_header %}
+            <tr class="section-row">
+                <td colspan="5">{{ item.custom_header }}</td>
+            </tr>
+            {% endif %}
+            {# Long descriptions are split into one <tr> per paragraph so no
+               single row is ever taller than a page — a row taller than the
+               page forces a mid-row page break that collides with the
+               repeating table header. #}
+            {% set has_desc = item.description and item.description != item.item_name %}
+            {% set blocks = item.description.split('</p>') if has_desc else [''] %}
+            {% for block in blocks %}
+            {% set block = (block ~ '</p>') if (has_desc and not loop.last) else block %}
+            {% set block_clean = block.strip() %}
+            <tr class="item-row{{ ' row-top' if loop.first else '' }}{{ ' row-bottom' if loop.last else '' }}">
+                <td class="item-no">{{ item_no if loop.first else '' }}</td>
+                <td class="item-desc">
+                    {% if loop.first %}
+                    <div class="item-name">{{ item.item_name or item.item_code }}</div>
+                    {% endif %}
+                    {% if has_desc and block_clean and block_clean not in ['</p>', '<p><br></p>', '<p><br/></p>', '<p>&nbsp;</p>'] %}
+                    <div class="item-sub">{{ block_clean }}</div>
+                    {% endif %}
+                </td>
+                <td class="item-qty">{{ ("{:.2f}".format(item.qty) if item.qty != item.qty|int else item.qty|int) if loop.first else '' }}</td>
+                <td class="item-rate">{{ "{:,.2f}".format(item.rate) if loop.first else '' }}</td>
+                <td class="item-amt">{{ "{:,.2f}".format(item.amount) if loop.first else '' }}</td>
+            </tr>
+            {% endfor %}
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="totals-wrap">
+        <table class="totals-tbl">
+            <tr>
+                <td class="lbl">Sub Total</td>
+                <td class="amt">{{ "{:,.2f}".format(doc.total) }}</td>
+            </tr>
+            {% if doc.discount_amount and doc.discount_amount > 0 %}
+            <tr>
+                <td class="lbl">Discount</td>
+                <td class="amt">- {{ "{:,.2f}".format(doc.discount_amount) }}</td>
+            </tr>
+            {% endif %}
+            {% if doc.total_taxes_and_charges and doc.total_taxes_and_charges > 0 %}
+            <tr>
+                <td class="lbl">VAT (5%)</td>
+                <td class="amt">{{ "{:,.2f}".format(doc.total_taxes_and_charges) }}</td>
+            </tr>
+            {% endif %}
+            <tr class="grand">
+                <td class="lbl">Total</td>
+                <td class="amt">{{ doc.currency }} {{ "{:,.2f}".format(doc.grand_total) }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="comm-summary">
+        <h3>Commercial Summary</h3>
+        <table class="comm-tbl">
+            <thead>
+                <tr>
+                    <th>Tax Details</th>
+                    <th class="r">VAT Amount</th>
+                    <th class="r">Total Amount ({{ doc.currency }})</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="comm-data">
+                    <td>VAT (5%)</td>
+                    <td class="r">{{ "{:,.2f}".format(doc.total_taxes_and_charges or 0) }}</td>
+                    <td class="r">{{ "{:,.2f}".format(doc.grand_total) }}</td>
+                </tr>
+                <tr class="comm-total">
+                    <td><strong>Total</strong></td>
+                    <td class="r"><strong>{{ doc.currency }} {{ "{:,.2f}".format(doc.total_taxes_and_charges or 0)
+                            }}</strong></td>
+                    <td class="r"><strong>{{ doc.currency }} {{ "{:,.2f}".format(doc.grand_total) }}</strong></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    {% if doc.custom_customer_notes %}
+    <div class="notes-box">
+        <div class="notes-hdr">Notes</div>
+        <ul style="margin-left:16px; margin-top:4px; padding:0;">
+            {% for line in doc.custom_customer_notes.split('\n') %}
+                {% if line.strip() %}
+                <li class="notes-txt" style="margin-bottom:4px;">{{ line.strip() }}</li>
+                {% endif %}
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+</div>
+
+
+<div style="page-break-before: always;"></div>
+<div class="terms-wrap">
+    <div class="terms-title">Terms</div>
+
+    <div class="terms-body">
+
+        <p><strong>1. Prices</strong><br>
+        All prices are quoted in AED and are exclusive of VAT unless otherwise stated. VAT will be charged as applicable under UAE tax regulations.</p>
+
+        <p><strong>2. Payment Terms</strong><br>
+        Payment shall be made as per the agreed Payment Terms {{ doc.custom_payment_terms or "" }}. Work, delivery, or procurement may commence only after receipt of the agreed advance payment.</p>
+
+        <p><strong>3. Delivery</strong><br>
+        {{ doc.custom_delivery_terms or "Delivery timelines are estimated and subject to product availability from suppliers. Delays caused by manufacturers, logistics, or force majeure conditions are beyond our control." }}
+        </p>
+
+        <p><strong>4. Installation & Commissioning</strong><br>
+        Installation and commissioning are not included unless explicitly mentioned in the quotation. Any additional work requested by the client outside the quoted scope will be charged separately.</p>
+
+        <p><strong>5. Scope of Work</strong><br>
+        This quotation is strictly limited to the items and services listed. Any additional work, materials, or modifications required at site will be treated as variation work and charged separately.</p>
+
+        <p><strong>6. Warranty</strong><br>
+        {{ doc.custom_warranty or "All equipment supplied is covered under the manufacturer’s standard warranty against manufacturing defects. Warranty does not cover: Physical damage, Power surge, Water damage, Improper usage or handling, Unauthorized repairs or modifications." }}
+        </p>
+
+        <p><strong>7. Software Licensing</strong><br>
+        All software licenses supplied are governed by the manufacturer’s licensing terms. The company is not responsible for limitations or restrictions imposed by the software vendor.</p>
+
+        <p><strong>8. Support & Maintenance</strong><br>
+        Support services are limited to the scope mentioned in the quotation or AMC agreement. Additional support requests outside the scope may be charged separately.</p>
+
+        <p><strong>9. Site Readiness</strong><br>
+        The client must ensure the site is ready for installation, including power availability, network readiness, access permissions, and civil works if required.</p>
+
+        <p><strong>10. Access & Safety</strong><br>
+        The client must provide safe access to the work location and necessary permissions. Any delays due to restricted access or safety issues may affect delivery timelines.</p>
+
+        <p><strong>11. Validity</strong><br>
+        This quotation is valid till {{ frappe.utils.formatdate(doc.valid_till, "dd MMM yyyy") if doc.valid_till else "" }}.</p>
+
+        <p><strong>12. Order Confirmation</strong><br>
+        Work commences upon receipt of an approved LPO/Contract and confirmed payment terms.</p>
+
+        <p><strong>13. Cancellation</strong><br>
+        Confirmed orders may be subject to cancellation charges based on procurement status.</p>
+
+        <p><strong>14. Force Majeure</strong><br>
+        The company shall not be liable for delays or failure in performance due to events beyond reasonable control, including natural disasters, supplier delays, or government restrictions.</p>
+
+        <p><strong>15. Jurisdiction</strong><br>
+        All disputes shall be subject to the jurisdiction of UAE courts.</p>
+
+    </div>
+</div>

@@ -1,0 +1,4 @@
+/* Hide right sidebar by default */
+.layout-side-section.right {
+    display: none;
+}

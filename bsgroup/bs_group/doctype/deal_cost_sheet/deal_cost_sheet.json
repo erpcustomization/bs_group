@@ -1,0 +1,375 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "DCS-.YYYY.-.####",
+ "creation": "2026-01-31 12:06:26.366139",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_giph",
+  "currency",
+  "opportunity",
+  "presales_request",
+  "customer",
+  "site_visit",
+  "project",
+  "column_break_wlnj",
+  "company",
+  "territory",
+  "deal_owner",
+  "apply_exclude_to_all_items",
+  "site_visit_evidence_section",
+  "site_visit_evidence_html",
+  "section_break_dsjr",
+  "document_upload",
+  "get_data",
+  "section_break_jbpa",
+  "subject",
+  "items",
+  "addtional_charges",
+  "resources",
+  "summary_section",
+  "commercial_summary_html",
+  "customer_notes",
+  "commercial_totals_section",
+  "products_cost_total",
+  "services_cost_total",
+  "total_resource_cost",
+  "total_cost",
+  "margin_value",
+  "column_break_ioow",
+  "products_selling_total",
+  "services_selling_total",
+  "total_selling",
+  "margin_percent",
+  "amended_from",
+  "section_break_ozlr",
+  "solution_responsibility_matrix",
+  "solutions",
+  "load_responsibilities",
+  "responsibilities",
+  "section_break_slkq",
+  "scope_overview"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_giph",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "opportunity",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Opportunity",
+   "options": "Opportunity",
+   "reqd": 1
+  },
+  {
+   "fieldname": "presales_request",
+   "fieldtype": "Link",
+   "label": "Presales Request",
+   "options": "Presales Request"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Data",
+   "label": "Customer"
+  },
+  {
+   "fetch_from": "presales_request.site_visit",
+   "fieldname": "site_visit",
+   "fieldtype": "Link",
+   "label": "Site Visit",
+   "options": "Site Visit",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_wlnj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "territory",
+   "fieldtype": "Link",
+   "label": "Territory",
+   "options": "Territory"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "deal_owner",
+   "fieldtype": "Link",
+   "label": "Deal Owner",
+   "options": "User"
+  },
+  {
+   "fieldname": "section_break_jbpa",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Deal Cost Item"
+  },
+  {
+   "fieldname": "resources",
+   "fieldtype": "Table",
+   "label": "Resources",
+   "options": "Deal Cost Resource"
+  },
+  {
+   "fieldname": "summary_section",
+   "fieldtype": "Section Break",
+   "label": "Summary"
+  },
+  {
+   "fieldname": "commercial_summary_html",
+   "fieldtype": "HTML",
+   "label": "Commercial Summary"
+  },
+  {
+   "collapsible": 1,
+   "depends_on": "eval:doc.site_visit",
+   "fieldname": "site_visit_evidence_section",
+   "fieldtype": "Section Break",
+   "label": "Site Visit Evidence"
+  },
+  {
+   "fieldname": "site_visit_evidence_html",
+   "fieldtype": "HTML",
+   "label": "Site Visit Evidence"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "commercial_totals_section",
+   "fieldtype": "Section Break",
+   "label": "Commercial Totals"
+  },
+  {
+   "fieldname": "products_cost_total",
+   "fieldtype": "Currency",
+   "label": "Products Cost Total",
+   "read_only": 1
+  },
+  {
+   "fieldname": "services_cost_total",
+   "fieldtype": "Currency",
+   "label": "Services Cost Total",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_resource_cost",
+   "fieldtype": "Currency",
+   "label": "Total Resource Cost",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_cost",
+   "fieldtype": "Currency",
+   "label": "Total Cost",
+   "read_only": 1
+  },
+  {
+   "fieldname": "margin_value",
+   "fieldtype": "Currency",
+   "label": "Margin Value",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_ioow",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "products_selling_total",
+   "fieldtype": "Currency",
+   "label": "Products Selling Total",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "services_selling_total",
+   "fieldtype": "Currency",
+   "label": "Services Selling Total",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_selling",
+   "fieldtype": "Currency",
+   "label": "Total Selling",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "margin_percent",
+   "fieldtype": "Percent",
+   "label": "Margin Percent",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Deal Cost Sheet",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "apply_exclude_to_all_items",
+   "fieldtype": "Check",
+   "label": "Apply Exclude to all Items"
+  },
+  {
+   "fieldname": "section_break_dsjr",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "document_upload",
+   "fieldtype": "Attach",
+   "label": "Document Upload"
+  },
+  {
+   "fieldname": "get_data",
+   "fieldtype": "Button",
+   "label": "Get Data"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "customer_notes",
+   "fieldtype": "Small Text",
+   "label": "Customer Notes"
+  },
+  {
+   "fieldname": "section_break_ozlr",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "solution_responsibility_matrix",
+   "fieldtype": "HTML",
+   "label": "Solution Responsibility Matrix "
+  },
+  {
+   "fieldname": "solutions",
+   "fieldtype": "Table",
+   "label": "Solutions",
+   "options": "Deal Solution Type"
+  },
+  {
+   "default": "0",
+   "fieldname": "load_responsibilities",
+   "fieldtype": "Button",
+   "label": "Load Responsibilities"
+  },
+  {
+   "fieldname": "responsibilities",
+   "fieldtype": "Table",
+   "label": "Responsibilities",
+   "options": "Solution Responsibility Detail"
+  },
+  {
+   "fieldname": "section_break_slkq",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "scope_overview",
+   "fieldtype": "Text Editor",
+   "label": "Scope Overview"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project",
+   "reqd": 1
+  },
+  {
+   "fieldname": "subject",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Subject",
+   "reqd": 1
+  },
+  {
+   "fieldname": "addtional_charges",
+   "fieldtype": "Table",
+   "label": "Addtional Charges",
+   "options": "Additional Charges Item"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-08-27 19:24:07.859799",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "Deal Cost Sheet",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales User",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Project Manager"
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

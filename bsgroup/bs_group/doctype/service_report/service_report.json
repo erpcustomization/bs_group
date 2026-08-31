@@ -1,0 +1,346 @@
+{
+ "actions": [],
+ "autoname": "SR-.YYYY.-.#####",
+ "creation": "2026-08-14 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_src",
+  "amended_from",
+  "source",
+  "visit_date",
+  "engineer",
+  "column_break_src2",
+  "ticket_section",
+  "ticket",
+  "subject",
+  "customer",
+  "contact",
+  "ppm_section",
+  "ppm_management",
+  "ppm_visit_date",
+  "site_section",
+  "location",
+  "column_break_site",
+  "device_replaced",
+  "report_section",
+  "work_performed",
+  "root_cause",
+  "resolution",
+  "device_section",
+  "serial_no_old",
+  "serial_no_new",
+  "column_break_device",
+  "any_other_materials_used",
+  "materials_used_detail",
+  "review_section",
+  "customer_rating",
+  "customer_feedback",
+  "attachments_section",
+  "attachments",
+  "signoff_section",
+  "engineer_signature",
+  "column_break_sign",
+  "customer_signee_name",
+  "customer_signature",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_src",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Service Report",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "default": "HD Ticket",
+   "fieldname": "source",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Source",
+   "options": "HD Ticket\nPPM Visit",
+   "reqd": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "visit_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Visit Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "engineer",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Engineer",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_src2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "collapsible": 0,
+   "depends_on": "eval:doc.source==\"HD Ticket\"",
+   "fieldname": "ticket_section",
+   "fieldtype": "Section Break",
+   "label": "Helpdesk Ticket"
+  },
+  {
+   "depends_on": "eval:doc.source==\"HD Ticket\"",
+   "fieldname": "ticket",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Ticket",
+   "mandatory_depends_on": "eval:doc.source==\"HD Ticket\"",
+   "options": "HD Ticket"
+  },
+  {
+   "fetch_from": "ticket.subject",
+   "fieldname": "subject",
+   "fieldtype": "Data",
+   "label": "Subject",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "ticket.customer",
+   "fieldname": "customer",
+   "fieldtype": "Data",
+   "label": "Customer",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "ticket.raised_by",
+   "fieldname": "contact",
+   "fieldtype": "Data",
+   "label": "Contact",
+   "read_only": 1
+  },
+  {
+   "collapsible": 0,
+   "depends_on": "eval:doc.source==\"PPM Visit\"",
+   "fieldname": "ppm_section",
+   "fieldtype": "Section Break",
+   "label": "PPM Visit"
+  },
+  {
+   "depends_on": "eval:doc.source==\"PPM Visit\"",
+   "fieldname": "ppm_management",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "PPM Contract",
+   "mandatory_depends_on": "eval:doc.source==\"PPM Visit\"",
+   "options": "PPM Management"
+  },
+  {
+   "depends_on": "eval:doc.source==\"PPM Visit\"",
+   "description": "Must match a Visit Date already scheduled in the linked PPM Contract's PPM Schedule.",
+   "fieldname": "ppm_visit_date",
+   "fieldtype": "Date",
+   "label": "Scheduled Visit Date",
+   "mandatory_depends_on": "eval:doc.source==\"PPM Visit\""
+  },
+  {
+   "fieldname": "site_section",
+   "fieldtype": "Section Break",
+   "label": "Site & Device"
+  },
+  {
+   "fieldname": "location",
+   "fieldtype": "Data",
+   "label": "Location"
+  },
+  {
+   "fieldname": "column_break_site",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "device_replaced",
+   "fieldtype": "Check",
+   "label": "Device Replaced"
+  },
+  {
+   "fieldname": "report_section",
+   "fieldtype": "Section Break",
+   "label": "Issue & Resolution"
+  },
+  {
+   "fieldname": "work_performed",
+   "fieldtype": "Text Editor",
+   "label": "Work Performed",
+   "reqd": 1
+  },
+  {
+   "fieldname": "root_cause",
+   "fieldtype": "Small Text",
+   "label": "Root Cause"
+  },
+  {
+   "fieldname": "resolution",
+   "fieldtype": "Small Text",
+   "label": "Resolution"
+  },
+  {
+   "depends_on": "eval:doc.device_replaced",
+   "fieldname": "device_section",
+   "fieldtype": "Section Break",
+   "label": "Device / Materials"
+  },
+  {
+   "fieldname": "serial_no_old",
+   "fieldtype": "Data",
+   "label": "Serial No (Old)"
+  },
+  {
+   "fieldname": "serial_no_new",
+   "fieldtype": "Data",
+   "label": "Serial No (New)"
+  },
+  {
+   "fieldname": "column_break_device",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "any_other_materials_used",
+   "fieldtype": "Check",
+   "label": "Any Other Materials Used"
+  },
+  {
+   "depends_on": "eval:doc.any_other_materials_used",
+   "fieldname": "materials_used_detail",
+   "fieldtype": "Small Text",
+   "label": "Materials Used - Details"
+  },
+  {
+   "fieldname": "review_section",
+   "fieldtype": "Section Break",
+   "label": "Customer Review"
+  },
+  {
+   "fieldname": "customer_rating",
+   "fieldtype": "Rating",
+   "label": "Customer Rating"
+  },
+  {
+   "fieldname": "customer_feedback",
+   "fieldtype": "Small Text",
+   "label": "Customer Feedback"
+  },
+  {
+   "fieldname": "attachments_section",
+   "fieldtype": "Section Break",
+   "label": "Attachments"
+  },
+  {
+   "fieldname": "attachments",
+   "fieldtype": "Table",
+   "label": "Attachments",
+   "options": "Service Report Attachment"
+  },
+  {
+   "fieldname": "signoff_section",
+   "fieldtype": "Section Break",
+   "label": "Sign-off"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "engineer_signature",
+   "fieldtype": "Signature",
+   "label": "Engineer Signature"
+  },
+  {
+   "fieldname": "column_break_sign",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "customer_signee_name",
+   "fieldtype": "Data",
+   "label": "Customer Name"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "customer_signature",
+   "fieldtype": "Signature",
+   "label": "Customer Signature"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-08-14 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "Service Report",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Projects User",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Projects Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "subject",
+ "track_changes": 1
+}

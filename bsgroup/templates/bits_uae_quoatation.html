@@ -1,0 +1,657 @@
+<!-- ================================================================
+  BITS SECURE IT – ERPNext Quotation Print Format (Jinja2) v4
+  Paste into: Print Format → HTML field
+  Custom Format = Yes | Standard = No
+  
+  - NO logo here — handled by Letterhead (header)
+  - NO footer here — handled by Letterhead (footer)
+  - padding-top on .page clears the letterhead logo on every page
+================================================================ -->
+
+<style>
+    /* ── Mandatory Hiding ─────────────────────────────────────────── */
+    [document-status] {
+        display: none;
+    }
+
+    .print-heading {
+        display: none;
+    }
+
+    /* ── Reset ───────────────────────────────────────────────────── */
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-size: 11pt !important;
+        font-family: "Times New Roman", Times, serif !important;
+    }
+
+    body,
+    p,
+    td,
+    th,
+    div,
+    span,
+    li {
+        font-family: "Times New Roman", Times, serif;
+        font-size: 11pt;
+        color: #1a1a1a;
+        line-height: 1.6;
+    }
+
+    /* ── Page Wrapper ─────────────────────────────────────────────── */
+    .page {
+        width: 100%;
+        /* padding: 28mm 18mm 8mm 18mm; */
+        min-height: 220mm;
+        display: flex;
+        flex-direction: column;
+        page-break-after: always;
+    }
+    .page-number  {     
+          display: none!important;     
+    }
+
+    .page:last-child {
+        page-break-after: auto;
+    }
+
+    /* ── Cover Letter ────────────────────────────────────────────── */
+    .cover-body {
+        flex: 1;
+    }
+
+    .cover-date {
+        font-weight: 700;
+        font-size: 9.5pt;
+        margin-bottom: 18px;
+    }
+
+    .cover-recipient {
+        margin-bottom: 20px;
+    }
+
+    .cust-name {
+        font-weight: 700;
+        font-size: 9.5pt;
+    }
+
+    .cust-contact {
+        font-size: 9.5pt;
+    }
+
+    .cover-subject {
+        font-weight: 700;
+        font-size: 9.5pt;
+        margin-bottom: 20px;
+    }
+
+    .cover-salute {
+        font-weight: 700;
+        font-size: 9.5pt;
+        margin-bottom: 14px;
+    }
+
+    .cover-para {
+        font-size: 9.5pt;
+        margin-bottom: 11px;
+    }
+
+    .cover-closing {
+        margin-top: 20px;
+        margin-bottom: 24px;
+        font-size: 9.5pt;
+    }
+
+    .sig-name {
+        font-weight: 700;
+        font-size: 9.5pt;
+    }
+
+    .sig-title {
+        font-size: 9.5pt;
+    }
+
+    /* ── Quotation Page Header ───────────────────────────────────── */
+    .qt-page-head {
+        display: flex;
+        justify-content: flex-end;
+        /* reference only, no logo */
+        align-items: flex-start;
+        margin-bottom: 14px;
+        border-bottom: 1.5px solid #2e80b7;
+        padding-bottom: 10px;
+    }
+
+    .qt-ref-label {
+        font-size: 8.5pt;
+        color: #555;
+        display: block;
+        text-align: right;
+    }
+
+    .qt-ref-title {
+        font-size: 15pt;
+        font-weight: 700;
+        color: #1a1a1a;
+        line-height: 1.2;
+        text-align: right;
+    }
+
+    /* ── Meta Bar ────────────────────────────────────────────────── */
+    .qt-meta {
+        display: flex;
+        justify-content: space-between;
+        background: #f2f5fa;
+        border-left: 3px solid #2e80b7;
+        padding: 7px 11px;
+        margin-bottom: 14px;
+        font-size: 8.5pt;
+    }
+
+    .qt-meta-lbl {
+        font-weight: 700;
+        color: #2c70ba;
+        margin-right: 4px;
+    }
+
+    /* ── Items Table ─────────────────────────────────────────────── */
+    .items-tbl {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .items-tbl thead tr th {
+        background: #2c70ba;
+        color: #fff;
+        padding: 7px 9px;
+        font-size: 8.5pt;
+        font-weight: 700;
+        text-align: left;
+        border: 1px solid #2c70ba;
+    }
+
+    .items-tbl thead tr th.r {
+        text-align: right;
+    }
+
+    .items-tbl tbody tr.section-row td {
+        background: #d6e4f0;
+        color: #2e80b7;
+        font-weight: 700;
+        text-align: left;
+        font-size: 8.5pt;
+        padding: 5px 9px;
+        border: 1px solid #b0c8dc;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+    }
+
+    .items-tbl tbody tr.item-row td {
+        padding: 7px 9px;
+        border-top: 1px solid #dde3eb;
+        border-bottom: 1px solid #dde3eb;
+        border-left: none;
+        border-right: none;
+        vertical-align: top;
+        font-size: 9pt;
+    }
+
+    .items-tbl tbody tr.item-row:nth-child(even) td {
+        background: #f8f9fb;
+    }
+
+    .item-no {
+        text-align: center;
+        color: #555;
+        width: 4%;
+    }
+
+    .item-desc {
+        width: 56%;
+    }
+
+    .item-name {
+        font-weight: 600;
+        font-size: 8.5pt;
+    }
+
+    .item-sub {
+        font-size: 8pt;
+        color: #555;
+        margin-top: 2px;
+        line-height: 1.4;
+    }
+
+    .item-qty,
+    .item-rate,
+    .item-amt {
+        text-align: right;
+        white-space: nowrap;
+        font-size: 9pt;
+    }
+
+    .item-qty {
+        width: 8%;
+    }
+
+    .item-rate {
+        width: 14%;
+    }
+
+    .item-amt {
+        width: 16%;
+    }
+
+    .items-tbl tr {
+        page-break-inside: avoid;
+    }
+
+    /* ── Totals ──────────────────────────────────────────────────── */
+    .totals-wrap {
+        display: block;
+        width: 100%;
+        margin-top: 4px;
+        margin-bottom: 18px;
+    }
+
+    .totals-tbl {
+        border-collapse: collapse;
+        min-width: 260px;
+        margin-left: auto;
+    }
+
+    .totals-tbl td {
+        padding: 5px 11px;
+        font-size: 9pt;
+        border-bottom: 1px solid #e2e6ec;
+    }
+
+    .totals-tbl .lbl {
+        text-align: left;
+        color: #2c70ba;
+        min-width: 140px;
+    }
+
+    .totals-tbl .amt {
+        text-align: left;
+        min-width: 110px;
+        color: #2c70ba;
+    }
+
+    .totals-tbl tr.grand td {
+        border-top: 2px solid #2e80b7;
+        background: #2e80b7;
+        color: #fff;
+        font-weight: 700;
+        font-size: 9.5pt;
+    }
+
+    /* ── Commercial Summary ──────────────────────────────────────── */
+    .comm-summary {
+        margin-bottom: 16px;
+    }
+
+    .comm-summary h3 {
+        font-size: 9.5pt;
+        font-weight: 400;
+        color: #1a1a1a;
+        margin-bottom: 6px;
+    }
+
+    .comm-tbl {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .comm-tbl thead tr th {
+        background: #2c70ba;
+        color: #fff;
+        padding: 6px 10px;
+        font-size: 8.5pt;
+        font-weight: 700;
+        text-align: left;
+        border: 1px solid #2c70ba;
+    }
+
+    .comm-tbl thead tr th.r {
+        text-align: right;
+    }
+
+    .comm-tbl tbody tr td {
+        padding: 6px 10px;
+        font-size: 9pt;
+        border-bottom: 1px solid #dde3eb;
+    }
+
+    .comm-tbl tbody tr.comm-data td.r {
+        text-align: right;
+    }
+
+    .comm-tbl tbody tr.comm-total {
+        border-top: 2px solid #2c70ba;
+    }
+
+    .comm-tbl tbody tr.comm-total td {
+        font-weight: 700;
+        font-size: 9.5pt;
+        background: #f2f5fa;
+        color: #2c70ba;
+    }
+
+    .comm-tbl tbody tr.comm-total td.r {
+        text-align: right;
+    }
+
+    /* ── Notes ───────────────────────────────────────────────────── */
+    .notes-box {
+        margin-top: 12px;
+        padding: 9px 12px;
+        background: #fffbec;
+        border-left: 3px solid #c8a800;
+    }
+
+    .notes-hdr {
+        font-weight: 700;
+        font-size: 8.5pt;
+        color: #7a6300;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        margin-bottom: 4px;
+    }
+
+    .notes-txt {
+        font-size: 8.5pt;
+        color: #444;
+    }
+
+    /* ── Terms ───────────────────────────────────────────────────── */
+    .terms-wrap {
+        /* padding: 28mm 18mm 8mm 18mm; */
+        orphans: 3;
+        widows: 3;
+        margin-top: 150px;
+    }
+
+    .terms-title {
+        font-size: 18pt;
+        font-weight: 700;
+        color: #1a1a1a;
+        margin-bottom: 25px;
+    }
+
+    .terms-body {
+        font-size: 10pt;
+        line-height: 1.6;
+    }
+
+    .terms-body p {
+        margin-bottom: 15px;
+    }
+
+    .terms-body ul,
+    .terms-body ol {
+        margin-left: 18px;
+        margin-bottom: 8px;
+    }
+
+    .terms-body li {
+        margin-bottom: 4px;
+    }
+
+    .terms-body h1,
+    .terms-body h2,
+    .terms-body h3,
+    .terms-body h4 {
+        page-break-after: avoid;
+        margin-bottom: 10px;
+    }
+
+    /* ── Print ───────────────────────────────────────────────────── */
+    @media print {
+        .page {
+            page-break-after: always;
+        }
+
+        .page:last-child {
+            page-break-after: auto;
+        }
+
+        .items-tbl tr {
+            page-break-inside: avoid;
+        }
+
+        .terms-body h1,
+        .terms-body h2,
+        .terms-body h3,
+        .terms-body h4 {
+            page-break-after: avoid;
+        }
+    }
+</style>
+
+<!-- <div style="width: 100%;float: left;">
+    <img src="/files/BITS_logo_High%20Resolution.png" alt="" style="width: 30%;">
+</div> -->
+
+{# COVER LETTER #}
+<div class="page">
+    <img src="/files/BITS_logo_High%20Resolution.png" alt="" style="width: 30%;margin-bottom: 21px !important;">
+    <div class="cover-body">
+        <p class="cover-date" style="margin-top: 30px;">
+            Date: {{ frappe.utils.formatdate(doc.transaction_date, "dd MMM yyyy") }}
+        </p>
+        <div class="cover-recipient">
+            <p class="cust-name" style="margin-top: 30px;">
+                {{ doc.custom_organization_name }}
+            </p>
+            {% if doc.custom_organization_name == doc.party_name %}
+                {% if doc.contact_person %}
+                    <p class="cust-contact">
+                        {{ frappe.db.get_value("Contact", doc.contact_person, "first_name") or doc.contact_person }}
+                    </p>
+                {% endif %}
+            {% else %}
+                <p class="cust-name">
+                    {{ doc.custom_contact_person_name or doc.party_name }}
+                </p>
+            {% endif %}
+        </div>
+        <p class="cover-subject" style="margin-top: 30px;">Subject: {{ doc.custom_subject }}
+        </p>
+        <p class="cover-salute" style="margin-top: 30px;">
+            {% if doc.contact_person %}Dear {{ doc.contact_person }},{% else %}Dear Sir / Madam,{% endif %}
+        </p>
+        <p class="cover-para" style="margin-top: 30px;">Thank you for considering us in the BID.</p>
+        <p class="cover-para" style="margin-top: 20px;">
+            We are excited about the possibility of working with you and believe we can be a valuable asset to your
+            team.
+            We believe that our proposal outlines a comprehensive approach to achieving your goals. We appreciate your
+            time
+            and look forward to discussing our proposal in more detail.
+        </p>
+        <p class="cover-para" style="margin-top: 20px;">Thank you again for your consideration of our proposal.</p>
+        <div class="cover-closing" style="margin-top: 30px;">With Regards,</div>
+        {% set emp = frappe.db.get_value("Employee", {"user_id": doc.owner}, ["employee_name"], as_dict=1) %}
+        <p class="sig-name" style="margin-top: 30px;">
+            {{ emp.employee_name if emp else doc.owner }}
+        </p>
+        <p class="sig-title">
+            {{ doc.custom_designation or "" }}
+        </p>
+    </div>
+</div>
+
+{# QUOTATION DETAILS #}
+<div class="page" style="margin-top: 130px;">
+    <div class="qt-page-head">
+        <div>
+            <span class="qt-ref-label">Reference# : {{ doc.name }}</span>
+            <!-- <span class="qt-ref-title"></span> -->
+        </div>
+    </div>
+
+    <!-- <div class="qt-meta">
+        <div>
+            <span class="qt-meta-lbl">QT No:</span>{{ doc.name }}
+            &nbsp;&nbsp;
+            <span class="qt-meta-lbl">Bill To:</span>{{ doc.customer_name or doc.party_name }}
+        </div>
+        <div style="text-align:right;">
+            <span class="qt-meta-lbl">Date:</span>{{ frappe.utils.formatdate(doc.transaction_date, "dd MMM yyyy") }}
+            {% if doc.valid_till %}
+            &nbsp;&nbsp;
+            <span class="qt-meta-lbl">Valid Till:</span>{{ frappe.utils.formatdate(doc.valid_till, "dd MMM yyyy") }}
+            {% endif %}
+        </div>
+    </div> -->
+
+    <table class="items-tbl">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Item &amp; Description</th>
+                <th class="r">Qty</th>
+                <th class="r">Rate</th>
+                <th class="r">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in doc.items %}
+            {% if item.custom_header %}
+            <tr class="section-row">
+                <td colspan="5">{{ item.custom_header }}</td>
+            </tr>
+            {% endif %}
+            <tr class="item-row">
+                <td class="item-no">{{ loop.index }}</td>
+                <td class="item-desc">
+                    <div class="item-name">{{ item.custom_customer_item_name or item.item_name }}</div>
+                    {% if item.description and item.description != item.item_name %}
+                    <div class="item-sub">{{ item.description | replace('\n','<br>') }}</div>
+                    {% endif %}
+                </td>
+                <td class="item-qty">{{ "%.2f"|format(item.qty) if item.qty != item.qty|int else item.qty|int }}</td>
+                <td class="item-rate">{{ "{:,.2f}".format(item.rate) }}</td>
+                <td class="item-amt">{{ "{:,.2f}".format(item.amount) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="totals-wrap">
+        <table class="totals-tbl">
+            <tr>
+                <td class="lbl">Sub Total</td>
+                <td class="amt">{{ "{:,.2f}".format(doc.total) }}</td>
+            </tr>
+            {% if doc.discount_amount and doc.discount_amount > 0 %}
+            <tr>
+                <td class="lbl">Discount</td>
+                <td class="amt">- {{ "{:,.2f}".format(doc.discount_amount) }}</td>
+            </tr>
+            {% endif %}
+            {% if doc.total_taxes_and_charges and doc.total_taxes_and_charges > 0 %}
+            <tr>
+                <td class="lbl">VAT (5%)</td>
+                <td class="amt">{{ "{:,.2f}".format(doc.total_taxes_and_charges) }}</td>
+            </tr>
+            {% endif %}
+            <tr class="grand">
+                <td class="lbl">Total</td>
+                <td class="amt">{{ doc.currency }} {{ "{:,.2f}".format(doc.grand_total) }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="comm-summary">
+        <h3>Commercial Summary</h3>
+        <table class="comm-tbl">
+            <thead>
+                <tr>
+                    <th>Tax Details</th>
+                    <th class="r">VAT Amount</th>
+                    <th class="r">Total Amount ({{ doc.currency }})</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="comm-data">
+                    <td>VAT (5%)</td>
+                    <td class="r">{{ "{:,.2f}".format(doc.total_taxes_and_charges or 0) }}</td>
+                    <td class="r">{{ "{:,.2f}".format(doc.grand_total) }}</td>
+                </tr>
+                <tr class="comm-total">
+                    <td><strong>Total</strong></td>
+                    <td class="r"><strong>{{ doc.currency }} {{ "{:,.2f}".format(doc.total_taxes_and_charges or 0)
+                            }}</strong></td>
+                    <td class="r"><strong>{{ doc.currency }} {{ "{:,.2f}".format(doc.grand_total) }}</strong></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    {% if doc.custom_customer_notes %}
+    <div>
+        <div class="notes-hdr">Notes</div>
+        <div class="notes-txt">{{ doc.custom_customer_notes }}</div>
+    </div>
+    {% endif %}
+</div>
+
+
+<div style="page-break-before: always;"></div>
+<div class="terms-wrap">
+    <div class="terms-title">Terms</div>
+
+    <div class="terms-body">
+
+        <p><strong>1. Prices</strong><br>
+        All prices are quoted in AED and are exclusive of VAT unless otherwise stated. VAT will be charged as applicable under UAE tax regulations.</p>
+
+        <p><strong>2. Payment Terms</strong><br>
+        Payment shall be made as per the agreed Payment Terms {{ doc.custom_payment_terms or "" }}. Work, delivery, or procurement may commence only after receipt of the agreed advance payment.</p>
+
+        <p><strong>3. Delivery</strong><br>
+        {{ doc.custom_delivery_terms or "Delivery timelines are estimated and subject to product availability from suppliers. Delays caused by manufacturers, logistics, or force majeure conditions are beyond our control." }}
+        </p>
+
+        <p><strong>4. Installation & Commissioning</strong><br>
+        Installation and commissioning are not included unless explicitly mentioned in the quotation. Any additional work requested by the client outside the quoted scope will be charged separately.</p>
+
+        <p><strong>5. Scope of Work</strong><br>
+        This quotation is strictly limited to the items and services listed. Any additional work, materials, or modifications required at site will be treated as variation work and charged separately.</p>
+
+        <p><strong>6. Warranty</strong><br>
+        {{ doc.custom_warranty or "All equipment supplied is covered under the manufacturer’s standard warranty against manufacturing defects. Warranty does not cover: Physical damage, Power surge, Water damage, Improper usage or handling, Unauthorized repairs or modifications." }}
+        </p>
+
+        <p><strong>7. Software Licensing</strong><br>
+        All software licenses supplied are governed by the manufacturer’s licensing terms. The company is not responsible for limitations or restrictions imposed by the software vendor.</p>
+
+        <p><strong>8. Support & Maintenance</strong><br>
+        Support services are limited to the scope mentioned in the quotation or AMC agreement. Additional support requests outside the scope may be charged separately.</p>
+
+        <p><strong>9. Site Readiness</strong><br>
+        The client must ensure the site is ready for installation, including power availability, network readiness, access permissions, and civil works if required.</p>
+
+        <p><strong>10. Access & Safety</strong><br>
+        The client must provide safe access to the work location and necessary permissions. Any delays due to restricted access or safety issues may affect delivery timelines.</p>
+
+        <p><strong>11. Validity</strong><br>
+        This quotation is valid till {{ frappe.utils.formatdate(doc.valid_till, "dd MMM yyyy") if doc.valid_till else "" }}.</p>
+
+        <p><strong>12. Order Confirmation</strong><br>
+        Work will commence only upon receipt of: Approved Purchase Order, Signed Quotation, and agreed advance payment.</p>
+
+        <p><strong>13. Cancellation</strong><br>
+        Orders once confirmed may be subject to cancellation charges depending on procurement status.</p>
+
+        <p><strong>14. Force Majeure</strong><br>
+        The company shall not be liable for delays or failure in performance due to events beyond reasonable control, including natural disasters, supplier delays, or government restrictions.</p>
+
+        <p><strong>15. Jurisdiction</strong><br>
+        All disputes shall be subject to the jurisdiction of UAE courts.</p>
+
+    </div>
+</div>

@@ -1,0 +1,91 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "creation": "2026-08-10 13:03:27.724874",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "month",
+  "invoiced_sales_revenue",
+  "invoiced_sales_gp",
+  "booked_sales_revenue",
+  "booked_sales_gp",
+  "invoiced_gp_pct",
+  "booked_gp_pct",
+  "comments",
+  "status"
+ ],
+ "fields": [
+  {
+   "fieldname": "month",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Month",
+   "options": "January\nFebruary\nMarch\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember",
+   "reqd": 1
+  },
+  {
+   "fieldname": "invoiced_sales_revenue",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Invoiced Sales Revenue"
+  },
+  {
+   "fieldname": "invoiced_sales_gp",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Invoiced Sales GP"
+  },
+  {
+   "fieldname": "booked_sales_revenue",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Booked Sales Revenue"
+  },
+  {
+   "fieldname": "booked_sales_gp",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Booked Sales GP"
+  },
+  {
+   "fieldname": "invoiced_gp_pct",
+   "fieldtype": "Percent",
+   "label": "Invoiced GP %"
+  },
+  {
+   "fieldname": "booked_gp_pct",
+   "fieldtype": "Percent",
+   "label": "Booked GP %"
+  },
+  {
+   "fieldname": "comments",
+   "fieldtype": "Small Text",
+   "label": "Comments"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Not Entered\nDraft\nSaved"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-10 14:19:46.597907",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "Sales Target GP Month",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

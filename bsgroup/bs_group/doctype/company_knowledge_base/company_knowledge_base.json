@@ -1,0 +1,254 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-06-25 10:11:03.778847",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sb_meta",
+  "kb_version",
+  "last_updated_by",
+  "cb_k1",
+  "last_updated_on",
+  "is_active",
+  "sb_overview",
+  "company_legal_name",
+  "company_short_name",
+  "company_overview",
+  "company_size",
+  "years_in_business",
+  "sb_geo",
+  "primary_geographies",
+  "secondary_geographies",
+  "sb_verticals",
+  "verticals",
+  "sb_partners",
+  "partners",
+  "sb_strengths",
+  "core_strengths",
+  "differentiators",
+  "cb_k2",
+  "certifications",
+  "awards",
+  "sb_idealcustomer",
+  "icp_description",
+  "disqualifiers",
+  "sb_competitors",
+  "known_competitors"
+ ],
+ "fields": [
+  {
+   "fieldname": "sb_meta",
+   "fieldtype": "Section Break",
+   "label": "Knowledge Base Metadata"
+  },
+  {
+   "default": "1.0",
+   "description": "Bump on every meaningful change. Used in audit logs.",
+   "fieldname": "kb_version",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "KB Version",
+   "reqd": 1
+  },
+  {
+   "fieldname": "last_updated_by",
+   "fieldtype": "Link",
+   "label": "Last Updated By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb_k1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "last_updated_on",
+   "fieldtype": "Datetime",
+   "label": "Last Updated On",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Active"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sb_overview",
+   "fieldtype": "Section Break",
+   "label": "Company Overview"
+  },
+  {
+   "fieldname": "company_legal_name",
+   "fieldtype": "Data",
+   "label": "Company Legal Name"
+  },
+  {
+   "fieldname": "company_short_name",
+   "fieldtype": "Data",
+   "label": "Short Name / Brand"
+  },
+  {
+   "description": "Plain-language summary fed into AI prompt",
+   "fieldname": "company_overview",
+   "fieldtype": "Text Editor",
+   "label": "Company Overview"
+  },
+  {
+   "fieldname": "company_size",
+   "fieldtype": "Data",
+   "label": "Company Size"
+  },
+  {
+   "fieldname": "years_in_business",
+   "fieldtype": "Int",
+   "label": "Years in Business"
+  },
+  {
+   "fieldname": "sb_geo",
+   "fieldtype": "Section Break",
+   "label": "Geographies"
+  },
+  {
+   "description": "Comma-separated, e.g. UAE, KSA, Oman, Qatar",
+   "fieldname": "primary_geographies",
+   "fieldtype": "Small Text",
+   "label": "Primary Geographies"
+  },
+  {
+   "fieldname": "secondary_geographies",
+   "fieldtype": "Small Text",
+   "label": "Secondary Geographies"
+  },
+  {
+   "fieldname": "sb_verticals",
+   "fieldtype": "Section Break",
+   "label": "Verticals We Serve"
+  },
+  {
+   "fieldname": "verticals",
+   "fieldtype": "Table",
+   "label": "Verticals",
+   "options": "Company Vertical Row"
+  },
+  {
+   "fieldname": "sb_partners",
+   "fieldtype": "Section Break",
+   "label": "Strategic Partners & Vendors"
+  },
+  {
+   "fieldname": "partners",
+   "fieldtype": "Table",
+   "label": "Partners",
+   "options": "Company Partner Row"
+  },
+  {
+   "fieldname": "sb_strengths",
+   "fieldtype": "Section Break",
+   "label": "Strengths & Differentiators"
+  },
+  {
+   "description": "Bullet our top capabilities; AI matches lead requirements against these",
+   "fieldname": "core_strengths",
+   "fieldtype": "Text Editor",
+   "label": "Core Strengths"
+  },
+  {
+   "fieldname": "differentiators",
+   "fieldtype": "Text Editor",
+   "label": "Differentiators vs Competitors"
+  },
+  {
+   "fieldname": "cb_k2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "certifications",
+   "fieldtype": "Small Text",
+   "label": "Certifications & Accreditations"
+  },
+  {
+   "fieldname": "awards",
+   "fieldtype": "Small Text",
+   "label": "Awards & Recognitions"
+  },
+  {
+   "fieldname": "sb_idealcustomer",
+   "fieldtype": "Section Break",
+   "label": "Ideal Customer Profile"
+  },
+  {
+   "fieldname": "icp_description",
+   "fieldtype": "Text Editor",
+   "label": "ICP Description"
+  },
+  {
+   "description": "Sender domains / signals that should mark a lead Disqualified",
+   "fieldname": "disqualifiers",
+   "fieldtype": "Small Text",
+   "label": "Auto-Disqualifiers"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sb_competitors",
+   "fieldtype": "Section Break",
+   "label": "Known Competitors"
+  },
+  {
+   "description": "Comma-separated; AI flags when these names appear in inbound emails",
+   "fieldname": "known_competitors",
+   "fieldtype": "Small Text",
+   "label": "Known Competitors"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-06-25 10:11:03.778847",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "Company Knowledge Base",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Sales Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Sales User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

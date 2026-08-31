@@ -1,0 +1,183 @@
+{
+ "actions": [],
+ "autoname": "LPRE-.YYYY.-.####",
+ "creation": "2026-01-27 15:02:15.945825",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_gm9w",
+  "amended_from",
+  "source",
+  "reference",
+  "task",
+  "column_break_ixxa",
+  "cost_center",
+  "company",
+  "section_break_isqw",
+  "labor_line_items",
+  "section_break_avbw",
+  "total_persons",
+  "total_labor_cost",
+  "approved_person_days",
+  "column_break_qvyy",
+  "remaining_persons",
+  "pending_attendance",
+  "section_break_euqw",
+  "labor_preapproval_html"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_gm9w",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Labor Preapproval",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "default": "Project",
+   "fieldname": "source",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Source",
+   "options": "Project\nHD Ticket",
+   "reqd": 1
+  },
+  {
+   "fieldname": "reference",
+   "fieldtype": "Dynamic Link",
+   "in_list_view": 1,
+   "label": "Project / Ticket",
+   "options": "source",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.source==\"Project\"",
+   "fieldname": "task",
+   "fieldtype": "Link",
+   "label": "Task",
+   "mandatory_depends_on": "eval:doc.source==\"Project\"",
+   "options": "Task"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "cost_center",
+   "fieldtype": "Link",
+   "label": "Cost Center",
+   "options": "Cost Center",
+   "read_only": 1
+  },
+  {
+   "fieldname": "labor_line_items",
+   "fieldtype": "Table",
+   "label": "Labor Line Item",
+   "options": "Labor Line Item"
+  },
+  {
+   "fieldname": "total_persons",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Total Persons",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_labor_cost",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Total Labor Cost",
+   "read_only": 1
+  },
+  {
+   "description": "SUM(no_of_persons \u00d7 days) across all Labor Line Items. Authoritative capacity ceiling for Labor Attendance consumption.",
+   "fieldname": "approved_person_days",
+   "fieldtype": "Int",
+   "label": "Approved Person-Days",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_ixxa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_isqw",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "section_break_avbw",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "Legacy field, retained for historical records only. Not the authoritative capacity mechanism - remaining person-days/cost are derived live from Labor Attendance/Labor Payment Voucher.",
+   "fieldname": "remaining_persons",
+   "fieldtype": "Int",
+   "label": "Remaining Persons (Legacy)",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_qvyy",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Of what has been scheduled (Tech Task Scheduler) against this Labor Preapproval, how many person-days still have no submitted Labor Attendance. Auto-updated on Labor Attendance submit/cancel.",
+   "fieldname": "pending_attendance",
+   "fieldtype": "Int",
+   "label": "Pending Attendance",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_euqw",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "labor_preapproval_html",
+   "fieldtype": "HTML",
+   "label": "Labor Preapproval HTML"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-08-28 14:11:48.466456",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "Labor Preapproval",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "mohan@bitssecureit.com",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

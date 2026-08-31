@@ -1,0 +1,243 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "creation": "2026-05-07 15:40:40.555262",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "provider_section",
+  "ai_provider",
+  "col1",
+  "is_enabled",
+  "model_section",
+  "ai_model",
+  "col2",
+  "api_key",
+  "azure_section",
+  "azure_endpoint",
+  "col3",
+  "azure_api_version",
+  "ollama_section",
+  "ollama_url",
+  "behaviour_section",
+  "max_tokens",
+  "col4",
+  "fallback_to_rules",
+  "fallback_section",
+  "fallback_provider",
+  "fallback_col",
+  "fallback_model",
+  "fallback_api_key",
+  "status_section",
+  "gateway_status",
+  "status_col",
+  "active_provider_display",
+  "last_used",
+  "col5",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "provider_section",
+   "fieldtype": "Section Break",
+   "label": "AI Provider Configuration"
+  },
+  {
+   "default": "Anthropic (Claude)",
+   "description": "Select your AI provider. To switch providers, change this field and update the API key below.",
+   "fieldname": "ai_provider",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "AI Provider",
+   "options": "Anthropic (Claude)\nOpenAI (GPT)\nAzure OpenAI\nGoogle Gemini\nOllama (Local)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "col1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "Turn AI analysis on or off. When off, rule-based analysis is used instead.",
+   "fieldname": "is_enabled",
+   "fieldtype": "Check",
+   "label": "Enable AI Analysis"
+  },
+  {
+   "fieldname": "model_section",
+   "fieldtype": "Section Break",
+   "label": "Model & Authentication"
+  },
+  {
+   "default": "claude-3-5-haiku-20241022",
+   "description": "Anthropic: claude-3-5-haiku-20241022 | OpenAI: gpt-4o-mini | Azure: your deployment name | Gemini: gemini-1.5-flash",
+   "fieldname": "ai_model",
+   "fieldtype": "Data",
+   "label": "Model Name"
+  },
+  {
+   "fieldname": "col2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Stored encrypted. Never exposed to browser. Anthropic: sk-ant-api03-... | OpenAI: sk-...",
+   "fieldname": "api_key",
+   "fieldtype": "Password",
+   "label": "API Key"
+  },
+  {
+   "fieldname": "azure_section",
+   "fieldtype": "Section Break",
+   "label": "Azure OpenAI (only if using Azure)"
+  },
+  {
+   "depends_on": "eval:doc.ai_provider==\"Azure OpenAI\"",
+   "description": "e.g. https://your-resource.openai.azure.com",
+   "fieldname": "azure_endpoint",
+   "fieldtype": "Data",
+   "label": "Azure Endpoint URL"
+  },
+  {
+   "fieldname": "col3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "2024-02-01",
+   "depends_on": "eval:doc.ai_provider==\"Azure OpenAI\"",
+   "fieldname": "azure_api_version",
+   "fieldtype": "Data",
+   "label": "API Version"
+  },
+  {
+   "fieldname": "ollama_section",
+   "fieldtype": "Section Break",
+   "label": "Ollama / Local LLM (only if using Ollama)"
+  },
+  {
+   "default": "http://localhost:11434",
+   "depends_on": "eval:doc.ai_provider==\"Ollama (Local)\"",
+   "fieldname": "ollama_url",
+   "fieldtype": "Data",
+   "label": "Ollama Base URL"
+  },
+  {
+   "fieldname": "behaviour_section",
+   "fieldtype": "Section Break",
+   "label": "Behaviour"
+  },
+  {
+   "default": "2000",
+   "description": "Keep under 4000. Higher = more detailed analysis but slower and more expensive.",
+   "fieldname": "max_tokens",
+   "fieldtype": "Int",
+   "label": "Max Tokens per Request"
+  },
+  {
+   "fieldname": "col4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "If AI API call fails, automatically fall back to rule-based analysis instead of showing an error.",
+   "fieldname": "fallback_to_rules",
+   "fieldtype": "Check",
+   "label": "Fallback to Rule-Based if AI Fails"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "fallback_section",
+   "fieldtype": "Section Break",
+   "label": "ChatGPT Fallback (if primary AI fails)"
+  },
+  {
+   "description": "If primary AI fails, automatically try this provider",
+   "fieldname": "fallback_provider",
+   "fieldtype": "Select",
+   "label": "Fallback Provider",
+   "options": "\nOpenAI (ChatGPT)"
+  },
+  {
+   "fieldname": "fallback_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "gpt-4o-mini",
+   "description": "OpenAI model to use for fallback (e.g. gpt-4o-mini, gpt-4o)",
+   "fieldname": "fallback_model",
+   "fieldtype": "Data",
+   "label": "Fallback Model"
+  },
+  {
+   "description": "OpenAI API key. Stored encrypted. Starts with sk-...",
+   "fieldname": "fallback_api_key",
+   "fieldtype": "Password",
+   "label": "Fallback API Key (OpenAI)"
+  },
+  {
+   "fieldname": "status_section",
+   "fieldtype": "Section Break",
+   "label": "Status & Notes"
+  },
+  {
+   "description": "Live status updated on every AI call",
+   "fieldname": "gateway_status",
+   "fieldtype": "Data",
+   "label": "Gateway Status",
+   "read_only": 1
+  },
+  {
+   "fieldname": "status_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Which provider handled the last request",
+   "fieldname": "active_provider_display",
+   "fieldtype": "Data",
+   "label": "Active Provider",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_used",
+   "fieldtype": "Datetime",
+   "label": "Last Used",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col5",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Internal notes about provider contract, cost centre, etc.",
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Admin Notes"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-08-21 12:18:58.149137",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "AI Provider Settings",
+ "owner": "mohan@bitssecureit.com",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

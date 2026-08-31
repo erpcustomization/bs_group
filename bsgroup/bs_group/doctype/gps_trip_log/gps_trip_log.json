@@ -1,0 +1,323 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-06-25 09:55:31.630183",
+ "default_view": "List",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "trip_section",
+  "trip_date",
+  "vehicle",
+  "col1",
+  "employee",
+  "employee_name",
+  "times_section",
+  "ignition_on",
+  "first_stop_time",
+  "col2",
+  "last_ignition_on",
+  "ignition_off",
+  "distance_section",
+  "total_distance",
+  "drive_time_minutes",
+  "longest_idle_duration",
+  "col3",
+  "total_stops",
+  "on_site_time_minutes",
+  "overnight_stay",
+  "alerts_section",
+  "max_speed",
+  "overspeed_count",
+  "col4",
+  "total_alerts",
+  "alert_summary",
+  "locations_section",
+  "start_location",
+  "end_location",
+  "col5",
+  "key_stops",
+  "erp_section",
+  "matched_task",
+  "matched_project",
+  "col6",
+  "match_confidence",
+  "dispatch_flag",
+  "ai_section",
+  "ai_suggestion",
+  "col7",
+  "ai_confidence_score",
+  "ai_analysed_on",
+  "raw_section",
+  "raw_json"
+ ],
+ "fields": [
+  {
+   "fieldname": "trip_section",
+   "fieldtype": "Section Break",
+   "label": "Trip Identity"
+  },
+  {
+   "fieldname": "trip_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Trip Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "vehicle",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Vehicle (License Plate)",
+   "options": "Vehicle",
+   "reqd": 1
+  },
+  {
+   "fieldname": "col1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Driver / Engineer",
+   "options": "Employee"
+  },
+  {
+   "fetch_from": "employee.employee_name",
+   "fieldname": "employee_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Driver Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "times_section",
+   "fieldtype": "Section Break",
+   "label": "Trip Times"
+  },
+  {
+   "fieldname": "ignition_on",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Ignition ON (First Start)"
+  },
+  {
+   "fieldname": "first_stop_time",
+   "fieldtype": "Datetime",
+   "label": "First Stop Time"
+  },
+  {
+   "fieldname": "col2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "last_ignition_on",
+   "fieldtype": "Datetime",
+   "label": "Last Ignition ON"
+  },
+  {
+   "fieldname": "ignition_off",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Last Ignition OFF"
+  },
+  {
+   "fieldname": "distance_section",
+   "fieldtype": "Section Break",
+   "label": "Distance & Drive Time"
+  },
+  {
+   "fieldname": "total_distance",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Total Distance (km)"
+  },
+  {
+   "fieldname": "drive_time_minutes",
+   "fieldtype": "Int",
+   "label": "Total Drive Time (min)"
+  },
+  {
+   "description": "e.g. 11m 22s",
+   "fieldname": "longest_idle_duration",
+   "fieldtype": "Data",
+   "label": "Longest Idle Duration"
+  },
+  {
+   "fieldname": "col3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_stops",
+   "fieldtype": "Int",
+   "label": "Total Stops"
+  },
+  {
+   "fieldname": "on_site_time_minutes",
+   "fieldtype": "Int",
+   "label": "On-Site Time (min)"
+  },
+  {
+   "default": "0",
+   "fieldname": "overnight_stay",
+   "fieldtype": "Check",
+   "label": "Overnight Stay"
+  },
+  {
+   "fieldname": "alerts_section",
+   "fieldtype": "Section Break",
+   "label": "Speed & Alerts"
+  },
+  {
+   "fieldname": "max_speed",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Max Speed (km/h)"
+  },
+  {
+   "fieldname": "overspeed_count",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Overspeed Events"
+  },
+  {
+   "fieldname": "col4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_alerts",
+   "fieldtype": "Int",
+   "label": "Total Alerts"
+  },
+  {
+   "fieldname": "alert_summary",
+   "fieldtype": "Small Text",
+   "label": "Alert Summary"
+  },
+  {
+   "fieldname": "locations_section",
+   "fieldtype": "Section Break",
+   "label": "Locations"
+  },
+  {
+   "fieldname": "start_location",
+   "fieldtype": "Data",
+   "label": "Start Location"
+  },
+  {
+   "fieldname": "end_location",
+   "fieldtype": "Data",
+   "label": "End Location"
+  },
+  {
+   "fieldname": "col5",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Comma separated list of notable stops",
+   "fieldname": "key_stops",
+   "fieldtype": "Small Text",
+   "label": "Key Stops / Sites Visited"
+  },
+  {
+   "fieldname": "erp_section",
+   "fieldtype": "Section Break",
+   "label": "ERPNext Integration"
+  },
+  {
+   "fieldname": "matched_task",
+   "fieldtype": "Link",
+   "label": "Matched Task",
+   "options": "Task"
+  },
+  {
+   "fieldname": "matched_project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "col6",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "match_confidence",
+   "fieldtype": "Select",
+   "label": "Match Confidence",
+   "options": "High\nPartial\nUnmatched\nManually Assigned"
+  },
+  {
+   "fieldname": "dispatch_flag",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Dispatch Flag",
+   "options": "\nCorrect Territory\nWrong Territory\nNearest Engineer Not Used\nUnassigned"
+  },
+  {
+   "fieldname": "ai_section",
+   "fieldtype": "Section Break",
+   "label": "AI Analysis"
+  },
+  {
+   "fieldname": "ai_suggestion",
+   "fieldtype": "Long Text",
+   "label": "AI Dispatch Suggestion",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col7",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ai_confidence_score",
+   "fieldtype": "Int",
+   "label": "AI Confidence (%)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_analysed_on",
+   "fieldtype": "Datetime",
+   "label": "AI Analysed On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "raw_section",
+   "fieldtype": "Section Break",
+   "label": "Raw Data"
+  },
+  {
+   "fieldname": "raw_json",
+   "fieldtype": "Code",
+   "label": "Raw GPS Data (JSON)",
+   "options": "JSON"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-06-25 09:55:31.630183",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "GPS Trip Log",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -1,0 +1,29 @@
+{
+ "content": null,
+ "creation": "2026-04-07 11:45:29.821480",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-04-07 13:33:51.559965",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "presales-request-das",
+ "owner": "Administrator",
+ "page_name": "presales-request-das",
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "Sales User"
+  },
+  {
+   "role": "Sales Manager"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 0,
+ "title": "Presales Request Dashboard"
+}

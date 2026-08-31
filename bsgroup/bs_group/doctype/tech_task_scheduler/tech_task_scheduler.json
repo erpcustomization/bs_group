@@ -1,0 +1,70 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "TTS-.YYYY.-.######",
+ "creation": "2026-04-28 13:36:43.310289",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_k5br",
+  "amended_from",
+  "tech_task_scheduler",
+  "tech_task_scheduler_list"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_k5br",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Tech Task Scheduler",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "tech_task_scheduler_list",
+   "fieldtype": "Table",
+   "label": "Tech Task Scheduler List",
+   "options": "Tech Task Scheduler List"
+  },
+  {
+   "fieldname": "tech_task_scheduler",
+   "fieldtype": "HTML",
+   "label": "Tech Task Scheduler"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-04-29 09:51:53.896107",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "Tech Task Scheduler",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

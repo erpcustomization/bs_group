@@ -1,0 +1,304 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:lead",
+ "creation": "2026-06-25 10:10:40.982641",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "lead",
+  "kb_version_used",
+  "rubric_snapshot",
+  "cb_e1",
+  "last_enriched_on",
+  "enrichment_status",
+  "sb_extracted",
+  "extracted_phone_primary",
+  "extracted_phone_mobile",
+  "extracted_job_title",
+  "cb_e2",
+  "extracted_industry",
+  "extracted_company_size",
+  "extracted_geography",
+  "sb_scoring",
+  "score_geo",
+  "score_vertical",
+  "score_partner",
+  "score_rfq_size",
+  "cb_e3",
+  "score_urgency",
+  "score_repeat",
+  "score_signal",
+  "score_total",
+  "sb_ai_text",
+  "ai_reasoning_summary",
+  "ai_strengths_detail",
+  "ai_gaps_detail",
+  "ai_competitor_mentions",
+  "sb_rfq",
+  "rfq_line_items",
+  "sb_audit",
+  "ai_raw_response"
+ ],
+ "fields": [
+  {
+   "fieldname": "lead",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Lead",
+   "options": "Lead",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "kb_version_used",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "KB Version Used",
+   "read_only": 1
+  },
+  {
+   "description": "Rubric version used at scoring time",
+   "fieldname": "rubric_snapshot",
+   "fieldtype": "Data",
+   "label": "Rubric Snapshot",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb_e1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "last_enriched_on",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Last Enriched On",
+   "read_only": 1
+  },
+  {
+   "default": "Pending",
+   "fieldname": "enrichment_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Enrichment Status",
+   "options": "Pending\nIn Progress\nApplied\nLow Confidence\nFailed\nDisabled",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sb_extracted",
+   "fieldtype": "Section Break",
+   "label": "Extracted Contact"
+  },
+  {
+   "fieldname": "extracted_phone_primary",
+   "fieldtype": "Data",
+   "label": "Phone (Primary)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "extracted_phone_mobile",
+   "fieldtype": "Data",
+   "label": "Mobile",
+   "read_only": 1
+  },
+  {
+   "fieldname": "extracted_job_title",
+   "fieldtype": "Data",
+   "label": "Job Title",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb_e2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "extracted_industry",
+   "fieldtype": "Data",
+   "label": "Industry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "extracted_company_size",
+   "fieldtype": "Data",
+   "label": "Company Size",
+   "read_only": 1
+  },
+  {
+   "fieldname": "extracted_geography",
+   "fieldtype": "Data",
+   "label": "Geography",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sb_scoring",
+   "fieldtype": "Section Break",
+   "label": "Scoring Breakdown"
+  },
+  {
+   "fieldname": "score_geo",
+   "fieldtype": "Int",
+   "label": "Geo Score",
+   "read_only": 1
+  },
+  {
+   "fieldname": "score_vertical",
+   "fieldtype": "Int",
+   "label": "Vertical Score",
+   "read_only": 1
+  },
+  {
+   "fieldname": "score_partner",
+   "fieldtype": "Int",
+   "label": "Partner Score",
+   "read_only": 1
+  },
+  {
+   "fieldname": "score_rfq_size",
+   "fieldtype": "Int",
+   "label": "RFQ Size Score",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb_e3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "score_urgency",
+   "fieldtype": "Int",
+   "label": "Urgency Score",
+   "read_only": 1
+  },
+  {
+   "fieldname": "score_repeat",
+   "fieldtype": "Int",
+   "label": "Repeat-Customer Score",
+   "read_only": 1
+  },
+  {
+   "fieldname": "score_signal",
+   "fieldtype": "Int",
+   "label": "Signal Strength Score",
+   "read_only": 1
+  },
+  {
+   "description": "Same as Lead.bsi_ai_score; mirrored here for sidecar reporting",
+   "fieldname": "score_total",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Total Score",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sb_ai_text",
+   "fieldtype": "Section Break",
+   "label": "AI Reasoning"
+  },
+  {
+   "fieldname": "ai_reasoning_summary",
+   "fieldtype": "Text",
+   "label": "Reasoning Summary",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_strengths_detail",
+   "fieldtype": "Text",
+   "label": "Strengths Detail",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_gaps_detail",
+   "fieldtype": "Text",
+   "label": "Gaps Detail",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_competitor_mentions",
+   "fieldtype": "Small Text",
+   "label": "Competitor Mentions",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "depends_on": "eval:doc.rfq_line_items && doc.rfq_line_items.length",
+   "fieldname": "sb_rfq",
+   "fieldtype": "Section Break",
+   "label": "RFQ Line Items"
+  },
+  {
+   "fieldname": "rfq_line_items",
+   "fieldtype": "Table",
+   "label": "RFQ Line Items",
+   "options": "Lead RFQ Line Item"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sb_audit",
+   "fieldtype": "Section Break",
+   "label": "Raw Response (Audit)"
+  },
+  {
+   "fieldname": "ai_raw_response",
+   "fieldtype": "Code",
+   "label": "AI Raw JSON Response",
+   "options": "JSON",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-06-25 10:10:40.982641",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "Lead Enrichment Detail",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

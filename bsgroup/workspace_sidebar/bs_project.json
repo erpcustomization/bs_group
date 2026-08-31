@@ -1,0 +1,100 @@
+{
+ "app": "bsgroup",
+ "creation": "2026-06-26 11:02:04.497471",
+ "docstatus": 0,
+ "doctype": "Workspace Sidebar",
+ "idx": 0,
+ "items": [
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "book-lock",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Project",
+   "link_to": "Project",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "book-open-text",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Task",
+   "link_to": "Task",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "timer-reset",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Timesheet",
+   "link_to": "Timesheet",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "anchor",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Tech Task Scheduler",
+   "link_to": "Tech Task Scheduler",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "chart-column-increasing",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Task Summary Report",
+   "link_to": "Task Summary Report",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "chart-no-axes-combined",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Task Scheduler Report",
+   "link_to": "Task Scheduler Report",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "chart-network",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Tech Task Scheduler Report",
+   "link_to": "Tech Task Scheduler Report",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-06-26 11:06:56.498212",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "BS Project",
+ "owner": "Administrator",
+ "standard": 1,
+ "title": "BS Project"
+}

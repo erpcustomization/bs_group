@@ -1,0 +1,21 @@
+{
+ "app": "bsgroup",
+ "bg_color": "gray",
+ "creation": "2026-06-26 11:02:04.529103",
+ "docstatus": 0,
+ "doctype": "Desktop Icon",
+ "hidden": 0,
+ "icon_image": "/private/files/project (1).png",
+ "icon_type": "Link",
+ "idx": 0,
+ "label": "BS Project",
+ "link_to": "BS Project",
+ "link_type": "Workspace Sidebar",
+ "modified": "2026-06-26 11:07:25.940847",
+ "modified_by": "Administrator",
+ "name": "BS Project",
+ "owner": "Administrator",
+ "restrict_removal": 0,
+ "roles": [],
+ "standard": 1
+}

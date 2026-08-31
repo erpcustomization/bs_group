@@ -1,0 +1,113 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "format:STGP-{salesperson}-{fiscal_year}",
+ "creation": "2026-08-10 14:06:50.426065",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "fiscal_year",
+  "salesperson",
+  "data_basis",
+  "monthly_data",
+  "total_invoiced_revenue",
+  "total_invoiced_gp",
+  "total_booked_revenue",
+  "total_booked_gp"
+ ],
+ "fields": [
+  {
+   "fieldname": "fiscal_year",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Fiscal Year",
+   "options": "Fiscal Year",
+   "reqd": 1
+  },
+  {
+   "fieldname": "salesperson",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Salesperson",
+   "options": "Sales Person",
+   "reqd": 1
+  },
+  {
+   "default": "Sales Data",
+   "fieldname": "data_basis",
+   "fieldtype": "Data",
+   "label": "Data Basis",
+   "read_only": 1
+  },
+  {
+   "fieldname": "monthly_data",
+   "fieldtype": "Table",
+   "label": "Monthly Data",
+   "options": "Sales Target GP Month"
+  },
+  {
+   "fieldname": "total_invoiced_revenue",
+   "fieldtype": "Currency",
+   "label": "Total Invoiced Revenue",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_invoiced_gp",
+   "fieldtype": "Currency",
+   "label": "Total Invoiced GP",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_booked_revenue",
+   "fieldtype": "Currency",
+   "label": "Total Booked Revenue",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_booked_gp",
+   "fieldtype": "Currency",
+   "label": "Total Booked GP",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-10 14:09:22.037592",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "Sales Target GP Entry",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

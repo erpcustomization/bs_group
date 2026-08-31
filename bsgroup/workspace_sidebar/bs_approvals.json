@@ -1,0 +1,64 @@
+{
+ "app": "bsgroup",
+ "creation": "2026-06-26 11:13:01.052041",
+ "docstatus": 0,
+ "doctype": "Workspace Sidebar",
+ "idx": 0,
+ "items": [
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "backpack",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Labor-Preapproval",
+   "link_to": "Labor Preapproval",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "file-box",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Employee Advance",
+   "link_to": "Employee Advance",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "expenses",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Expense claim",
+   "link_to": "Expense Claim",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "chart-column-big",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Material Request",
+   "link_to": "Material Request",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-06-26 11:18:06.113431",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "BS Approvals",
+ "owner": "Administrator",
+ "standard": 1,
+ "title": "BS Approvals"
+}

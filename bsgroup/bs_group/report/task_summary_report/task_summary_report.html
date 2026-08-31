@@ -1,0 +1,217 @@
+<style type="text/css">
+	body, html {
+		margin: 0; padding: 0;
+		font-family: Inter, Arial, sans-serif;
+		font-size: 12px;
+		color: #1f2937;
+	}
+
+	@media print {
+		@page { size: A4 landscape; margin: 10mm; }
+		thead { display: table-header-group; }
+		tfoot { display: table-footer-group; }
+	}
+
+	.pd-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		background: linear-gradient(135deg, #0f2d58 0%, #18478f 100%);
+		color: #fff;
+		border-radius: 10px;
+		padding: 20px 24px;
+		margin-bottom: 18px;
+	}
+	.pd-header .title   { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+	.pd-header .sub     { font-size: 12px; opacity: 0.82; margin-top: 4px; }
+	.pd-header .meta    { text-align: right; font-size: 12px; opacity: 0.9; }
+
+	.pd-filters {
+		background: #f8fafc;
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
+		padding: 8px 14px;
+		font-size: 11px;
+		margin-bottom: 14px;
+		color: #374151;
+	}
+
+	.pd-kpi-grid { display: flex; gap: 12px; margin-bottom: 18px; }
+	.pd-kpi-card {
+		flex: 1;
+		border: 1px solid #e5e7eb;
+		border-radius: 10px;
+		padding: 12px;
+		text-align: center;
+		background: #fff;
+	}
+	.pd-kpi-val { font-size: 24px; font-weight: 800; }
+	.pd-kpi-lbl { font-size: 10px; color: #6b7280; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+	.section-title {
+		font-size: 13px;
+		font-weight: 700;
+		color: #0f2d58;
+		margin-bottom: 8px;
+		padding-bottom: 4px;
+		border-bottom: 2px solid #2563eb;
+	}
+
+	.pd-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+	.pd-table th {
+		background: #f3f4f6;
+		padding: 7px 8px;
+		border: 1px solid #e5e7eb;
+		text-align: left;
+		font-size: 10px;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: #6b7280;
+	}
+	.pd-table td { padding: 6px 8px; border: 1px solid #e5e7eb; vertical-align: middle; }
+	.pd-table tr:nth-child(even) td { background: #f9fafb; }
+	.pd-table tr.group-row td { background: #eef3fb; font-weight: 700; color: #0f2d58; }
+
+	.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; }
+	.b-completed  { background: #d1fae5; color: #065f46; }
+	.b-inprogress { background: #fef3c7; color: #92400e; }
+	.b-pending    { background: #fee2e2; color: #991b1b; }
+	.b-high       { background: #fee2e2; color: #991b1b; }
+	.b-urgent     { background: #fce7f3; color: #9d174d; }
+	.b-medium     { background: #fef3c7; color: #92400e; }
+	.b-low        { background: #f3f4f6; color: #374151; }
+
+	.progress-wrap { background: #e8edf5; border-radius: 999px; height: 7px; min-width: 50px; overflow: hidden; }
+	.progress-fill { height: 100%; border-radius: 999px; background: #2563eb; }
+
+	.footer { text-align: right; margin-top: 20px; font-size: 10px; color: #9ca3af; }
+</style>
+
+{%
+var rows    = data || [];
+var total   = rows.length;
+var done    = 0, open = 0, overdue = 0;
+var today   = frappe.datetime.get_today();
+var projName = (rows.length && rows[0].project_name) ? rows[0].project_name : (filters.project || "All Projects");
+
+for (var i = 0; i < rows.length; i++) {
+	if (rows[i].status === "Completed") { done++; }
+	else {
+		open++;
+		if (rows[i].exp_end_date && rows[i].exp_end_date < today) overdue++;
+	}
+}
+%}
+
+<!-- Header -->
+<div class="pd-header">
+	<div>
+		<div class="title">Task Summary Report</div>
+		<div class="sub">{%= projName %}</div>
+		{% if (filters.from_date && filters.to_date) { %}
+		<div class="sub">Period: {%= frappe.datetime.str_to_user(filters.from_date) %} &ndash; {%= frappe.datetime.str_to_user(filters.to_date) %}</div>
+		{% } %}
+	</div>
+	<div class="meta">
+		<div style="font-size:11px; opacity:0.75; margin-bottom:4px;">Report Date</div>
+		<div style="font-weight:700">{%= frappe.datetime.str_to_user(today) %}</div>
+		{% if (filters.assigned_to) { %}
+		<div style="margin-top:8px; font-size:11px">Assigned To: {%= filters.assigned_to %}</div>
+		{% } %}
+	</div>
+</div>
+
+<!-- Active filters -->
+{% if (filters.project || filters.status || filters.priority || filters.assigned_to) { %}
+<div class="pd-filters">
+	<strong>Filters:</strong>&nbsp;
+	{% if (filters.project)     { %} Project: <strong>{%= filters.project %}</strong>&nbsp;&nbsp; {% } %}
+	{% if (filters.status)      { %} Status: <strong>{%= filters.status %}</strong>&nbsp;&nbsp; {% } %}
+	{% if (filters.priority)    { %} Priority: <strong>{%= filters.priority %}</strong>&nbsp;&nbsp; {% } %}
+	{% if (filters.assigned_to) { %} Assigned To: <strong>{%= filters.assigned_to %}</strong> {% } %}
+</div>
+{% } %}
+
+<!-- KPI Cards -->
+<div class="pd-kpi-grid">
+	<div class="pd-kpi-card">
+		<div class="pd-kpi-val">{%= total %}</div>
+		<div class="pd-kpi-lbl">Total Tasks</div>
+	</div>
+	<div class="pd-kpi-card">
+		<div class="pd-kpi-val" style="color:#16a34a">{%= done %}</div>
+		<div class="pd-kpi-lbl">Completed</div>
+	</div>
+	<div class="pd-kpi-card">
+		<div class="pd-kpi-val" style="color:#1e5bb8">{%= open %}</div>
+		<div class="pd-kpi-lbl">Open</div>
+	</div>
+	<div class="pd-kpi-card">
+		<div class="pd-kpi-val" style="color:#dc2626">{%= overdue %}</div>
+		<div class="pd-kpi-lbl">Overdue</div>
+	</div>
+</div>
+
+<!-- Task Table -->
+<div class="section-title">Detailed Task Plan</div>
+<table class="pd-table">
+	<thead>
+		<tr>
+			<th style="width:28px">#</th>
+			<th>Task</th>
+			<th>Project</th>
+			<th>Assigned To</th>
+			<th style="width:65px">Priority</th>
+			<th style="width:78px">Start Date</th>
+			<th style="width:78px">End Date</th>
+			<th style="width:90px">Progress</th>
+			<th style="width:85px">Status</th>
+		</tr>
+	</thead>
+	<tbody>
+		{% if (rows.length > 0) { %}
+			{% for (var i = 0; i < rows.length; i++) { %}
+				{% var t = rows[i];
+				   var indent  = (t.indent || 0) * 12;
+				   var isGrp   = t.is_group;
+				   var pct     = t.progress || 0;
+				   var barClr  = pct >= 100 ? "#16a34a" : pct >= 60 ? "#1e5bb8" : pct >= 30 ? "#d97706" : "#dc2626";
+				   var sBadge  = t.status === "Completed" ? "b-completed"
+				               : (t.status === "Working" || t.status === "Open" || t.status === "Pending Review") ? "b-inprogress"
+				               : "b-pending";
+				   var pBadge  = t.priority === "Urgent" ? "b-urgent"
+				               : t.priority === "High"   ? "b-high"
+				               : t.priority === "Medium" ? "b-medium" : "b-low";
+				%}
+				<tr {% if (isGrp) { %}class="group-row"{% } %}>
+					<td style="text-align:center; color:#9ca3af">{%= i + 1 %}</td>
+					<td style="padding-left:{%= indent + 8 %}px">
+						{% if (isGrp) { %}<strong>{% } %}
+						{%= t.subject || "" %}
+						{% if (isGrp) { %}</strong>{% } %}
+					</td>
+					<td>{%= t.project_name || "&mdash;" %}</td>
+					<td>{%= t.assigned_to  || "&mdash;" %}</td>
+					<td><span class="badge {%= pBadge %}">{%= t.priority || "&mdash;" %}</span></td>
+					<td>{%= t.exp_start_date ? frappe.datetime.str_to_user(t.exp_start_date) : "&mdash;" %}</td>
+					<td>{%= t.exp_end_date   ? frappe.datetime.str_to_user(t.exp_end_date)   : "&mdash;" %}</td>
+					<td>
+						<div style="display:flex; align-items:center; gap:5px">
+							<div class="progress-wrap" style="flex:1">
+								<div class="progress-fill" style="width:{%= pct %}%; background:{%= barClr %}"></div>
+							</div>
+							<span style="font-size:10px; font-weight:700; color:#374151; white-space:nowrap">{%= pct %}%</span>
+						</div>
+					</td>
+					<td><span class="badge {%= sBadge %}">{%= t.status || "&mdash;" %}</span></td>
+				</tr>
+			{% } %}
+		{% } else { %}
+			<tr><td colspan="9" style="text-align:center; padding:20px; color:#9ca3af">No tasks found</td></tr>
+		{% } %}
+	</tbody>
+</table>
+
+<div class="footer">
+	Printed on {%= frappe.datetime.str_to_user(frappe.datetime.get_datetime_as_string()) %}
+</div>

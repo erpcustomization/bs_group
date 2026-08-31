@@ -1,0 +1,182 @@
+{
+ "actions": [],
+ "autoname": "LAT-.YYYY.-.#####",
+ "creation": "2026-02-07 16:45:30.681118",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_xzyy",
+  "amended_from",
+  "labour",
+  "project",
+  "task",
+  "ticket",
+  "company",
+  "cost_center",
+  "section_break_nlvf",
+  "check_in_time",
+  "check_out_time",
+  "total_hours",
+  "site__proof_section",
+  "site_location",
+  "latitude",
+  "photo",
+  "system__validation_section",
+  "labor_preapproval",
+  "validation_status",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_xzyy",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Labor Attendance",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "labour",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Labour",
+   "options": "Labour Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "task",
+   "fieldtype": "Link",
+   "label": "Task",
+   "options": "Task"
+  },
+  {
+   "fieldname": "ticket",
+   "fieldtype": "Link",
+   "label": "HD Ticket",
+   "options": "HD Ticket",
+   "description": "Set for Helpdesk-route (HD Ticket sourced) Labor Preapproval consumption. Not required for Project-route attendance."
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "cost_center",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Cost Center",
+   "options": "Cost Center"
+  },
+  {
+   "fieldname": "section_break_nlvf",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "check_in_time",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Check-In Time",
+   "reqd": 1
+  },
+  {
+   "fieldname": "check_out_time",
+   "fieldtype": "Datetime",
+   "label": "Check-Out Time"
+  },
+  {
+   "fieldname": "total_hours",
+   "fieldtype": "Float",
+   "label": "Total Hours"
+  },
+  {
+   "fieldname": "site__proof_section",
+   "fieldtype": "Section Break",
+   "label": "Site / Proof"
+  },
+  {
+   "fieldname": "site_location",
+   "fieldtype": "Data",
+   "label": "Site Location"
+  },
+  {
+   "fieldname": "latitude",
+   "fieldtype": "Float",
+   "label": "Latitude"
+  },
+  {
+   "fieldname": "photo",
+   "fieldtype": "Attach",
+   "label": "Photo Proof"
+  },
+  {
+   "fieldname": "system__validation_section",
+   "fieldtype": "Section Break",
+   "label": "System / Validation"
+  },
+  {
+   "fieldname": "labor_preapproval",
+   "fieldtype": "Link",
+   "label": "Labor Pre-Approval",
+   "options": "Labor Preapproval"
+  },
+  {
+   "fieldname": "validation_status",
+   "fieldtype": "Select",
+   "label": "Validation Status",
+   "options": "OK\nExceeded\nNot Approved",
+   "read_only": 1,
+   "description": "System-set informational status only. Actual authorization is enforced by server-side hard validation (frappe.throw), not by this field."
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-03-25 17:23:49.889256",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "Labor Attendance",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

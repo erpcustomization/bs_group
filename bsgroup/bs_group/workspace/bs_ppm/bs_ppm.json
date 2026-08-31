@@ -1,0 +1,120 @@
+{
+ "app": "bsgroup",
+ "charts": [],
+ "content": "[{\"id\":\"bs8v0p7w1x\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>PPM Management</b></span>\",\"col\":12}},{\"id\":\"zvgf34fl29\",\"type\":\"card\",\"data\":{\"card_name\":\"PPM Planning\",\"col\":4}},{\"id\":\"3owlhytk48\",\"type\":\"card\",\"data\":{\"card_name\":\"Checklists\",\"col\":4}},{\"id\":\"ppmrpts01card\",\"type\":\"card\",\"data\":{\"card_name\":\"PPM Reports\",\"col\":4}}]",
+ "creation": "2026-07-15 12:02:42.954184",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "hide_custom": 0,
+ "icon": "calendar",
+ "idx": 0,
+ "indicator_color": "green",
+ "is_hidden": 0,
+ "label": "BS PPM",
+ "link_type": "DocType",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PPM Planning",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PPM Plan",
+   "link_count": 0,
+   "link_to": "PPM Plan",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PPM Visit",
+   "link_count": 0,
+   "link_to": "PPM Visit",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Checklists",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PPM Checklist Template",
+   "link_count": 0,
+   "link_to": "PPM Checklist Template",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PPM Checklist Result",
+   "link_count": 0,
+   "link_to": "PPM Checklist Result",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PPM Reports",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Upcoming PPM Visits",
+   "link_count": 0,
+   "link_to": "Upcoming PPM Visits",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "PPM Visit",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Overdue PPM Visits",
+   "link_count": 0,
+   "link_to": "Overdue PPM Visits",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "PPM Visit",
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-07-15 18:58:19.875715",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "BS PPM",
+ "number_cards": [],
+ "owner": "Administrator",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [],
+ "sequence_id": 0.0,
+ "shortcuts": [],
+ "title": "BS PPM",
+ "type": "Workspace"
+}

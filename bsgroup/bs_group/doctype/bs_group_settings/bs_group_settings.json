@@ -1,0 +1,78 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-07-16 11:19:41.119566",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "dcs_addtional_item",
+  "hr_module_tab",
+  "select_leave_type",
+  "attachment_required_after_days",
+  "project_costing_tab",
+  "cost_overrun_policy"
+ ],
+ "fields": [
+  {
+   "fieldname": "dcs_addtional_item",
+   "fieldtype": "Link",
+   "label": "DCS Addtional Item",
+   "options": "Item"
+  },
+  {
+   "fieldname": "hr_module_tab",
+   "fieldtype": "Tab Break",
+   "label": "HR Module"
+  },
+  {
+   "fieldname": "select_leave_type",
+   "fieldtype": "Link",
+   "label": "Select Leave Type",
+   "options": "Leave Type"
+  },
+  {
+   "fieldname": "attachment_required_after_days",
+   "fieldtype": "Int",
+   "label": "Attachment Required After (Days)"
+  },
+  {
+   "fieldname": "project_costing_tab",
+   "fieldtype": "Tab Break",
+   "label": "Project Costing"
+  },
+  {
+   "default": "Warn",
+   "description": "Policy applied when a Project's committed/actual cost exceeds its approved Project Cost Baseline (DEC-09).",
+   "fieldname": "cost_overrun_policy",
+   "fieldtype": "Select",
+   "label": "Cost Overrun Policy",
+   "options": "None\nWarn\nBlock"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-08-21 12:11:20.458637",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "BS Group Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

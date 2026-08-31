@@ -1,0 +1,195 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:LFB-{YYYY}-{####}",
+ "creation": "2026-06-25 10:10:06.454220",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "lead",
+  "salesperson",
+  "submitted_on",
+  "cb_f1",
+  "status_at_feedback",
+  "outcome_category",
+  "outcome_reason",
+  "sb_qual",
+  "was_right_lead",
+  "ai_helpful_rating",
+  "cb_f2",
+  "score_correction",
+  "corrected_intent",
+  "sb_narrative",
+  "what_went_well",
+  "what_didnt",
+  "lessons",
+  "used_for_training"
+ ],
+ "fields": [
+  {
+   "fieldname": "lead",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Lead",
+   "options": "Lead",
+   "reqd": 1
+  },
+  {
+   "fieldname": "salesperson",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Salesperson",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "default": "now",
+   "fieldname": "submitted_on",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Submitted On",
+   "reqd": 1
+  },
+  {
+   "fieldname": "cb_f1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status_at_feedback",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Lead Status at Feedback"
+  },
+  {
+   "fieldname": "outcome_category",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Outcome",
+   "options": "\nWon\nLost\nDropped\nDisqualified\nDeferred\nOngoing"
+  },
+  {
+   "fieldname": "outcome_reason",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Outcome Reason",
+   "options": "Lead Outcome Reason"
+  },
+  {
+   "fieldname": "sb_qual",
+   "fieldtype": "Section Break",
+   "label": "Lead Quality Feedback"
+  },
+  {
+   "fieldname": "was_right_lead",
+   "fieldtype": "Select",
+   "label": "Was this a right-fit lead?",
+   "options": "\nYes\nPartial\nNo"
+  },
+  {
+   "description": "1\u20135 stars: was the AI summary/score useful?",
+   "fieldname": "ai_helpful_rating",
+   "fieldtype": "Rating",
+   "label": "AI Helpfulness"
+  },
+  {
+   "fieldname": "cb_f2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Salesperson override of AI score; used in feedback aggregation",
+   "fieldname": "score_correction",
+   "fieldtype": "Int",
+   "label": "Suggested Score (0-100)"
+  },
+  {
+   "fieldname": "corrected_intent",
+   "fieldtype": "Select",
+   "label": "Corrected Intent",
+   "options": "\nRFQ\nInquiry\nDemo Request\nPartnership\nSupport\nSpam\nOther"
+  },
+  {
+   "fieldname": "sb_narrative",
+   "fieldtype": "Section Break",
+   "label": "Narrative"
+  },
+  {
+   "fieldname": "what_went_well",
+   "fieldtype": "Small Text",
+   "label": "What went well"
+  },
+  {
+   "fieldname": "what_didnt",
+   "fieldtype": "Small Text",
+   "label": "What didn't work"
+  },
+  {
+   "fieldname": "lessons",
+   "fieldtype": "Small Text",
+   "label": "Lessons / coaching notes"
+  },
+  {
+   "default": "1",
+   "description": "If checked, this feedback is included in the few-shot examples cache",
+   "fieldname": "used_for_training",
+   "fieldtype": "Check",
+   "label": "Use for AI Training"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-06-25 10:10:06.454220",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "Lead Feedback",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "submitted_on",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

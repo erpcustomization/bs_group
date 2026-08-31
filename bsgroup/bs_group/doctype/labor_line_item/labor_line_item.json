@@ -1,0 +1,78 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-01-27 15:43:51.422858",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_16ym",
+  "role__skill",
+  "no_of_persons",
+  "days",
+  "section_break_1fdz",
+  "rate",
+  "total_cost"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_16ym",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "role__skill",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Role / Skill",
+   "options": "Technician\nHelper\nCCTV Engineer",
+   "reqd": 1
+  },
+  {
+   "fieldname": "no_of_persons",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "No. of Persons",
+   "reqd": 1
+  },
+  {
+   "fieldname": "days",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "No. of Days",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_1fdz",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "rate",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Rate per Day",
+   "reqd": 1
+  },
+  {
+   "fieldname": "total_cost",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Total Cost",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-03-25 17:23:52.712844",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "Labor Line Item",
+ "owner": "mohan@bitssecureit.com",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

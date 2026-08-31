@@ -1,0 +1,311 @@
+{
+  "actions": [],
+  "allow_rename": 0,
+  "autoname": "format:ORG-DOC-{YYYY}-{#####}",
+  "creation": "2026-01-01 00:00:00.000000",
+  "custom": 0,
+  "doctype": "DocType",
+  "editable_grid": 1,
+  "engine": "InnoDB",
+  "field_order": [
+    "section_identification",
+    "document_title",
+    "category",
+    "column_break_ident",
+    "document_code",
+    "revision",
+    "section_classification",
+    "visibility_scope",
+    "confidentiality",
+    "column_break_class",
+    "applicable_department",
+    "company",
+    "section_lifecycle",
+    "approval_status",
+    "lifecycle_status",
+    "column_break_life",
+    "effective_date",
+    "review_date",
+    "expiry_date",
+    "supersedes",
+    "superseded_by",
+    "section_ownership",
+    "document_owner",
+    "process_owner",
+    "column_break_owner",
+    "owning_department",
+    "section_access",
+    "allowed_roles",
+    "allowed_users",
+    "section_content",
+    "summary",
+    "body",
+    "section_attachments",
+    "supporting_attachments",
+    "section_tags",
+    "tags"
+  ],
+  "fields": [
+    {
+      "fieldname": "section_identification",
+      "fieldtype": "Section Break",
+      "label": "Identification"
+    },
+    {
+      "fieldname": "document_title",
+      "fieldtype": "Data",
+      "label": "Document Title",
+      "in_list_view": 1,
+      "in_standard_filter": 1,
+      "reqd": 1
+    },
+    {
+      "fieldname": "category",
+      "fieldtype": "Link",
+      "label": "Category",
+      "options": "Organization Document Category",
+      "in_list_view": 1,
+      "in_standard_filter": 1,
+      "reqd": 1
+    },
+    {
+      "fieldname": "column_break_ident",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "document_code",
+      "fieldtype": "Data",
+      "label": "Document Code",
+      "unique": 1
+    },
+    {
+      "fieldname": "revision",
+      "fieldtype": "Data",
+      "label": "Revision",
+      "default": "1.0"
+    },
+    {
+      "fieldname": "section_classification",
+      "fieldtype": "Section Break",
+      "label": "Classification"
+    },
+    {
+      "fieldname": "visibility_scope",
+      "fieldtype": "Select",
+      "label": "Visibility Scope",
+      "options": "All Employees\nDepartment Specific",
+      "default": "All Employees",
+      "in_standard_filter": 1,
+      "reqd": 1
+    },
+    {
+      "fieldname": "confidentiality",
+      "fieldtype": "Select",
+      "label": "Confidentiality",
+      "options": "Public\nInternal\nConfidential\nRestricted",
+      "default": "Internal",
+      "in_standard_filter": 1,
+      "reqd": 1
+    },
+    {
+      "fieldname": "column_break_class",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "applicable_department",
+      "fieldtype": "Link",
+      "label": "Applicable Department",
+      "options": "Department",
+      "in_standard_filter": 1,
+      "description": "Scope-match field for Department Specific documents."
+    },
+    {
+      "fieldname": "company",
+      "fieldtype": "Link",
+      "label": "Company",
+      "options": "Company",
+      "in_standard_filter": 1,
+      "description": "Recorded only. Not used in access enforcement."
+    },
+    {
+      "fieldname": "section_lifecycle",
+      "fieldtype": "Section Break",
+      "label": "Lifecycle"
+    },
+    {
+      "fieldname": "approval_status",
+      "fieldtype": "Select",
+      "label": "Approval Status",
+      "options": "Draft\nUnder Review\nPending Approval\nApproved\nRejected",
+      "default": "Draft",
+      "in_list_view": 1,
+      "in_standard_filter": 1,
+      "reqd": 1
+    },
+    {
+      "fieldname": "lifecycle_status",
+      "fieldtype": "Select",
+      "label": "Lifecycle Status",
+      "options": "Active\nSuperseded\nArchived\nExpired",
+      "default": "Active",
+      "in_list_view": 1,
+      "in_standard_filter": 1,
+      "reqd": 1
+    },
+    {
+      "fieldname": "column_break_life",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "effective_date",
+      "fieldtype": "Date",
+      "label": "Effective Date"
+    },
+    {
+      "fieldname": "review_date",
+      "fieldtype": "Date",
+      "label": "Review Date"
+    },
+    {
+      "fieldname": "expiry_date",
+      "fieldtype": "Date",
+      "label": "Expiry Date"
+    },
+    {
+      "fieldname": "supersedes",
+      "fieldtype": "Link",
+      "label": "Supersedes",
+      "options": "Organization Document"
+    },
+    {
+      "fieldname": "superseded_by",
+      "fieldtype": "Link",
+      "label": "Superseded By",
+      "options": "Organization Document",
+      "read_only": 1
+    },
+    {
+      "fieldname": "section_ownership",
+      "fieldtype": "Section Break",
+      "label": "Ownership"
+    },
+    {
+      "fieldname": "document_owner",
+      "fieldtype": "Link",
+      "label": "Document Owner",
+      "options": "User"
+    },
+    {
+      "fieldname": "process_owner",
+      "fieldtype": "Link",
+      "label": "Process Owner",
+      "options": "Employee"
+    },
+    {
+      "fieldname": "column_break_owner",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "owning_department",
+      "fieldtype": "Link",
+      "label": "Owning Department",
+      "options": "Department"
+    },
+    {
+      "fieldname": "section_access",
+      "fieldtype": "Section Break",
+      "label": "Explicit Access"
+    },
+    {
+      "fieldname": "allowed_roles",
+      "fieldtype": "Table",
+      "label": "Allowed Roles",
+      "options": "Organization Document Allowed Role"
+    },
+    {
+      "fieldname": "allowed_users",
+      "fieldtype": "Table",
+      "label": "Allowed Users",
+      "options": "Organization Document Allowed User"
+    },
+    {
+      "fieldname": "section_content",
+      "fieldtype": "Section Break",
+      "label": "Content"
+    },
+    {
+      "fieldname": "summary",
+      "fieldtype": "Small Text",
+      "label": "Summary"
+    },
+    {
+      "fieldname": "body",
+      "fieldtype": "Text Editor",
+      "label": "Body"
+    },
+    {
+      "fieldname": "section_attachments",
+      "fieldtype": "Section Break",
+      "label": "Attachments"
+    },
+    {
+      "fieldname": "supporting_attachments",
+      "fieldtype": "Table",
+      "label": "Supporting Attachments",
+      "options": "Organization Document Attachment",
+      "description": "Metadata only. Canonical file bytes live in File (is_private=1)."
+    },
+    {
+      "fieldname": "section_tags",
+      "fieldtype": "Section Break",
+      "label": "Tags"
+    },
+    {
+      "fieldname": "tags",
+      "fieldtype": "Small Text",
+      "label": "Tags"
+    }
+  ],
+  "index_web_pages_for_search": 0,
+  "istable": 0,
+  "is_submittable": 0,
+  "links": [],
+  "modified": "2026-01-01 00:00:00.000000",
+  "modified_by": "Administrator",
+  "module": "BS Group",
+  "name": "Organization Document",
+  "naming_rule": "Expression",
+  "owner": "Administrator",
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1,
+      "report": 1,
+      "export": 1,
+      "print": 1,
+      "share": 1
+    },
+    {
+      "role": "Organization Document Admin",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1,
+      "report": 1,
+      "print": 1
+    },
+    {
+      "role": "Organization Document Reader",
+      "read": 1,
+      "print": 1
+    }
+  ],
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "states": [],
+  "title_field": "document_title",
+  "track_changes": 1
+}

@@ -1,0 +1,308 @@
+{%- set filters = filters if filters is defined else {} -%}
+{%- set data = data if data is defined else [] -%}
+{%- set doc = doc if doc is defined else {} -%}
+
+{%- set party_currency = filters.presentation_currency or filters.currency or (doc.default_currency if doc and doc.get is defined and doc.get("default_currency") else None) or (doc.currency if doc and doc.get is defined and doc.get("currency") else None) or frappe.db.get_default("currency") or "" -%}
+{%- set party_name = (filters.party_name[0] if filters.party_name else None) or (filters.party[0] if filters.party else None) or filters.customer_name or (doc.supplier_name if doc and doc.get is defined and doc.get("supplier_name") else None) or (doc.customer_name if doc and doc.get is defined and doc.get("customer_name") else None) or (doc.supplier if doc and doc.get is defined and doc.get("supplier") else None) or (doc.customer if doc and doc.get is defined and doc.get("customer") else None) or "" -%}
+{%- set party_tax_id = filters.tax_id or (doc.tax_id if doc and doc.get is defined and doc.get("tax_id") else None) or "" -%}
+{%- set stmt_from_date = filters.from_date or filters.report_date -%}
+{%- set stmt_to_date = filters.to_date or filters.report_date or frappe.utils.nowdate() -%}
+
+{#- Determine whether this party is Payable (Supplier) or Receivable (Customer) so we
+    can show the correct Zoho-style labels and sign convention either way. -#}
+{%- set doc_doctype = doc.doctype if doc and doc.get is defined and doc.get("doctype") else "" -%}
+{%- set party_type_resolved = filters.party_type or (doc_doctype if doc_doctype in ["Supplier", "Customer"] else None) or "Customer" -%}
+{%- set is_payable = party_type_resolved == "Supplier" -%}
+
+{%- set voucher_label_map = {
+    "Purchase Invoice": "Bill",
+    "Sales Invoice": "Invoice",
+    "Payment Entry": ("Payment Made" if is_payable else "Payment Received"),
+    "Journal Entry": "Journal Entry",
+    "Purchase Order": "Purchase Order",
+    "Sales Order": "Sales Order",
+    "Credit Note": "Credit Note",
+    "Debit Note": "Debit Note"
+} -%}
+
+{%- set is_gl_mode = data and data[0] is defined and data[0].get is defined and data[0].get("balance") is not none and data[0].get("debit") is not none -%}
+
+{%- if is_gl_mode -%}
+  {%- set opening_balance = data[0].balance or 0 -%}
+  {%- set raw_rows = data[1:-1] | selectattr("voucher_no") | list -%}
+  {%- set ns = namespace(balance=opening_balance, rows=[]) -%}
+  {%- for e in raw_rows -%}
+    {%- if is_payable -%}
+      {%- set row_invoiced = e.credit or 0 -%}
+      {%- set row_paid = e.debit or 0 -%}
+      {%- set signed = (e.credit or 0) - (e.debit or 0) -%}
+    {%- else -%}
+      {%- set row_invoiced = e.debit or 0 -%}
+      {%- set row_paid = e.credit or 0 -%}
+      {%- set signed = (e.debit or 0) - (e.credit or 0) -%}
+    {%- endif -%}
+    {%- set ns.balance = ns.balance + signed -%}
+    {%- set _ = ns.rows.append({
+        "posting_date": e.posting_date,
+        "voucher_type": e.voucher_type,
+        "voucher_no": e.voucher_no,
+        "due_date": e.due_date or (frappe.db.get_value(e.voucher_type, e.voucher_no, "due_date") if e.voucher_type in ["Sales Invoice", "Purchase Invoice"] else None),
+        "remarks": e.remarks,
+        "invoiced": row_invoiced,
+        "paid": row_paid,
+        "outstanding": ns.balance
+    }) -%}
+  {%- endfor -%}
+  {%- set invoiced_amount = ns.rows | sum(attribute="invoiced") -%}
+  {%- set paid_amount = ns.rows | sum(attribute="paid") -%}
+  {%- set closing_balance = ns.balance -%}
+  {%- set txn_rows = ns.rows -%}
+{%- elif data and data|length > 0 -%}
+  {#- Accounts Receivable / Accounts Payable voucher mode -#}
+  {%- set opening_balance = 0 -%}
+  {%- set invoiced_amount = data | sum(attribute="invoiced") -%}
+  {%- set paid_amount = data | sum(attribute="paid") -%}
+  {%- set closing_balance = data | sum(attribute="outstanding") -%}
+  {%- for e in data -%}
+  {%- if not e.get("due_date") -%}
+    {%- set _ = e.update({"due_date": (frappe.db.get_value(e.voucher_type, e.voucher_no, "due_date") if e.get("voucher_type") in ["Sales Invoice", "Purchase Invoice"] else None)}) -%}
+  {%- endif -%}
+{%- endfor -%}
+{%- set txn_rows = data -%}
+{%- else -%}
+  {#- LIVE MODE: no filters/data supplied - printed directly from the Supplier/Customer
+      document. Self-query GL Entry and compute a running balance ourselves. -#}
+  {%- set live_party_type = party_type_resolved if doc_doctype in ["Supplier", "Customer"] else "" -%}
+  {%- set live_party = doc.name if doc and doc.get is defined and doc.get("name") else "" -%}
+  {%- if live_party_type and live_party -%}
+    {%- set gl_entries = frappe.get_all("GL Entry",
+          filters={"party_type": live_party_type, "party": live_party, "is_cancelled": 0},
+          fields=["posting_date", "voucher_type", "voucher_no", "due_date", "debit", "credit", "remarks"],
+          order_by="posting_date asc, creation asc") -%}
+  {%- else -%}
+    {%- set gl_entries = [] -%}
+  {%- endif -%}
+  {%- set ns = namespace(balance=0, rows=[]) -%}
+  {%- for e in gl_entries -%}
+    {%- if is_payable -%}
+      {%- set signed = (e.credit or 0) - (e.debit or 0) -%}
+      {%- set row_invoiced = e.credit or 0 -%}
+      {%- set row_paid = e.debit or 0 -%}
+    {%- else -%}
+      {%- set signed = (e.debit or 0) - (e.credit or 0) -%}
+      {%- set row_invoiced = e.debit or 0 -%}
+      {%- set row_paid = e.credit or 0 -%}
+    {%- endif -%}
+    {%- set ns.balance = ns.balance + signed -%}
+    {%- set _ = ns.rows.append({
+          "posting_date": e.posting_date,
+          "voucher_type": e.voucher_type,
+          "voucher_no": e.voucher_no,
+          "due_date": e.due_date,
+          "remarks": e.remarks,
+          "invoiced": row_invoiced,
+          "paid": row_paid,
+          "outstanding": ns.balance
+        }) -%}
+  {%- endfor -%}
+  {%- set opening_balance = 0 -%}
+  {%- set invoiced_amount = ns.rows | sum(attribute="invoiced") -%}
+  {%- set paid_amount = ns.rows | sum(attribute="paid") -%}
+  {%- set closing_balance = ns.balance -%}
+  {%- set txn_rows = ns.rows -%}
+{%- endif -%}
+
+<style>
+  [document-status] { display: none; }
+  .print-heading { display: none; }
+
+  @page {
+    size: A4;
+    margin: 0mm;
+  }
+
+  .page-number  {     
+        display: none!important;     
+    }
+
+  .soa-container, .soa-container * { box-sizing: border-box; }
+  .soa-container table, .soa-container th, .soa-container td {
+    border: none !important;
+    background: none;
+    box-shadow: none !important;
+  }
+
+  .soa-container {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    color: #1a1a1a;
+    font-size: 12px;
+    line-height: 1.6;
+    width: 100%;
+  }
+
+  .soa-partyinfo {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    margin-bottom: 18px;
+  }
+  .soa-partyinfo td { vertical-align: top; padding: 0; }
+
+  .soa-to-cell { width: 55%; font-size: 12px; line-height: 1.6; color: #333; }
+  .soa-to-cell .to-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .03em; color: #666; margin-bottom: 4px;
+  }
+  .soa-to-cell .party-name { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+
+  .soa-title-cell { width: 45%; text-align: right; padding-right: 30px; }
+  .soa-title { font-size: 18px; font-weight: 700; border-bottom: 1px solid #333; padding-bottom: 4px; margin-bottom: 0; }
+  .soa-daterange {
+    font-size: 11.5px; border-bottom: 1px solid #333;
+    padding: 4px 4px 4px 0; display: block; white-space: nowrap; margin-top: 0;
+  }
+
+  .soa-summary-box {
+    width: 60%; margin-left: 40%; margin-bottom: 24px;
+    border: 1px solid #ddd !important;
+  }
+  table.soa-summary-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.soa-summary-tbl td.ss-title {
+    background: #f2f2f2 !important; font-weight: 700; font-size: 12px;
+    padding: 7px 10px; border-bottom: 1px solid #ddd !important;
+  }
+  table.soa-summary-tbl tr.ss-row td { padding: 7px 10px; border-bottom: 1px solid #eee !important; }
+  table.soa-summary-tbl tr.ss-row:last-child td { border-bottom: none !important; }
+  table.soa-summary-tbl td.ss-label { color: #333; text-align: left; }
+  table.soa-summary-tbl td.ss-value { white-space: nowrap; text-align: right; }
+  table.soa-summary-tbl tr.balance-due td { font-weight: 700; font-size: 12.5px; border-top: 1px solid #333 !important; border-bottom: none !important; }
+  .soa-negative { color: #b3261e; }
+
+  table.soa-txn-table { width: 100%; table-layout: fixed; border-collapse: collapse; margin-top: 4px; }
+  table.soa-txn-table thead th {
+    background: #2b2b2b !important; color: #fff; font-weight: 600;
+    padding: 9px 10px; text-align: left; font-size: 11px;
+  }
+  table.soa-txn-table thead th.text-right { text-align: right; }
+  table.soa-txn-table tbody td {
+    padding: 9px 10px; border-bottom: 1px solid #eee !important;
+    font-size: 11px; line-height: 1.5; vertical-align: top; word-wrap: break-word;
+  }
+  table.soa-txn-table tbody tr:nth-child(even) td { background: #fafafa !important; }
+  table.soa-txn-table tbody tr.opening-row td { font-weight: 700; }
+  table.soa-txn-table td.text-right { text-align: right; white-space: nowrap; }
+  table.soa-txn-table td.details-cell .voucher-no { font-weight: 600; }
+  table.soa-txn-table td.details-cell .remarks { color: #555; }
+
+  .soa-footer-total-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+  .soa-footer-total-table td { padding: 10px; font-weight: 700; font-size: 11px; text-align: right; border-top: 1.5px solid #333 !important; }
+  .soa-footer-total-table td:first-child { border-top: none !important; }
+
+  .soa-negative-amount { color: #b3261e; }
+</style>
+
+<div class="soa-container">
+  {% if not no_letterhead and letter_head %}<div id="header-html" class="hidden-pdf"><div class="letter-head">{{ letter_head.content if letter_head.content is defined else letter_head }}</div></div>{% endif %}
+
+
+  <table class="soa-partyinfo">
+    <tr>
+    <td class="soa-to-cell">
+      <div class="to-label">To</div>
+      <div class="party-name">{{ party_name }}</div>
+      {% if party_tax_id %}
+      <div>TRN {{ party_tax_id }}</div>
+      {% endif %}
+    </td>
+    <td class="soa-title-cell">
+      <div class="soa-title">Statement of Accounts</div>
+      <div class="soa-daterange">{%- if stmt_from_date -%}{{ frappe.utils.formatdate(stmt_from_date, "dd MMM yyyy") }} To {% endif -%}{{ frappe.utils.formatdate(stmt_to_date, "dd MMM yyyy") }}</div>
+    </td>
+    </tr>
+  </table>
+
+  <div class="soa-summary-box">
+  <table class="soa-summary-tbl">
+    <tr><td class="ss-title" colspan="2">Account Summary</td></tr>
+    <tr class="ss-row">
+      <td class="ss-label">Opening Balance</td>
+      <td class="ss-value">{{ party_currency }} {{ "{:,.2f}".format(opening_balance) }}</td>
+    </tr>
+    <tr class="ss-row">
+      <td class="ss-label">{{ "Billed Amount" if is_payable else "Invoiced Amount" }}</td>
+      <td class="ss-value {% if invoiced_amount < 0 %}soa-negative{% endif %}">{{ party_currency }} {{ "{:,.2f}".format(invoiced_amount) }}</td>
+    </tr>
+    <tr class="ss-row">
+      <td class="ss-label">{{ "Amount Paid" if is_payable else "Amount Received" }}</td>
+      <td class="ss-value">{{ party_currency }} {{ "{:,.2f}".format(paid_amount) }}</td>
+    </tr>
+    <tr class="ss-row balance-due">
+      <td class="ss-label">Balance Due</td>
+      <td class="ss-value">{{ party_currency }} {{ "{:,.2f}".format(closing_balance) }}</td>
+    </tr>
+  </table>
+</div>
+
+  <table class="soa-txn-table">
+    <thead>
+      <tr>
+        <th style="width:12%;">Date</th>
+        <th style="width:14%;">Transactions</th>
+        <th style="width:34%;">Details</th>
+        <th style="width:13%;" class="text-right">Amount</th>
+        <th style="width:13%;" class="text-right">Payments</th>
+        <th style="width:14%;" class="text-right">Balance</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="opening-row">
+        <td>{% if stmt_from_date %}{{ frappe.utils.formatdate(stmt_from_date, "dd MMM yyyy") }}{% endif %}</td>
+        <td>***Opening Balance***</td>
+        <td></td>
+        <td class="text-right">{{ party_currency }} {{ "{:,.2f}".format(opening_balance) }}</td>
+        <td class="text-right"></td>
+        <td class="text-right">{{ party_currency }} {{ "{:,.2f}".format(opening_balance) }}</td>
+      </tr>
+
+      {% for row in txn_rows %}
+      {% set row_amount = row.invoiced if row.invoiced is defined else row.debit %}
+      {% set row_paid = row.paid if row.paid is defined else row.credit %}
+      {% set row_balance = (row.outstanding if row.outstanding is defined else row.balance) or 0 %}
+      <tr>
+        <td>{{ frappe.utils.formatdate(row.posting_date, "dd MMM yyyy") if row.posting_date else "" }}</td>
+        <td>{{ voucher_label_map.get(row.voucher_type, row.voucher_type) }}</td>
+        <td class="details-cell">
+          <div class="voucher-no">{{ row.voucher_no }}{% if row.due_date %} - due on {{ frappe.utils.formatdate(row.due_date, "dd MMM yyyy") }}{% endif %}</div>
+          {% if row.remarks %}
+          <div class="remarks">{{ row.remarks }}</div>
+          {% endif %}
+        </td>
+        <td class="text-right {% if row_amount and row_amount < 0 %}soa-negative-amount{% endif %}">
+          {% if row_amount %}
+            {% if row_amount < 0 %}
+              ({{ party_currency }} {{ "{:,.2f}".format(row_amount * -1) }})
+            {% else %}
+              {{ party_currency }} {{ "{:,.2f}".format(row_amount) }}
+            {% endif %}
+          {% endif %}
+        </td>
+        <td class="text-right">
+          {% if row_paid %}{{ party_currency }} {{ "{:,.2f}".format(row_paid) }}{% endif %}
+        </td>
+        <td class="text-right">{{ party_currency }} {{ "{:,.2f}".format(row_balance) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <table class="soa-footer-total-table">
+    <tr>
+      <td style="width:73%;"></td>
+      <td class="label-cell" style="width:13%;">Balance Due</td>
+      <td class="value-cell" style="width:14%;">{{ party_currency }} {{ "{:,.2f}".format(closing_balance) }}</td>
+    </tr>
+  </table>
+
+
+  {% if not no_letterhead and letter_head and letter_head.footer %}<div id="footer-html" class="hidden-pdf"><div class="letter-head-footer">{{ letter_head.footer }}</div></div>{% endif %}
+</div>

@@ -1,0 +1,95 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:sender_domain",
+ "creation": "2026-05-16 17:14:19.648313",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_main",
+  "sender_domain",
+  "friendly_name",
+  "subject_regex",
+  "body_regex",
+  "capture_group",
+  "active"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_main",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "Domain of the partner ITSM sender, e.g. alamar.com",
+   "fieldname": "sender_domain",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Sender Domain",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "friendly_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Friendly Name"
+  },
+  {
+   "description": "Python regex applied to the email Subject. The capture group holds the partner ticket key.",
+   "fieldname": "subject_regex",
+   "fieldtype": "Small Text",
+   "label": "Subject Regex",
+   "reqd": 1
+  },
+  {
+   "description": "Fallback regex against the first 2 KB of body when subject is rewritten.",
+   "fieldname": "body_regex",
+   "fieldtype": "Small Text",
+   "label": "Body Regex"
+  },
+  {
+   "default": "1",
+   "fieldname": "capture_group",
+   "fieldtype": "Int",
+   "label": "Capture Group"
+  },
+  {
+   "default": "1",
+   "fieldname": "active",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Active"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-05-16 17:22:46.244560",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "Partner Email Source",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "friendly_name"
+}

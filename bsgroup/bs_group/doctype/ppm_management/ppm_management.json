@@ -1,0 +1,180 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "format:PPM-{#####}",
+ "creation": "2026-07-11 16:21:34.500707",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_bghi",
+  "project",
+  "assigned_engineer",
+  "frequency",
+  "contract_start_date",
+  "column_break_jmlr",
+  "contract_document",
+  "agreement_document",
+  "sign_off_certificate",
+  "ppm_schedule_and_status_section",
+  "next_ppm_date",
+  "status",
+  "ppm_schedule",
+  "column_break_dzf1",
+  "last_completed_on",
+  "completion_report",
+  "reminder_sent"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_bghi",
+   "fieldtype": "Section Break",
+   "label": "Contract & Site Details"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project",
+   "reqd": 1
+  },
+  {
+   "fieldname": "assigned_engineer",
+   "fieldtype": "Link",
+   "label": "Assigned Engineer",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "frequency",
+   "fieldtype": "Select",
+   "label": "Frequency",
+   "options": "Monthly\nQuarterly\nHalf-Yearly\nYearly\nAd-hoc",
+   "reqd": 1
+  },
+  {
+   "fieldname": "contract_start_date",
+   "fieldtype": "Date",
+   "label": "Contract Start Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_jmlr",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "contract_document",
+   "fieldtype": "Attach",
+   "label": "Contract Document"
+  },
+  {
+   "fieldname": "agreement_document",
+   "fieldtype": "Attach",
+   "label": "Agreement Document"
+  },
+  {
+   "fieldname": "sign_off_certificate",
+   "fieldtype": "Attach",
+   "label": "Sign-off Certificate"
+  },
+  {
+   "fieldname": "ppm_schedule_and_status_section",
+   "fieldtype": "Section Break",
+   "label": "PPM Schedule & Status"
+  },
+  {
+   "fieldname": "next_ppm_date",
+   "fieldtype": "Date",
+   "label": "Next PPM Date",
+   "read_only": 1
+  },
+  {
+   "default": "Scheduled",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_filter": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Scheduled\nUpcoming\nOverdue\nCompleted"
+  },
+  {
+   "fieldname": "ppm_schedule",
+   "fieldtype": "Table",
+   "label": "PPM Schedule",
+   "options": "PPM Visit Schedule"
+  },
+  {
+   "fieldname": "column_break_dzf1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "last_completed_on",
+   "fieldtype": "Date",
+   "label": "Last Completed On"
+  },
+  {
+   "fieldname": "completion_report",
+   "fieldtype": "Attach",
+   "label": "Completion Report"
+  },
+  {
+   "default": "0",
+   "fieldname": "reminder_sent",
+   "fieldtype": "Check",
+   "label": "Reminder Sent"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [
+  {
+   "group": "Service",
+   "link_doctype": "Service Report",
+   "link_fieldname": "ppm_management"
+  }
+ ],
+ "modified": "2026-08-14 17:55:19.542051",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "PPM Management",
+ "naming_rule": "Expression (old style)",
+ "owner": "mohan@bitssecureit.com",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [
+  {
+   "color": "Blue",
+   "title": "Scheduled"
+  },
+  {
+   "color": "Yellow",
+   "title": "Upcoming"
+  },
+  {
+   "color": "Red",
+   "title": "Overdue"
+  },
+  {
+   "color": "Green",
+   "title": "Completed"
+  }
+ ],
+ "title_field": "project"
+}

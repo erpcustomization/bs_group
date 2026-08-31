@@ -1,0 +1,158 @@
+{
+ "app": "bsgroup",
+ "charts": [],
+ "content": "[{\"id\":\"rxjwce2f54\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>AMC Management</b></span>\",\"col\":12}},{\"id\":\"xcfejo08ma\",\"type\":\"card\",\"data\":{\"card_name\":\"AMC Contracts\",\"col\":4}},{\"id\":\"lvjsqkigab\",\"type\":\"card\",\"data\":{\"card_name\":\"PPM Management\",\"col\":4}},{\"id\":\"sw1twvzhov\",\"type\":\"card\",\"data\":{\"card_name\":\"Support\",\"col\":4}},{\"id\":\"vs6ru3lw83\",\"type\":\"card\",\"data\":{\"card_name\":\"Related Records\",\"col\":4}}]",
+ "creation": "2026-07-15 12:02:42.693583",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "hide_custom": 0,
+ "icon": "tool",
+ "idx": 0,
+ "indicator_color": "green",
+ "is_hidden": 0,
+ "label": "BS AMC",
+ "link_type": "DocType",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "AMC Contracts",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "AMC Contract",
+   "link_count": 0,
+   "link_to": "AMC Contract",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "AMC Contract Asset",
+   "link_count": 0,
+   "link_to": "AMC Contract Asset",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PPM Management",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PPM Plan",
+   "link_count": 0,
+   "link_to": "PPM Plan",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PPM Visit",
+   "link_count": 0,
+   "link_to": "PPM Visit",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PPM Checklist Template",
+   "link_count": 0,
+   "link_to": "PPM Checklist Template",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PPM Checklist Result",
+   "link_count": 0,
+   "link_to": "PPM Checklist Result",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Support",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Issue",
+   "link_count": 0,
+   "link_to": "Issue",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Related Records",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Project",
+   "link_count": 0,
+   "link_to": "Project",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sales Order",
+   "link_count": 0,
+   "link_to": "Sales Order",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-07-15 12:15:49.739556",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "BS AMC",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [],
+ "sequence_id": 0.0,
+ "shortcuts": [],
+ "title": "BS AMC",
+ "type": "Workspace"
+}

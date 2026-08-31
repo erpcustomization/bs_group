@@ -1,0 +1,247 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "autoname": "format:{dcs}-R{revision_no}",
+ "creation": "2026-08-10 13:05:25.564292",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "dcs",
+  "revision_no",
+  "changed_by",
+  "changed_on",
+  "source",
+  "reason",
+  "sec_prev",
+  "prev_total_cost",
+  "prev_total_selling",
+  "cb_prev",
+  "prev_margin_percent",
+  "prev_concession_percent",
+  "sec_new",
+  "new_total_cost",
+  "new_total_selling",
+  "cb_new",
+  "new_margin_percent",
+  "new_concession_percent",
+  "sec_move",
+  "gp_movement",
+  "margin_movement",
+  "cb_move",
+  "technical_impact",
+  "sec_appr",
+  "approval_requirement",
+  "margin_gate",
+  "approval_state",
+  "cb_appr",
+  "decided_by",
+  "decided_on",
+  "decision_reason"
+ ],
+ "fields": [
+  {
+   "fieldname": "dcs",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Deal Cost Sheet",
+   "options": "Deal Cost Sheet",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "revision_no",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Revision No",
+   "reqd": 1
+  },
+  {
+   "fieldname": "changed_by",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Changed By",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "changed_on",
+   "fieldtype": "Datetime",
+   "label": "Changed On",
+   "reqd": 1
+  },
+  {
+   "fieldname": "source",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Source",
+   "options": "Customer\nVendor\nTechnical\nInternal",
+   "reqd": 1
+  },
+  {
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "label": "Reason",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sec_prev",
+   "fieldtype": "Section Break",
+   "label": "Previous Commercial Position"
+  },
+  {
+   "fieldname": "prev_total_cost",
+   "fieldtype": "Currency",
+   "label": "Previous Total Cost"
+  },
+  {
+   "fieldname": "prev_total_selling",
+   "fieldtype": "Currency",
+   "label": "Previous Total Selling"
+  },
+  {
+   "fieldname": "cb_prev",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "prev_margin_percent",
+   "fieldtype": "Percent",
+   "label": "Previous Margin %"
+  },
+  {
+   "fieldname": "prev_concession_percent",
+   "fieldtype": "Percent",
+   "label": "Previous Concession % from Baseline"
+  },
+  {
+   "fieldname": "sec_new",
+   "fieldtype": "Section Break",
+   "label": "Proposed Commercial Position"
+  },
+  {
+   "fieldname": "new_total_cost",
+   "fieldtype": "Currency",
+   "label": "Proposed Total Cost"
+  },
+  {
+   "fieldname": "new_total_selling",
+   "fieldtype": "Currency",
+   "label": "Proposed Total Selling"
+  },
+  {
+   "fieldname": "cb_new",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "new_margin_percent",
+   "fieldtype": "Percent",
+   "in_list_view": 1,
+   "label": "Proposed Margin %"
+  },
+  {
+   "fieldname": "new_concession_percent",
+   "fieldtype": "Percent",
+   "label": "Proposed Concession % from Baseline"
+  },
+  {
+   "fieldname": "sec_move",
+   "fieldtype": "Section Break",
+   "label": "Movement & Impact"
+  },
+  {
+   "fieldname": "gp_movement",
+   "fieldtype": "Currency",
+   "label": "GP Movement"
+  },
+  {
+   "fieldname": "margin_movement",
+   "fieldtype": "Percent",
+   "label": "Margin Movement"
+  },
+  {
+   "fieldname": "cb_move",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "technical_impact",
+   "fieldtype": "Small Text",
+   "label": "Technical Impact"
+  },
+  {
+   "fieldname": "sec_appr",
+   "fieldtype": "Section Break",
+   "label": "Approval"
+  },
+  {
+   "fieldname": "approval_requirement",
+   "fieldtype": "Select",
+   "label": "Approval Requirement",
+   "options": "None\nManaging Director\nBlocked"
+  },
+  {
+   "description": "Independent commercial floor gate. Not an approver-routing rule.",
+   "fieldname": "margin_gate",
+   "fieldtype": "Select",
+   "label": "Margin Gate",
+   "options": "\nClear\nBlocked"
+  },
+  {
+   "fieldname": "approval_state",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Approval State",
+   "options": "Not Required\nPending Endorsement\nEndorsed - Pending MD\nApproved\nReturned for Rework\nRejected\nBlocked"
+  },
+  {
+   "fieldname": "cb_appr",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "decided_by",
+   "fieldtype": "Link",
+   "label": "Decided By",
+   "options": "User"
+  },
+  {
+   "fieldname": "decided_on",
+   "fieldtype": "Datetime",
+   "label": "Decided On"
+  },
+  {
+   "fieldname": "decision_reason",
+   "fieldtype": "Small Text",
+   "label": "Decision Reason"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-10 13:06:58.572197",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "DCS Revision",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

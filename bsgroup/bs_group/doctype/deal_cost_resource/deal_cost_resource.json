@@ -1,0 +1,116 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-03-14 16:33:21.197401",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "currency",
+  "section_break_8td0",
+  "resource_type",
+  "role",
+  "no_of_persons",
+  "column_break_rmrt",
+  "no_of_days",
+  "hours",
+  "cost_rate",
+  "cost_amount",
+  "linked_project",
+  "section_break_iqdy",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "section_break_8td0",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "resource_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Resource Type",
+   "options": "Internal\nOutsourced"
+  },
+  {
+   "fieldname": "role",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Role"
+  },
+  {
+   "fieldname": "no_of_persons",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "No. of Persons"
+  },
+  {
+   "fieldname": "column_break_rmrt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "no_of_days",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "No. of Days"
+  },
+  {
+   "fieldname": "hours",
+   "fieldtype": "Float",
+   "label": "Hours"
+  },
+  {
+   "fieldname": "cost_rate",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Cost Rate",
+   "options": "currency"
+  },
+  {
+   "fieldname": "cost_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Cost Amount",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "linked_project",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Linked Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "section_break_iqdy",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-03-25 17:23:13.526413",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "Deal Cost Resource",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

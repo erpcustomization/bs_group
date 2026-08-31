@@ -1,0 +1,351 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "CR-.YYYY.-.MM.-.#####",
+ "creation": "2026-04-15 17:50:23.182888",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "request_information_section",
+  "request_date",
+  "requested_by",
+  "company",
+  "department",
+  "project",
+  "purpose",
+  "column_break_sveq",
+  "status",
+  "party_type",
+  "payee_name",
+  "reference_doctype",
+  "reference_name",
+  "financial_details_section",
+  "amount",
+  "currency",
+  "column_break_hzoj",
+  "bank_account",
+  "pre_approval_section",
+  "pre_approval_status",
+  "pre_approved_by",
+  "pre_approved_on",
+  "column_break_ktfk",
+  "pre_approval_comment",
+  "financial_details_tab",
+  "cheque_preparation_section",
+  "column_break_pgif",
+  "prepared_by",
+  "prepared_on",
+  "column_break_ycnd",
+  "cheque_number",
+  "cheque_date",
+  "signing_section",
+  "signing_status",
+  "signed_by",
+  "signed_on",
+  "column_break_sner",
+  "signing_comment",
+  "issue_tracking_section",
+  "issue_status",
+  "issued_by",
+  "issued_on",
+  "column_break_jnhz",
+  "issue_comment",
+  "attachment_remarks_section",
+  "attachment",
+  "remarks",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "request_information_section",
+   "fieldtype": "Section Break",
+   "label": "Request Information"
+  },
+  {
+   "fieldname": "request_date",
+   "fieldtype": "Date",
+   "label": "Request Date"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "label": "Department",
+   "options": "Department"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "payee_name",
+   "fieldtype": "Dynamic Link",
+   "label": "Payee Name",
+   "options": "party_type"
+  },
+  {
+   "fieldname": "party_type",
+   "fieldtype": "Select",
+   "label": "Party Type",
+   "options": "\nSupplier\nCustomer\nEmployee"
+  },
+  {
+   "fieldname": "purpose",
+   "fieldtype": "Small Text",
+   "label": "Purpose",
+   "max_height": "30px"
+  },
+  {
+   "fieldname": "reference_doctype",
+   "fieldtype": "Link",
+   "label": "Reference Doctype",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "column_break_sveq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "reference_name",
+   "fieldtype": "Dynamic Link",
+   "label": "Reference Name",
+   "options": "reference_doctype"
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "label": "Amount"
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "bank_account",
+   "fieldtype": "Link",
+   "label": "Bank Account",
+   "options": "Bank Account"
+  },
+  {
+   "fieldname": "financial_details_section",
+   "fieldtype": "Section Break",
+   "label": "Financial Details"
+  },
+  {
+   "fieldname": "pre_approval_section",
+   "fieldtype": "Section Break",
+   "label": "Pre-Approval"
+  },
+  {
+   "fieldname": "pre_approved_by",
+   "fieldtype": "Link",
+   "label": "Pre Approved By",
+   "options": "User"
+  },
+  {
+   "fieldname": "pre_approved_on",
+   "fieldtype": "Datetime",
+   "label": "Pre Approved On"
+  },
+  {
+   "fieldname": "pre_approval_comment",
+   "fieldtype": "Small Text",
+   "label": "Pre Approval Comment"
+  },
+  {
+   "fieldname": "cheque_number",
+   "fieldtype": "Data",
+   "label": "Cheque Number"
+  },
+  {
+   "fieldname": "cheque_date",
+   "fieldtype": "Date",
+   "label": "Cheque Date"
+  },
+  {
+   "fieldname": "prepared_by",
+   "fieldtype": "Link",
+   "label": "Prepared By",
+   "options": "User"
+  },
+  {
+   "fieldname": "prepared_on",
+   "fieldtype": "Datetime",
+   "label": "Prepared On"
+  },
+  {
+   "fieldname": "cheque_preparation_section",
+   "fieldtype": "Section Break",
+   "label": "Cheque Preparation"
+  },
+  {
+   "fieldname": "signing_section",
+   "fieldtype": "Section Break",
+   "label": "Signing"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "signing_status",
+   "fieldtype": "Select",
+   "label": "Signing Status",
+   "options": "\nPending\nSigned\nRejected"
+  },
+  {
+   "fieldname": "signed_by",
+   "fieldtype": "Link",
+   "label": "Signed By",
+   "options": "User"
+  },
+  {
+   "fieldname": "signed_on",
+   "fieldtype": "Datetime",
+   "label": "Signed On"
+  },
+  {
+   "fieldname": "signing_comment",
+   "fieldtype": "Small Text",
+   "label": "Signing Comment"
+  },
+  {
+   "fieldname": "issue_tracking_section",
+   "fieldtype": "Section Break",
+   "label": "Issue Tracking"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "issue_status",
+   "fieldtype": "Select",
+   "label": "Issue Status",
+   "options": "\nPending\nIssued"
+  },
+  {
+   "fieldname": "issued_by",
+   "fieldtype": "Link",
+   "label": "Issued By",
+   "options": "User"
+  },
+  {
+   "fieldname": "issued_on",
+   "fieldtype": "Datetime",
+   "label": "Issued On"
+  },
+  {
+   "fieldname": "issue_comment",
+   "fieldtype": "Small Text",
+   "label": "Issue Comment"
+  },
+  {
+   "fieldname": "attachment_remarks_section",
+   "fieldtype": "Section Break",
+   "label": "Attachment & Remarks"
+  },
+  {
+   "fieldname": "attachment",
+   "fieldtype": "Attach",
+   "label": "Attachment"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "requested_by",
+   "fieldtype": "Link",
+   "label": "Requested By",
+   "options": "User"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "pre_approval_status",
+   "fieldtype": "Select",
+   "label": "Pre Approval Status",
+   "options": "\nPending\nApproved\nRejected"
+  },
+  {
+   "fieldname": "financial_details_tab",
+   "fieldtype": "Tab Break",
+   "label": "Financial Details"
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "\nDraft\nPending Pre-Approval\nPre-Approved\nPrepared\nPending Signature\nSigned\nIssued\nRejected\nCancelled"
+  },
+  {
+   "fieldname": "column_break_pgif",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_ktfk",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_sner",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_jnhz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_hzoj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_ycnd",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Cheque Request",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-04-17 11:09:09.692526",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "Cheque Request",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

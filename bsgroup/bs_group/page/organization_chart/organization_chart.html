@@ -1,0 +1,496 @@
+
+<style>
+/* ===== Organization Structure — Enterprise Refactor ===== */
+.oc-page{font-family:"Segoe UI",Arial,sans-serif;background:#f4f6f9;min-height:100vh;color:#1a202c;--oc-navy:#0b1f3a;--oc-navy-2:#15305c;--oc-gold:#e8b93d;--oc-line:#e2e8f0;}
+.oc-header{background:linear-gradient(135deg,#0b1f3a,#15305c);padding:24px 40px 20px;position:relative;text-align:center;}
+.oc-header h1{color:#fff;font-size:30px;font-weight:800;letter-spacing:2px;margin:0;}
+.oc-divider{width:90px;height:3px;background:var(--oc-gold);margin:10px auto;border-radius:2px;}
+.oc-subtitle{color:#c9d6e8;font-size:12.5px;letter-spacing:0.5px;}
+.oc-header-topright{position:absolute;top:18px;right:32px;text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
+.oc-header-note{color:#9fb0c8;font-size:10.5px;}
+.oc-badge-pill{display:inline-block;background:rgba(255,255,255,0.12);border:1px solid rgba(232,185,61,0.6);color:#e8b93d;padding:5px 14px;border-radius:20px;font-size:10.5px;font-weight:700;letter-spacing:1.2px;}
+/* Toolbar */
+.oc-toolbar{display:flex;align-items:center;gap:14px;padding:12px 32px;background:#fff;border-bottom:1px solid var(--oc-line);flex-wrap:wrap;position:sticky;top:0;z-index:25;}
+.oc-search-wrap{position:relative;flex:1;min-width:200px;max-width:280px;}
+.oc-search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;opacity:0.5;}
+#oc-search-input{width:100%;box-sizing:border-box;padding:8px 10px 8px 30px;border:1px solid #cbd5e0;border-radius:8px;font-size:12.5px;}
+#oc-search-input:focus{outline:2px solid rgba(11,31,58,0.35);outline-offset:1px;border-color:var(--oc-navy);}
+.oc-search-results{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid var(--oc-line);border-radius:8px;box-shadow:0 6px 16px rgba(0,0,0,0.12);max-height:260px;overflow-y:auto;z-index:40;display:none;}
+.oc-search-results.show{display:block;}
+.oc-search-item{padding:8px 12px;font-size:12.5px;cursor:pointer;border-bottom:1px solid #f1f5f9;}
+.oc-search-item:hover,.oc-search-item.active{background:#f8fafc;}
+.oc-search-item b{color:var(--oc-navy);}
+.oc-si-sub{color:#718096;font-size:11px;}
+.oc-dept-filter select{padding:8px 10px;border:1px solid #cbd5e0;border-radius:8px;font-size:12px;background:#fff;color:#334155;min-width:170px;}
+.oc-dept-filter select:focus{outline:2px solid rgba(11,31,58,0.35);}
+.oc-btn{border:none;padding:8px 16px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+.oc-btn:focus-visible{outline:2px solid var(--oc-gold);outline-offset:2px;}
+.oc-btn-primary{background:var(--oc-navy);color:#fff;}
+.oc-btn-primary:hover{background:var(--oc-navy-2);}
+.oc-btn-secondary{background:#fff;color:var(--oc-navy);border:1px solid var(--oc-navy);}
+.oc-btn-secondary:hover{background:#f1f5f9;}
+/* Statistics badges */
+.oc-stats{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;}
+.oc-stat-chip{background:#eef2f7;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;color:#334155;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;}
+.oc-stat-chip .oc-stat-num{color:var(--oc-navy);font-weight:800;}
+.oc-greeting{margin-left:auto;font-size:15px;font-weight:600;color:var(--oc-navy);white-space:nowrap;display:inline-flex;align-items:center;gap:6px;}
+/* Tree scroll area */
+.oc-scroll{overflow:auto;padding:10px 30px 30px;position:relative;min-height:400px;max-height:calc(100vh - 220px);}
+.oc-tree-wrapper{position:relative;display:flex;justify-content:center;min-width:100%;width:max-content;transform-origin:top center;transition:transform 0.15s ease;}
+.oc-lines-svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;}
+.oc-tree{display:flex;justify-content:center;position:relative;z-index:2;width:max-content;min-width:100%;margin:0 auto;}
+.oc-node{display:flex;flex-direction:column;align-items:center;position:relative;padding:0 10px;}
+.oc-children-row{display:flex;justify-content:center;gap:16px;margin-top:74px;position:relative;flex-wrap:nowrap;}
+/* Cards — width increased ~10% (212 -> 234, root 250 -> 276) */
+.oc-card{width:234px;height:142px;box-sizing:border-box;padding:11px 13px;border-radius:12px;background:#fff;border:1px solid var(--oc-line);box-shadow:0 2px 6px rgba(15,23,42,0.07);cursor:pointer;position:relative;display:flex;flex-direction:column;gap:3px;transition:opacity .2s,box-shadow .15s ease-in-out,transform .15s ease-in-out;}
+.oc-card:hover{box-shadow:0 10px 22px rgba(15,23,42,0.18);transform:translateY(-4px);}
+.oc-card.oc-manager{border-width:2px;}
+.oc-card.oc-lead{border-width:1.5px;}
+.oc-card.oc-leaf{border:1px solid var(--oc-line);border-left:4px solid #94a3b8;}
+.oc-card.oc-root{width:276px;height:108px;background:linear-gradient(135deg,#0b1f3a,#1c3a63);border:2px solid var(--oc-gold);justify-content:center;align-items:center;text-align:center;}
+.oc-card.oc-root .oc-name{color:#fff;font-size:17px;max-width:240px;}
+.oc-card.oc-root .oc-desig{color:var(--oc-gold);font-size:12.5px;-webkit-line-clamp:1;min-height:0;}
+.oc-card.dimmed{opacity:0.40;}
+.oc-card.path-highlight{box-shadow:0 0 0 3px rgba(232,185,61,0.65),0 6px 14px rgba(0,0,0,0.18);}
+.oc-card.search-match{box-shadow:0 0 0 3px rgba(11,31,58,0.55),0 8px 18px rgba(0,0,0,0.20);animation:oc-pulse 1.1s ease-in-out;}
+@keyframes oc-pulse{0%{box-shadow:0 0 0 0 rgba(232,185,61,0.7);}100%{box-shadow:0 0 0 3px rgba(11,31,58,0.55),0 8px 18px rgba(0,0,0,0.20);}}
+.oc-card:focus-visible{outline:2px solid var(--oc-gold);outline-offset:2px;}
+.oc-card-top{display:flex;align-items:center;gap:8px;}
+.oc-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px;flex-shrink:0;}
+.oc-name{font-size:15.5px;font-weight:600;color:#1a202c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:168px;}
+.oc-desig{font-size:12.5px;color:#64748b;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.25;min-height:31px;}
+.oc-dept-badge{align-self:flex-start;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:#fff;}
+.oc-reports{margin-top:auto;padding-top:7px;display:flex;align-items:center;justify-content:space-between;gap:6px;}
+.oc-report-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.95);font-size:13px;font-weight:500;line-height:1;padding:4px 10px;border-radius:999px;white-space:nowrap;}
+.oc-report-badge .oc-rb-icon{font-size:12px;line-height:1;display:inline-flex;align-items:center;}
+.oc-card:not(.oc-root) .oc-report-badge{background:rgba(11,31,58,0.08);color:#0b1f3a;}
+.oc-chevron{width:18px;height:18px;border-radius:50%;background:#f1f5f9;border:1px solid #cbd5e0;display:flex;align-items:center;justify-content:center;font-size:10px;cursor:pointer;color:#334155;flex-shrink:0;}
+.oc-chevron:hover{background:#e2e8f0;}
+/* Expand animation for children rows */
+.oc-children-row.oc-animating{animation:oc-expand-in .2s ease-in-out;}
+@keyframes oc-expand-in{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:translateY(0);}}
+.oc-lines-svg path{transition:opacity .2s ease-in-out;}
+/* Zoom controls — floating, semi-transparent until hover */
+.oc-zoom-controls{position:fixed;right:22px;bottom:22px;background:rgba(255,255,255,0.55);border:1px solid var(--oc-line);border-radius:14px;box-shadow:0 4px 14px rgba(0,0,0,0.14);display:flex;flex-direction:column;overflow:hidden;z-index:50;width:52px;opacity:0.55;transition:opacity .2s ease,box-shadow .2s ease;backdrop-filter:saturate(1.1);}
+.oc-zoom-controls:hover{opacity:1;background:#fff;box-shadow:0 8px 22px rgba(0,0,0,0.20);}
+.oc-zoom-controls button{border:none;background:transparent;padding:9px 0;font-size:15px;cursor:pointer;color:#334155;border-bottom:1px solid #eef2f7;}
+.oc-zoom-controls button:last-child{border-bottom:none;}
+.oc-zoom-controls button:hover{background:#f1f5f9;}
+.oc-zoom-controls button:focus-visible{outline:2px solid var(--oc-gold);outline-offset:-2px;}
+#oc-zoom-level{font-size:10px;text-align:center;padding:4px 0;color:#64748b;border-bottom:1px solid #eef2f7;}
+/* Hover popover */
+.oc-hover-popover{position:fixed;background:var(--oc-navy);color:#fff;padding:12px 14px;border-radius:10px;font-size:12px;line-height:1.7;box-shadow:0 8px 20px rgba(0,0,0,0.25);z-index:100;display:none;min-width:200px;}
+.oc-hover-popover b{color:var(--oc-gold);}
+.oc-pop-actions{margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.15);display:flex;gap:12px;}
+.oc-pop-actions a{color:#cbd5e0;text-decoration:none;font-size:11.5px;}
+.oc-pop-actions a:hover{color:#fff;}
+/* Bottom bar */
+.oc-bottom-bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;background:var(--oc-navy);color:#cbd5e0;padding:10px 30px;font-size:11.5px;}
+.oc-bottom-bar span{display:flex;align-items:center;gap:4px;}
+/* ===== Organization Reference Drawer ===== */
+.oc-drawer-overlay{position:fixed;inset:0;background:rgba(15,23,42,0.35);opacity:0;visibility:hidden;transition:opacity .22s ease,visibility .22s ease;z-index:200;}
+.oc-drawer-overlay.open{opacity:1;visibility:visible;}
+.oc-drawer{position:fixed;top:0;right:0;height:100%;width:460px;max-width:94vw;background:#f7f9fc;box-shadow:-8px 0 28px rgba(0,0,0,0.18);transform:translateX(100%);transition:transform .22s ease-in-out;z-index:201;display:flex;flex-direction:column;}
+.oc-drawer.open{transform:translateX(0);}
+.oc-drawer-head{padding:18px 22px 14px;background:#fff;border-bottom:1px solid var(--oc-line);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.oc-drawer-head h2{margin:0;font-size:17px;font-weight:800;letter-spacing:0.3px;color:var(--oc-navy);}
+.oc-drawer-close{border:none;background:#f1f5f9;width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:16px;color:#334155;}
+.oc-drawer-close:hover{background:#e2e8f0;}
+.oc-tabs{display:flex;gap:6px;padding:12px 16px;background:#fff;border-bottom:1px solid var(--oc-line);flex-shrink:0;}
+.oc-tab{flex:1;border:1px solid var(--oc-line);background:#fff;color:#475569;padding:9px 10px;border-radius:9px;font-size:12.5px;font-weight:700;cursor:pointer;line-height:1.3;transition:background .15s,color .15s,border-color .15s;text-align:center;}
+.oc-tab:hover{background:#f1f5f9;}
+.oc-tab.active{background:var(--oc-navy);color:#fff;border-color:var(--oc-navy);}
+.oc-tab:focus-visible{outline:2px solid var(--oc-gold);outline-offset:2px;}
+.oc-drawer-body{overflow-y:auto;padding:12px 16px 20px;flex:1;}
+.oc-tabpanel{display:none;}
+.oc-tabpanel.active{display:block;}
+.oc-panel-intro{font-size:12.5px;color:#64748b;line-height:1.55;margin:2px 4px 12px;}
+.oc-ref-acc{background:#fff;border:1px solid var(--oc-line);border-radius:10px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(15,23,42,0.04);}
+.oc-ref-head{width:100%;text-align:left;background:#fff;border:none;padding:13px 16px;font-size:14px;font-weight:700;color:#1a202c;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.oc-ref-head:hover{background:#f8fafc;}
+.oc-ref-head:focus-visible{outline:2px solid var(--oc-gold);outline-offset:-2px;}
+.oc-ref-head .oc-ref-ttl{display:flex;align-items:center;gap:9px;}
+.oc-ref-caret{transition:transform .2s ease;color:#94a3b8;font-size:12px;}
+.oc-ref-acc.open .oc-ref-caret{transform:rotate(90deg);}
+.oc-ref-body{max-height:0;overflow:hidden;transition:max-height .24s ease;}
+.oc-ref-acc.open .oc-ref-body{max-height:1600px;}
+.oc-ref-inner{padding:2px 16px 14px;}
+.oc-ref-sub{font-size:12.5px;font-weight:700;color:var(--oc-navy);margin:12px 0 5px;letter-spacing:0.2px;}
+.oc-ref-inner ul{margin:4px 0 0;padding-left:18px;}
+.oc-ref-inner li{font-size:14px;color:#475569;line-height:1.5;margin:3px 0;}
+.oc-ref-inner p{font-size:14px;color:#475569;line-height:1.55;margin:4px 0;}
+.oc-rep-item{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px dashed var(--oc-line);}
+.oc-rep-item:last-child{border-bottom:none;}
+.oc-rep-swatch{width:26px;height:0;margin-top:9px;border-top-width:3px;border-top-style:solid;flex-shrink:0;}
+.oc-rep-txt b{font-size:13px;color:#1a202c;}
+.oc-rep-txt span{display:block;font-size:12.5px;color:#64748b;line-height:1.45;margin-top:2px;}
+.oc-ref-placeholder{background:#f8fafc;border:1px dashed #cbd5e0;border-radius:8px;padding:12px 14px;font-size:13px;color:#64748b;line-height:1.5;}
+.oc-ref-placeholder b{color:#475569;}
+.oc-flow{display:flex;flex-direction:column;gap:6px;margin-top:6px;}
+.oc-flow-step{background:#f8fafc;border:1px solid var(--oc-line);border-left:4px solid var(--oc-navy);border-radius:8px;padding:9px 12px;}
+.oc-flow-step b{font-size:13px;color:#1a202c;}
+.oc-flow-step span{display:block;font-size:12.5px;color:#64748b;margin-top:1px;}
+.oc-flow-arrow{text-align:center;color:#cbd5e0;font-size:14px;line-height:1;}
+.oc-ref-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;}
+.oc-ref-table th{background:#eef2f7;color:var(--oc-navy);font-weight:700;text-align:left;padding:8px 10px;font-size:11.5px;text-transform:uppercase;letter-spacing:0.4px;border-bottom:1px solid var(--oc-line);}
+.oc-ref-table td{padding:8px 10px;border-bottom:1px solid #eef2f7;color:#475569;vertical-align:top;line-height:1.4;}
+.oc-ref-table tr:last-child td{border-bottom:none;}
+.oc-ref-table td:first-child{font-weight:600;color:#1a202c;}
+.oc-ref-future{margin-top:6px;font-size:11.5px;color:#94a3b8;text-align:center;padding:10px 0 2px;}
+.oc-drawer-foot{padding:12px 16px;border-top:1px solid var(--oc-line);background:#fff;flex-shrink:0;}
+.oc-drawer-foot .oc-btn{width:100%;justify-content:center;}
+@media (max-width:800px){.oc-children-row{flex-wrap:wrap;}.oc-toolbar{padding:10px 16px;}.oc-stats{margin-left:0;}.oc-tree-wrapper{width:100%;}}
+</style>
+
+<div class="oc-page">
+  <div class="oc-header">
+    <div class="oc-header-topright">
+      <div class="oc-badge-pill">UAE TEAM</div>
+      <div class="oc-header-note">Note: Structure reflects UAE team.</div>
+    </div>
+    <h1>ORGANIZATION STRUCTURE</h1>
+    <div class="oc-divider"></div>
+  </div>
+
+  <div class="oc-toolbar" role="toolbar" aria-label="Organization chart controls">
+    <div class="oc-search-wrap">
+      <span class="oc-search-icon" aria-hidden="true">&#128269;</span>
+      <input id="oc-search-input" type="text" placeholder="Search employees..." autocomplete="off" role="combobox" aria-expanded="false" aria-controls="oc-search-results" aria-label="Search employees" />
+      <div id="oc-search-results" class="oc-search-results" role="listbox"></div>
+    </div>
+    <div class="oc-dept-filter">
+      <select id="oc-dept-filter" aria-label="Filter by department">
+        <option value="">All Departments</option>
+      </select>
+    </div>
+    <button id="oc-expand-btn" class="oc-btn oc-btn-primary" type="button">Expand Teams</button>
+    <button id="oc-reset-btn" class="oc-btn oc-btn-secondary" type="button">Reset View</button>
+    <button id="oc-gov-btn" class="oc-btn oc-btn-secondary" type="button" aria-haspopup="dialog" aria-controls="oc-gov-drawer">&#128218; Governance</button>
+    <div class="oc-greeting" id="oc-greeting" aria-live="polite">Welcome &#128075;</div>
+  </div>
+
+
+  <div class="oc-scroll" id="oc-scroll">
+    <div class="oc-tree-wrapper" id="org-chart-tree-wrapper">
+      <svg id="oc-lines-svg" class="oc-lines-svg"></svg>
+      <div id="org-chart-tree" class="oc-tree"></div>
+    </div>
+  </div>
+
+  <div class="oc-zoom-controls" role="group" aria-label="Zoom controls">
+    <button id="oc-zoom-in" type="button" aria-label="Zoom in">+</button>
+    <div id="oc-zoom-level">100%</div>
+    <button id="oc-zoom-out" type="button" aria-label="Zoom out">&minus;</button>
+    <button id="oc-zoom-fit" type="button" aria-label="Reset zoom to fit">Fit</button>
+  </div>
+
+  <div class="oc-bottom-bar">
+    <span id="oc-last-updated">Last updated: --</span>
+    <span>Powered by AIRA</span>
+  </div>
+
+  <div id="oc-hover-popover" class="oc-hover-popover"></div>
+
+  <!-- ===== Governance Right-Slide Drawer ===== -->
+  <div id="oc-gov-overlay" class="oc-drawer-overlay"></div>
+<aside id="oc-gov-drawer" class="oc-drawer" role="dialog" aria-modal="true" aria-labelledby="oc-gov-title" aria-hidden="true">
+  <div class="oc-drawer-head">
+    <h2 id="oc-gov-title">Organization Reference</h2>
+    <button class="oc-drawer-close" id="oc-gov-close" type="button" aria-label="Close reference drawer">&times;</button>
+  </div>
+  <div class="oc-tabs" role="tablist" aria-label="Reference sections">
+    <button class="oc-tab active" id="oc-tab-gov" role="tab" aria-selected="true" aria-controls="oc-panel-gov" type="button">Governance</button>
+    <button class="oc-tab" id="oc-tab-ops" role="tab" aria-selected="false" aria-controls="oc-panel-ops" type="button">Operating Model &amp; Cross-Functional Responsibilities</button>
+  </div>
+  <div class="oc-drawer-body">
+    <div class="oc-tabpanel active" id="oc-panel-gov" role="tabpanel" aria-labelledby="oc-tab-gov">
+      <p class="oc-panel-intro">Reporting authority, governance and accountability across the organization.</p>
+      <div class="oc-ref-acc">
+        <button class="oc-ref-head" type="button" aria-expanded="false"><span class="oc-ref-ttl">&#128218; Reporting Structure</span><span class="oc-ref-caret">&#9654;</span></button>
+        <div class="oc-ref-body"><div class="oc-ref-inner">
+          <div class="oc-rep-item"><span class="oc-rep-swatch" style="border-top-color:#1e3a5f;"></span><div class="oc-rep-txt"><b>Direct Reporting</b><span>Line manager relationship shown by the solid line in the chart. Owns objectives, performance and day-to-day direction.</span></div></div>
+          <div class="oc-rep-item"><span class="oc-rep-swatch" style="border-top-color:#0f6b4c;border-top-style:dashed;"></span><div class="oc-rep-txt"><b>Administrative Reporting</b><span>Dashed line. Coordination and operational alignment without direct people-management authority.</span></div></div>
+          <div class="oc-rep-item"><span class="oc-rep-swatch" style="border-top-color:#6b3fa0;border-top-style:dotted;"></span><div class="oc-rep-txt"><b>Technical Governance Reporting</b><span>Dotted line. Functional oversight of technical standards, design authority and quality.</span></div></div>
+          <div class="oc-rep-item"><span class="oc-rep-swatch" style="border-top-color:#b7791f;border-top-style:dotted;"></span><div class="oc-rep-txt"><b>Commercial Governance Reporting</b><span>Dotted line. Functional oversight of pricing, commercial approvals and financial controls.</span></div></div>
+        </div></div>
+      </div>
+      <div class="oc-ref-acc">
+        <button class="oc-ref-head" type="button" aria-expanded="false"><span class="oc-ref-ttl">&#128737; Technical Governance</span><span class="oc-ref-caret">&#9654;</span></button>
+        <div class="oc-ref-body"><div class="oc-ref-inner">
+          <ul>
+            <li>Technical standards</li>
+            <li>Solution architecture</li>
+            <li>Technical approvals</li>
+            <li>Design authority</li>
+            <li>All design &amp; technical escalations</li>
+            <li>Technical quality assurance</li>
+            <li>UAE and Oman oversight</li>
+          </ul>
+        </div></div>
+      </div>
+      <div class="oc-ref-acc">
+        <button class="oc-ref-head" type="button" aria-expanded="false"><span class="oc-ref-ttl">&#128176; Commercial &amp; Financial Governance</span><span class="oc-ref-caret">&#9654;</span></button>
+        <div class="oc-ref-body"><div class="oc-ref-inner">
+          <ul>
+            <li>Commercial approvals</li>
+            <li>Quotation governance</li>
+            <li>Pricing authority</li>
+            <li>Contract administration</li>
+            <li>Procurement governance</li>
+            <li>Billing</li>
+            <li>Collections</li>
+            <li>Gross Profit management</li>
+          </ul>
+        </div></div>
+      </div>
+      <div class="oc-ref-acc">
+        <button class="oc-ref-head" type="button" aria-expanded="false"><span class="oc-ref-ttl">&#128273; Delegation of Authority</span><span class="oc-ref-caret">&#9654;</span></button>
+        <div class="oc-ref-body"><div class="oc-ref-inner">
+          <div class="oc-ref-placeholder"><b>Coming soon.</b> Approval authority limits and the delegation matrix will be maintained here in future versions.</div>
+        </div></div>
+      </div>
+      <div class="oc-ref-future">Additional governance sections can be added here as the framework matures.</div>
+    </div>
+    <div class="oc-tabpanel" id="oc-panel-ops" role="tabpanel" aria-labelledby="oc-tab-ops" hidden>
+      <p class="oc-panel-intro">How departments collaborate &mdash; who owns the customer, who delivers, and who decides.</p>
+      <div class="oc-ref-acc">
+        <button class="oc-ref-head" type="button" aria-expanded="false"><span class="oc-ref-ttl">&#129309; Customer Account Ownership</span><span class="oc-ref-caret">&#9654;</span></button>
+        <div class="oc-ref-body"><div class="oc-ref-inner">
+          <p>The assigned <b>Sales Manager</b> remains the owner of the customer relationship throughout the engagement.</p>
+          <p>Operations and Technical teams communicate directly with customers during execution.</p>
+          <div class="oc-ref-sub">Sales Manager is kept informed of</div>
+          <ul>
+            <li>Customer concerns</li>
+            <li>Scope changes</li>
+            <li>Commercial risks</li>
+            <li>Contractual matters</li>
+            <li>Delivery commitments</li>
+          </ul>
+        </div></div>
+      </div>
+      <div class="oc-ref-acc">
+        <button class="oc-ref-head" type="button" aria-expanded="false"><span class="oc-ref-ttl">&#128736; Project Delivery &amp; Operations</span><span class="oc-ref-caret">&#9654;</span></button>
+        <div class="oc-ref-body"><div class="oc-ref-inner">
+          <div class="oc-ref-sub">Operations Manager owns</div>
+          <ul>
+            <li>Project execution</li>
+            <li>Engineer allocation</li>
+            <li>Scheduling</li>
+            <li>Site coordination</li>
+            <li>Delivery planning</li>
+            <li>Operational communication</li>
+          </ul>
+        </div></div>
+      </div>
+      <div class="oc-ref-acc">
+        <button class="oc-ref-head" type="button" aria-expanded="false"><span class="oc-ref-ttl">&#127919; Pre-Sales &amp; Solution Engineering</span><span class="oc-ref-caret">&#9654;</span></button>
+        <div class="oc-ref-body"><div class="oc-ref-inner">
+          <div class="oc-ref-sub">Activities</div>
+          <ul>
+            <li>Technical validation</li>
+            <li>Architecture discussions</li>
+            <li>Design reviews</li>
+            <li>BoQ validation</li>
+            <li>Site surveys</li>
+            <li>Proposal preparation</li>
+          </ul>
+          <div class="oc-ref-sub">Coordinates with</div>
+          <ul>
+            <li>Technical Manager</li>
+            <li>ELV Team Lead</li>
+            <li>Operations Manager</li>
+          </ul>
+          <p>Commercial ownership remains with <b>Sales</b>.</p>
+        </div></div>
+      </div>
+      <div class="oc-ref-acc">
+        <button class="oc-ref-head" type="button" aria-expanded="false"><span class="oc-ref-ttl">&#128260; Scope Changes &amp; Variations</span><span class="oc-ref-caret">&#9654;</span></button>
+        <div class="oc-ref-body"><div class="oc-ref-inner">
+          <div class="oc-flow">
+            <div class="oc-flow-step"><b>Technical</b><span>Feasibility assessment</span></div>
+            <div class="oc-flow-arrow">&#8595;</div>
+            <div class="oc-flow-step"><b>Operations</b><span>Execution impact</span></div>
+            <div class="oc-flow-arrow">&#8595;</div>
+            <div class="oc-flow-step"><b>Sales</b><span>Customer communication, commercial approval &amp; variation management</span></div>
+          </div>
+        </div></div>
+      </div>
+      <div class="oc-ref-acc">
+        <button class="oc-ref-head" type="button" aria-expanded="false"><span class="oc-ref-ttl">&#128231; Customer Communication Matrix</span><span class="oc-ref-caret">&#9654;</span></button>
+        <div class="oc-ref-body"><div class="oc-ref-inner">
+          <table class="oc-ref-table"><thead><tr><th>Activity</th><th>Primary Owner</th></tr></thead><tbody>
+            <tr><td>Commercial discussion</td><td>Sales</td></tr>
+            <tr><td>Project execution</td><td>Operations</td></tr>
+            <tr><td>Technical clarification</td><td>Technical</td></tr>
+            <tr><td>Site scheduling</td><td>Operations</td></tr>
+            <tr><td>Scope variation</td><td>Sales + Operations + Technical</td></tr>
+            <tr><td>Technical escalation</td><td>Technical Manager</td></tr>
+            <tr><td>Commercial approval</td><td>Finance &amp; Commercial</td></tr>
+          </tbody></table>
+        </div></div>
+      </div>
+      <div class="oc-ref-acc">
+        <button class="oc-ref-head" type="button" aria-expanded="false"><span class="oc-ref-ttl">&#9989; Decision Matrix</span><span class="oc-ref-caret">&#9654;</span></button>
+        <div class="oc-ref-body"><div class="oc-ref-inner">
+          <table class="oc-ref-table"><thead><tr><th>Activity</th><th>Accountable</th><th>Responsible</th><th>Consulted</th></tr></thead><tbody>
+            <tr><td>Customer Relationship</td><td>Sales</td><td>Sales</td><td>Operations</td></tr>
+            <tr><td>Project Delivery</td><td>Operations Manager</td><td>Operations</td><td>Sales</td></tr>
+            <tr><td>Technical Design</td><td>Technical Manager</td><td>Technical</td><td>Pre-Sales</td></tr>
+            <tr><td>Scope Change</td><td>Sales</td><td>Operations</td><td>Technical</td></tr>
+            <tr><td>Engineer Scheduling</td><td>Operations Manager</td><td>Operations</td><td>Technical</td></tr>
+            <tr><td>Commercial Approval</td><td>Finance</td><td>Sales</td><td>Management</td></tr>
+          </tbody></table>
+        </div></div>
+      </div>
+      <div class="oc-ref-future">Future modules: HR Policies &middot; Project Governance &middot; Information Security &middot; Quality &amp; ISO &middot; SOP Library.</div>
+    </div>
+  </div>
+  <div class="oc-drawer-foot">
+    <button class="oc-btn oc-btn-secondary" id="oc-gov-close2" type="button">Close</button>
+  </div>
+</aside>
+</div>
+<script>
+(function(){
+function getCk(n){var v="; "+document.cookie;var p=v.split("; "+n+"=");if(p.length===2)return decodeURIComponent(p.pop().split(";").shift());return "";}
+var uid=getCk("user_id");
+if(!uid||uid==="Guest"){window.location.href="/login?redirect-to="+encodeURIComponent(window.location.pathname+window.location.search);return;}
+var employeesByName={};var rootNode=null;var expandedState={};var currentZoom=1;var highlightedId=null;var lastFocused=null;
+(function(){
+var g=document.getElementById('oc-greeting');if(!g)return;
+var hr=new Date().getHours();var salu=(hr>=5&&hr<12)?'Good Morning':(hr>=12&&hr<17)?'Good Afternoon':'Good Evening';
+function paint(fn){g.innerHTML=(fn?(salu+', '+fn):'Welcome')+' &#128075;';}
+paint(null);
+try{fetch('/api/resource/User/'+encodeURIComponent(uid)+'?fields='+encodeURIComponent(JSON.stringify(['first_name','full_name'])),{credentials:'same-origin'}).then(function(r){return r.json();}).then(function(res){var d=res&&res.data?res.data:{};var fn=(d.first_name&&d.first_name.trim())?d.first_name.trim():((d.full_name&&d.full_name.trim())?d.full_name.trim().split(' ')[0]:'');paint(fn||null);}).catch(function(){paint(null);});}catch(e){paint(null);}
+})();
+function deptColor(dept){if(!dept)return "#4a5568";var d=dept.toLowerCase();if(d.indexOf("management")>-1)return "#1e3a5f";if(d.indexOf("sales")>-1)return "#1d6fa5";if(d.indexOf("financ")>-1||d.indexOf("commercial")>-1)return "#0f6b4c";if(d.indexOf("operation")>-1)return "#6b3fa0";if(d.indexOf("technical")>-1||d.indexOf("project")>-1||d.indexOf("ict")>-1)return "#b7791f";if(d.indexOf("human")>-1||d.indexOf("hr")>-1)return "#0e7c86";if(d.indexOf("marketing")>-1)return "#9b2c53";return "#4a5568";}
+function deptLabel(dept){if(!dept)return "GENERAL";return dept.replace(/\s*-\s*[A-Z]{2,4}$/,"").trim().toUpperCase();}
+function initials(name){if(!name)return "?";var parts=name.trim().split(/\s+/);var s=parts[0][0]||"";if(parts.length>1)s+=parts[parts.length-1][0];return s.toUpperCase();}
+function fetchData(){
+fetch("/api/method/get_org_chart",{credentials:"same-origin"}).then(function(r){return r.json();}).then(function(res){buildTree((res&&res.message&&res.message.data)?res.message.data:[]);}).catch(function(err){document.getElementById("org-chart-tree").innerHTML="<div style=\"padding:40px;color:#c0392b;\">Unable to load organisation data.</div>";});
+}
+function buildTree(data){
+employeesByName={};
+data.forEach(function(e){e.children=[];employeesByName[e.name]=e;});
+rootNode=null;
+data.forEach(function(e){if(e.reports_to&&employeesByName[e.reports_to]){employeesByName[e.reports_to].children.push(e);}else if(!rootNode){rootNode=e;}});
+var deptCount={};data.forEach(function(e){if(e.department){deptCount[e.department]=(deptCount[e.department]||0)+1;}});
+var sel=document.getElementById("oc-dept-filter");
+sel.innerHTML="<option value=\"\">All Departments ("+data.length+")</option>";
+Object.keys(deptCount).sort().forEach(function(d){var opt=document.createElement("option");opt.value=d;opt.textContent=deptLabel(d)+" ("+deptCount[d]+")";sel.appendChild(opt);});
+var mgrCount=0;data.forEach(function(e){if(e.children&&e.children.length>0)mgrCount++;});
+renderTree();
+var now=new Date();document.getElementById("oc-last-updated").textContent="Last updated: "+now.toLocaleDateString()+" "+now.toLocaleTimeString();
+}
+function renderTree(){
+var container=document.getElementById("org-chart-tree");
+if(!rootNode){container.innerHTML="<div style=\"padding:40px;\">No data available.</div>";return;}
+container.innerHTML="";
+container.appendChild(renderNode(rootNode,0));
+requestAnimationFrame(drawLines);
+}
+function renderNode(node,depth){
+var wrap=document.createElement("div");wrap.className="oc-node";wrap.setAttribute("data-name",node.name);
+var isRoot=depth===0;var hasChildren=node.children&&node.children.length>0;var dc=isRoot?"#e8b93d":deptColor(node.department);
+var card=document.createElement("div");
+card.className="oc-card "+(isRoot?"oc-root":(hasChildren?(depth===1?"oc-manager":"oc-lead"):"oc-leaf"));
+card.setAttribute("data-name",node.name);
+card.setAttribute("tabindex","0");card.setAttribute("role","treeitem");card.setAttribute("aria-label",(node.employee_name||node.name)+", "+(node.designation||"")+(hasChildren?", "+node.children.length+" direct reports":""));
+if(hasChildren)card.setAttribute("aria-expanded",(expandedState[node.name]===undefined?(depth<1):expandedState[node.name])?"true":"false");
+if(!isRoot){if(hasChildren){card.style.borderColor=dc;}else{card.style.borderLeftColor=dc;}}
+var top=document.createElement("div");top.className="oc-card-top";
+var avatar=document.createElement("div");avatar.className="oc-avatar";avatar.style.background=isRoot?"#e8b93d":dc;if(isRoot)avatar.style.color="#0b1f3a";avatar.textContent=initials(node.employee_name);
+var nameEl=document.createElement("div");nameEl.className="oc-name";nameEl.textContent=node.employee_name||node.name;
+top.appendChild(avatar);top.appendChild(nameEl);card.appendChild(top);
+var desig=document.createElement("div");desig.className="oc-desig";desig.textContent=node.designation||"";card.appendChild(desig);
+if(!isRoot&&node.department){var badge=document.createElement("div");badge.className="oc-dept-badge";badge.style.background=dc;badge.textContent=deptLabel(node.department);card.appendChild(badge);}
+var reportCount=(node.children||[]).length;
+var repRow=null;if(reportCount>0){repRow=document.createElement("div");repRow.className="oc-reports";var repLabel=document.createElement("span");repLabel.className="oc-report-badge";repLabel.innerHTML="<span class=\"oc-rb-icon\">&#128101;</span>Direct Reports: "+reportCount;repRow.appendChild(repLabel);if(hasChildren){var chev=document.createElement("span");chev.className="oc-chevron";repRow.appendChild(chev);}card.appendChild(repRow);}
+function toggleNode(ev){if(ev)ev.stopPropagation();clearHighlight();if(hasChildren){expandedState[node.name]=!expandedState[node.name];renderTree();requestAnimationFrame(function(){var re=document.querySelector(".oc-card[data-name=\""+cssEscape(node.name)+"\"]");if(re)re.focus();});}}
+card.addEventListener("click",toggleNode);
+card.addEventListener("keydown",function(ev){if(ev.key==="Enter"){ev.preventDefault();toggleNode(ev);}});
+card.addEventListener("mouseenter",function(){showPopover(node,card);});
+card.addEventListener("focus",function(){showPopover(node,card);});
+card.addEventListener("mouseleave",function(){hidePopover();});
+card.addEventListener("blur",function(){hidePopover();});
+wrap.appendChild(card);
+if(hasChildren){
+if(expandedState[node.name]===undefined){expandedState[node.name]=depth<1;}
+var expanded=expandedState[node.name];
+if(repRow){var chev2=repRow.querySelector(".oc-chevron");if(chev2){chev2.innerHTML=expanded?"&#9652;":"&#9662;";}}
+if(expanded){
+var childrenRow=document.createElement("div");childrenRow.className="oc-children-row oc-animating";
+node.children.forEach(function(ch){childrenRow.appendChild(renderNode(ch,depth+1));});
+wrap.appendChild(childrenRow);
+}
+}
+return wrap;
+}
+function getAncestorChain(name){var chain=[];var cur=employeesByName[name];while(cur){chain.push(cur.name);cur=cur.reports_to?employeesByName[cur.reports_to]:null;}return chain;}
+function applyHighlight(name){var chain=getAncestorChain(name);var chainSet={};chain.forEach(function(n){chainSet[n]=true;});var cards=document.querySelectorAll(".oc-card");for(var i=0;i<cards.length;i++){var c=cards[i];var n=c.getAttribute("data-name");if(chainSet[n]){c.classList.add("path-highlight");c.classList.remove("dimmed");}else{c.classList.remove("path-highlight");c.classList.add("dimmed");}}}
+function clearHighlight(){highlightedId=null;var cards=document.querySelectorAll(".oc-card");for(var i=0;i<cards.length;i++){cards[i].classList.remove("path-highlight");cards[i].classList.remove("dimmed");cards[i].classList.remove("search-match");}}
+function expandAll(){Object.keys(employeesByName).forEach(function(n){if(employeesByName[n].children&&employeesByName[n].children.length)expandedState[n]=true;});}
+function cssEscape(s){return s.replace(/["\\]/g,"\\$&");}
+function selectEmployee(name){var chain=getAncestorChain(name);chain.forEach(function(n){if(employeesByName[n].children&&employeesByName[n].children.length)expandedState[n]=true;});renderTree();highlightedId=name;requestAnimationFrame(function(){applyHighlight(name);var card=document.querySelector(".oc-card[data-name=\""+cssEscape(name)+"\"]");if(card){card.classList.add("search-match");card.classList.remove("dimmed");card.scrollIntoView({behavior:"smooth",block:"center",inline:"center"});}});}
+function showPopover(node,cardEl){var popover=document.getElementById("oc-hover-popover");var rect=cardEl.getBoundingClientRect();var html="";html+="<div><b>ID:</b> "+node.name+"</div>";if(node.company_email)html+="<div><b>Email:</b> "+node.company_email+"</div>";if(node.cell_number)html+="<div><b>Phone:</b> "+node.cell_number+"</div>";if(node.department)html+="<div><b>Dept:</b> "+deptLabel(node.department)+"</div>";if(node.date_of_joining)html+="<div><b>Joined:</b> "+node.date_of_joining+"</div>";var actions="";if(node.company_email)actions+="<a href=\"mailto:"+node.company_email+"\">&#9993; Email</a>";if(node.cell_number)actions+="<a href=\"tel:"+node.cell_number+"\">&#9742; Call</a>";if(actions)html+="<div class=\"oc-pop-actions\">"+actions+"</div>";popover.innerHTML=html;popover.style.display="block";var top=rect.top-popover.offsetHeight-10;if(top<10)top=rect.bottom+10;var left=rect.left+rect.width/2-popover.offsetWidth/2;if(left<10)left=10;popover.style.top=top+"px";popover.style.left=left+"px";}
+function hidePopover(){document.getElementById("oc-hover-popover").style.display="none";}
+function lineStyleFor(managerNode){var desig=(managerNode.designation||"").toLowerCase();if(desig.indexOf("operation")>-1){return{stroke:"#0f6b4c",dash:"7,5",width:2};}return{stroke:"#1e3a5f",dash:"",width:2.5};}
+function drawLines(){
+var svg=document.getElementById("oc-lines-svg");var wrapper=document.getElementById("org-chart-tree-wrapper");svg.innerHTML="";
+var wrapperRect=wrapper.getBoundingClientRect();
+var nodes=document.querySelectorAll(".oc-node");
+for(var i=0;i<nodes.length;i++){
+var node=nodes[i];var parentName=node.getAttribute("data-name");var parentEmp=employeesByName[parentName];
+var card=node.querySelector(":scope > .oc-card");if(!card)continue;
+var childrenRow=node.querySelector(":scope > .oc-children-row");if(!childrenRow)continue;
+var pRect=card.getBoundingClientRect();var startX=(pRect.left+pRect.width/2-wrapperRect.left)/currentZoom;var startY=(pRect.bottom-wrapperRect.top)/currentZoom;
+var childNodes=childrenRow.querySelectorAll(":scope > .oc-node");
+for(var j=0;j<childNodes.length;j++){
+var ccard=childNodes[j].querySelector(":scope > .oc-card");if(!ccard)continue;
+var cRect=ccard.getBoundingClientRect();var endX=(cRect.left+cRect.width/2-wrapperRect.left)/currentZoom;var endY=(cRect.top-wrapperRect.top)/currentZoom;
+var midY=(startY+endY)/2;var style=lineStyleFor(parentEmp);
+var path=document.createElementNS("http://www.w3.org/2000/svg","path");
+var d="M "+startX+" "+startY+" C "+startX+" "+midY+", "+endX+" "+midY+", "+endX+" "+endY;
+path.setAttribute("d",d);path.setAttribute("stroke",style.stroke);path.setAttribute("stroke-width",style.width);path.setAttribute("fill","none");if(style.dash)path.setAttribute("stroke-dasharray",style.dash);
+svg.appendChild(path);
+}}}
+function applyZoom(){document.getElementById("org-chart-tree-wrapper").style.transform="scale("+currentZoom+")";document.getElementById("oc-zoom-level").textContent=Math.round(currentZoom*100)+"%";requestAnimationFrame(drawLines);}
+document.getElementById("oc-zoom-in").addEventListener("click",function(){currentZoom=Math.min(1.5,currentZoom+0.1);applyZoom();});
+document.getElementById("oc-zoom-out").addEventListener("click",function(){currentZoom=Math.max(0.5,currentZoom-0.1);applyZoom();});
+document.getElementById("oc-zoom-fit").addEventListener("click",function(){currentZoom=1;applyZoom();});
+document.getElementById("oc-expand-btn").addEventListener("click",function(){expandAll();renderTree();});
+document.getElementById("oc-reset-btn").addEventListener("click",function(){expandedState={};highlightedId=null;currentZoom=1;document.getElementById("oc-dept-filter").value="";applyZoom();renderTree();});
+document.getElementById("oc-scroll").addEventListener("click",function(){clearHighlight();});
+document.getElementById("oc-dept-filter").addEventListener("change",function(ev){var val=ev.target.value;if(!val){clearHighlight();return;}expandAll();renderTree();requestAnimationFrame(function(){var showSet={};Object.keys(employeesByName).forEach(function(n){if(employeesByName[n].department===val){getAncestorChain(n).forEach(function(a){showSet[a]=true;});}});var cards=document.querySelectorAll(".oc-card");for(var i=0;i<cards.length;i++){var n=cards[i].getAttribute("data-name");if(showSet[n]){cards[i].classList.remove("dimmed");}else{cards[i].classList.add("dimmed");}}});});
+window.addEventListener("resize",function(){drawLines();});
+var searchInput=document.getElementById("oc-search-input");var searchResults=document.getElementById("oc-search-results");
+searchInput.addEventListener("input",function(){var q=searchInput.value.trim().toLowerCase();if(!q){searchResults.classList.remove("show");searchInput.setAttribute("aria-expanded","false");searchResults.innerHTML="";clearHighlight();return;}var matches=[];Object.keys(employeesByName).forEach(function(n){var e=employeesByName[n];var hay=((e.employee_name||"")+" "+(e.designation||"")+" "+(e.department||"")).toLowerCase();if(hay.indexOf(q)>-1)matches.push(e);});matches=matches.slice(0,8);if(!matches.length){searchResults.innerHTML="<div class=\"oc-search-item\">No matches found</div>";searchResults.classList.add("show");searchInput.setAttribute("aria-expanded","true");return;}searchResults.innerHTML="";matches.forEach(function(e){var item=document.createElement("div");item.className="oc-search-item";item.setAttribute("role","option");item.innerHTML="<b>"+(e.employee_name||e.name)+"</b><div class=\"oc-si-sub\">"+(e.designation||"")+" &middot; "+deptLabel(e.department||"")+"</div>";item.addEventListener("click",function(){searchResults.classList.remove("show");searchInput.setAttribute("aria-expanded","false");searchInput.value="";selectEmployee(e.name);});searchResults.appendChild(item);});searchResults.classList.add("show");searchInput.setAttribute("aria-expanded","true");});
+document.addEventListener("click",function(ev){if(!searchResults.contains(ev.target)&&ev.target!==searchInput){searchResults.classList.remove("show");searchInput.setAttribute("aria-expanded","false");}});
+/* Organization Reference Drawer: open/close, tabs, accordions, keyboard */
+var govBtn=document.getElementById("oc-gov-btn");
+var govDrawer=document.getElementById("oc-gov-drawer");
+var govOverlay=document.getElementById("oc-gov-overlay");
+var govClose=document.getElementById("oc-gov-close");
+var govClose2=document.getElementById("oc-gov-close2");
+function openGov(){lastFocused=document.activeElement;govDrawer.classList.add("open");govOverlay.classList.add("open");govDrawer.setAttribute("aria-hidden","false");govClose.focus();}
+function closeGov(){govDrawer.classList.remove("open");govOverlay.classList.remove("open");govDrawer.setAttribute("aria-hidden","true");if(lastFocused&&lastFocused.focus)lastFocused.focus();}
+govBtn.addEventListener("click",openGov);
+govClose.addEventListener("click",closeGov);
+govClose2.addEventListener("click",closeGov);
+govOverlay.addEventListener("click",closeGov);
+var tabGov=document.getElementById("oc-tab-gov");var tabOps=document.getElementById("oc-tab-ops");
+var panelGov=document.getElementById("oc-panel-gov");var panelOps=document.getElementById("oc-panel-ops");
+function selectTab(which){var isGov=(which==="gov");
+tabGov.classList.toggle("active",isGov);tabOps.classList.toggle("active",!isGov);
+tabGov.setAttribute("aria-selected",isGov?"true":"false");tabOps.setAttribute("aria-selected",!isGov?"true":"false");
+panelGov.classList.toggle("active",isGov);panelOps.classList.toggle("active",!isGov);
+if(isGov){panelGov.removeAttribute("hidden");panelOps.setAttribute("hidden","");}else{panelOps.removeAttribute("hidden");panelGov.setAttribute("hidden","");}
+govDrawer.querySelector(".oc-drawer-body").scrollTop=0;}
+tabGov.addEventListener("click",function(){selectTab("gov");});
+tabOps.addEventListener("click",function(){selectTab("ops");});
+var refAccs=govDrawer.querySelectorAll(".oc-ref-acc");
+refAccs.forEach(function(acc){var head=acc.querySelector(".oc-ref-head");head.addEventListener("click",function(){var isOpen=acc.classList.contains("open");refAccs.forEach(function(a){a.classList.remove("open");a.querySelector(".oc-ref-head").setAttribute("aria-expanded","false");});if(!isOpen){acc.classList.add("open");head.setAttribute("aria-expanded","true");}});});
+document.addEventListener("keydown",function(ev){if(ev.key==="Escape"){if(govDrawer.classList.contains("open")){closeGov();}var sr=document.getElementById("oc-search-results");if(sr){sr.classList.remove("show");}}});
+fetchData();
+})();
+</script>

@@ -1,0 +1,275 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "autoname": "format:{dcs}-AREV{reversal_no}",
+ "creation": "2026-08-10 13:06:39.605973",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "dcs",
+  "reversal_no",
+  "status",
+  "sec_orig",
+  "original_award_reference",
+  "original_award_evidence_type",
+  "original_awarded_by",
+  "original_awarded_on",
+  "cb_orig",
+  "original_frozen_revision_no",
+  "original_frozen_total_cost",
+  "original_frozen_total_selling",
+  "original_frozen_margin_percent",
+  "sec_rev",
+  "reversal_reason",
+  "acknowledged",
+  "acknowledgement_text",
+  "evidence_reference",
+  "cb_rev",
+  "requested_by",
+  "requested_on",
+  "approved_by",
+  "approved_on",
+  "approver_authority",
+  "sec_impact",
+  "delivery_release_state_at_reversal",
+  "delivery_already_released",
+  "operational_review_required",
+  "cb_impact",
+  "approval_state_at_reversal",
+  "returned_to_state",
+  "operational_review_note"
+ ],
+ "fields": [
+  {
+   "fieldname": "dcs",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Deal Cost Sheet",
+   "options": "Deal Cost Sheet",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "reversal_no",
+   "fieldtype": "Int",
+   "label": "Reversal No",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Derived Award State",
+   "options": "\nReversed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_orig",
+   "fieldtype": "Section Break",
+   "label": "Original Award (immutable snapshot)"
+  },
+  {
+   "fieldname": "original_award_reference",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Original Award Reference",
+   "read_only": 1
+  },
+  {
+   "fieldname": "original_award_evidence_type",
+   "fieldtype": "Data",
+   "label": "Original Evidence Type",
+   "read_only": 1
+  },
+  {
+   "fieldname": "original_awarded_by",
+   "fieldtype": "Link",
+   "label": "Originally Awarded By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "original_awarded_on",
+   "fieldtype": "Datetime",
+   "label": "Originally Awarded On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb_orig",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "original_frozen_revision_no",
+   "fieldtype": "Int",
+   "label": "Frozen Revision No",
+   "read_only": 1
+  },
+  {
+   "fieldname": "original_frozen_total_cost",
+   "fieldtype": "Currency",
+   "label": "Frozen Total Cost",
+   "read_only": 1
+  },
+  {
+   "fieldname": "original_frozen_total_selling",
+   "fieldtype": "Currency",
+   "label": "Frozen Total Selling",
+   "read_only": 1
+  },
+  {
+   "fieldname": "original_frozen_margin_percent",
+   "fieldtype": "Percent",
+   "label": "Frozen Margin %",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_rev",
+   "fieldtype": "Section Break",
+   "label": "Reversal"
+  },
+  {
+   "fieldname": "reversal_reason",
+   "fieldtype": "Small Text",
+   "label": "Reversal Reason",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "acknowledged",
+   "fieldtype": "Check",
+   "label": "Consequences Acknowledged",
+   "read_only": 1
+  },
+  {
+   "fieldname": "acknowledgement_text",
+   "fieldtype": "Small Text",
+   "label": "Acknowledgement",
+   "read_only": 1
+  },
+  {
+   "fieldname": "evidence_reference",
+   "fieldtype": "Data",
+   "label": "Reversal Evidence / Reference",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb_rev",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "requested_by",
+   "fieldtype": "Link",
+   "label": "Requested By",
+   "options": "User",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "requested_on",
+   "fieldtype": "Datetime",
+   "label": "Requested On",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "approved_by",
+   "fieldtype": "Link",
+   "label": "Approved By",
+   "options": "User",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "approved_on",
+   "fieldtype": "Datetime",
+   "label": "Approved On",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "approver_authority",
+   "fieldtype": "Data",
+   "label": "Approver Authority",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_impact",
+   "fieldtype": "Section Break",
+   "label": "Downstream Impact At Reversal"
+  },
+  {
+   "fieldname": "delivery_release_state_at_reversal",
+   "fieldtype": "Data",
+   "label": "Delivery Release State At Reversal",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "delivery_already_released",
+   "fieldtype": "Check",
+   "label": "Delivery Was Already Released",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "operational_review_required",
+   "fieldtype": "Check",
+   "label": "Operational Review Required",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb_impact",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "approval_state_at_reversal",
+   "fieldtype": "Data",
+   "label": "Approval State At Reversal",
+   "read_only": 1
+  },
+  {
+   "fieldname": "returned_to_state",
+   "fieldtype": "Data",
+   "label": "Deal Returned To",
+   "read_only": 1
+  },
+  {
+   "fieldname": "operational_review_note",
+   "fieldtype": "Small Text",
+   "label": "Operational Review Note",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-10 13:07:19.255425",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "DCS Award Reversal",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

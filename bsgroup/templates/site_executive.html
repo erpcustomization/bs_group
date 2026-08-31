@@ -1,0 +1,453 @@
+<style>
+    /* ── Mandatory Hiding ─────────────────────────────────────────── */
+    [document-status] { display: none; }
+    .print-heading { display: none; }
+    .page-number  {
+          display: none!important;
+    }
+
+    /* ── Reset ───────────────────────────────────────────────────── */
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        /* NOTE: font-size intentionally NOT set here (and never with
+           !important) — that was overriding every specific font-size
+           rule below (table headers, small print, etc). Default body
+           copy size comes from the `body, p, td, ...` rule instead. */
+    }
+
+    body, p, td, th, div, span, li {
+        font-size: 10.5pt;
+        color: #1a1a1a;
+        line-height: 1.6;
+    }
+
+    /* ── Running Footer IMAGE (repeats on every page, pinned to the
+       very bottom of each page) ──────────────────────────────────
+       Own class (.footer-img) so it's sized independently of the
+       big page-1 header logo. ─────────────────────────────────── */
+    .fixed-footer {
+        position: fixed;
+        bottom: 0mm;
+        left: 0mm;
+        right: 0mm;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        text-align: center;
+        z-index: 9999;
+    }
+
+    .footer-img {
+        /* Capped height so the footer can never grow taller than the
+           padding-bottom reserved for it on .page — an oversized
+           footer image was overflowing the last page and spilling
+           onto an extra, otherwise-empty page. */
+        width: auto;
+        max-width: 100%;
+        height: auto;
+        max-height: 18mm;
+        display: block;
+        margin: 0 auto;
+    }
+
+    /* ── Page Wrapper ─────────────────────────────────────────────── */
+    .page {
+        width: 100%;
+        display: block;
+        page-break-after: always;
+        /* top padding kept modest since there's no running header now;
+           bottom padding sized to clear the fixed footer image.
+           left/right kept small — ERPNext's own Print Format page
+           margins (Print Settings tab) already add space on the
+           sides, so a big padding here on top of that is what was
+           causing the wide left/right gaps. */
+        padding-top: 0mm;
+        padding-bottom: 20mm;
+        padding-left: 6mm;
+        padding-right: 6mm;
+    }
+
+    .page:last-child { page-break-after: auto; }
+
+    /* Belt-and-suspenders: wkhtmltopdf sometimes ignores a lone
+       page-break-after on the preceding div and lets the next div's
+       content start bleeding onto the same physical page. Forcing
+       page-break-before on the following page fixes that. */
+    .tax-summary-page,
+    .terms-page {
+        page-break-before: always;
+    }
+
+    /* Dedicated, empty "hard break" marker. wkhtmltopdf sometimes
+       lands the break AFTER the first line of a container even when
+       that container has page-break-before — a plain empty element
+       given the break instead is the reliable fallback: there's no
+       heading/content on it for the break point to be miscalculated
+       against. */
+    .hard-break {
+        page-break-before: always;
+        height: 0;
+        line-height: 0;
+        font-size: 0;
+    }
+
+    /* ── Page 1 : Header Image Cover ──────────────────────────────────
+       wkhtmltopdf (used by Frappe's PDF engine) has unreliable/partial
+       support for flexbox centering — display:table/table-cell is the
+       classic fallback that renders correctly in wkhtmltopdf.
+    */
+    .cover-page {
+        display: table;
+        width: 100%;
+        min-height: 240mm;
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    .cover-page-cell {
+        display: table-cell;
+        width: 100%;
+        height: 240mm;
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    .logo-center {
+        width: 100%;
+        text-align: center;
+    }
+
+    .cover-logo {
+        max-width: 260px;
+        width: 45%;
+        display: inline-block;
+    }
+
+    /* ── Page 2 : Proposal Intro ─────────────────────────────────── */
+    .proposal-for {
+        font-size: 10.5pt;
+        margin-bottom: 2px;
+    }
+
+    .proposal-company {
+        font-size: 10.5pt;
+        font-weight: 700;
+        margin-bottom: 14px;
+    }
+
+    .dear-line {
+        margin-bottom: 14px;
+    }
+
+    .after-compliments {
+        margin-bottom: 4px;
+    }
+
+    .intro-para {
+        margin-bottom: 18px;
+    }
+
+    /* ── Items Table ─────────────────────────────────────────────── */
+    .items-tbl {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 4px;
+        table-layout: fixed;
+    }
+
+    .items-tbl thead tr th {
+        background: #1b3a6b;
+        color: #fff;
+        padding: 7px 9px;
+        font-size: 9pt;
+        font-weight: 700;
+        text-align: left;
+        border: 1px solid #1b3a6b;
+    }
+
+    .items-tbl thead tr th.r { text-align: right; }
+
+    .items-tbl tbody tr.item-row td {
+        padding: 7px 9px;
+        border-bottom: 1px solid #dde3eb;
+        vertical-align: top;
+        font-size: 9pt;
+    }
+
+    .item-no { text-align: center; color: #555; width: 5%; }
+    .item-desc {
+        width: 45%;
+        overflow-wrap: break-word;
+        word-break: break-word;
+    }
+    .item-qty, .item-rate, .item-tax, .item-amt {
+        text-align: right;
+        white-space: nowrap;
+        font-size: 9pt;
+        width: 12.5%;
+    }
+
+    .tax-rate-sub {
+        display: block;
+        font-size: 7.5pt;
+        color: #666;
+    }
+
+    .items-tbl tr.subtotal-row td {
+        border-top: 1.5px solid #1b3a6b;
+        font-weight: 700;
+        font-size: 9pt;
+        padding: 7px 9px;
+    }
+
+    .items-tbl tr.subtotal-row td.lbl-cell {
+        text-align: right;
+    }
+
+    /* ── Totals Block (below items table) ───────────────────────── */
+    .totals-below {
+        margin-top: 4px;
+        margin-bottom: 18px;
+    }
+
+    .totals-below table {
+        margin-left: auto;
+        border-collapse: collapse;
+        min-width: 280px;
+    }
+
+    .totals-below td {
+        padding: 5px 10px;
+        font-size: 9pt;
+    }
+
+    .totals-below td.lbl { text-align: left; }
+    .totals-below td.amt { text-align: right; }
+
+    .totals-below tr.grand-row td {
+        background: #eceff3;
+        font-weight: 700;
+        font-size: 9.5pt;
+        border-top: 1.5px solid #1b3a6b;
+    }
+
+    /* ── Tax Summary ─────────────────────────────────────────────── */
+    .tax-summary-heading {
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+
+    .comm-summary { margin-bottom: 18px; }
+
+    .comm-tbl {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .comm-tbl thead tr th {
+        background: #1b3a6b;
+        color: #fff;
+        padding: 6px 10px;
+        font-size: 9pt;
+        font-weight: 700;
+        text-align: left;
+        border: 1px solid #1b3a6b;
+    }
+
+    .comm-tbl thead tr th.r { text-align: right; }
+
+    .comm-tbl tbody tr td {
+        padding: 6px 10px;
+        font-size: 9pt;
+        border-bottom: 1px solid #dde3eb;
+    }
+
+    .comm-tbl tbody tr td.r { text-align: right; }
+
+    .comm-tbl tbody tr.comm-total td {
+        font-weight: 700;
+        background: #eceff3;
+        border-top: 1.5px solid #1b3a6b;
+    }
+
+    /* ── Closing / Terms ─────────────────────────────────────────── */
+    .closing-line { margin-bottom: 18px; }
+
+    .terms-hdr {
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+
+    .terms-section p {
+        margin-bottom: 6px;
+        font-size: 9.5pt;
+    }
+
+    /* ── Print ───────────────────────────────────────────────────── */
+    @media print {
+        .page { page-break-after: always; }
+        .page:last-child { page-break-after: auto; }
+        .items-tbl tr { page-break-inside: avoid; }
+    }
+</style>
+
+{# ============  RUNNING FOOTER IMAGE (every page)  ============= #}
+<div class="fixed-footer">
+    <img src="/files/Site Executive Footer.png" alt="Company Footer" class="footer-img">
+</div>
+
+{# =====================  PAGE 1 : HEADER IMAGE COVER  ============= #}
+<div class="page cover-page">
+    <div class="cover-page-cell">
+        <div class="logo-center">
+            <img src="/files/Site Executive header.png" alt="Company Logo" class="cover-logo">
+        </div>
+    </div>
+</div>
+
+{# =====================  PAGE 2 : PROPOSAL  ======================= #}
+<div class="page">
+
+    <p class="proposal-for">Proposal for :</p>
+    <p class="proposal-company">{{ doc.customer_name or doc.party_name or doc.customer }}</p>
+
+    {# ADJUST: swap doc.contact_person / custom field for actual salutation name #}
+    <p class="dear-line">
+        Dear {{ doc.custom_contact_person_name or (frappe.db.get_value("Contact", doc.contact_person, "first_name") if doc.contact_person else "") }}{{ "," if (doc.custom_contact_person_name or doc.contact_person) else "" }}
+    </p>
+
+    <p class="after-compliments">After Compliments</p>
+    <p class="intro-para">
+        Further to your request on the above subject please find herewith the detailed proposal for your perusal
+    </p>
+
+    {# Determine a flat tax rate to apply per line (uses first tax row on the doc) #}
+    {% set tax_rate = doc.taxes[0].rate if doc.taxes and doc.taxes[0].rate else 0 %}
+    {% set ns = namespace(tax_sum=0, amt_sum=0) %}
+
+    <table class="items-tbl">
+        <colgroup>
+            <col style="width: 5%;">
+            <col style="width: 45%;">
+            <col style="width: 12.5%;">
+            <col style="width: 12.5%;">
+            <col style="width: 12.5%;">
+            <col style="width: 12.5%;">
+        </colgroup>
+        <thead>
+            <tr>
+                <th>S.No</th>
+                <th>SKU &amp; Product</th>
+                <th class="r">Qty</th>
+                <th class="r">Unit Rate</th>
+                <th class="r">Tax</th>
+                <th class="r">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in doc.items %}
+            {% set base_amt = item.amount %}
+            {% set item_tax = base_amt * tax_rate / 100 %}
+            {% set item_total = base_amt + item_tax %}
+            {% set ns.tax_sum = ns.tax_sum + item_tax %}
+            {% set ns.amt_sum = ns.amt_sum + item_total %}
+            <tr class="item-row">
+                <td class="item-no">{{ loop.index }}</td>
+                <td class="item-desc">
+                    {{ item.item_code or item.item_name }}
+                    {% if item.description and item.description != item.item_name %}
+                    <br><span style="font-size:8pt;color:#555;overflow-wrap:break-word;word-break:break-word;">{{ item.description | replace('\n','<br>') }}</span>
+                    {% endif %}
+                </td>
+                <td class="item-qty">{{ "%.2f"|format(item.qty) if item.qty != item.qty|int else item.qty|int }}</td>
+                <td class="item-rate">{{ "{:,.2f}".format(item.rate) }}</td>
+                <td class="item-tax">
+                    {{ "{:,.2f}".format(item_tax) }}
+                    <span class="tax-rate-sub">{{ "%.2f"|format(tax_rate) }}%</span>
+                </td>
+                <td class="item-amt">{{ "{:,.2f}".format(item_total) }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="subtotal-row">
+                <td colspan="4" class="lbl-cell">Sub Total</td>
+                <td class="item-tax">{{ "{:,.2f}".format(doc.total_taxes_and_charges or ns.tax_sum) }}</td>
+                <td class="item-amt">{{ "{:,.2f}".format(doc.grand_total or ns.amt_sum) }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="totals-below">
+        <table>
+            <tr>
+                <td class="lbl">Total Taxable Amount</td>
+                <td class="amt">{{ "{:,.2f}".format(doc.net_total or doc.total) }}</td>
+            </tr>
+            <tr class="grand-row">
+                <td class="lbl">Total</td>
+                <td class="amt">{{ doc.currency }}{{ "{:,.2f}".format(doc.grand_total) }}</td>
+            </tr>
+        </table>
+    </div>
+</div>
+
+{# =====================  PAGE 3 : TAX SUMMARY  ==================== #}
+<div class="hard-break"></div>
+<div class="page tax-summary-page">
+    <p class="tax-summary-heading">Tax Summary</p>
+    <div class="comm-summary">
+        <table class="comm-tbl">
+            <thead>
+                <tr>
+                    <th>Tax Details</th>
+                    <th class="r">Taxable Amount ({{ doc.currency }})</th>
+                    <th class="r">Tax Amount ({{ doc.currency }})</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if doc.taxes %}
+                    {% for tax in doc.taxes %}
+                    <tr>
+                        <td>{{ tax.description }}</td>
+                        <td class="r">{{ "{:,.2f}".format(doc.net_total or doc.total) }}</td>
+                        <td class="r">{{ "{:,.2f}".format(tax.tax_amount) }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td>Standard Rate</td>
+                        <td class="r">{{ "{:,.2f}".format(doc.net_total or doc.total) }}</td>
+                        <td class="r">0.00</td>
+                    </tr>
+                {% endif %}
+                <tr class="comm-total">
+                    <td>Total</td>
+                    <td class="r">{{ doc.currency }}{{ "{:,.2f}".format(doc.net_total or doc.total) }}</td>
+                    <td class="r">{{ doc.currency }}{{ "{:,.2f}".format(doc.total_taxes_and_charges or 0) }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <p class="closing-line">Looking forward for your business.</p>
+</div>
+
+{# =====================  PAGE 4 : TERMS & CONDITIONS  ============== #}
+<div class="hard-break"></div>
+<div class="page terms-page">
+    <div class="terms-section">
+        <p class="terms-hdr">Terms and Conditions:</p>
+        {% if doc.custom_delivery_terms %}
+            <p>Delivery: {{ doc.custom_delivery_terms }}</p>
+        {% endif %}
+        {% if doc.custom_payment_terms or doc.payment_terms_template %}
+            <p>Payment Terms: {{ doc.custom_payment_terms or doc.payment_terms_template }}</p>
+        {% endif %}
+        {% if doc.valid_till %}
+            <p>Validity of Quote: {{ frappe.utils.formatdate(doc.valid_till, "dd MMM yyyy") }}</p>
+        {% endif %}
+        <p>** Above prices are subject to change due to any future government duties/levies.</p>
+    </div>
+
+</div>

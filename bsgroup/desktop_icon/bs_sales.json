@@ -1,0 +1,21 @@
+{
+ "app": "bsgroup",
+ "bg_color": "gray",
+ "creation": "2026-06-26 10:09:09.315877",
+ "docstatus": 0,
+ "doctype": "Desktop Icon",
+ "hidden": 0,
+ "icon_image": "/private/files/bill.png",
+ "icon_type": "Link",
+ "idx": 0,
+ "label": "BS Sales",
+ "link_to": "BS Sales",
+ "link_type": "Workspace Sidebar",
+ "modified": "2026-06-26 11:01:05.265942",
+ "modified_by": "Administrator",
+ "name": "BS Sales",
+ "owner": "Administrator",
+ "restrict_removal": 0,
+ "roles": [],
+ "standard": 1
+}

@@ -1,0 +1,76 @@
+{
+ "app": "bsgroup",
+ "creation": "2026-06-26 11:08:25.169968",
+ "docstatus": 0,
+ "doctype": "Workspace Sidebar",
+ "idx": 0,
+ "items": [
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "tickets",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "HD Ticket",
+   "link_to": "HD Ticket",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "circle-user",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "HD Customer",
+   "link_to": "HD Customer",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "contact",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Contact",
+   "link_to": "Contact",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "book-user",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "HD Agent",
+   "link_to": "HD Agent",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "calculator",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "HD Ticket Dashboard",
+   "link_to": "hd-ticket-das",
+   "link_type": "Page",
+   "show_arrow": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-06-26 11:11:00.718630",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "BS Helpdesk",
+ "owner": "Administrator",
+ "standard": 1,
+ "title": "BS Helpdesk"
+}

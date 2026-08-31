@@ -1,0 +1,98 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-03-26 10:47:38.191010",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "next_action",
+  "next_action_date",
+  "column_break_bsve",
+  "update_note",
+  "update_date",
+  "section_break_lzqu",
+  "commitment",
+  "column_break_grkx",
+  "updated_by",
+  "stage_snapshot",
+  "update_source"
+ ],
+ "fields": [
+  {
+   "fieldname": "update_date",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Update Date"
+  },
+  {
+   "fieldname": "update_note",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Update Note"
+  },
+  {
+   "fieldname": "commitment",
+   "fieldtype": "Small Text",
+   "label": "Commitment"
+  },
+  {
+   "fieldname": "next_action",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Next Action"
+  },
+  {
+   "fieldname": "next_action_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Next Action Date"
+  },
+  {
+   "fieldname": "updated_by",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Updated By",
+   "options": "User"
+  },
+  {
+   "fieldname": "stage_snapshot",
+   "fieldtype": "Data",
+   "label": "Stage Snapshot"
+  },
+  {
+   "fieldname": "update_source",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Update Source",
+   "options": "\nCall\nMeeting\nEmail\nWhatsApp\nVisit\nInternal Review\nOther"
+  },
+  {
+   "fieldname": "column_break_bsve",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_lzqu",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_grkx",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-03-26 15:16:14.124943",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "Sales Update Log",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

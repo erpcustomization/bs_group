@@ -1,0 +1,2274 @@
+{
+ "app": "bsgroup",
+ "charts": [
+  {
+   "chart_name": "Projects by Lifecycle Status",
+   "label": "Projects by Lifecycle Status"
+  },
+  {
+   "chart_name": "Project Completion Trend",
+   "label": "Project Completion Trend"
+  },
+  {
+   "chart_name": "AMC Contracts by Type",
+   "label": "AMC Contracts by Type"
+  },
+  {
+   "chart_name": "PPM Visits by Delivery Mode",
+   "label": "PPM Visits by Delivery Mode"
+  },
+  {
+   "chart_name": "PPM Due versus Completed Trend",
+   "label": "PPM Due versus Completed Trend"
+  },
+  {
+   "chart_name": "PPM Overdue by Customer",
+   "label": "PPM Overdue by Customer"
+  },
+  {
+   "chart_name": "Support Issues by Priority",
+   "label": "Support Issues by Priority"
+  },
+  {
+   "chart_name": "Support Issues by Mode",
+   "label": "Support Issues by Mode"
+  },
+  {
+   "chart_name": "SLA Compliance Trend",
+   "label": "SLA Compliance Trend"
+  },
+  {
+   "chart_name": "Billable versus Non-Billable Hours",
+   "label": "Billable versus Non-Billable Hours"
+  },
+  {
+   "chart_name": "Engineer Utilization",
+   "label": "Engineer Utilization"
+  },
+  {
+   "chart_name": "Chargeable Work Pending Billing",
+   "label": "Chargeable Work Pending Billing"
+  },
+  {
+   "chart_name": "Remote versus On-site Support Hours",
+   "label": "Remote versus On-site Support Hours"
+  },
+  {
+   "chart_name": "PPM Remote versus On-site Hours",
+   "label": "PPM Remote versus On-site Hours"
+  }
+ ],
+ "content": "[{\"id\":\"blk1001\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Overview and My Work</b></span>\",\"col\":12}},{\"id\":\"blk1002\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"My Projects\",\"col\":3}},{\"id\":\"blk1003\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"My Tasks\",\"col\":3}},{\"id\":\"blk1004\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"My Timesheets\",\"col\":3}},{\"id\":\"blk1005\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"My Support Issues\",\"col\":3}},{\"id\":\"blk1006\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"My PPM Visits\",\"col\":3}},{\"id\":\"blk1007\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"My PPM Reports\",\"col\":3}},{\"id\":\"blk1008\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Pending My Approval\",\"col\":3}},{\"id\":\"blk1009\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"My Overdue Activities\",\"col\":3}},{\"id\":\"blk1010\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"blk1011\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Key Management Indicators</b></span>\",\"col\":12}},{\"id\":\"blk1012\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Projects Pending Approval\",\"col\":4}},{\"id\":\"blk1013\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Projects Pending Handover\",\"col\":4}},{\"id\":\"blk1014\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"AMC Pending Activation\",\"col\":4}},{\"id\":\"blk1015\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"AMC Renewal Due\",\"col\":4}},{\"id\":\"blk1016\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Engineer Assignment Pending\",\"col\":4}},{\"id\":\"blk1017\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Customer Sign-off Pending\",\"col\":4}},{\"id\":\"blk1018\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Timesheets Pending My Approval\",\"col\":4}},{\"id\":\"blk1019\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Chargeable Work Pending Approval\",\"col\":4}},{\"id\":\"blk1020\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Reconciliation Variances\",\"col\":4}},{\"id\":\"blk1021\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"blk1022\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Sales Classification</b></span>\",\"col\":12}},{\"id\":\"blk1023\",\"type\":\"card\",\"data\":{\"card_name\":\"Sales Classification\",\"col\":4}},{\"id\":\"blk1024\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"blk1025\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Project Management</b></span>\",\"col\":12}},{\"id\":\"blk1026\",\"type\":\"card\",\"data\":{\"card_name\":\"Project Management\",\"col\":4}},{\"id\":\"blk1027\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Projects by Lifecycle Status\",\"col\":6}},{\"id\":\"blk1028\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Project Completion Trend\",\"col\":6}},{\"id\":\"blk1029\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"blk1030\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>AMC Management</b></span>\",\"col\":12}},{\"id\":\"blk1031\",\"type\":\"card\",\"data\":{\"card_name\":\"AMC Management\",\"col\":4}},{\"id\":\"blk1032\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Active AMC Contracts\",\"col\":4}},{\"id\":\"blk1033\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"AMC Pending Activation\",\"col\":4}},{\"id\":\"blk1034\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"AMC Expiring in 30 Days\",\"col\":4}},{\"id\":\"blk1035\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"AMC Expiring in 60 Days\",\"col\":4}},{\"id\":\"blk1036\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"AMC Expiring in 90 Days\",\"col\":4}},{\"id\":\"blk1037\",\"type\":\"chart\",\"data\":{\"chart_name\":\"AMC Contracts by Type\",\"col\":6}},{\"id\":\"blk1039\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"blk1040\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>PPM Plans and Visits</b></span>\",\"col\":12}},{\"id\":\"blk1041\",\"type\":\"card\",\"data\":{\"card_name\":\"PPM Plans and Visits\",\"col\":4}},{\"id\":\"blk1042\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"PPM Due Today\",\"col\":4}},{\"id\":\"blk1043\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"PPM Due This Week\",\"col\":4}},{\"id\":\"blk1044\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"PPM Overdue\",\"col\":4}},{\"id\":\"blk1045\",\"type\":\"chart\",\"data\":{\"chart_name\":\"PPM Visits by Delivery Mode\",\"col\":6}},{\"id\":\"blk1046\",\"type\":\"chart\",\"data\":{\"chart_name\":\"PPM Due versus Completed Trend\",\"col\":6}},{\"id\":\"blk1047\",\"type\":\"chart\",\"data\":{\"chart_name\":\"PPM Overdue by Customer\",\"col\":6}},{\"id\":\"blk1047b\",\"type\":\"chart\",\"data\":{\"chart_name\":\"PPM Remote versus On-site Hours\",\"col\":6}},{\"id\":\"blk1048\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"blk1049\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>PPM Reports</b></span>\",\"col\":12}},{\"id\":\"blk1050\",\"type\":\"card\",\"data\":{\"card_name\":\"PPM Reports\",\"col\":4}},{\"id\":\"blk1051\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"PPM Reports Pending Manager Review\",\"col\":4}},{\"id\":\"blk1052\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"PPM Corrective Actions Open\",\"col\":4}},{\"id\":\"blk1053\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"blk1054\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>AMC Support</b></span>\",\"col\":12}},{\"id\":\"blk1055\",\"type\":\"card\",\"data\":{\"card_name\":\"AMC Support\",\"col\":4}},{\"id\":\"blk1056\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Open AMC Issues\",\"col\":4}},{\"id\":\"blk1057\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"High-Priority Issues\",\"col\":4}},{\"id\":\"blk1058\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"SLA Response Breaches\",\"col\":4}},{\"id\":\"blk1059\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"SLA Resolution Breaches\",\"col\":4}},{\"id\":\"blk1060\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Support Issues by Priority\",\"col\":6}},{\"id\":\"blk1061\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Support Issues by Mode\",\"col\":6}},{\"id\":\"blk1062\",\"type\":\"chart\",\"data\":{\"chart_name\":\"SLA Compliance Trend\",\"col\":6}},{\"id\":\"blk1063\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"blk1064\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Timesheets and Resources</b></span>\",\"col\":12}},{\"id\":\"blk1065\",\"type\":\"card\",\"data\":{\"card_name\":\"Timesheets and Resources\",\"col\":4}},{\"id\":\"blk1066\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Timesheets Pending AMC Manager Approval\",\"col\":4}},{\"id\":\"blk1067\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Unbilled Chargeable Timesheets\",\"col\":4}},{\"id\":\"blk1068\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Billable versus Non-Billable Hours\",\"col\":6}},{\"id\":\"blk1069\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Engineer Utilization\",\"col\":6}},{\"id\":\"blk1069b\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Remote versus On-site Support Hours\",\"col\":6}},{\"id\":\"blk1069c\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Chargeable Work Pending Billing\",\"col\":6}},{\"id\":\"blk1070\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"blk1071\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Assets and Materials</b></span>\",\"col\":12}},{\"id\":\"blk1072\",\"type\":\"card\",\"data\":{\"card_name\":\"Assets and Materials\",\"col\":4}},{\"id\":\"blk1073\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"blk1074\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Reports and Analytics</b></span>\",\"col\":12}},{\"id\":\"blk1075\",\"type\":\"card\",\"data\":{\"card_name\":\"Project Reports\",\"col\":4}},{\"id\":\"blk1076\",\"type\":\"card\",\"data\":{\"card_name\":\"AMC Analytics Reports\",\"col\":4}},{\"id\":\"blk1077\",\"type\":\"card\",\"data\":{\"card_name\":\"PPM Analytics Reports\",\"col\":4}},{\"id\":\"blk1078\",\"type\":\"card\",\"data\":{\"card_name\":\"Support Analytics Reports\",\"col\":4}},{\"id\":\"blk1079\",\"type\":\"card\",\"data\":{\"card_name\":\"Timesheet Analytics Reports\",\"col\":4}},{\"id\":\"blk1080\",\"type\":\"card\",\"data\":{\"card_name\":\"Commercial Reports\",\"col\":4}},{\"id\":\"blk1081\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"blk1082\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Settings and Administration</b></span>\",\"col\":12}},{\"id\":\"blk1083\",\"type\":\"card\",\"data\":{\"card_name\":\"Settings and Administration\",\"col\":4}},{\"id\":\"blk1084\",\"type\":\"spacer\",\"data\":{\"col\":12}}]",
+ "creation": "2026-07-16 03:28:36.654321",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "hide_custom": 0,
+ "icon": "project",
+ "idx": 0,
+ "indicator_color": "green",
+ "is_hidden": 0,
+ "label": "Projects, AMC & PPM Management",
+ "link_type": "DocType",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sales Classification",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "All Sales Orders",
+   "link_count": 0,
+   "link_to": "Sales Order",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Material Sales Orders",
+   "link_count": 0,
+   "link_to": "Material Sales Orders",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Project-Oriented Sales Orders",
+   "link_count": 0,
+   "link_to": "Project-Oriented Sales Orders",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Standalone AMC Sales Orders",
+   "link_count": 0,
+   "link_to": "Standalone AMC Sales Orders",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "AMC Renewal Sales Orders",
+   "link_count": 0,
+   "link_to": "AMC Renewal Sales Orders",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Sales Orders Pending Classification",
+   "link_count": 0,
+   "link_to": "Sales Orders Without Classification",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Sales Orders Pending Project Creation",
+   "link_count": 0,
+   "link_to": "Sales Orders Pending Project Creation",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Sales Orders Pending AMC Creation",
+   "link_count": 0,
+   "link_to": "Sales Orders Pending AMC Creation",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Sales Orders by Sales Type",
+   "link_count": 0,
+   "link_to": "Sales Orders by Sales Type",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Project Management",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "All Projects",
+   "link_count": 0,
+   "link_to": "Project",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Active Projects",
+   "link_count": 0,
+   "link_to": "Active Projects",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Projects Pending Approval",
+   "link_count": 0,
+   "link_to": "Projects Pending Approval",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Projects Pending Handover",
+   "link_count": 0,
+   "link_to": "Projects Pending Handover",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Projects Pending Customer Sign-off",
+   "link_count": 0,
+   "link_to": "Projects Pending Customer Sign-off",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Projects in Testing and Commissioning",
+   "link_count": 0,
+   "link_to": "Projects in Testing and Commissioning",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Overdue Projects",
+   "link_count": 0,
+   "link_to": "Overdue Projects",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Completed Projects",
+   "link_count": 0,
+   "link_to": "Completed Projects",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Projects Converted to AMC",
+   "link_count": 0,
+   "link_to": "Projects Converted to AMC",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Closed Projects",
+   "link_count": 0,
+   "link_to": "Closed Projects",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Cancelled Projects",
+   "link_count": 0,
+   "link_to": "Cancelled Projects",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Project Tasks",
+   "link_count": 0,
+   "link_to": "Task",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Project Timesheets",
+   "link_count": 0,
+   "link_to": "Project Timesheets",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Project Templates",
+   "link_count": 0,
+   "link_to": "Project Template",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "AMC Management",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "All AMC Contracts",
+   "link_count": 0,
+   "link_to": "AMC Contract",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Pending Activation",
+   "link_count": 0,
+   "link_to": "AMC Pending Activation",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Active AMC Contracts",
+   "link_count": 0,
+   "link_to": "Active AMC Contracts",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Comprehensive AMC",
+   "link_count": 0,
+   "link_to": "Comprehensive AMC",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Non-Comprehensive AMC",
+   "link_count": 0,
+   "link_to": "Non-Comprehensive AMC",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Support Only",
+   "link_count": 0,
+   "link_to": "AMC Support Only",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Support and PPM",
+   "link_count": 0,
+   "link_to": "AMC Support and PPM",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "PPM Only",
+   "link_count": 0,
+   "link_to": "AMC PPM Only",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Warranty Support",
+   "link_count": 0,
+   "link_to": "AMC Warranty Support",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "On-Call Support",
+   "link_count": 0,
+   "link_to": "AMC On-Call Support",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Suspended Contracts",
+   "link_count": 0,
+   "link_to": "Suspended AMC Contracts",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Expiring in 30 Days",
+   "link_count": 0,
+   "link_to": "AMC Expiring in 30 Days",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Expiring in 60 Days",
+   "link_count": 0,
+   "link_to": "AMC Expiring in 60 Days",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Expiring in 90 Days",
+   "link_count": 0,
+   "link_to": "AMC Contracts Expiring in 90 Days",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Renewal Due",
+   "link_count": 0,
+   "link_to": "AMC Renewal Pipeline",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Expired Contracts",
+   "link_count": 0,
+   "link_to": "Expired AMC Contracts",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Renewed Contracts",
+   "link_count": 0,
+   "link_to": "Renewed AMC Contracts",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Closed Contracts",
+   "link_count": 0,
+   "link_to": "Closed AMC Contracts",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "AMC Asset Register",
+   "link_count": 0,
+   "link_to": "AMC Asset Register",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "AMC Entitlement Reconciliation",
+   "link_count": 0,
+   "link_to": "AMC Entitlement Reconciliation",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "AMC Entitlement Consumption Ledger",
+   "link_count": 0,
+   "link_to": "AMC Entitlement Consumption Ledger",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PPM Plans and Visits",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "All PPM Plans",
+   "link_count": 0,
+   "link_to": "PPM Plan",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Active PPM Plans",
+   "link_count": 0,
+   "link_to": "Active PPM Plans",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Remote PPM Plans",
+   "link_count": 0,
+   "link_to": "Remote PPM Plans",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "On-site PPM Plans",
+   "link_count": 0,
+   "link_to": "On-site PPM Plans",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Hybrid PPM Plans",
+   "link_count": 0,
+   "link_to": "Hybrid PPM Plans",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Completed PPM Plans",
+   "link_count": 0,
+   "link_to": "Completed PPM Plans",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Suspended PPM Plans",
+   "link_count": 0,
+   "link_to": "Suspended PPM Plans",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Expired PPM Plans",
+   "link_count": 0,
+   "link_to": "Expired PPM Plans",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "All PPM Visits",
+   "link_count": 0,
+   "link_to": "PPM Visit",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Due Today",
+   "link_count": 0,
+   "link_to": "PPM Visits Due Today",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Due This Week",
+   "link_count": 0,
+   "link_to": "PPM Visits Due This Week",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Due This Month",
+   "link_count": 0,
+   "link_to": "PPM Visits Due This Month",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Remote PPM",
+   "link_count": 0,
+   "link_to": "Remote PPM Visits",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "On-site PPM",
+   "link_count": 0,
+   "link_to": "On-site PPM Visits",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Hybrid PPM",
+   "link_count": 0,
+   "link_to": "Hybrid PPM Visits",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Engineer Assignment Pending",
+   "link_count": 0,
+   "link_to": "PPM Engineer Assignment Pending",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Remote Access Pending",
+   "link_count": 0,
+   "link_to": "PPM Remote Access Pending",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Site Access Pending",
+   "link_count": 0,
+   "link_to": "PPM Site Access Pending",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "In Progress",
+   "link_count": 0,
+   "link_to": "PPM Visits In Progress",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Partially Completed",
+   "link_count": 0,
+   "link_to": "PPM Visits Partially Completed",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Customer Sign-off Pending",
+   "link_count": 0,
+   "link_to": "PPM Visits Customer Sign-off Pending",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Overdue",
+   "link_count": 0,
+   "link_to": "Overdue PPM Visits",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Completed",
+   "link_count": 0,
+   "link_to": "PPM Visits Completed",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Rescheduled",
+   "link_count": 0,
+   "link_to": "PPM Visits Rescheduled",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Cancelled",
+   "link_count": 0,
+   "link_to": "PPM Visits Cancelled",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PPM Reports",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "All PPM Reports",
+   "link_count": 0,
+   "link_to": "All PPM Reports",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "My PPM Reports",
+   "link_count": 0,
+   "link_to": "PPM Report",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Draft Reports",
+   "link_count": 0,
+   "link_to": "Draft PPM Reports",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Pending Engineer Submission",
+   "link_count": 0,
+   "link_to": "PPM Reports Pending Engineer Submission",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Pending Manager Review",
+   "link_count": 0,
+   "link_to": "PPM Reports Pending Manager Review",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Returned for Correction",
+   "link_count": 0,
+   "link_to": "PPM Reports Returned for Correction",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Pending Customer Sign-off",
+   "link_count": 0,
+   "link_to": "PPM Reports Pending Customer Sign-off",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Approved Reports",
+   "link_count": 0,
+   "link_to": "Approved PPM Reports",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Corrective Action Required",
+   "link_count": 0,
+   "link_to": "PPM Reports with Corrective Action Required",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Closed Reports",
+   "link_count": 0,
+   "link_to": "Closed PPM Reports",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Cancelled Reports",
+   "link_count": 0,
+   "link_to": "Cancelled PPM Reports",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Create PPM Report",
+   "link_count": 0,
+   "link_to": "PPM Report",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Corrective Issues from PPM",
+   "link_count": 0,
+   "link_to": "Issues Created from PPM Findings",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PPM Checklist Templates",
+   "link_count": 0,
+   "link_to": "PPM Checklist Template",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PPM Checklist Results",
+   "link_count": 0,
+   "link_to": "PPM Checklist Result",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "AMC Support",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "All Support Issues",
+   "link_count": 0,
+   "link_to": "Issue",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "My Support Issues",
+   "link_count": 0,
+   "link_to": "Issue",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Open AMC Issues",
+   "link_count": 0,
+   "link_to": "Open Issues by AMC Contract",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Remote Support Issues",
+   "link_count": 0,
+   "link_to": "Remote Support Issues",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "On-site Support Issues",
+   "link_count": 0,
+   "link_to": "On-site Support Issues",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Remote Escalated to On-site",
+   "link_count": 0,
+   "link_to": "Remote Escalated to On-site Issues",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Emergency Support",
+   "link_count": 0,
+   "link_to": "Emergency Support Issues",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "High-Priority Issues",
+   "link_count": 0,
+   "link_to": "High-Priority Issues",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Issues Pending Assignment",
+   "link_count": 0,
+   "link_to": "Issues Pending Assignment",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Issues Awaiting Customer",
+   "link_count": 0,
+   "link_to": "Issues Awaiting Customer",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Issues Awaiting Engineer",
+   "link_count": 0,
+   "link_to": "Issues Awaiting Engineer",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "SLA Response Breaches",
+   "link_count": 0,
+   "link_to": "SLA Response Breaches",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "SLA Resolution Breaches",
+   "link_count": 0,
+   "link_to": "SLA Resolution Breaches",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Issues Created from PPM Findings",
+   "link_count": 0,
+   "link_to": "Issues Created from PPM Findings",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Closed Issues",
+   "link_count": 0,
+   "link_to": "Closed Issues",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Timesheets and Resources",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "My Timesheets",
+   "link_count": 0,
+   "link_to": "Timesheet",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "All Managed Timesheets",
+   "link_count": 0,
+   "link_to": "Timesheet",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Draft Timesheets",
+   "link_count": 0,
+   "link_to": "Draft Timesheets",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Pending Team Leader Approval",
+   "link_count": 0,
+   "link_to": "Pending Team Leader Approval",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Pending Project Manager Approval",
+   "link_count": 0,
+   "link_to": "Pending Project Manager Approval",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Pending Support Manager Approval",
+   "link_count": 0,
+   "link_to": "Pending Support Manager Approval",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Pending PPM Manager Approval",
+   "link_count": 0,
+   "link_to": "Pending PPM Manager Approval",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Pending AMC Manager Approval",
+   "link_count": 0,
+   "link_to": "Pending AMC Manager Approval",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Approved Timesheets",
+   "link_count": 0,
+   "link_to": "Approved Timesheets",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Rejected Timesheets",
+   "link_count": 0,
+   "link_to": "Rejected Timesheets",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Project Timesheets",
+   "link_count": 0,
+   "link_to": "Project Timesheets",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "AMC Support Timesheets",
+   "link_count": 0,
+   "link_to": "AMC Support Timesheets",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "PPM Timesheets",
+   "link_count": 0,
+   "link_to": "PPM Timesheets",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Remote Support Timesheets",
+   "link_count": 0,
+   "link_to": "Remote Support Timesheets",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "On-site Support Timesheets",
+   "link_count": 0,
+   "link_to": "On-site Support Timesheets",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Chargeable Timesheets",
+   "link_count": 0,
+   "link_to": "Chargeable Timesheets",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Unbilled Chargeable Timesheets",
+   "link_count": 0,
+   "link_to": "Unbilled Chargeable Work",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Timesheets Outside Contract Period",
+   "link_count": 0,
+   "link_to": "Timesheets Outside Contract Period",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Timesheet Overlap Exceptions",
+   "link_count": 0,
+   "link_to": "Timesheet Overlap Exceptions",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Engineer Utilization",
+   "link_count": 0,
+   "link_to": "Engineer Utilization",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Activity Type Analysis",
+   "link_count": 0,
+   "link_to": "Activity Type Analysis",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "AMC Entitlement Consumption Ledger",
+   "link_count": 0,
+   "link_to": "AMC Entitlement Consumption Ledger",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Assets and Materials",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "AMC Asset Register",
+   "link_count": 0,
+   "link_to": "AMC Asset Register",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Installed Assets",
+   "link_count": 0,
+   "link_to": "Asset",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Assets Covered by AMC",
+   "link_count": 0,
+   "link_to": "Assets Covered by AMC",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Comprehensive Coverage Assets",
+   "link_count": 0,
+   "link_to": "Comprehensive Coverage Assets",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Non-Comprehensive Coverage Assets",
+   "link_count": 0,
+   "link_to": "Non-Comprehensive Coverage Assets",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Excluded Assets",
+   "link_count": 0,
+   "link_to": "Excluded Assets",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Expired Warranty Assets",
+   "link_count": 0,
+   "link_to": "Expired Warranty Assets",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Serial Numbers",
+   "link_count": 0,
+   "link_to": "Serial No",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Asset Support History",
+   "link_count": 0,
+   "link_to": "Asset Support History",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Asset PPM History",
+   "link_count": 0,
+   "link_to": "Asset PPM History",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Asset-wise Support Effort",
+   "link_count": 0,
+   "link_to": "Asset-wise Support Effort",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Material Requests",
+   "link_count": 0,
+   "link_to": "Material Request",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Site Material Issues",
+   "link_count": 0,
+   "link_to": "Stock Entry",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Material Returns",
+   "link_count": 0,
+   "link_to": "Stock Entry",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Replacement Assets",
+   "link_count": 0,
+   "link_to": "Asset",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Stock Entries by Project",
+   "link_count": 0,
+   "link_to": "Stock Entry",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Delivery Notes by Project",
+   "link_count": 0,
+   "link_to": "Delivery Note",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Project Reports",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Active Projects",
+   "link_count": 0,
+   "link_to": "Active Projects",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Completed Projects",
+   "link_count": 0,
+   "link_to": "Completed Projects",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Overdue Projects",
+   "link_count": 0,
+   "link_to": "Overdue Projects",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Projects Pending Handover",
+   "link_count": 0,
+   "link_to": "Projects Pending Handover",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Projects Pending Customer Sign-off",
+   "link_count": 0,
+   "link_to": "Projects Pending Customer Sign-off",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Projects Converted to AMC",
+   "link_count": 0,
+   "link_to": "Projects Converted to AMC",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Project Profitability",
+   "link_count": 0,
+   "link_to": "Project Profitability",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "AMC Analytics Reports",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Active AMC Contracts",
+   "link_count": 0,
+   "link_to": "Active AMC Contracts",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "AMC Expiring in 30 Days",
+   "link_count": 0,
+   "link_to": "AMC Expiring in 30 Days",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "AMC Expiring in 60 Days",
+   "link_count": 0,
+   "link_to": "AMC Expiring in 60 Days",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "AMC Expiring in 90 Days",
+   "link_count": 0,
+   "link_to": "AMC Contracts Expiring in 90 Days",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "AMC Renewal Pipeline",
+   "link_count": 0,
+   "link_to": "AMC Renewal Pipeline",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Included versus Consumed Remote Hours",
+   "link_count": 0,
+   "link_to": "Included versus Consumed AMC Hours",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Included versus Consumed Visits",
+   "link_count": 0,
+   "link_to": "Included versus Consumed AMC Visits",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "AMC Entitlement Reconciliation",
+   "link_count": 0,
+   "link_to": "AMC Entitlement Reconciliation",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PPM Analytics Reports",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Upcoming PPM Visits",
+   "link_count": 0,
+   "link_to": "Upcoming PPM Visits",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Overdue PPM Visits",
+   "link_count": 0,
+   "link_to": "Overdue PPM Visits",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "PPM Remote versus On-site Hours",
+   "link_count": 0,
+   "link_to": "PPM Remote versus On-site Hours",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Corrective Actions from PPM",
+   "link_count": 0,
+   "link_to": "PPM Reports with Corrective Action Required",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Support Analytics Reports",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Open Issues by AMC Contract",
+   "link_count": 0,
+   "link_to": "Open Issues by AMC Contract",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Remote versus On-site Issues",
+   "link_count": 0,
+   "link_to": "Remote Support Issues",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "SLA Response Breaches",
+   "link_count": 0,
+   "link_to": "SLA Response Breaches",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "SLA Resolution Breaches",
+   "link_count": 0,
+   "link_to": "SLA Resolution Breaches",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Asset Fault History",
+   "link_count": 0,
+   "link_to": "Asset Support History",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Customer-wise Support Effort",
+   "link_count": 0,
+   "link_to": "Customer-wise Support Effort",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Timesheet Analytics Reports",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Engineer Utilization",
+   "link_count": 0,
+   "link_to": "Engineer Utilization",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Activity Type Analysis",
+   "link_count": 0,
+   "link_to": "Activity Type Analysis",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Remote versus On-site Support Hours",
+   "link_count": 0,
+   "link_to": "Remote versus On-site Support Hours",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Work Outside Contract Period",
+   "link_count": 0,
+   "link_to": "Timesheets Outside Contract Period",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Timesheet Hours by Task",
+   "link_count": 0,
+   "link_to": "Timesheet Hours by Task",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Timesheet Hours by AMC Contract",
+   "link_count": 0,
+   "link_to": "Timesheet Hours by AMC Contract",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Timesheet Hours by Support Issue",
+   "link_count": 0,
+   "link_to": "Timesheet Hours by Support Issue",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Timesheet Hours by PPM Plan",
+   "link_count": 0,
+   "link_to": "Timesheet Hours by PPM Plan",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Timesheet Hours by PPM Visit",
+   "link_count": 0,
+   "link_to": "Timesheet Hours by PPM Visit",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Timesheet Hours by PPM Report",
+   "link_count": 0,
+   "link_to": "Timesheet Hours by PPM Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Timesheet Hours by Site",
+   "link_count": 0,
+   "link_to": "Timesheet Hours by Site",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Commercial Reports",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Chargeable Work Pending Approval",
+   "link_count": 0,
+   "link_to": "Chargeable Work Pending Approval",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Unbilled Chargeable Work",
+   "link_count": 0,
+   "link_to": "Unbilled Chargeable Work",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Billing Adjustment Required",
+   "link_count": 0,
+   "link_to": "Billing Adjustment Required",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Included versus Chargeable Hours",
+   "link_count": 0,
+   "link_to": "Included versus Chargeable Hours",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Draft Invoices from Timesheets",
+   "link_count": 0,
+   "link_to": "Draft Invoices from Timesheets",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Invoiced Support Activity",
+   "link_count": 0,
+   "link_to": "Invoiced Support Activity",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Settings and Administration",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Project Templates",
+   "link_count": 0,
+   "link_to": "Project Template",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Activity Types",
+   "link_count": 0,
+   "link_to": "Activity Type",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PPM Checklist Templates",
+   "link_count": 0,
+   "link_to": "PPM Checklist Template",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "SLA Configuration",
+   "link_count": 0,
+   "link_to": "Service Level Agreement",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "AMC PPM Timesheet Settings",
+   "link_count": 0,
+   "link_to": "AMC PPM Timesheet Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Notification Settings",
+   "link_count": 0,
+   "link_to": "Notification Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "User Permissions",
+   "link_count": 0,
+   "link_to": "User Permission",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "AMC Entitlement Recalculation Log",
+   "link_count": 0,
+   "link_to": "AMC Entitlement Recalculation Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Test Data Audit",
+   "link_count": 0,
+   "link_to": "Test Data Audit",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Reconciliation Exceptions",
+   "link_count": 0,
+   "link_to": "Reconciliation Variances",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-07-16 10:50:46.566841",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "Projects, AMC & PPM Management",
+ "number_cards": [
+  {
+   "label": "Projects Pending Approval",
+   "number_card_name": "Projects Pending Approval"
+  },
+  {
+   "label": "Projects Pending Handover",
+   "number_card_name": "Projects Pending Handover"
+  },
+  {
+   "label": "AMC Pending Activation",
+   "number_card_name": "AMC Pending Activation"
+  },
+  {
+   "label": "AMC Renewal Due",
+   "number_card_name": "AMC Renewal Due"
+  },
+  {
+   "label": "Engineer Assignment Pending",
+   "number_card_name": "Engineer Assignment Pending"
+  },
+  {
+   "label": "Customer Sign-off Pending",
+   "number_card_name": "Customer Sign-off Pending"
+  },
+  {
+   "label": "Timesheets Pending My Approval",
+   "number_card_name": "Timesheets Pending My Approval"
+  },
+  {
+   "label": "Chargeable Work Pending Approval",
+   "number_card_name": "Chargeable Work Pending Approval"
+  },
+  {
+   "label": "Reconciliation Variances",
+   "number_card_name": "Reconciliation Variances"
+  },
+  {
+   "label": "Active AMC Contracts",
+   "number_card_name": "Active AMC Contracts"
+  },
+  {
+   "label": "AMC Pending Activation",
+   "number_card_name": "AMC Pending Activation"
+  },
+  {
+   "label": "AMC Expiring in 30 Days",
+   "number_card_name": "AMC Expiring in 30 Days"
+  },
+  {
+   "label": "AMC Expiring in 60 Days",
+   "number_card_name": "AMC Expiring in 60 Days"
+  },
+  {
+   "label": "AMC Expiring in 90 Days",
+   "number_card_name": "AMC Expiring in 90 Days"
+  },
+  {
+   "label": "PPM Due Today",
+   "number_card_name": "PPM Due Today"
+  },
+  {
+   "label": "PPM Due This Week",
+   "number_card_name": "PPM Due This Week"
+  },
+  {
+   "label": "PPM Overdue",
+   "number_card_name": "PPM Overdue"
+  },
+  {
+   "label": "PPM Reports Pending Manager Review",
+   "number_card_name": "PPM Reports Pending Manager Review"
+  },
+  {
+   "label": "PPM Corrective Actions Open",
+   "number_card_name": "PPM Corrective Actions Open"
+  },
+  {
+   "label": "Open AMC Issues",
+   "number_card_name": "Open AMC Issues"
+  },
+  {
+   "label": "High-Priority Issues",
+   "number_card_name": "High-Priority Issues"
+  },
+  {
+   "label": "SLA Response Breaches",
+   "number_card_name": "SLA Response Breaches"
+  },
+  {
+   "label": "SLA Resolution Breaches",
+   "number_card_name": "SLA Resolution Breaches"
+  },
+  {
+   "label": "Timesheets Pending AMC Manager Approval",
+   "number_card_name": "Timesheets Pending AMC Manager Approval"
+  },
+  {
+   "label": "Unbilled Chargeable Timesheets",
+   "number_card_name": "Unbilled Chargeable Timesheets"
+  }
+ ],
+ "owner": "Administrator",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [],
+ "sequence_id": 0.5,
+ "shortcuts": [
+  {
+   "doc_view": "List",
+   "label": "My Projects",
+   "link_to": "Project",
+   "type": "DocType"
+  },
+  {
+   "doc_view": "List",
+   "label": "My Tasks",
+   "link_to": "Task",
+   "type": "DocType"
+  },
+  {
+   "doc_view": "List",
+   "label": "My Timesheets",
+   "link_to": "Timesheet",
+   "type": "DocType"
+  },
+  {
+   "doc_view": "List",
+   "label": "My Support Issues",
+   "link_to": "Issue",
+   "type": "DocType"
+  },
+  {
+   "doc_view": "List",
+   "label": "My PPM Visits",
+   "link_to": "PPM Visit",
+   "type": "DocType"
+  },
+  {
+   "doc_view": "List",
+   "label": "My PPM Reports",
+   "link_to": "PPM Report",
+   "type": "DocType"
+  },
+  {
+   "doc_view": "",
+   "label": "Pending My Approval",
+   "link_to": "Pending My Approval",
+   "report_ref_doctype": "Timesheet",
+   "type": "Report"
+  },
+  {
+   "doc_view": "List",
+   "label": "My Overdue Activities",
+   "link_to": "Task",
+   "type": "DocType"
+  }
+ ],
+ "title": "Projects, AMC & PPM Management",
+ "type": "Workspace"
+}
