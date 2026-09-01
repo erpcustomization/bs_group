@@ -20,6 +20,9 @@ frappe.ui.form.on('Quotation', {
     custom_apply_exclude_to_all_items: function(frm) {
         exclude_all_items(frm);
     },
+    custom_pipeline_stage: function(frm) {
+        prompt_lost_reason_if_needed(frm);
+    },
     onload: function(frm) {
         if (!frm.doc.custom_designation) {
             frappe.db.get_value("Employee",
@@ -134,6 +137,28 @@ function apply_company_tax(frm) {
             frm.set_value("taxes_and_charges", list[0].name);
         }
     });
+}
+
+function prompt_lost_reason_if_needed(frm) {
+    const stagesNeedingReason = ["Lost", "Cancelled"];
+    if (!stagesNeedingReason.includes(frm.doc.custom_pipeline_stage)) return;
+    if (frm.doc.custom_lost_reason) return;
+
+    frappe.prompt(
+        [
+            {
+                fieldname: "custom_lost_reason",
+                fieldtype: "Small Text",
+                label: "Reason",
+                reqd: 1,
+            },
+        ],
+        (values) => {
+            frm.set_value("custom_lost_reason", values.custom_lost_reason);
+        },
+        `Reason for marking as ${frm.doc.custom_pipeline_stage}`,
+        "Save"
+    );
 }
 
 function reduce_subject_height(frm){

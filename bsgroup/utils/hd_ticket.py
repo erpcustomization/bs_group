@@ -131,3 +131,35 @@ def delete_duplicate_ticket(ticket_name, original_name):
 		f"HD Ticket {ticket_name} deleted. "
 		f"Communication threaded into #{original_name}."
 	)
+
+
+@frappe.whitelist()
+def resolve_ticket(ticket_name, resolution_details, status=None):
+	"""Set an HD Ticket's resolution details and mark it resolved, from the
+	backend only. Setting `status` to a "Resolved"-category status and
+	saving triggers HD Ticket's own before_save -> apply_sla(), which
+	recomputes resolution_date/agreement_status - so the Resolution SLA
+	badge in the Helpdesk UI updates automatically; no frontend change
+	needed."""
+	if not frappe.db.exists("HD Ticket", ticket_name):
+		frappe.throw(f"HD Ticket {ticket_name} does not exist")
+
+	doc = frappe.get_doc("HD Ticket", ticket_name)
+
+	if not status:
+		status = frappe.db.get_value(
+			"HD Ticket Status", {"category": "Resolved"}, "name"
+		)
+		if not status:
+			frappe.throw("No HD Ticket Status with category 'Resolved' is configured")
+
+	doc.resolution_details = resolution_details
+	doc.status = status
+	doc.save(ignore_permissions=True)
+
+	return {
+		"status": doc.status,
+		"resolution_details": doc.resolution_details,
+		"resolution_date": doc.resolution_date,
+		"agreement_status": doc.agreement_status,
+	}

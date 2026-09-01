@@ -3,6 +3,15 @@
   "docstatus": 0,
   "doctype": "Workflow State",
   "icon": "",
+  "modified": "2026-08-28 11:25:28.228310",
+  "name": "Completed",
+  "style": "",
+  "workflow_state_name": "Completed"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "",
   "modified": "2026-06-26 11:50:15.233559",
   "name": "Approved by the Manager",
   "style": "",
@@ -205,5 +214,14 @@
   "name": "Pending Approval",
   "style": "Warning",
   "workflow_state_name": "Pending Approval"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "",
+  "modified": "2026-08-28 11:25:36.796450",
+  "name": "Closed",
+  "style": "",
+  "workflow_state_name": "Closed"
  }
 ]

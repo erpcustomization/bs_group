@@ -335,6 +335,12 @@ doc_events = {
             "bsgroup.utils.hd_ticket.sync_tts_status",
         ],
     },
+    "Quotation": {
+        "validate": "bsgroup.utils.quotation.validate_pipeline_stage",
+        "on_update": "bsgroup.utils.quotation.sync_pipeline_result",
+        "before_update_after_submit": "bsgroup.utils.quotation.validate_pipeline_stage",
+        "on_update_after_submit": "bsgroup.utils.quotation.sync_pipeline_result",
+    },
     "Opportunity": {
         "before_insert": [
             "bsgroup.utils.opportunity.set_opportunity_owner",

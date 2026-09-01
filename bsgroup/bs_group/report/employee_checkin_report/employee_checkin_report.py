@@ -1,9 +1,18 @@
 # Copyright (c) 2026, Tridots Tech and contributors
 # For license information, please see license.txt
 
+import time
+
 import frappe
+import requests
 from frappe import _
 from frappe.utils import add_days, getdate, nowdate, time_diff_in_hours
+
+from bsgroup.utils.employee_checkin import _haversine_distance_meters
+
+DEFAULT_NOMINATIM_URL = "https://nominatim.openstreetmap.org/reverse"
+
+_last_nominatim_call = 0.0
 
 
 def execute(filters: dict | None = None):
@@ -128,8 +137,101 @@ def get_columns(filters=None) -> list[dict]:
 			"precision": 6,
 			"width": 120,
 		},
+		{
+			"label": _("Place"),
+			"fieldname": "place",
+			"fieldtype": "Data",
+			"width": 160,
+		},
 	]
 	return cols
+
+
+def get_head_offices():
+	"""All Head Office records with valid coordinates, for nearest-match lookup."""
+	rows = frappe.db.get_all(
+		"Head Office",
+		filters=[["latitude", "is", "set"], ["longitude", "is", "set"]],
+		fields=["name", "title", "latitude", "longitude", "allowd_distance_meters"],
+	)
+	return [r for r in rows if r.latitude and r.longitude]
+
+
+def get_place(latitude, longitude, head_offices):
+	"""Nearest Head Office name if the check-in falls within that office's
+	allowed radius; otherwise a real-world address via reverse geocoding.
+	Returns None only when there are no coordinates or geocoding fails."""
+	if not latitude or not longitude:
+		return None
+
+	lat, lon = float(latitude), float(longitude)
+	nearest = None
+	nearest_distance = None
+
+	for ho in head_offices:
+		distance = _haversine_distance_meters(lat, lon, float(ho.latitude), float(ho.longitude))
+		if nearest_distance is None or distance < nearest_distance:
+			nearest = ho
+			nearest_distance = distance
+
+	if nearest is not None:
+		allowed_m = float(nearest.allowd_distance_meters or 0)
+		if not allowed_m or nearest_distance <= allowed_m:
+			return nearest.title or nearest.name
+
+	return reverse_geocode(lat, lon)
+
+
+def reverse_geocode(latitude, longitude):
+	"""Address for (latitude, longitude) via OpenStreetMap Nominatim,
+	cached per rounded coordinate so repeat report runs and duplicate
+	check-in points don't re-hit the API. Behaviour (on/off, URL, contact,
+	rate limit, cache TTL) is configured in BS Group Settings > Geocoding."""
+	global _last_nominatim_call
+
+	settings = frappe.get_cached_doc("BS Group Settings")
+	if not settings.enable_reverse_geocoding:
+		return None
+
+	cache_key = f"bsgroup:reverse_geocode:en:{round(latitude, 5)}:{round(longitude, 5)}"
+	cache = frappe.cache()
+	cached = cache.get_value(cache_key)
+	if cached is not None:
+		return cached or None
+
+	min_interval = settings.nominatim_min_interval or 1.1
+	cache_ttl = (settings.geocode_cache_ttl_days or 30) * 24 * 60 * 60
+	user_agent = (
+		f"bsgroup-frappe-app/1.0 ({settings.geocoding_contact_email})"
+		if settings.geocoding_contact_email
+		else "bsgroup-frappe-app/1.0"
+	)
+
+	address = None
+	try:
+		elapsed = time.time() - _last_nominatim_call
+		if elapsed < min_interval:
+			time.sleep(min_interval - elapsed)
+
+		response = requests.get(
+			settings.nominatim_url or DEFAULT_NOMINATIM_URL,
+			params={"lat": latitude, "lon": longitude, "format": "jsonv2", "accept-language": "en"},
+			headers={"User-Agent": user_agent},
+			timeout=5,
+		)
+		_last_nominatim_call = time.time()
+		response.raise_for_status()
+		address = response.json().get("display_name")
+	except Exception:
+		frappe.log_error(
+			title="Reverse Geocoding Failed",
+			message=frappe.get_traceback(),
+		)
+
+	# Cache a failure too (as "") so a bad point doesn't get re-queried on
+	# every report refresh within the TTL.
+	cache.set_value(cache_key, address or "", expires_in_sec=cache_ttl)
+	return address
 
 
 def get_data(filters=None):
@@ -190,6 +292,7 @@ def get_data(filters=None):
 	)
 
 	leave_map = get_leave_map(from_date, to_date, [emp.name for emp in all_employees])
+	head_offices = get_head_offices()
 
 	standard_working_hours = (
 		frappe.db.get_single_value("HR Settings", "standard_working_hours") or 8
@@ -295,6 +398,7 @@ def get_data(filters=None):
 				"working_hours": working_hours,
 				"latitude": latitude,
 				"longitude": longitude,
+				"place": get_place(latitude, longitude, head_offices),
 			})
 
 	data.sort(key=lambda r: (r["work_date"] is None, r["work_date"]), reverse=True)

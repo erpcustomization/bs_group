@@ -10,7 +10,14 @@
   "select_leave_type",
   "attachment_required_after_days",
   "project_costing_tab",
-  "cost_overrun_policy"
+  "cost_overrun_policy",
+  "geocoding_tab",
+  "enable_reverse_geocoding",
+  "nominatim_url",
+  "geocoding_contact_email",
+  "geocoding_column_break",
+  "nominatim_min_interval",
+  "geocode_cache_ttl_days"
  ],
  "fields": [
   {
@@ -47,6 +54,53 @@
    "fieldtype": "Select",
    "label": "Cost Overrun Policy",
    "options": "None\nWarn\nBlock"
+  },
+  {
+   "fieldname": "geocoding_tab",
+   "fieldtype": "Tab Break",
+   "label": "Geocoding"
+  },
+  {
+   "default": "1",
+   "description": "When a check-in location does not match any Head Office, look up its address via the free OpenStreetMap Nominatim API.",
+   "fieldname": "enable_reverse_geocoding",
+   "fieldtype": "Check",
+   "label": "Enable Reverse Geocoding"
+  },
+  {
+   "default": "https://nominatim.openstreetmap.org/reverse",
+   "depends_on": "enable_reverse_geocoding",
+   "fieldname": "nominatim_url",
+   "fieldtype": "Data",
+   "label": "Nominatim API URL"
+  },
+  {
+   "depends_on": "enable_reverse_geocoding",
+   "description": "Nominatim's usage policy requires a contact identifier in the request. Leave blank to send a generic identifier with no contact details.",
+   "fieldname": "geocoding_contact_email",
+   "fieldtype": "Data",
+   "label": "Contact Email for API Requests",
+   "options": "Email"
+  },
+  {
+   "fieldname": "geocoding_column_break",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1.1",
+   "depends_on": "enable_reverse_geocoding",
+   "description": "Minimum seconds between API requests (Nominatim allows max 1 request/sec).",
+   "fieldname": "nominatim_min_interval",
+   "fieldtype": "Float",
+   "label": "Minimum Request Interval (sec)"
+  },
+  {
+   "default": "30",
+   "depends_on": "enable_reverse_geocoding",
+   "description": "How long a resolved address is cached before it is looked up again.",
+   "fieldname": "geocode_cache_ttl_days",
+   "fieldtype": "Int",
+   "label": "Cache TTL (Days)"
   }
  ],
  "grid_page_length": 50,
