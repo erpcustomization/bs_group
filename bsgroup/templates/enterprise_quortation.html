@@ -1,0 +1,1495 @@
+{% if letter_head %}<div id="header-html">{{ letter_head }}</div>{% endif %}{% if footer %}<div id="footer-html">{{ footer }}</div>{% endif %}
+{#- Enterprise Quotation - Class A - OM | Sprint 2 fine-tune | no redesign, no new cover architecture -#}
+{%- set PLACEHOLDERS = ["Generic","GENERIC","generic","Item","ITEM"] -%}
+{%- set NL = "||~||" -%}
+{#- S8-A | DMAX is a safety ceiling only, shared by the priced schedule and the
+    Annexure value test. The former hard 110-character slice cut through model
+    names and mid-word ("5x o...", "PE j...", "PE jacket" -> "PE j...") and is
+    removed. No line on a normal quotation reaches DMAX, so nothing truncates. -#}
+{%- set DMAX = 600 -%}
+{%- set company = frappe.get_doc("Company", doc.company) -%}
+{%- set idreq = [] -%}
+{%- if not company.company_name %}{%- set _ = idreq.append("Legal company name") -%}{%- endif -%}
+{%- if not company.company_logo %}{%- set _ = idreq.append("Company logo") -%}{%- endif -%}
+{%- if idreq -%}
+<div class="eqa"><div class="hardfail">
+<div class="hf-h">RENDER BLOCKED &mdash; COMPANY NOT CONFIGURED</div>
+<p>The issuing Company record <b>{{ doc.company }}</b> is missing corporate identity required to produce a customer-facing document. This format is not bound to any single entity; it renders for any Company whose master record is configured.</p>
+<p>Missing configuration: {% for i in idreq %}<b>{{ i }}</b>{% if not loop.last %} &middot; {% endif %}{% endfor %}</p>
+<p>No quotation content has been rendered. Complete the Company master record, then reprint.</p>
+<p class="hf-f">Reference {{ doc.name }} &middot; Company {{ doc.company }}</p>
+</div></div>
+{%- else -%}
+{%- set addr_name = frappe.db.get_value("Dynamic Link", {"link_doctype":"Company","link_name":doc.company,"parenttype":"Address"}, "parent") -%}
+{%- set addr = frappe.get_doc("Address", addr_name) if addr_name else None -%}
+{%- set L = namespace(reg="Registration No.", tax="Tax Registration") -%}
+{%- if company.country == "Oman" -%}{%- set L.reg = "Commercial Registration" -%}{%- set L.tax = "VAT Registration" -%}
+{%- elif company.country in ["United Arab Emirates","UAE"] -%}{%- set L.reg = "Trade Licence" -%}{%- set L.tax = "TRN" -%}
+{%- endif -%}
+{#- S6-A | SIGNATURE BLOCK SOURCE -------------------------------------------
+    doc.owner -> User.full_name identifies the person who PREPARED the record.
+    It carries no signing authority, so it is never labelled "Authorised
+    Signatory". A governed authorised signatory is only asserted when
+    Company.custom_authorised_contact (Link -> Contact) is populated. -#}
+{%- set signatory = frappe.db.get_value("User", doc.owner, "full_name") -%}
+{%- set auth_link = company.custom_authorised_contact -%}
+{%- set auth = frappe.get_doc("Contact", auth_link) if auth_link else None -%}
+{%- set auth_name = ((auth.first_name or "") ~ " " ~ (auth.last_name or ""))|trim if auth else "" -%}
+{%- set auth_desig = auth.designation if auth else "" -%}
+{%- set g = namespace(md=0) -%}
+{%- if not company.company_logo %}{% set g.md = g.md + 1 %}{% endif %}
+{%- if not addr_name %}{% set g.md = g.md + 1 %}{% endif %}
+{%- if not company.phone_no %}{% set g.md = g.md + 1 %}{% endif %}
+{%- if not company.email %}{% set g.md = g.md + 1 %}{% endif %}
+{#- S2-B | RECIPIENT DESIGNATION PROVENANCE ----------------------------------
+    The addressee designation is read from the Contact linked on the Quotation
+    (contact_person -> Contact.designation), the only field on this instance
+    that describes the addressee. The Quotation-level custom_designation field
+    (label "Designation", inserted after custom_customer_notes) is not bound to
+    the recipient by anything in the schema, so it is no longer used for
+    recipient presentation. No fallback wording is generated. -#}
+{#- S1-A | PAYMENT CONDITION SOURCE ------------------------------------------
+    The customer-facing payment condition is doc.custom_payment_terms (approved
+    commercial wording). The ERPNext payment_schedule child table is left exactly
+    as it is for operational / accounting use, but it is NOT printed: it holds a
+    single operational row (one due date, 100%) which is not the agreed proposal
+    condition. The former readiness comparison - percentage tokens in
+    custom_payment_terms versus payment_schedule row count - compared two
+    different business structures and produced a false blocker. It is removed.
+    No milestone amount is calculated in Jinja. -#}
+{%- set ft = doc.custom_payment_terms or "" -%}
+{%- set rev = doc.name.split("-")|last if doc.amended_from else "0" -%}
+{#- S2-A | AUDIENCE RESOLUTION -------------------------------------------------
+    internal preview  : every diagnostic is visible
+    customer output   : diagnostics are withheld, EXCEPT a blocking condition,
+                        which is never hidden.
+    Resolution order  : explicit ?internal=1 / ?internal=0 overrides, otherwise a
+                        draft is treated as an internal preview by definition. -#}
+{%- set fd = frappe.form_dict or {} -%}
+{%- set fdi = (fd.get("internal") or "")|string|lower -%}
+{%- set internal = true if fdi in ["1","true","yes"] else (false if fdi in ["0","false","no"] else (doc.docstatus == 0)) -%}
+
+
+{#- S2-C | DESCRIPTION SEGMENTATION -------------------------------------------
+    Block-level tags are converted to an explicit separator BEFORE striptags, so
+    that striptags can no longer weld the end of one paragraph onto the start of
+    the next (the cause of "ServicesDecommissioning"). Wording is not altered. -#}
+{%- set specs = [] -%}
+{%- for row in doc.items -%}
+{%- set raw = row.description or row.item_name or "" -%}
+{%- set marked = raw|replace("</p>",NL)|replace("</li>",NL)|replace("</div>",NL)|replace("</ul>",NL)|replace("</ol>",NL)|replace("</h1>",NL)|replace("</h2>",NL)|replace("</h3>",NL)|replace("</h4>",NL)|replace("</tr>",NL)|replace("<br>",NL)|replace("<br/>",NL)|replace("<br />",NL) -%}
+{%- set parts = [] -%}
+{%- for s in (marked|striptags).split(NL) -%}
+{%- if s|trim|length > 0 %}{% set _ = parts.append(s|trim) %}{% endif -%}
+{%- endfor -%}
+{%- set head = parts[0] if parts|length else (row.item_name or "") -%}
+{%- set body = parts[1:] -%}
+{%- set hn = head|lower|replace(" ","")|replace(".","")|replace(",","")|replace("-","")|replace(":","")|replace(";","")|replace("&","")|replace("(","")|replace(")","")|replace("'","") -%}
+{%- set bn = body|join(" ")|lower|replace(" ","")|replace(".","")|replace(",","")|replace("-","")|replace(":","")|replace(";","")|replace("&","")|replace("(","")|replace(")","")|replace("'","") -%}
+{%- set dup = (bn|length == 0) or (bn in hn) or (hn in bn) -%}
+{#- S3-A | ANNEXURE VALUE TEST ----------------------------------------------
+    A line earns an Annexure entry only when the ERP source carries MATERIAL
+    ADDITIONAL technical content that the priced schedule cannot carry.
+    Measured across the whole 69-quotation corpus (241 priced lines), the
+    secondary description blocks are strongly bimodal:
+      short references / split prose : 17, 22, 29, 35, 53, 72, 81, 81, 89,
+                                       96, 117 characters
+      structured specifications     : 236, 664, 685, 971, 1106, 2300 characters
+    No real example falls between 117 and 236 characters, so the qualifying
+    thresholds sit inside that empty band. They are layout and value
+    heuristics derived from current evidence, not business rules.
+      bchars > 180                   substantial additional specification text
+      blines >= 3 and bchars > 120   structured multi-parameter specification,
+                                     shorter per line but genuinely tabular
+      head|length > DMAX             heading longer than the schedule cell can
+                                     carry, where the Annexure restores it
+    A line that does NOT qualify keeps its secondary content in the priced
+    schedule Description cell, verbatim and in source order, so nothing is
+    lost and no Annexure reference is emitted without an Annexure.
+    Nothing is invented and no wording is altered. -#}
+{%- set bchars = body|join(" ")|trim|length -%}
+{%- set blines = body|length -%}
+{%- set anx = ((not dup) and (bchars > 180 or (blines >= 3 and bchars > 120))) or (head|length > DMAX) -%}
+{%- set _ = specs.append({"head": head, "body": body, "dup": dup, "anx": anx, "bchars": bchars, "blines": blines}) -%}
+{%- endfor -%}
+
+{#- S3-B | ANNEXURE RENUMBERING ---------------------------------------------
+    Retained entries are renumbered sequentially, so "Annexure A, item X" on a
+    priced line always resolves to a real Annexure entry. -#}
+{%- set anx_map = {} -%}
+{%- set an = namespace(n=0) -%}
+{%- for s in specs -%}
+{%- if s.anx %}{% set an.n = an.n + 1 %}{% set _ = anx_map.update({loop.index0: an.n}) %}{% endif -%}
+{%- endfor -%}
+{%- set anx_count = an.n -%}
+
+{#- S4-A | BLOCKED-STATE LOGIC ----------------------------------------------
+Unchanged in substance: the same conditions decide whether the document may be
+issued. What changed is where the detail is reported. The PDF now carries the
+block notice only; the field-level readiness detail (blockers and advisories,
+with the exact ERP source of each) is rendered on the Quotation form by the
+Client Script "Quotation Readiness". Nothing below emits a field name. -#}
+{%- set b = namespace(status="", ident="", pay="", mand="", data="") -%}
+
+{#- BLOCKING 1 | document status. A cancelled quotation must never be issued.
+   A draft is a normal working state and is no longer blocked. -#}
+{%- if doc.docstatus == 2 %}{% set b.status = "y" %}{% endif -%}
+
+{#- BLOCKING 2 | required company identity data -#}
+{%- if g.md > 0 %}{% set b.ident = "y" %}{% endif -%}
+
+{#- BLOCKING 3 | payment terms -#}
+{%- if ft|trim|length == 0 %}{% set b.pay = "y" %}{% endif -%}
+
+{#- BLOCKING 4 | mandatory customer-facing legal / commercial content -#}
+{%- set warr_ok = doc.custom_warranty or (doc.tc_name and doc.terms and "arrant" in doc.terms) -%}
+{%- if not doc.custom_scope_overview or not warr_ok or not doc.tc_name or not doc.valid_till %}{% set b.mand = "y" %}{% endif -%}
+
+{#- BLANK-DESCRIPTION PROBE | measured on the flattened TEXT, never raw HTML -#}
+{#- S7-A | BLANK / PLACEHOLDER-ONLY DESCRIPTION PROBE ------------------------
+    A line whose entire customer-facing text is a placeholder token (the Item
+    master name, e.g. "Generic") is the same customer-visible accuracy failure as
+    an empty description: the priced schedule would print "Generic" to the
+    customer. Both are blocking. No substitute wording is generated here - the
+    defect is repaired on the Quotation Item / Item source. -#}
+{%- set dq = namespace(blank=0) -%}
+{%- for row in doc.items -%}
+{%- set txt = (specs[loop.index0].head ~ " " ~ specs[loop.index0].body|join(" "))|trim -%}
+{%- if txt|length == 0 or txt in PLACEHOLDERS %}{% set dq.blank = dq.blank + 1 %}{% endif -%}
+{%- endfor -%}
+
+{#- BLOCKING 5 | escalated data quality (customer-visible accuracy) -#}
+{%- if dq.blank %}{% set b.data = "y" %}{% endif -%}
+
+{%- set blocked = (b.status|length + b.ident|length + b.pay|length + b.mand|length + b.data|length) > 0 -%}
+
+{#- S14 | WATERMARK REMOVED on explicit instruction. The former company-name
+   tiled SVG background (.eqa-wm) and its Jinja text/size setup are deleted.
+   Nothing replaces it; no layout, margin, page-break or page-count compensation
+   was applied, and no other rule depended on it. -#}
+
+<div class="eqa">
+
+<div class="pg">
+
+
+
+{#- S4 | PRINTED BLOCK NOTICE ------------------------------------------------
+The document carries the block itself and nothing else. Every field-level
+diagnostic now lives on the Quotation form (Client Script "Quotation
+Readiness"), so no ERP field name, custom field name, line number, schema note
+or source-data finding is ever rendered into the PDF. -#}
+{% if blocked %}
+<div class="alert stop dx">
+<b>NOT FOR CUSTOMER ISSUE &mdash; RESOLVE BEFORE SENDING</b>
+</div>
+{% endif %}
+
+<div class="doctitle">Commercial Quotation</div>
+
+{#- S13 | PAGE-1 METADATA PANEL: TWO-COLUMN, TABLE MODEL -------------------
+    Approved reference layout is a 2-up panel:
+        QUOTATION NUMBER | QUOTATION DATE
+        VALID UNTIL      | CURRENCY
+    The previous markup was a CSS Grid of .mrow children. The wkhtmltopdf
+    engine does not implement Grid, so the WK-COMPAT layer degraded .meta to
+    display:block and the real customer PDF printed a single-column stack.
+    This rebuilds the same visual system on the CSS table model that the
+    engine does support: table-layout:fixed, collapsed borders and explicit
+    column widths, with a dedicated spacer column reproducing the former
+    12mm grid gutter. Chrome and wkhtmltopdf now render the same panel.
+    Column widths are declared on every cell, not only the first row, so the
+    fixed layout resolves identically regardless of which rows are emitted.
+    The label is wrapped in span.mlbl rather than shrinking the cell font:
+    the cell keeps the value font-size, so both cells of a row share one line
+    box strut and the label and value sit on exactly the same baseline in
+    every engine, independent of font metrics.
+    REVISION: rev is derived from doc.amended_from (the amendment suffix when
+    the document is an amendment, otherwise the literal "0"), so 0 is the
+    initial state of that derivation and not a stored business value. The
+    pair is appended only for genuine amendments, which leaves the reference
+    arrangement of the first two rows intact and lets Revision take the next
+    free cell. The ERP value itself is untouched.
+    doc.opportunity holds an internal ERP identifier (OPP-<CUSTOMER>-nnn) and
+    remains unprinted, as before. -#}
+{%- set meta_pairs = [("Quotation Number", doc.name), ("Quotation Date", doc.get_formatted("transaction_date"))]
+      + ([("Valid Until", doc.get_formatted("valid_till"))] if doc.valid_till else [])
+      + ([("Reference No.", doc.custom_reference_number)] if doc.custom_reference_number else [])
+      + ([("Revision", rev)] if doc.amended_from else []) -%}
+{%- set meta_rows = ((meta_pairs|length) + 1) // 2 -%}
+<div class="metawrap">
+<table class="metat">
+{%- for r in range(meta_rows) %}
+<tr{% if loop.last %} class="mlast"{% endif %}>
+<td class="mc1"><span class="mlbl">{{ meta_pairs[r*2][0] }}</span></td>
+<td class="mc2">{{ meta_pairs[r*2][1] }}</td>
+<td class="mc3"></td>
+{%- if (meta_pairs|length) > (r*2+1) %}
+<td class="mc4"><span class="mlbl">{{ meta_pairs[r*2+1][0] }}</span></td>
+<td class="mc5">{{ meta_pairs[r*2+1][1] }}</td>
+{%- else %}
+<td class="mc4"></td>
+<td class="mc5"></td>
+{%- endif %}
+</tr>
+{%- endfor %}
+</table>
+</div>
+
+{#- The quotation number and the issuing company are already printed directly
+   above (meta grid and masthead) and the full strip closes the document, so
+   the front-page marking carries the classification only. -#}
+
+<div class="sec"><div class="sh">Addressed To</div>
+<div class="party">
+<div class="pn">{{ doc.custom_organization_name or doc.customer_name }}</div>
+{#- Recipient identity. Name: Quotation override, then the ERPNext contact
+   display, then the linked Contact name parts. Salutation: only a value
+   explicitly stored on the linked Contact (Contact.salutation, Link to
+   Salutation) and only when the printed name is that Contact own name, so
+   nothing is inferred from a name, an email or a designation. A full stop is
+   added only to abbreviated titles that do not already carry one. -#}
+{%- set rcpt = frappe.db.get_value("Contact", doc.contact_person, ["salutation","designation","first_name","last_name"], as_dict=True) if doc.contact_person else None -%}
+{%- set rcpt_own = ((rcpt.first_name or "") ~ " " ~ (rcpt.last_name or ""))|trim if rcpt else "" -%}
+{%- set contact_nm = doc.custom_contact_person_name or doc.contact_display or rcpt_own -%}
+{%- set SAL_DOT = ["Mr","Mrs","Ms","Mx","Dr","Prof"] -%}
+{%- set sal_raw = (rcpt.salutation or "")|trim if rcpt else "" -%}
+{#- ERPNext already composes the stored salutation into contact_display
+   ("Mr Muralidharan.S"), and the Quotation override often carries it too, so a
+   prefix is emitted only when the name being printed does not already open with
+   the stored title. That keeps "Mr Mr." out of the document without editing any
+   stored value. -#}
+{%- set nm_head = (contact_nm|lower).replace(".", " ").split(" ")[0] -%}
+{%- set sal_ok = sal_raw and nm_head != (sal_raw|lower).replace(".", "") -%}
+{%- set sal_txt = ((sal_raw ~ ".") if (sal_raw in SAL_DOT and not sal_raw.endswith(".")) else sal_raw) if sal_ok else "" -%}
+{%- set rcpt_desig = (rcpt.designation or "")|trim if rcpt else "" -%}
+{% if contact_nm %}<div class="pl">{% if sal_txt %}{{ sal_txt }} {% endif %}{{ contact_nm }}</div>{% endif %}
+{% if rcpt_desig %}<div class="pl pf">{{ rcpt_desig }}</div>{% endif %}
+</div>
+</div>
+
+{% if doc.custom_subject %}<div class="sec"><div class="sh">Subject</div><div class="subj">{{ doc.custom_subject }}</div></div>{% endif %}
+
+<div class="sec"><div class="sh">Transmittal</div>
+<p>We thank you for the opportunity to respond to your enquiry and are pleased to submit our proposal for your kind consideration.</p>
+<p>Our submission has been carefully prepared to align with your stated requirements. Our team offers the requisite technical expertise, professional capability, and local market knowledge to support the successful execution of the assignment at every stage. We would welcome the opportunity to present our proposal in greater detail at your convenience and to discuss how our proposed approach may best support your objectives.</p>
+<p>We appreciate your consideration and remain at your reach should you require any further information or clarification</p>
+</div>
+
+{% if auth_name %}
+<div class="sec"><div class="sh">Authorised Signatory</div>
+<div class="sign">
+<div class="sigline"></div>
+<div class="pl"><b>{{ auth_name }}</b></div>
+<div class="pl pf">{% if auth_desig %}{{ auth_desig }} &middot; {% endif %}{{ company.company_name }}</div>
+</div>
+</div>
+{% elif signatory %}
+<div class="sec"><div class="sh">With Regards</div>
+<div class="sign">
+<div class="sigline"></div>
+<div class="pl"><b>{{ signatory }}</b></div>
+{% if doc.custom_designation %}<div class="pl pf">{{ doc.custom_designation }}</div>{% endif %}
+{% if doc.custom_phone__no %}<div class="pl pf">{{ doc.custom_phone__no }}</div>{% endif %}
+<div class="pl pf">{{ company.company_name }}</div>
+</div>
+</div>
+{% endif %}
+
+</div>
+
+<div class="pg abpg">
+
+<div class="v2lab">ABOUT US</div>
+
+<table class="v2hero"><tbody><tr>
+<td class="v2hl">
+<div class="v2h1">ENTERPRISE-GRADE<br>TECHNOLOGY &amp; INFRASTRUCTURE<br><span class="v2h1a">SOLUTIONS ACROSS OMAN</span></div>
+<div class="v2tag">ENGINEERING EXCELLENCE. CERTIFIED QUALITY. RELIABLE DELIVERY.</div>
+<p class="v2in"><b>{{ company.company_name }}</b> is an ISO-certified technology and infrastructure solutions provider delivering enterprise IT, networking, cybersecurity, ELV, data centre and digital infrastructure solutions across the Sultanate of Oman.</p>
+<p class="v2in">We support commercial, industrial, government and enterprise customers through an engineering-led delivery model combining locally based expertise, multi-vendor capability, structured project governance and end-to-end lifecycle support.</p>
+<p class="v2in">From requirements assessment and solution design through supply, deployment, testing, commissioning, documentation, handover and ongoing support, we act as a single accountable technology partner throughout the project lifecycle.</p>
+</td>
+<td class="v2hr">
+<div class="v2cth">CONTACT US</div>
+<table class="v2ct"><tbody>
+{%- set _al = [] -%}
+{%- if addr and addr.address_line1 -%}{%- set _ = _al.append(addr.address_line1) -%}{%- endif -%}
+{%- if addr and addr.address_line2 -%}{%- set _ = _al.append(addr.address_line2) -%}{%- endif -%}
+{%- set _cl = [] -%}
+{%- if addr and addr.city -%}{%- set _ = _cl.append(addr.city) -%}{%- endif -%}
+{%- if addr and addr.country -%}{%- set _ = _cl.append(addr.country) -%}{%- elif company.country -%}{%- set _ = _cl.append(company.country) -%}{%- endif -%}
+{%- if _cl -%}{%- set _ = _al.append(_cl|join(", ")) -%}{%- endif -%}
+{%- if _al %}<tr><td class="v2cio"><div class="v2cc"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg></div></td><td class="v2cit">{% for _l in _al %}{{ _l }}{% if not loop.last %}<br>{% endif %}{% endfor %}</td></tr>{% endif -%}
+{%- set _ph = (company.phone_no or "")|trim -%}
+{%- if _ph %}<tr><td class="v2cio"><div class="v2cc"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 1.9.6 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.8.6a2 2 0 0 1 1.7 2z"></path></svg></div></td><td class="v2cit">{{ _ph }}</td></tr>{% endif -%}
+{%- set _em = (company.email or "")|trim -%}
+{%- if _em %}<tr><td class="v2cio"><div class="v2cc"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M2 7l10 7 10-7"></path></svg></div></td><td class="v2cit">{{ _em }}</td></tr>{% endif -%}
+{%- set _wb = (company.website or "")|trim -%}
+{%- if _wb %}<tr><td class="v2cio"><div class="v2cc"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20"></path><path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"></path></svg></div></td><td class="v2cit">{{ _wb }}</td></tr>{% endif -%}
+</tbody></table>
+</td>
+</tr></tbody></table>
+
+<table class="v2vc"><tbody><tr>
+<td class="v2vcc v2vcc1"><div class="v2card"><table class="v2vt"><tbody><tr><td class="v2vti"><div class="v2vi v2vi1">01</div></td><td class="v2vtl"><div class="v2vn">OMAN-WIDE DELIVERY</div></td></tr></tbody></table><div class="v2vh">Engineering Resources Across Oman</div><div class="v2vp">{% if addr and addr.city %}{{ addr.city }}-based{% else %}Oman-based{% endif %} operations with engineering resources available for mobilisation across the Sultanate, supporting single-site, multi-site and geographically distributed projects with responsive coordination and on-site execution.</div></div></td>
+<td class="v2vcc v2vcc2"><div class="v2card"><table class="v2vt"><tbody><tr><td class="v2vti"><div class="v2vi v2vi2">02</div></td><td class="v2vtl"><div class="v2vn">ENTERPRISE ENGINEERING</div></td></tr></tbody></table><div class="v2vh">Multi-Technology &amp; Multi-Vendor Expertise</div><div class="v2vp">Engineering capability across networking, cybersecurity, wireless, servers, data centres, structured cabling, fibre, IP CCTV and ELV systems supported by multi-vendor expertise.</div></div></td>
+<td class="v2vcc v2vcc3"><div class="v2card"><table class="v2vt"><tbody><tr><td class="v2vti"><div class="v2vi v2vi3">03</div></td><td class="v2vtl"><div class="v2vn">DELIVERY ASSURANCE</div></td></tr></tbody></table><div class="v2vh">End-to-End Project Ownership</div><div class="v2vp">A structured delivery approach covering assessment, design, supply, deployment, integration, testing, commissioning, documentation, handover and lifecycle support.</div></div></td>
+</tr></tbody></table>
+
+<div class="v2bar">OUR CORE CAPABILITIES</div>
+<table class="v2cap"><tbody><tr>
+<td class="v2capc v2capc1"><table class="v2ch"><tbody><tr><td class="v2chi"><div class="v2cm v2cm1"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3v6c0 5-3.4 9.3-8 11-4.6-1.7-8-6-8-11V5z"></path><path d="M9 12l2 2 4-4"></path></svg></div></td><td class="v2cht"><div class="v2capt v2capt1">NETWORKING &amp;<br>CYBERSECURITY</div></td></tr></tbody></table><div class="v2li"><span class="v2d v2d1"></span>Enterprise Networking</div><div class="v2li"><span class="v2d v2d1"></span>LAN / WAN Infrastructure</div><div class="v2li"><span class="v2d v2d1"></span>Switching &amp; Wireless</div><div class="v2li"><span class="v2d v2d1"></span>Network Security</div><div class="v2li"><span class="v2d v2d1"></span>Firewalls &amp; Secure Connectivity</div><div class="v2li"><span class="v2d v2d1"></span>Server &amp; IT Infrastructure</div></td>
+<td class="v2capc v2capc2"><table class="v2ch"><tbody><tr><td class="v2chi"><div class="v2cm v2cm2"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="6" rx="1"></rect><rect x="3" y="15" width="18" height="6" rx="1"></rect><path d="M7 6h.01M7 18h.01"></path></svg></div></td><td class="v2cht"><div class="v2capt v2capt2">INFRASTRUCTURE &amp;<br>ELV SOLUTIONS</div></td></tr></tbody></table><div class="v2li"><span class="v2d v2d2"></span>Structured Cabling</div><div class="v2li"><span class="v2d v2d2"></span>Fibre &amp; Passive Infrastructure</div><div class="v2li"><span class="v2d v2d2"></span>IP CCTV &amp; Video Surveillance</div><div class="v2li"><span class="v2d v2d2"></span>Data Centre Infrastructure</div><div class="v2li"><span class="v2d v2d2"></span>Racks, Cabinets &amp; Connectivity</div><div class="v2li"><span class="v2d v2d2"></span>Multi-Site Infrastructure Deployment</div></td>
+<td class="v2capc v2capc3"><table class="v2ch"><tbody><tr><td class="v2chi"><div class="v2cm v2cm3"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6v3H9z"></path><path d="M6 6h12v15H6z"></path><path d="M9 12l2 2 4-4"></path></svg></div></td><td class="v2cht"><div class="v2capt v2capt3">PROJECT DELIVERY &amp;<br>SUPPORT</div></td></tr></tbody></table><div class="v2li"><span class="v2d v2d3"></span>Requirement Assessment &amp; Solution Design</div><div class="v2li"><span class="v2d v2d3"></span>Supply, Installation &amp; Integration</div><div class="v2li"><span class="v2d v2d3"></span>Configuration &amp; Technical Implementation</div><div class="v2li"><span class="v2d v2d3"></span>Testing &amp; Commissioning</div><div class="v2li"><span class="v2d v2d3"></span>Documentation &amp; Handover</div><div class="v2li"><span class="v2d v2d3"></span>Maintenance &amp; Technical Support</div></td>
+</tr></tbody></table>
+
+<div class="v2pt">END-TO-END PROJECT LIFECYCLE</div>
+<table class="v2life"><tbody><tr><td class="v2lc"><div class="v2lci">01</div><div class="v2ls">Assess</div></td><td class="v2la">&rsaquo;</td><td class="v2lc"><div class="v2lci">02</div><div class="v2ls">Design</div></td><td class="v2la">&rsaquo;</td><td class="v2lc"><div class="v2lci">03</div><div class="v2ls">Supply</div></td><td class="v2la">&rsaquo;</td><td class="v2lc"><div class="v2lci">04</div><div class="v2ls">Deploy</div></td><td class="v2la">&rsaquo;</td><td class="v2lc"><div class="v2lci">05</div><div class="v2ls">Configure</div></td><td class="v2la">&rsaquo;</td><td class="v2lc"><div class="v2lci">06</div><div class="v2ls">Test</div></td><td class="v2la">&rsaquo;</td><td class="v2lc"><div class="v2lci">07</div><div class="v2ls">Commission</div></td><td class="v2la">&rsaquo;</td><td class="v2lc"><div class="v2lci">08</div><div class="v2ls">Document</div></td><td class="v2la">&rsaquo;</td><td class="v2lc"><div class="v2lci">09</div><div class="v2ls">Handover</div></td><td class="v2la">&rsaquo;</td><td class="v2lc"><div class="v2lci">10</div><div class="v2ls">Support</div></td></tr></tbody></table>
+
+<table class="v2low"><tbody><tr>
+<td class="v2lowl">
+
+<div class="v2pt">OUR COMMITMENT</div>
+<div class="v2com">We engineer and deliver technology environments around the principles of <b>Security, Reliability, Availability, Performance, Scalability, Compliance, Safety, Maintainability, Business Continuity and Cost Effectiveness.</b><span class="v2comb"></span>Our objective is to provide every customer with more than technology supply &mdash; we provide <b>enterprise engineering, accountable project delivery and dependable lifecycle support across Oman.</b></div>
+</td>
+<td class="v2lowr">
+<div class="v2pt">ISO-CERTIFIED EXCELLENCE</div>
+<table class="v2iso"><tbody><tr><td class="v2isoc"><div class="v2isob"><div class="v2isot v2isot1">ISO 9001</div><div class="v2isos">Quality Management</div></div></td><td class="v2isoc"><div class="v2isob"><div class="v2isot v2isot2">ISO 14001</div><div class="v2isos">Environmental Management</div></div></td></tr><tr><td class="v2isoc"><div class="v2isob"><div class="v2isot v2isot3">ISO 45001</div><div class="v2isos">Occupational Health &amp; Safety</div></div></td><td class="v2isoc"><div class="v2isob"><div class="v2isot v2isot4">ISO/IEC 27001</div><div class="v2isos">Information Security Management</div></div></td></tr><tr><td class="v2isoc"><div class="v2isob"><div class="v2isot v2isot5">ISO/IEC 20000-1</div><div class="v2isos">IT Service Management</div></div></td><td class="v2isoc"><div class="v2isob"><div class="v2isot v2isot6">ISO 22301</div><div class="v2isos">Business Continuity Management</div></div></td></tr></tbody></table>
+</td>
+</tr></tbody></table>
+
+<div class="v2why">
+<div class="v2bar">WHY BITS SECURE?</div>
+<table class="v2wg"><tbody><tr><td class="v2wc"><div class="v2wi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg></div><div class="v2wt">Oman Presence &amp;<br>Nationwide Reach</div><div class="v2wd">Locally based operations with engineering resources deployable across the Sultanate.</div></td><td class="v2wc v2wcr"><div class="v2wi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3v6c0 5-3.4 9.3-8 11-4.6-1.7-8-6-8-11V5z"></path><path d="M9 12l2 2 4-4"></path></svg></div><div class="v2wt">Enterprise<br>Engineering</div><div class="v2wd">Solutions engineered for security, performance, reliability, availability and scalability.</div></td><td class="v2wc v2wcr"><div class="v2wi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l9 5-9 5-9-5z"></path><path d="M3 12l9 5 9-5"></path><path d="M3 17l9 5 9-5"></path></svg></div><div class="v2wt">Multi-Vendor<br>Capability</div><div class="v2wd">Technology selection driven by customer requirements, interoperability and best-fit integration.</div></td><td class="v2wc v2wcr"><div class="v2wi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M8 12l2.5 2.5L16 9"></path></svg></div><div class="v2wt">Quality &amp;<br>Compliance</div><div class="v2wd">Execution aligned with standards, specifications, OEM recommendations and best practices.</div></td><td class="v2wc v2wcr"><div class="v2wi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l6-6"></path><path d="M10 5h3a5 5 0 0 1 0 10h-1"></path><path d="M14 19h-3a5 5 0 0 1 0-10h1"></path></svg></div><div class="v2wt">End-to-End<br>Accountability</div><div class="v2wd">One accountable technology partner from assessment through implementation and support.</div></td><td class="v2wc v2wcr"><div class="v2wi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"></path><path d="M15 7h6v6"></path></svg></div><div class="v2wt">Structured Delivery<br>Approach</div><div class="v2wd">Project governance, documented processes and disciplined technical execution.</div></td></tr></tbody></table>
+</div>
+<div class="v2foot"><span class="v2fi">ISO CERTIFIED</span><span class="v2fs">|</span><span class="v2fi">ENTERPRISE ENGINEERING</span><span class="v2fs">|</span><span class="v2fi">OMAN-WIDE DELIVERY</span><span class="v2fs">|</span><span class="v2fi">END-TO-END ACCOUNTABILITY</span></div>
+
+</div>
+
+<div class="pg">
+
+<div class="sec"><div class="sh">Priced Schedule</div>
+<table class="tbl">
+<caption class="vh">Priced schedule of quoted items</caption>
+<thead><tr>
+<th scope="col" class="c-n">#</th>
+<th scope="col" class="c-d">Description</th>
+<th scope="col" class="c-q">Qty</th>
+<th scope="col" class="c-r">Rate</th>
+<th scope="col" class="c-a">Amount</th>
+</tr></thead>
+<tbody>
+{% for row in doc.items %}
+{%- set head = specs[loop.index0].head -%}
+<tr>
+<td class="c-n">{{ loop.index }}</td>
+<td class="c-d">
+{%- set dtrunc = head|length > DMAX -%}
+{%- set dcut = head[:DMAX] -%}
+{%- set dshow = ((dcut[:dcut.rfind(" ")] if dcut.rfind(" ") > 0 else dcut) if dtrunc else head) -%}
+<div class="idesc">{{ dshow }}{% if dtrunc %}&hellip;{% endif %}</div>
+{% if not specs[loop.index0].anx and not specs[loop.index0].dup %}{% for b in specs[loop.index0].body %}<div class="idesc idesc-cont">{{ b }}</div>{% endfor %}{% endif %}
+{% if row.item_code and row.item_code not in PLACEHOLDERS %}<div class="icode">Item {{ row.item_code }}</div>{% endif %}
+{% if specs[loop.index0].anx %}<div class="iref">Specification: Annexure A, item {{ anx_map[loop.index0] }}</div>{% endif %}
+</td>
+<td class="c-q">{{ row.get_formatted("qty") }}</td>
+<td class="c-r">{{ row.get_formatted("rate") }}</td>
+<td class="c-a">{{ row.get_formatted("amount") }}</td>
+</tr>
+{% endfor %}
+</tbody>
+{#- CONTINUATION ROW REMOVED: the print engine emits a table foot on the final
+   fragment as well, so the message printed immediately above the totals on the
+   page where the schedule had in fact ended. There is no reliable way to detect
+   a genuine table break at render time, so the false statement is dropped. -#}
+</table>
+</div>
+
+<div class="totwrap">
+<table class="tot">
+<tr><td>Subtotal</td><td>{{ doc.get_formatted("net_total") }}</td></tr>
+{% for t in doc.taxes %}
+<tr><td>{{ t.description or t.account_head }}</td><td>{{ t.get_formatted("tax_amount") }}</td></tr>
+{% endfor %}
+{% if doc.rounding_adjustment %}
+<tr><td>Rounding Adjustment</td><td>{{ doc.get_formatted("rounding_adjustment") }}</td></tr>
+{% endif %}
+<tr class="grand"><td>Total Payable ({{ doc.currency }})</td><td>{{ doc.get_formatted("rounded_total") if doc.rounded_total else doc.get_formatted("grand_total") }}</td></tr>
+</table>
+</div>
+{% if doc.in_words %}<div class="inwords"><span>Amount in words</span> {{ doc.in_words }}</div>{% endif %}
+
+{#- S13 | EMPTY SECTION SUPPRESSION ---------------------------------------
+    custom_scope_overview is a rich-text field. The editor stores an EMPTY
+    document as markup, e.g. <div class="ql-editor read-mode"><p><br></p></div>
+    (50 characters), which is truthy, so the previous raw test printed the
+    Scope Included heading with no body. The section is now emitted only when
+    the field carries visible content: text surviving striptags once
+    non-breaking spaces and surrounding whitespace are removed, or an embedded
+    image/table, which is visible without contributing text. Because the whole
+    wrapper is inside the guard, suppression leaves no heading, no body and no
+    residual margin. Generic: no document identity, no fallback wording, no
+    change to Scope content or to any source record. -#}
+{%- set scope_raw = doc.custom_scope_overview or "" -%}
+{%- set scope_txt = scope_raw|striptags|replace("\u00a0"," ")|trim -%}
+{%- set scope_media = ("<img" in scope_raw|lower) or ("<table" in scope_raw|lower) -%}
+{% if scope_txt or scope_media %}<div class="sec scope-sec"><div class="sh">Scope Included</div><div class="rt">{{ doc.custom_scope_overview }}</div></div>{% endif %}
+
+{#- S9 | Commercial Conditions column fallback. Each wrapper is emitted only when it has
+    content; with one side populated the grid collapses to a single full-width column, with
+    neither the whole section is suppressed. No placeholders and no fallback wording. -#}
+{%- set cc_l = (doc.custom_delivery_terms or doc.valid_till or doc.custom_warranty) -%}
+{%- set cc_r = (doc.currency or doc.taxes) -%}
+{% if cc_l or cc_r %}
+<div class="sec commercial-sec"><div class="sh">Commercial Conditions</div>
+<div class="gr2"{% if not (cc_l and cc_r) %} style="grid-template-columns:1fr;"{% endif %}>
+{% if cc_l %}<div>
+{% if doc.custom_delivery_terms %}<div class="kv"><span>Delivery</span><b>{{ doc.custom_delivery_terms }}</b></div>{% endif %}
+{% if doc.valid_till %}<div class="kv"><span>Validity</span><b>Valid until {{ doc.get_formatted("valid_till") }}</b></div>{% endif %}
+{% if doc.custom_warranty %}<div class="kv"><span>Warranty</span><b>{{ doc.custom_warranty }}</b></div>{% endif %}
+</div>{% endif %}
+{% if cc_r %}<div>
+<div class="kv"><span>Currency</span><b>All amounts are stated in {{ doc.currency }}.</b></div>
+{% if doc.taxes %}<div class="kv"><span>Taxation</span><b>{% for t in doc.taxes %}{{ t.description or t.account_head }}{% if not loop.last %}; {% endif %}{% endfor %} applied on the net value.</b></div>{% endif %}
+</div>{% endif %}
+</div>
+</div>
+{% endif %}
+
+{#- S1-B | PAYMENT TERMS -----------------------------------------------------
+    Rendered from doc.custom_payment_terms, the approved customer-facing payment
+    condition. The operational payment_schedule row (due date, 100%, calculated
+    amount) is deliberately not printed: no due date, no calculated milestone
+    amount and no unnamed payment row reaches the customer. -#}
+{% if doc.custom_payment_terms %}
+<div class="sec payment-sec"><div class="sh">Payment Terms</div>
+<div class="rt">{{ doc.custom_payment_terms }}</div>
+</div>
+{% endif %}
+
+{#- S10 | PAGINATION: CONTRACTUAL TERMS HOLD -------------------------------
+   The previous test was  doc.terms|length < 5500 . Two defects were measured:
+   (1) it counts the Jinja SOURCE, not the rendered text. The stored terms of
+       this corpus are 3,371 source characters but render to 2,199 characters,
+       because four inline expressions expand to short values. The number
+       therefore does not describe what is actually printed.
+   (2) it is a bare character count with no line or block term, so it cannot
+       express rendered height at all.
+   Replacement: estimate rendered height from the RENDERED terms, using two
+   constants measured directly from this print format at print width
+   (186.25mm text column, 8pt, line-height 1.42):
+       0.062 mm per rendered character  - measured 8pt wrap rate, rounded up
+       6.0  mm per block                - measured 4.26mm line + 2.19mm block
+                                          margin, rounded up to absorb the
+                                          heading line of each clause
+   Calibrated against 21 real rendered measurements of this content between
+   15mm and 668mm: the estimate is ABOVE measured height at every point, so it
+   can never hold a section that will not fit.
+   Budget: A4 297mm - 15mm top - 15mm bottom = 267mm of content height. The
+   hold is permitted only up to 260mm, leaving 7mm of clearance. The 7.6mm
+   term is the measured height of the section heading and its rule.
+   If the estimate exceeds the budget the section is NOT held and the terms
+   paginate naturally. Individual clauses are protected from splitting in CSS,
+   so long terms fragment at clause boundaries and can never produce a blank
+   or throwaway page. -#}
+{%- set tc_html = frappe.render_template(doc.terms, {"doc": doc}) if doc.terms else "" -%}
+{%- set tcl = tc_html|lower -%}
+{%- set tc_blocks = (tcl.split("</p>")|length - 1) + (tcl.split("</li>")|length - 1) + (tcl.split("</tr>")|length - 1) -%}
+{%- set tc_blocks = tc_blocks if tc_blocks > 0 else 1 -%}
+{%- set tc_est = ((tc_html|striptags|length) * 0.062) + (tc_blocks * 6.0) + 7.6 -%}
+{%- set tc_hold = (tc_est <= 260) if tc_html else False -%}
+{% if doc.tc_name and doc.terms %}<div class="sec tc{% if tc_hold %} tc-hold{% endif %}"><div class="sh">Contractual Terms</div><div class="rt small">{{ tc_html }}</div></div>{% endif %}
+
+{#- ORDER PLACEMENT / CUSTOMER ACCEPTANCE BLOCK REMOVED -------------------
+   Orders are placed by customer PO / LPO, so no signature-back acceptance
+   block is printed. Contractual terms clause 12 already states that work
+   commences on receipt of an approved LPO / Contract. -#}
+
+</div>
+
+{#- S3-C | ANNEXURE A --------------------------------------------------------
+    Only lines that passed the value test are listed, renumbered sequentially.
+    If no line carries additional technical detail the whole Annexure page is
+    suppressed rather than printed almost empty. Wording is reproduced exactly
+    as recorded in ERP. -#}
+{% if anx_count %}
+<div class="annex">
+<div class="sec anx-intro">
+<div class="sh">Annexure A &mdash; Technical Specification</div>
+<p class="note">This annexure covers only those lines of the priced schedule that carry technical specification or configuration detail beyond the description already shown. Lines fully described in the schedule are not restated here. The wording below is reproduced without alteration from the commercial record.</p>
+</div>
+{% for row in doc.items %}
+{%- set s = specs[loop.index0] -%}
+{% if s.anx %}
+<div class="spec">
+<div class="spec-h">Item {{ anx_map[loop.index0] }} &mdash; {{ s.head }}</div>
+<div class="kv"><span>Quantity</span><b>{{ row.get_formatted("qty") }} {{ row.uom }}</b></div>
+<div class="kv"><span>Schedule Line</span><b>{{ loop.index }}</b></div>
+{% if row.item_code and row.item_code not in PLACEHOLDERS %}<div class="kv"><span>Item Code</span><b>{{ row.item_code }}</b></div>{% endif %}
+{% if row.warranty_period %}<div class="kv"><span>Warranty Period</span><b>{{ row.warranty_period }}</b></div>{% endif %}
+{% if not s.dup %}
+<div class="spec-sh">Technical Specification</div>
+<ul class="speclist">
+{% for b in s.body %}<li>{{ b }}</li>{% endfor %}
+</ul>
+{% endif %}
+</div>
+{% endif %}
+{% endfor %}
+</div>
+{% endif %}
+
+</div>
+{%- endif -%}
+
+<!-- ----------------------------------------------------------------------------------------------------------------- -->
+
+/* Enterprise Quotation - Class A - OM | Sprint 2 fine-tune | all rules scoped under .eqa */
+.eqa{--ink:#141414;--soft:#43484d;--faint:#6b7075;--rule:#c2c6ca;--hair:#e4e7ea;--band:#eef1f4;--zebra:#f7f8f9;--navy:#0b3d62;--warnbg:#fdf6e6;--warnink:#8a5a00;--stopbg:#fbeceb;--stopink:#a02020;--infobg:#eef4f9;--infoink:#0b3d62;
+font-family:Arial,Helvetica,"Liberation Sans",sans-serif;color:var(--ink);font-size:9pt;line-height:1.42;orphans:3;widows:3;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+.eqa *{box-sizing:border-box;}
+.eqa p{margin:0 0 2.2mm 0;orphans:3;widows:3;}
+.eqa b{font-weight:700;}
+.eqa .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+
+.eqa .pg{padding-bottom:2mm;}
+.eqa .pg + .pg{break-before:page;page-break-before:always;}
+
+/* S2-02 | page 1 vertical hierarchy: masthead breathes, title sits closer to the rule */
+.eqa .mast{display:flex;align-items:flex-start;justify-content:space-between;gap:8mm;border-bottom:2pt solid var(--navy);padding-bottom:3.6mm;margin-bottom:5mm;break-inside:avoid;page-break-inside:avoid;}
+.eqa .mast-l{flex:0 0 52mm;}
+.eqa .logo{width:48mm;height:auto;display:block;}
+.eqa .mast-r{flex:1 1 auto;text-align:right;}
+.eqa .ent{font-size:11pt;font-weight:700;color:var(--navy);line-height:1.25;}
+.eqa .entl{font-size:8pt;color:var(--soft);line-height:1.45;}
+.eqa .entc{font-weight:700;color:var(--ink);}
+
+.eqa .alert{display:flex;flex-direction:column;gap:.6mm;border-left:2.4pt solid;padding:2mm 3mm;margin:0 0 2.6mm 0;font-size:8pt;break-inside:avoid;page-break-inside:avoid;}
+.eqa .alert b{letter-spacing:.04em;}
+.eqa .alert.stop{background:var(--stopbg);border-color:var(--stopink);color:var(--stopink);}
+.eqa .alert.warn{background:var(--warnbg);border-color:var(--warnink);color:var(--warnink);}
+.eqa .alert.info{background:var(--infobg);border-color:var(--infoink);color:var(--infoink);}
+.eqa .alert span{color:var(--soft);}
+
+/* S2-01 | one consolidated diagnostic panel replaces four stacked panels.
+   Same palette, same semantics, ~1/3 of the vertical cost. */
+.eqa .alert.dx{gap:.9mm;padding:2mm 3mm;margin-bottom:3.4mm;}
+.eqa .alert.dx b{font-size:8.2pt;}
+.eqa .alert.dx span{display:block;font-size:7.5pt;line-height:1.38;color:var(--soft);}
+.eqa .alert.dx span i{font-style:normal;font-weight:700;letter-spacing:.05em;margin-right:2mm;white-space:nowrap;}
+.eqa .alert.stop.dx span i{color:var(--stopink);}
+.eqa .alert.info.dx span i{color:var(--infoink);}
+
+.eqa .doctitle{font-size:16pt;font-weight:700;letter-spacing:.005em;color:var(--navy);margin:1.5mm 0 4mm 0;line-height:1.2;}
+
+/* S3-01 | metadata panel: label/value pairs on a shared baseline grid, hairline
+   separators instead of dotted leaders, no field-box appearance */
+.eqa .meta{display:grid;grid-template-columns:1fr 1fr;gap:0 12mm;border-top:.7pt solid var(--rule);border-bottom:.7pt solid var(--rule);padding:3.2mm 0 3mm 0;margin-bottom:4.5mm;break-inside:avoid;page-break-inside:avoid;}
+.eqa .mrow{display:grid;grid-template-columns:auto 1fr;align-items:baseline;column-gap:6mm;padding:1.5mm 0 1.7mm 0;border-bottom:.4pt solid var(--hair);}
+.eqa .meta .mrow:nth-last-child(1),.eqa .meta .mrow:nth-last-child(2){border-bottom:0;padding-bottom:0;}
+.eqa .mrow span{font-size:7.8pt;font-weight:400;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);white-space:nowrap;}
+.eqa .mrow b{font-size:9.2pt;font-weight:700;color:var(--ink);text-align:right;letter-spacing:.01em;font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;}
+
+.eqa .sec{margin:0 0 3.2mm 0;}
+.eqa .sh{font-size:8.4pt;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--navy);
+border-bottom:.7pt solid var(--rule);padding-bottom:1.1mm;margin-bottom:2mm;break-after:avoid;page-break-after:avoid;}
+.eqa .pn{font-size:11pt;font-weight:700;line-height:1.3;}
+.eqa .pl{font-size:9pt;}
+.eqa .pf{color:var(--faint);font-size:8.4pt;}
+.eqa .subj{font-size:10pt;font-weight:700;line-height:1.35;background:var(--band);padding:2.4mm 3mm;border-left:2.4pt solid var(--navy);}
+.eqa .note{font-size:8pt;color:var(--faint);}
+.eqa .rt{font-size:8.8pt;}
+.eqa .rt.small{font-size:8pt;}
+
+.eqa .sign{margin-top:11mm;break-inside:avoid;page-break-inside:avoid;}
+.eqa .sigline{width:62mm;border-bottom:.7pt solid var(--ink);height:0;margin-bottom:1.6mm;}
+
+.eqa table.tbl{width:100%;border-collapse:collapse;font-size:8.6pt;table-layout:fixed;}
+.eqa table.tbl caption{text-align:left;}
+.eqa table.tbl thead{display:table-header-group;}
+.eqa table.tbl tfoot{display:table-footer-group;}
+.eqa table.tbl th{background:var(--band);border-top:.7pt solid var(--rule);border-bottom:.7pt solid var(--rule);
+padding:1.5mm 2mm;text-align:left;font-size:8pt;letter-spacing:.05em;text-transform:uppercase;color:var(--navy); font-weight:700;}
+.eqa table.tbl td{border-bottom:.35pt solid var(--rule);padding:1.4mm 2mm;vertical-align:top;overflow-wrap:break-word;word-wrap:break-word;}
+.eqa table.tbl tbody tr:nth-child(even) td{background:var(--zebra);}
+.eqa table.tbl tbody tr{break-inside:avoid;page-break-inside:avoid;}
+/* S8-B | column widths rebalanced. Content width is unchanged (A4 minus the
+   frozen 12mm side margins = 186mm); only the split between columns moves.
+   Fixed columns: 9 + 11 + 12 + 26 + 28 = 86mm, so Description resolves to
+   ~100mm - by far the widest column, up ~2mm. #, UoM and Qty keep their
+   original widths so "10" and short units such as "Nos" never wrap. Rate and Amount keep room for a
+   14-character currency string at 8.6pt tabular figures, so numeric
+   readability is not compromised. No clamp, no ellipsis, no max-height:
+   the Description cell wraps naturally over as many lines as it needs. */
+.eqa .c-n{width:9mm;text-align:right;}
+.eqa .c-d{width:auto;}
+/* UoM column removed from the priced schedule; the freed width is absorbed
+   by the auto-width Description column under the fixed table layout. */
+.eqa .c-q{width:12mm;text-align:right;}
+.eqa .c-r{width:26mm;text-align:right;}
+.eqa .c-a{width:28mm;text-align:right;}
+.eqa .c-r,.eqa .c-a,.eqa .c-q{font-variant-numeric:tabular-nums;}
+.eqa .idesc{font-weight:700;line-height:1.3;}
+.eqa .icode,.eqa .iref{font-size:7.6pt;line-height:1.3;color:var(--faint);}
+.eqa .cont{font-size:7.8pt;color:var(--faint);border-bottom:0;padding:1mm 2mm;}
+
+.eqa .totwrap{display:flex;justify-content:flex-end;margin-top:2.6mm;break-inside:avoid;page-break-inside:avoid;}
+.eqa table.tot{border-collapse:collapse;font-size:9pt;min-width:84mm;}
+.eqa table.tot td{padding:1.2mm 2mm;border-bottom:.35pt solid var(--rule);}
+.eqa table.tot td:last-child{text-align:right;width:36mm;font-variant-numeric:tabular-nums;}
+/* S2-04 | Total Payable is the strongest element on the commercial page */
+.eqa table.tot tr.grand td{border-top:1.6pt solid var(--navy);border-bottom:1.6pt solid var(--navy);
+background:var(--navy);color:#fff;font-weight:700;font-size:11.5pt;letter-spacing:.01em;padding:2.2mm 2mm;}
+.eqa .inwords{margin-top:1.6mm;font-size:8.4pt;background:var(--zebra);border-left:2.4pt solid var(--rule);padding:1.4mm 3mm;break-inside:avoid;page-break-inside:avoid;}
+.eqa .inwords span{color:var(--faint);text-transform:uppercase;letter-spacing:.06em;font-size:7.9pt;display:block;}
+
+.eqa .gr2{display:grid;grid-template-columns:1fr 1fr;gap:0 6mm;}
+/* S4-01 | conditions rows adopt the metadata hairline family (was .35pt dotted) */
+.eqa .kv{display:flex;gap:3mm;padding:1.1mm 0 1.2mm 0;border-bottom:.4pt solid var(--hair);font-size:8.6pt;}
+.eqa .kv span{flex:0 0 22mm;color:var(--faint);}
+.eqa .kv b{flex:1 1 auto;font-weight:700;}
+.eqa .gr2 > div > .kv:last-child{border-bottom:0;padding-bottom:0;}
+/* S7-01 | pagination: hold the contractual section together when it fits a page */
+.eqa .sec.tc-hold{break-inside:avoid;page-break-inside:avoid;}
+
+.eqa .acc{margin-top:2mm;break-inside:avoid;page-break-inside:avoid;}
+.eqa .accl{font-size:7.9pt;color:var(--faint);text-transform:uppercase;letter-spacing:.06em;margin-top:2.2mm;}
+.eqa .accr{border-bottom:.7pt solid var(--ink);height:5mm;}
+.eqa .acc .gr2 > div > .accl:first-child{margin-top:0;}
+
+/* S2-05 | Annexure pagination.
+   The intro is glued to item 1, so the annexure can no longer open on a page of
+   its own; and a spec taller than one page is allowed to break internally
+   instead of being pushed whole onto the next page. */
+.eqa .annex .anx-intro{break-after:avoid;page-break-after:avoid;break-inside:avoid;page-break-inside:avoid;margin-bottom:3.4mm;}
+.eqa .annex .spec{margin-bottom:4.2mm;break-inside:auto;page-break-inside:auto;}
+.eqa .spec-h{font-size:9.4pt;font-weight:700;line-height:1.35;background:var(--band);padding:1.8mm 2.5mm;margin-bottom:1.6mm;
+break-after:avoid;page-break-after:avoid;break-inside:avoid;page-break-inside:avoid;}
+.eqa .spec-sh{font-size:7.9pt;color:var(--faint);text-transform:uppercase;letter-spacing:.06em;margin:2.2mm 0 1.2mm 0;break-after:avoid;page-break-after:avoid;}
+.eqa ul.speclist{margin:0;padding-left:5mm;font-size:8.4pt;}
+.eqa ul.speclist li{margin-bottom:1mm;orphans:3;widows:3;}
+
+.eqa .hardfail{border:1.2pt solid var(--stopink);background:var(--stopbg);padding:8mm;color:var(--stopink);}
+.eqa .hf-h{font-size:13pt;font-weight:700;letter-spacing:.05em;margin-bottom:4mm;}
+.eqa .hardfail p{color:var(--ink);font-size:9.4pt;}
+.eqa .hf-f{font-size:8pt;color:var(--faint);margin-top:5mm;}
+
+/* D-16 correction | normal-flow document control strips replace the fixed repeating footer */
+.eqa .ctrlstrip{border-top:.7pt solid var(--rule);padding-top:1.6mm;margin-top:4mm;margin-bottom:4mm;
+font-size:8pt;letter-spacing:.02em;color:var(--faint);background:#fff;}
+.eqa .ctrlstrip.ctrl-end{margin-top:5mm;margin-bottom:0;break-inside:avoid;page-break-inside:avoid;}
+/* D-05 correction | column widths when the milestone label column is suppressed */
+/* S2-07 | the payment schedule carries different semantics to the priced schedule,
+   so it keeps its own column widths under the fixed table layout */
+.eqa table.tbl.pay .c-q{width:22mm;}
+.eqa table.tbl.pay .c-r{width:32mm;}
+.eqa table.tbl.pay .c-a{width:32mm;}
+.eqa table.tbl.pay.ps-nolabel .c-r{width:auto;}
+/* S5 | printed block notice: one heading line, nothing else. */
+
+/* S14 | company-name watermark REMOVED on instruction. The former
+   .eqa.eqa-wm tiled background rule is deleted; nothing replaces it. */
+
+/* S2-13 | FINAL POLISH PASS - presentation only, no content change.
+   F1  The metadata panel already closes with its own bottom rule. The page-1
+       confidentiality strip then drew a second parallel hairline 4.5mm below
+       it with nothing in between, reading as a duplicated rule. Suppress the
+       strip rule only where the strip directly follows the panel; the closing
+       .ctrl-end strip keeps its rule because it separates real content.
+   F2  Priced-schedule numeric headers were left-aligned while their values are
+       right-aligned, so Qty / Rate / Amount headings sat away from their
+       figures. Align the headers to their own columns. No height change.
+   F3  .inwords carried a top margin but no bottom margin, so whenever a
+       section follows it on the same page its heading touched the panel.
+       Adopt the standard .sec bottom rhythm (3.2mm). */
+.eqa .meta + .ctrlstrip{border-top:0;}
+.eqa table.tbl thead th.c-n,.eqa table.tbl thead th.c-q,.eqa table.tbl thead th.c-r,.eqa table.tbl thead th.c-a{text-align:right;}
+.eqa .inwords{margin-bottom:3.2mm;}
+
+
+/* S2-14 FINAL POLISH (pre-freeze) */
+/* 1. Priced schedule: description body to regular weight (single undifferentiated source block; no heading markup present to preserve). Size, line-height, widths, wording unchanged. */
+.eqa .idesc{font-weight:400;}
+/* 2. Metadata separators: parity-safe. Grid is row-major, 2 columns. Rule drawn as border-top between rows, suppressed on the first visual row and on a lone trailing cell (odd row count), so no half-width orphan rule can appear. Outer .meta top/bottom rules, typography, columns and padding preserved. */
+.eqa .meta .mrow{border-bottom:0;border-top:.4pt solid var(--hair);}
+.eqa .meta .mrow:nth-child(-n+2){border-top:0;}
+.eqa .meta .mrow:last-child:nth-child(odd){border-top:0;}
+/* :nth-child(n) is a specificity bump only, so the parity-aware padding below overrides the older nth-last-child pair */
+.eqa .meta .mrow:nth-child(n){padding-bottom:1.7mm;}
+.eqa .meta .mrow:last-child,.eqa .meta .mrow:nth-last-child(2):nth-child(odd){padding-bottom:0;}
+
+/* S2-15 PAGE-3 SECTION RHYTHM — scoped to the Scope / Commercial Conditions / Payment Terms run only (sections following the amount-in-words block). Global .sec margin, page 1 and Contractual Terms internals untouched. */
+/* S2-16 supersedes the positional selectors above: the same values now belong to the sections themselves, so an absent section cannot transfer its spacing to another. */
+.eqa .scope-sec{margin-bottom:5.5mm;}
+.eqa .commercial-sec{margin-bottom:4.5mm;}
+.eqa .payment-sec{margin-bottom:5.5mm;}
+
+
+/* S2-17 | CONTRACTUAL TERMS READABILITY TEST -------------------------------
+   Isolated legibility test of the contractual clause body and the bold clause
+   headings only. Scoped strictly to the Contractual Terms section via .sec.tc
+   so no other .rt, .small, schedule header, control strip or footer text is
+   affected. Line-height is pinned to the document base ratio of 1.42, which is
+   the value the section already resolved to, so only the type size changes. */
+.eqa .sec.tc .rt.small{font-size:8.5pt;line-height:1.42;}
+
+
+/* S11 | ADAPTIVE PAGINATION -------------------------------------------------
+   Architecture only. No typography, colour, width, margin-geometry or identity
+   change. Three rules:
+   1. Secondary description content that does not qualify for Annexure A stays
+      in the priced-schedule Description cell. It inherits .idesc exactly
+      (8.6pt, weight 400, natural wrapping) and receives only a small block
+      separation, so a continuation line is visually identical to the primary
+      description line. No faint metadata treatment is applied, because the
+      source does not reliably distinguish a reference such as a serial number
+      from ordinary continuation prose.
+   2. Annexure A is a content section, not a page identity. The forced page
+      wrapper was removed from the markup, so the Annexure now consumes
+      available space when it is small and moves to the next page only when it
+      genuinely does not fit. This rule restores the normal section rhythm
+      above it, which the removed page wrapper used to provide.
+   3. Each Contractual Terms clause is protected from splitting. Combined with
+      the existing heading break-after:avoid and the guarded section hold, a
+      terms section taller than one page now fragments at clause boundaries
+      instead of being pushed whole onto a page it can never fill. This is the
+      structural guarantee that no blank or throwaway page can be produced. */
+.eqa .idesc-cont{margin-top:.8mm;}
+.eqa .annex{margin-top:5.5mm;}
+.eqa .sec.tc .rt > *{break-inside:avoid;page-break-inside:avoid;}
+
+/* S12 ANNEXURE MINIMUM-START (generic, content-adaptive).
+   Purpose: prevent an Annexure item from starting at the very bottom of a
+   page with only its heading / key-value rows and no meaningful
+   specification content. Chains break-after:avoid from the item heading
+   through the key-value rows, the sub-heading and the first specification
+   entries, so Chrome must move the whole start group forward if it does not
+   fit. Purely CSS-native: no document identity, no page-number test, no
+   item-count test, no forced Annexure page break, no min-height, no spacer.
+   Entries beyond the protected start group paginate naturally, and an
+   Annexure larger than one page can still break internally. */
+.eqa .annex .kv{break-after:avoid;page-break-after:avoid;break-inside:avoid;page-break-inside:avoid;}
+.eqa .annex ul.speclist > li{break-inside:avoid;page-break-inside:avoid;}
+.eqa .annex ul.speclist > li:nth-child(-n+2){break-after:avoid;page-break-after:avoid;}
+
+
+/* ===== WK-COMPAT LAYER (additive, appended) ===== */
+/* 1. literal-colour re-declarations: engine has no CSS custom properties */
+.eqa{color:#141414;}
+.eqa .mast{border-bottom:2pt solid #0b3d62;}
+.eqa .ent{color:#0b3d62;}
+.eqa .entl{color:#43484d;}
+.eqa .entc{color:#141414;}
+.eqa .alert.stop{background:#fbeceb;border-color:#a02020;color:#a02020;}
+.eqa .alert.warn{background:#fdf6e6;border-color:#8a5a00;color:#8a5a00;}
+.eqa .alert.info{background:#eef4f9;border-color:#0b3d62;color:#0b3d62;}
+.eqa .alert span{color:#43484d;}
+.eqa .alert.dx span{color:#43484d;}
+.eqa .alert.stop.dx span i{color:#a02020;}
+.eqa .alert.info.dx span i{color:#0b3d62;}
+.eqa .doctitle{color:#0b3d62;}
+.eqa .meta{border-top:.7pt solid #c2c6ca;border-bottom:.7pt solid #c2c6ca;}
+.eqa .mrow{border-bottom:.4pt solid #e4e7ea;}
+.eqa .mrow span{color:#6b7075;}
+.eqa .mrow b{color:#141414;}
+.eqa .sh{color:#0b3d62;border-bottom:.7pt solid #c2c6ca;}
+.eqa .pf{color:#6b7075;}
+.eqa .subj{background:#eef1f4;border-left:2.4pt solid #0b3d62;}
+.eqa .note{color:#6b7075;}
+.eqa .sigline{border-bottom:.7pt solid #141414;}
+.eqa table.tbl th{background:#eef1f4;border-top:.7pt solid #c2c6ca;border-bottom:.7pt solid #c2c6ca;color:#0b3d62;}
+.eqa table.tbl td{border-bottom:.35pt solid #c2c6ca;}
+.eqa table.tbl tbody tr:nth-child(even) td{background:#f7f8f9;}
+.eqa .icode,.eqa .iref{color:#6b7075;}
+.eqa .cont{color:#6b7075;}
+.eqa table.tot td{border-bottom:.35pt solid #c2c6ca;}
+.eqa table.tot tr.grand td{border-top:1.6pt solid #0b3d62;border-bottom:1.6pt solid #0b3d62;background:#0b3d62;}
+.eqa .inwords{background:#f7f8f9;border-left:2.4pt solid #c2c6ca;}
+.eqa .inwords span{color:#6b7075;}
+.eqa .kv{border-bottom:.4pt solid #e4e7ea;}
+.eqa .kv span{color:#6b7075;}
+.eqa .accl{color:#6b7075;}
+.eqa .accr{border-bottom:.7pt solid #141414;}
+.eqa .spec-h{background:#eef1f4;}
+.eqa .spec-sh{color:#6b7075;}
+.eqa .hardfail{border:1.2pt solid #a02020;background:#fbeceb;color:#a02020;}
+.eqa .hardfail p{color:#141414;}
+.eqa .hf-f{color:#6b7075;}
+.eqa .ctrlstrip{border-top:.7pt solid #c2c6ca;color:#6b7075;}
+.eqa .meta .mrow{border-top:.4pt solid #e4e7ea;}
+
+/* 2. table-model layout fallbacks */
+/* WK-COMPAT | additive engine-compatibility layer. Base rules use the CSS table model,
+   which the wkhtmltopdf engine supports; the @supports block re-asserts the approved
+   grid/flex design for Chrome, which wkhtmltopdf skips. No approved rule is edited. */
+.eqa .mast{display:table;width:100%;}
+.eqa .mast-l{display:table-cell;width:52mm;vertical-align:top;}
+.eqa .mast-r{display:table-cell;vertical-align:top;text-align:right;}
+.eqa .mrow{display:table;width:100%;}
+.eqa .mrow>span{display:table-cell;vertical-align:baseline;padding-right:6mm;white-space:nowrap;}
+.eqa .mrow>b{display:table-cell;vertical-align:baseline;width:100%;}
+.eqa .gr2{display:table;width:100%;table-layout:fixed;border-spacing:0;}
+.eqa .gr2>div{display:table-cell;vertical-align:top;}
+.eqa .gr2>div:first-child{padding-right:3mm;}
+.eqa .gr2>div+div{padding-left:3mm;}
+.eqa .kv{display:table;width:100%;}
+.eqa .kv>span{display:table-cell;width:22mm;vertical-align:top;padding-right:3mm;}
+.eqa .kv>b{display:table-cell;vertical-align:top;}
+.eqa .totwrap{display:block;text-align:right;}
+.eqa .totwrap>table.tot{display:inline-table;text-align:left;}
+.eqa .alert{display:block;}
+.eqa .alert>b,.eqa .alert>span{display:block;}
+/* .meta: approved layout is a 2-up grid of .mrow. The table model cannot reproduce a
+   2-up wrap of N children, so the engine fallback is a single-column stack, which keeps
+   every label/value pair intact and only makes the panel taller. */
+.eqa .meta{display:block;}
+.eqa .meta .mrow:nth-child(2){border-top:.4pt solid #e4e7ea;}
+/* Heading keep-with-next: this engine ignores page-break-after:avoid but honours
+   page-break-inside:avoid, so short semantic groups are protected as whole blocks. */
+.eqa .sec.scope-sec{page-break-inside:avoid;}
+.eqa .annex .spec{page-break-inside:avoid;}
+
+/* 3. Chrome re-assertion of the approved layout */
+@supports (display:grid){
+.eqa .sec.scope-sec{page-break-inside:auto;}
+.eqa .annex .spec{page-break-inside:auto;break-inside:auto;}
+.eqa .meta{display:grid;grid-template-columns:1fr 1fr;gap:0 12mm;}
+.eqa .meta .mrow:nth-child(2){border-top:0;}
+.eqa .mast{display:flex;align-items:flex-start;justify-content:space-between;gap:8mm;width:auto;}
+.eqa .mast-l{display:block;flex:0 0 52mm;width:auto;}
+.eqa .mast-r{display:block;flex:1 1 auto;text-align:right;}
+.eqa .mrow{display:grid;grid-template-columns:auto 1fr;align-items:baseline;column-gap:6mm;width:auto;}
+.eqa .mrow>span{display:inline;padding-right:0;}
+.eqa .mrow>b{display:inline;width:auto;}
+.eqa .gr2{display:grid;grid-template-columns:1fr 1fr;gap:0 6mm;width:auto;}
+.eqa .gr2>div{display:block;}
+.eqa .gr2>div:first-child{padding-right:0;}
+.eqa .gr2>div+div{padding-left:0;}
+.eqa .kv{display:flex;gap:3mm;width:auto;}
+.eqa .kv>span{display:block;flex:0 0 22mm;width:auto;padding-right:0;}
+.eqa .kv>b{display:block;flex:1 1 auto;}
+.eqa .totwrap{display:flex;justify-content:flex-end;text-align:left;}
+.eqa .totwrap>table.tot{display:table;}
+.eqa .alert{display:flex;flex-direction:column;gap:.6mm;}
+.eqa .alert>b,.eqa .alert>span{display:block;}
+}
+
+
+/* S-BEAUTIFY 2026-08-16 | page-1 vertical compaction. Presentation values only:
+   contact-block leading, masthead padding/margin under the rule, and the title
+   margins. No structural, engine-compatibility or layout-model rule is edited,
+   and no company information is removed. */
+.eqa .entl{line-height:1.18;}
+.eqa .mast{padding-bottom:2.2mm;margin-bottom:2.8mm;}
+.eqa .doctitle{margin:.5mm 0 3mm 0;}
+
+
+/* S12 | DYNAMIC COMMERCIAL VALUES: BOLD VALUE WEIGHT --------------------
+   Visual ownership rule: a value typed into the quotation by the salesperson
+   is bold; static labels, narrative and contractual wording stay regular.
+   Commercial Conditions already complies through .eqa .kv b (Delivery,
+   Validity, Warranty, Currency, Taxation) with labels held light by
+   .eqa .kv span, so those rules are retained untouched.
+   Payment Terms was the one remaining commercial term whose value is a
+   direct quotation field (doc.custom_payment_terms) yet printed at regular
+   weight. The whole field value is bolded as a single unit -- no parsing,
+   no partial emphasis of percentages or phrases.
+   Scope is deliberate and narrow: the child combinator binds this to the
+   direct .rt of .sec.payment-sec only, so Scope Included
+   (.eqa .sec.scope-sec > .rt) and Contractual Terms
+   (.eqa .sec.tc > .rt.small) keep regular-weight bodies. The PAYMENT TERMS
+   heading is .sh and is not touched. Weight is the only declaration:
+   font-size, colour, line-height, margins and page-break rules unchanged. */
+.eqa .sec.payment-sec > .rt{font-weight:700;}
+
+
+/* S13 | PAGE-1 METADATA PANEL: TWO-COLUMN TABLE MODEL ---------------------
+   Restores the approved reference layout in the real customer PDF. The base
+   .meta/.mrow grid rules and their WK-COMPAT fallbacks are left in place but
+   are now inert, because the panel no longer emits .meta markup; no existing
+   rule is edited. Colours are literals rather than var(), since wkhtmltopdf
+   does not implement custom properties -- these are the same values the
+   WK-COMPAT layer already pins for this panel: rule #c2c6ca, hairline
+   #e4e7ea, label #6b7075, value #141414.
+   Five fixed columns: label 19.5% + value 27.5% | 6% gutter | label 19.5% +
+   value 27.5%. Each half is 47% of the panel, so the halves are equal and
+   the gutter reproduces the former 12mm grid gap. Values are right aligned
+   inside their own half.
+   Rules are declared in px, not sub-point: this engine floors border widths
+   to whole device pixels, so the previous .4pt/.7pt hairlines resolved to
+   zero and no rule was drawn in the customer PDF at all. 1px is the thinnest
+   width it will actually paint.
+   Both cells of a row carry the value font-size so they share one line box
+   strut; the label is shrunk on an inner span, which keeps label and value
+   on a common baseline. */
+.eqa .metawrap{margin-bottom:4.5mm;break-inside:avoid;page-break-inside:avoid;}
+.eqa table.metat{width:100%;table-layout:fixed;border-collapse:collapse;
+  border-top:1px solid #c2c6ca;border-bottom:1px solid #c2c6ca;}
+.eqa table.metat td{padding:1.5mm 0 1.7mm 0;border-bottom:1px solid #e4e7ea;
+  font-size:9.2pt;line-height:1.2;vertical-align:top;color:#141414;background:none;}
+.eqa table.metat tr.mlast td{border-bottom:0;padding-bottom:0;}
+.eqa table.metat td.mc1,.eqa table.metat td.mc4{width:19.5%;text-align:left;}
+.eqa table.metat td.mc2,.eqa table.metat td.mc5{width:27.5%;font-weight:700;
+  text-align:right;}
+.eqa table.metat td.mc3{width:6%;}
+.eqa table.metat span.mlbl{font-size:7.8pt;font-weight:400;letter-spacing:.07em;
+  text-transform:uppercase;color:#6b7075;white-space:nowrap;}
+
+/* ===== WK-COMPAT | S14 SECTION-HEADING HAIRLINE RESTORATION (append-only) =====
+   Defect measured in the production wkhtmltopdf PDF, not inferred from CSS:
+   the approved heading rule .eqa .sh{border-bottom:.7pt solid #c2c6ca} is
+   never painted. This engine lays out and rasterises border widths in whole
+   96dpi device pixels, so .7pt (= .933px) floors to zero; it then emits either
+   a zero-height fill rect or no fill call at all. Baseline for 00073: 0 of 9
+   heading rules painted across all 3 pages.
+   Fix: restate the SAME rule at the smallest width this engine draws
+   reliably, 1px (= .75pt at 96dpi). That width is already proven in this
+   document by the page-1 metadata table hairlines, which are declared in px
+   and do paint. Width is the only property that changes. The colour #c2c6ca
+   is the literal value of var(--rule) already restated by the WK-COMPAT
+   colour layer above, the style stays solid, and font-size, font-weight,
+   letter-spacing, text-transform, padding-bottom and margin-bottom are all
+   left untouched. No box, no background, no new element, no extra markup.
+   Applies to the whole existing .sh family so the headings keep one visual
+   language: Addressed To, Subject, Transmittal, Prepared By, Priced Schedule,
+   Scope Included, Commercial Conditions, Payment Terms, Contractual Terms and
+   Annexure A. .spec-sh is deliberately excluded: it carries no rule by design. */
+.eqa .sh{border-bottom:1px solid #c2c6ca;}
+
+/* ===== S15 | PAGE-1 VERTICAL RHYTHM (append-only, page-1 elements only) =====
+   Page 1 read loose in the customer PDF. Vertical space only -- no font size,
+   weight, tracking, colour, border, logo or structural change.
+   Scope: every selector below resolves exclusively inside the first .pg block.
+   .mast, .doctitle, .metawrap and table.metat exist only on page 1, and
+   ".metawrap + .sec" is the Addressed To section alone (adjacent sibling of the
+   page-1 metadata wrapper). The two .pg blocks are separated by the existing
+   hard break .eqa .pg + .pg, so shortening page 1 cannot reflow anything onto
+   or off pages 2+.
+   Root cause of the oversized metadata rows: Frappe's own print stylesheet
+   ships ".print-format td,.print-format th{padding:10px !important}". That
+   !important beat every padding this format declared for table.metat td, so
+   the authored 1.5mm/1.7mm was inert and each row carried a forced 20px
+   (15pt) of vertical padding. Measured proof: dropping the format padding to
+   0 and line-height to 1 moved the row height by only 1.5pt. The padding below
+   is therefore declared !important at higher specificity (0,3,1 vs 0,1,1) so
+   the format wins for this one page-1 table and nothing else. Row padding
+   stays symmetric top/bottom -- the inert tr.mlast padding-bottom:0 is
+   deliberately not revived, so the two-column panel keeps even rows. Its
+   border-bottom:0 still applies, so the last row still shows only the table
+   rule. Column widths, alignment, label/value typography and the 1px
+   hairlines are untouched.
+   .mast padding-bottom stays 2.2mm, so the logo, the contact block and the
+   navy rule keep their exact positions and the masthead does not move toward
+   the physical top edge. Title typography (16pt / 700 / 1.2) untouched.
+   Baseline -> new, page 1: masthead rule to metadata top 34.5pt; metadata row
+   height 26.25pt; metadata bottom to ADDRESSED TO 27.75pt; ADDRESSED TO to
+   SUBJECT 43.5pt. */
+.eqa .mast{margin-bottom:2.2mm;}
+.eqa .doctitle{margin:.3mm 0 2.4mm 0;}
+.eqa table.metat td{padding:1.5mm 0 1.6mm 0 !important;}
+.eqa .metawrap{margin-bottom:3.6mm;}
+.eqa .metawrap + .sec{margin-bottom:2.6mm;}
+
+/* ═════ WK-COMPAT | S15  PAGE-1 FONT HIERARCHY (append-only) ═════
+   SCOPE. Every rule is bound to the first .pg only. Verified against the live
+   markup: .eqa has exactly two element children, both .pg, and the page-1 .pg is
+   the first, so .eqa > .pg:first-child resolves to page 1 alone. The combinator
+   was proved in THIS engine by a throwaway probe, not assumed: setting
+   .eqa > .pg:first-child .sh{font-size:14pt} printed the four page-1 headings at
+   14.25pt in the real wkhtmltopdf PDF while the five page-2/3 headings stayed at
+   8.25pt. Pages 2+ are therefore unreachable from this block, and that was then
+   confirmed byte-for-byte: every page-2+ content stream is unchanged.
+
+   SIZES. This engine lays out at 96dpi and floors every font-size and line-height
+   to a whole device pixel, so the printed size is round(pt * 4/3) * 0.75 and many
+   pt values are indistinguishable. Each value below is the SMALLEST value inside
+   its approved band that the engine actually prints larger than the current one.
+   8.5pt was tried first for the headings and rejected: it floors to the same 11px
+   as 8.4pt and prints identically.
+
+   Only font-size changes, plus one line-height on the transmittal body. No
+   structure, colour, weight, letter-spacing, margin, padding, border or
+   alignment is touched anywhere.
+
+   NOT CHANGED, deliberately:
+   - .mast has NO page-1 offset. A negative margin-top was tested at -1, -2, -3
+     and -4mm and rejected on measured evidence: this engine clamps the logo image
+     to the body content-box top (it stayed at 782.75pt at every offset) while the
+     navy rule and the text did move, so the logo-to-rule gap collapsed from 6pt
+     to 0.75pt at -2mm and the rule crossed the logo at -3mm; and the header band
+     paints an opaque white rectangle down to exactly the content-box top, so the
+     first address line was shaved at -1mm and dropped from the PDF at -4mm.
+   - .pn customer name stays 11pt. The approved band is 11-11.5pt and both ends
+     floor to 15px, so 11pt already prints the largest size in the band (11.25pt).
+   - .mlbl metadata labels stay 7.8pt (print 7.5pt), inside the keep band.
+   - .entl contact block, .logo, navy rule, subject band, all weights, tracking,
+     colours, margins and padding: untouched.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Commercial Quotation title: 16pt -> 17pt (21px -> 23px, prints 15.75 -> 17.25pt) */
+.eqa > .pg:first-child .doctitle{font-size:17pt;}
+
+/* Metadata panel: 9.2pt -> 9.5pt (12px -> 13px, prints 9 -> 9.75pt).
+   Applied to EVERY cell, not only the value cells. The label cells contain nothing
+   but <span class="mlbl">, which carries its own 7.8pt, so the labels print
+   unchanged at 7.5pt; but raising the cell font-size keeps every cell line box at
+   the same 15.6px. Restricting this to td.mc2/td.mc5 was tried first and rejected:
+   it left the label cells on a 14.4px line box and split the label and value
+   baselines by 0.7pt, breaking the row alignment of the approved two-column
+   panel. Column widths, padding, borders and the 700 weight on the value cells
+   are untouched. */
+.eqa > .pg:first-child table.metat td{font-size:9.5pt;}
+
+/* Page-1 headings ADDRESSED TO / SUBJECT / TRANSMITTAL / PREPARED BY:
+   8.4pt -> 9pt (11px -> 12px, prints 8.25 -> 9pt). */
+.eqa > .pg:first-child .sh{font-size:9pt;}
+
+/* Subject value: 10pt -> 10.5pt (13px -> 14px, prints 9.75 -> 10.5pt). */
+.eqa > .pg:first-child .subj{font-size:10.5pt;}
+
+/* Transmittal body: 9pt -> 9.5pt (prints 9 -> 9.75pt). Leading is declared 1.31,
+   not 1.3, because the engine floors the computed line box: 1.3 x 13px = 16.9px
+   floors to 16px and printed a 1.23 ratio, tighter than approved, whereas 1.31 x
+   13px = 17.03px floors to 17px and prints 12.75pt, a 1.308 ratio. Only the three
+   DIRECT p children of a page-1 .sec are selected; the Contractual Terms
+   paragraphs on page 2 sit inside .rt and are grandchildren, so this combinator
+   cannot reach them. */
+.eqa > .pg:first-child .sec > p{font-size:9.5pt;line-height:1.31;}
+
+/* Prepared By name: 9pt -> 9.5pt (prints 9 -> 9.75pt). The company line beneath
+   carries .pf and is pinned back to its approved 8.4pt at higher specificity so
+   append order cannot promote it. */
+.eqa > .pg:first-child .pl{font-size:9.5pt;}
+.eqa > .pg:first-child .pl.pf{font-size:8.4pt;}
+
+/* ==================================================================
+   S16 | ABOUT US - DEDICATED PHYSICAL PAGE 2
+   The block is the SECOND .eqa > .pg. Its physical page break is supplied
+   entirely by the already-proven base rule
+     .eqa .pg + .pg{break-before:page;page-break-before:always;}
+   so NO fixed-height spacer is used, and the Priced Schedule .pg keeps its
+   own break and therefore starts on the next physical page.
+   Every rule is scoped under .aupg so it cannot reach the cover (first .pg)
+   or the commercial pages (third .pg). The cover keeps being :first-child,
+   so all S15 page-1-only overrides remain correct and unaffected.
+   Colours are written as literal hex rather than var(--token) because this
+   engine (QtWebKit) cannot be assumed to resolve CSS custom properties;
+   the values are copied verbatim from the .eqa token block.
+   Cell padding is declared !important solely to neutralise Frappe's own
+   print stylesheet ".print-format td,.print-format th{padding:10px !important}".
+   ================================================================== */
+.eqa .aupg .sec{margin:0 0 6.5mm 0;}
+.eqa .aupg .autitle{font-size:15pt;font-weight:700;letter-spacing:.005em;color:#0b3d62;margin:0 0 2.8mm 0;line-height:1.2;}
+.eqa .aupg .aulead{font-size:9.6pt;line-height:1.5;color:#43484d;margin:0 0 6.5mm 0;}
+.eqa .aupg p.aup{font-size:9.4pt;line-height:1.5;color:#141414;margin:0;}
+.eqa .aupg table.aucap{width:100%;table-layout:fixed;border-collapse:collapse;margin:0;}
+.eqa .aupg table.aucap td{padding:0 !important;border:0;vertical-align:top;background:none;}
+.eqa .aupg table.aucap td.aucl{padding:0 5mm 0 0 !important;}
+.eqa .aupg table.aucap td.aucr{padding:0 0 0 5mm !important;}
+.eqa .aupg .auci{font-size:9.4pt;line-height:1.3;color:#141414;padding:1.6mm 0 1.6mm 0;border-bottom:1px solid #e4e7ea;}
+.eqa .aupg .auci.auclast{border-bottom:0;}
+.eqa .aupg table.aucd{width:100%;table-layout:fixed;border-collapse:collapse;margin:0;border-top:1px solid #c2c6ca;}
+.eqa .aupg table.aucd td{padding:2.2mm 0 0 0 !important;border:0;vertical-align:top;background:none;}
+.eqa .aupg table.aucd td.aucdr{text-align:right;}
+.eqa .aupg .aucn{font-size:9.4pt;font-weight:700;color:#141414;line-height:1.35;}
+.eqa .aupg .aucv{font-size:8.6pt;color:#43484d;line-height:1.45;}
+
+
+/* ============ ABOUT US PAGE-2 DENSITY POLISH — CANDIDATE B (typography + vertical rhythm) ============
+   Scope: .eqa .aupg descendants ONLY. Append-only. No global selectors. No var(). 1px hairlines only.
+   No fixed heights, no spacers, no vertical centring — layout remains content-driven. */
+/* typography */
+.eqa .aupg .autitle{font-size:17pt;margin:0 0 4.2mm 0;}
+.eqa .aupg .sh{font-size:9pt;margin-bottom:4mm;}
+.eqa .aupg .aulead{font-size:10pt;line-height:1.45;margin:0 0 9mm 0;}
+.eqa .aupg p.aup{font-size:9.8pt;line-height:1.42;}
+.eqa .aupg .auci{font-size:9.8pt;line-height:1.32;padding:2.3mm 0 2.3mm 0;}
+.eqa .aupg .aucn{font-size:9.8pt;line-height:1.4;}
+.eqa .aupg .aucv{font-size:8.9pt;line-height:1.5;}
+/* vertical rhythm between sections */
+.eqa .aupg .sec{margin:0 0 10.5mm 0;}
+.eqa .aupg table.aucd td{padding:2.8mm 0 0 0 !important;}
+/* Company Details: the .sh underline already provides the hairline; suppress the
+   redundant second rule on the details table so the block reads as one hairline. */
+.eqa .aupg table.aucd{border-top:0;}
+
+/* ===== S21 | ABOUT US PAGE 2 - REDESIGN (append-only, .aupg scope only) =====
+   Translated from the supplied HTML mock into constructs THIS engine renders:
+   CSS Grid and flexbox replaced by fixed-layout tables, custom properties replaced
+   by literal hex, gradients replaced by flat fills, box-shadow and @media dropped.
+   Every td carries padding !important to neutralise Frappe .print-format td{padding:10px}. */
+.eqa .aupg .abhead{margin:0 0 3.2mm 0}
+.eqa .aupg .abeyebrow{font-size:8pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#0b5f9e;margin:0 0 1.4mm 0}
+.eqa .aupg .abh1{font-size:16pt;font-weight:700;line-height:1.14;color:#0b3d62;margin:0}
+.eqa .aupg .absub{font-size:9.4pt;font-weight:700;color:#0b5f9e;line-height:1.35;margin:2mm 0 0 0}
+.eqa .aupg p.abintro{font-size:9pt;line-height:1.5;color:#2e3944;margin:0 0 3.8mm 0}
+.eqa .aupg p.abintro b{color:#0b3d62}
+.eqa .aupg table.abhl{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:0;margin:0 0 3.8mm 0}
+.eqa .aupg table.abhl td{padding:0 !important;border:0;vertical-align:top;background:none}
+.eqa .aupg table.abhl td.abhlc1{padding:0 1.5mm 0 0 !important}
+.eqa .aupg table.abhl td.abhlc2{padding:0 1.5mm !important}
+.eqa .aupg table.abhl td.abhlc3{padding:0 0 0 1.5mm !important}
+.eqa .aupg .abcard{border:1px solid #cfdae5;background:#f7fafd;padding:2.3mm 2.5mm}
+.eqa .aupg .abkick{font-size:7.2pt;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#0b5f9e}
+.eqa .aupg .abct{font-size:9.8pt;font-weight:700;color:#0b3d62;line-height:1.2;margin:1mm 0}
+.eqa .aupg .abcc{font-size:8pt;line-height:1.38;color:#5d6b78}
+.eqa .aupg .abst{margin:0 0 2.1mm 0;border-bottom:1px solid #cfdae5;padding-bottom:1mm}
+.eqa .aupg .abst span{font-size:8.6pt;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#0b3d62}
+.eqa .aupg table.abex{width:100%;table-layout:fixed;border-collapse:collapse;margin:0 0 3.8mm 0;border:1px solid #cfdae5}
+.eqa .aupg table.abex td.abexc{padding:2.3mm 2.5mm !important;border:0;vertical-align:top;background:none}
+.eqa .aupg table.abex td.abexcm{border-left:1px solid #cfdae5}
+.eqa .aupg .abexh{font-size:8.6pt;font-weight:700;text-transform:uppercase;color:#0b5f9e;margin:0 0 1.5mm 0}
+.eqa .aupg .abli{font-size:8.2pt;line-height:1.4;color:#1f2933;margin:0 0 .8mm 0}
+.eqa .aupg .abdot{color:#4ba7d8;font-weight:700;padding-right:1.2mm}
+.eqa .aupg .ablife{background:#0b3d62;padding:2.3mm 2.6mm;margin:0 0 3.8mm 0}
+.eqa .aupg .ablifel{font-size:7.2pt;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#bcd4e6;margin:0 0 1.3mm 0}
+.eqa .aupg .ablifes{font-size:8.2pt;font-weight:700;color:#ffffff;line-height:1.3}
+.eqa .aupg .abar{color:#7fb2d6;padding:0 .5mm}
+.eqa .aupg table.abbot{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:0;margin:0}
+.eqa .aupg table.abbot td{padding:0 !important;border:0;vertical-align:top;background:none}
+.eqa .aupg table.abbot td.abbotl{width:57%;padding:0 2mm 0 0 !important}
+.eqa .aupg table.abbot td.abbotr{width:43%;padding:0 0 0 2mm !important}
+.eqa .aupg .abwhy{border:1px solid #cfdae5;padding:2.3mm 2.5mm}
+.eqa .aupg .abwhy .abst{margin-top:0}
+.eqa .aupg table.abwg{width:100%;table-layout:fixed;border-collapse:collapse;margin:0}
+.eqa .aupg table.abwg td.abwc{padding:0 2mm 1.8mm 0 !important;border:0;vertical-align:top;background:none}
+.eqa .aupg table.abwg td.abwcr{padding:0 0 1.8mm 2mm !important}
+.eqa .aupg .abwt{font-size:8.4pt;font-weight:700;color:#0b3d62;line-height:1.3}
+.eqa .aupg .abwd{font-size:8pt;line-height:1.32;color:#5d6b78}
+.eqa .aupg .abcom{background:#f3f7fb;border-left:3px solid #0b5f9e;padding:2.3mm 2.5mm}
+.eqa .aupg .abcomh{font-size:8.6pt;font-weight:700;text-transform:uppercase;color:#0b3d62;margin:0 0 1.5mm 0}
+.eqa .aupg .abcomp{font-size:8pt;line-height:1.45;color:#36424e;margin:0}
+.eqa .aupg .abkw{font-size:7.6pt;line-height:1.4;font-weight:700;color:#0b5f9e;margin:1.9mm 0 0 0}
+
+/* ============================================================================
+   S22 | ABOUT US PAGE 2 -- FULL REDESIGN (append-only, page-2 only)
+   Scope: every selector is prefixed ".eqa .abpg". The page-2 wrapper class was
+   renamed from "aupg" to "abpg", so the 69 legacy ".eqa .aupg ..." rules can no
+   longer match anything and are left in place untouched (inert, reversible).
+   Engine notes (QtWebKit / wkhtmltopdf):
+     - no display:grid, no display:flex, no var() custom properties,
+       no linear-gradient, no box-shadow, no calc();
+     - all multi-column layout is HTML <table> + table-layout:fixed;
+     - Frappe ships ".print-format td,.print-format th{padding:10px}", so every
+       cell padding below is declared !important;
+     - font sizes are pt (96 dpi flooring: round(pt*4/3)*0.75);
+     - circles are border-radius + fixed line-height (no flex centring);
+     - icons are inline SVG (stroke=currentColor) -- no web fonts, no dingbats,
+       no raster images, no base64.
+   Page-1 cover, priced pages, #header-html and #footer-html are untouched.
+   ========================================================================== */
+.eqa .abpg{color:#182330}
+.eqa .abpg table{width:100%;table-layout:fixed;border-collapse:collapse;margin:0;border:0}
+.eqa .abpg td{padding:0 !important;vertical-align:top;border:0}
+.eqa .abpg p{margin:0}
+.eqa .abpg .v2lab{display:inline-block;background:#06396b;color:#ffffff;padding:5px 22px 5px 10px;font-size:7.6pt;font-weight:bold;letter-spacing:0.5px;margin:0 0 9px 0}
+.eqa .abpg .v2bar{display:inline-block;background:#06396b;color:#ffffff;padding:5px 20px 5px 10px;font-size:7.8pt;font-weight:bold;letter-spacing:0.4px;margin:0 0 8px 0}
+.eqa .abpg table.v2hero{margin:0 0 9px 0}
+.eqa .abpg table.v2hero td.v2hl{width:66%;padding:0 9px 0 0 !important}
+.eqa .abpg table.v2hero td.v2hr{width:34%;border-left:1px solid #d4dde5;padding:0 0 0 10px !important}
+.eqa .abpg .v2h1{font-size:19.5pt;font-weight:bold;line-height:1.08;color:#052b52;letter-spacing:-0.3pt}
+.eqa .abpg .v2h1a{color:#087d96}
+.eqa .abpg .v2tag{font-size:7.6pt;font-weight:bold;letter-spacing:0.6px;color:#06396b;margin:7px 0 8px 0}
+.eqa .abpg p.v2in{font-size:8.2pt;line-height:1.42;margin:0 0 5px 0;text-align:justify}
+.eqa .abpg p.v2in b{font-weight:bold;color:#052b52}
+.eqa .abpg .v2cth{font-size:8.6pt;font-weight:bold;color:#06396b;border-bottom:1px solid #aebdca;padding-bottom:4px;margin:0 0 8px 0;letter-spacing:0.3px}
+.eqa .abpg table.v2ct{table-layout:auto}
+.eqa .abpg table.v2ct td{vertical-align:middle;padding:0 0 7px 0 !important}
+.eqa .abpg table.v2ct td.v2cio{width:24px;padding:0 0 7px 0 !important}
+.eqa .abpg table.v2ct td.v2cit{font-size:7.6pt;line-height:1.32;color:#182330;padding:0 0 7px 7px !important}
+.eqa .abpg .v2cc{width:22px;height:22px;border-radius:11px;background:#06396b;color:#ffffff;text-align:center;line-height:22px}
+.eqa .abpg .v2cc svg{vertical-align:middle}
+.eqa .abpg table.v2vc{margin:0 0 10px 0}
+.eqa .abpg table.v2vc td.v2vcc{width:33.33%}
+.eqa .abpg table.v2vc td.v2vcc1{padding:0 4px 0 0 !important}
+.eqa .abpg table.v2vc td.v2vcc2{padding:0 4px 0 4px !important}
+.eqa .abpg table.v2vc td.v2vcc3{padding:0 0 0 4px !important}
+.eqa .abpg .v2card{background:#f8fafb;border:1px solid #e2e7eb;border-radius:5px;padding:8px;min-height:29mm}
+.eqa .abpg table.v2vt{table-layout:auto;margin:0 0 6px 0}
+.eqa .abpg table.v2vt td{vertical-align:middle}
+.eqa .abpg table.v2vt td.v2vti{width:26px}
+.eqa .abpg table.v2vt td.v2vtl{padding:0 0 0 7px !important}
+.eqa .abpg .v2vi{width:26px;height:26px;border-radius:13px;background:#06396b;color:#ffffff;font-size:7.6pt;font-weight:bold;text-align:center;line-height:26px}
+.eqa .abpg .v2vi2{background:#0796a8}
+.eqa .abpg .v2vi3{background:#56339b}
+.eqa .abpg .v2vn{font-size:6.6pt;font-weight:bold;color:#075a9c;letter-spacing:0.3px;line-height:1.2}
+.eqa .abpg .v2vh{font-size:8.2pt;font-weight:bold;color:#06396b;line-height:1.22;margin:0 0 4px 0}
+.eqa .abpg .v2vp{font-size:7.2pt;line-height:1.38;color:#182330}
+.eqa .abpg table.v2cap{margin:0 0 10px 0}
+.eqa .abpg table.v2cap td.v2capc{width:33.33%;padding:0 9px 0 0 !important}
+.eqa .abpg table.v2cap td.v2capc2{border-left:1px solid #bccbd6;padding:0 9px 0 9px !important}
+.eqa .abpg table.v2cap td.v2capc3{border-left:1px solid #bccbd6;padding:0 0 0 9px !important}
+.eqa .abpg table.v2ch{table-layout:auto;margin:0 0 6px 0}
+.eqa .abpg table.v2ch td{vertical-align:middle}
+.eqa .abpg table.v2ch td.v2chi{width:22px}
+.eqa .abpg table.v2ch td.v2cht{padding:0 0 0 7px !important}
+.eqa .abpg .v2cm{color:#075a9c;line-height:1}
+.eqa .abpg .v2cm2{color:#0796a8}
+.eqa .abpg .v2cm3{color:#56339b}
+.eqa .abpg .v2cm svg{width:17px;height:17px;vertical-align:middle}
+.eqa .abpg .v2capt{font-size:7.8pt;font-weight:bold;color:#06396b;line-height:1.2;letter-spacing:0.2px}
+.eqa .abpg .v2capt2{color:#0796a8}
+.eqa .abpg .v2capt3{color:#56339b}
+.eqa .abpg .v2li{font-size:7.4pt;line-height:1.32;color:#182330;margin:0 0 4px 0}
+.eqa .abpg .v2d{display:inline-block;width:3px;height:3px;border-radius:2px;background:#075a9c;vertical-align:middle;margin:0 5px 1px 0}
+.eqa .abpg .v2d2{background:#0796a8}
+.eqa .abpg .v2d3{background:#56339b}
+.eqa .abpg table.v2low{margin:0}
+.eqa .abpg table.v2low td.v2lowl{width:66%;padding:0 9px 0 0 !important}
+.eqa .abpg table.v2low td.v2lowr{width:34%;padding:0 !important}
+.eqa .abpg .v2pt{background:#06396b;color:#ffffff;font-size:7.8pt;font-weight:bold;padding:4px 8px;margin:0 0 7px 0;letter-spacing:0.3px}
+.eqa .abpg table.v2life{margin:0 0 9px 0}
+.eqa .abpg table.v2life td.v2lc{width:9.2%;text-align:center;padding:0 !important}
+.eqa .abpg table.v2life td.v2la{width:1.5%;text-align:center;font-size:11pt;color:#7f95ab;line-height:22px;padding:0 !important}
+.eqa .abpg .v2lci{width:22px;height:22px;border-radius:11px;background:#06396b;color:#ffffff;font-size:6.8pt;font-weight:bold;text-align:center;line-height:22px;margin:0 auto}
+.eqa .abpg .v2ls{font-size:6.2pt;font-weight:bold;color:#052b52;line-height:1.15;margin:3px 0 0 0}
+.eqa .abpg .v2com{background:#f2f5f7;padding:8px;font-size:7.4pt;line-height:1.42;color:#182330}
+.eqa .abpg .v2com b{font-weight:bold;color:#052b52}
+.eqa .abpg .v2comb{display:block;height:5px}
+.eqa .abpg table.v2iso td.v2isoc{width:50%;padding:0 3px 5px 0 !important}
+.eqa .abpg table.v2iso td.v2isoc + td.v2isoc{padding:0 0 5px 3px !important}
+.eqa .abpg .v2isob{border:1px solid #cdd6dc;border-radius:4px;padding:5px 4px;text-align:center;min-height:13.5mm;background:#ffffff}
+.eqa .abpg .v2isot{font-size:8.4pt;font-weight:bold;color:#075a9c;line-height:1.15;margin:0 0 2px 0}
+.eqa .abpg .v2isot2{color:#278843}
+.eqa .abpg .v2isot3{color:#c62828}
+.eqa .abpg .v2isot4{color:#65409b}
+.eqa .abpg .v2isot5{color:#e56a00}
+.eqa .abpg .v2isot6{color:#0796a8}
+.eqa .abpg .v2isos{font-size:6.4pt;line-height:1.22;color:#43484d}
+.eqa .abpg .v2why{border-top:1px solid #d4dde5;margin:8px 0 0 0;padding:9px 0 0 0}
+.eqa .abpg table.v2wg td.v2wc{width:16.66%;padding:0 7px 0 0 !important}
+.eqa .abpg table.v2wg td.v2wcr{border-left:1px dotted #aebdca;padding:0 7px 0 7px !important}
+.eqa .abpg .v2wi{color:#06396b;line-height:1;margin:0 0 5px 0}
+.eqa .abpg .v2wi svg{width:15px;height:15px}
+.eqa .abpg .v2wt{font-size:7.4pt;font-weight:bold;color:#06396b;line-height:1.2;margin:0 0 4px 0}
+.eqa .abpg .v2wd{font-size:6.6pt;line-height:1.32;color:#43484d}
+.eqa .abpg .v2foot{background:#06396b;color:#ffffff;padding:6px 10px;margin:9px 0 0 0;text-align:center;font-size:7.2pt;font-weight:bold;letter-spacing:0.3px}
+.eqa .abpg .v2fi{padding:0 9px}
+.eqa .abpg .v2fs{color:#5f86ab}
+
+/* ============================================================================
+   S22b | ABOUT US PAGE 2 -- DENSITY FIT + FULL-WIDTH LIFECYCLE (append-only)
+   Single consolidated override of the S22 base block. Nothing structural here:
+   only type sizes, line-heights, paddings, margins and the four rules that size
+   the lifecycle strip after its HTML was promoted to a full-width row (S22c).
+
+   Fitting was iterated against the real wkhtmltopdf PDF, never against the DOM.
+   Page-2 badge-bar text baseline / resulting page count for 00073:
+     pass 1  S22 base sizes        ~301 mm   5 pages   REJECTED
+     pass 2  hard tighten           247 mm   4 pages   fits, page looked bare
+     pass 3  relaxed too far       ~268 mm   5 pages   REJECTED
+     pass 4  near the edge          258 mm   4 pages   fits, ~1 mm margin only
+     pass 5  safe settlement        242 mm   4 pages   lifecycle labels collided
+     pass 6  + full-width strip     257 mm   4 pages   fits, ~2 mm margin only
+     pass 7  this block            ~247 mm   4 pages   ACCEPTED
+   Break threshold was bracketed to 259.6-261 mm for the bottom of the last box,
+   so this block targets ~250 mm to leave ~10 mm of real headroom. That headroom
+   matters because the hero and CONTACT US panel are fed from the Company and
+   Address masters: a longer legal name or registered address must not be able to
+   push the badge bar onto a page of its own.
+   Engine rules (unchanged from S22): no display:grid, no display:flex, no var(),
+   no calc(), no gradient, no box-shadow; all multi-column layout is <table> with
+   table-layout:fixed; every cell padding is declared !important because Frappe
+   ships ".print-format td,.print-format th{padding:10px}".
+   ========================================================================== */
+.eqa .abpg .v2lab{padding:4px 20px 4px 9px;font-size:7.5pt;margin:0 0 5px 0}
+.eqa .abpg .v2bar{padding:4px 18px 4px 9px;font-size:7.6pt;margin:0 0 4px 0}
+.eqa .abpg .v2h1{font-size:15.5pt;line-height:1.07;letter-spacing:-0.2pt}
+.eqa .abpg .v2tag{font-size:7.2pt;margin:5px 0 5px 0}
+.eqa .abpg p.v2in{font-size:7.6pt;line-height:1.32;margin:0 0 4px 0}
+.eqa .abpg .v2cth{font-size:8.2pt;padding-bottom:3px;margin:0 0 5px 0}
+.eqa .abpg table.v2hero{margin:0 0 4px 0}
+.eqa .abpg table.v2ct td{padding:0 0 5px 0 !important}
+.eqa .abpg table.v2ct td.v2cio{width:22px;padding:0 0 5px 0 !important}
+.eqa .abpg table.v2ct td.v2cit{font-size:7.4pt;line-height:1.26;padding:0 0 5px 6px !important}
+.eqa .abpg .v2cc{width:20px;height:20px;border-radius:10px;line-height:20px}
+.eqa .abpg .v2cc svg{width:12px;height:12px}
+.eqa .abpg table.v2vc{margin:0 0 5px 0}
+.eqa .abpg .v2card{padding:7px;min-height:0}
+.eqa .abpg table.v2vt{margin:0 0 4px 0}
+.eqa .abpg table.v2vt td.v2vti{width:24px}
+.eqa .abpg .v2vi{width:24px;height:24px;border-radius:12px;font-size:7.3pt;line-height:24px}
+.eqa .abpg .v2vn{font-size:6.4pt}
+.eqa .abpg .v2vh{font-size:8pt;line-height:1.2;margin:0 0 3px 0}
+.eqa .abpg .v2vp{font-size:6.7pt;line-height:1.28}
+.eqa .abpg table.v2cap{margin:0 0 5px 0}
+.eqa .abpg table.v2ch{margin:0 0 4px 0}
+.eqa .abpg .v2cm svg{width:15px;height:15px}
+.eqa .abpg .v2capt{font-size:7.5pt;line-height:1.18}
+.eqa .abpg .v2li{font-size:6.9pt;line-height:1.24;margin:0 0 3px 0}
+.eqa .abpg .v2pt{padding:3px 8px;font-size:7.5pt;margin:0 0 3px 0}
+.eqa .abpg .v2lci{width:20px;height:20px;border-radius:10px;font-size:6.7pt;line-height:20px}
+.eqa .abpg .v2com{padding:7px;font-size:6.9pt;line-height:1.28}
+.eqa .abpg .v2comb{height:4px}
+.eqa .abpg table.v2iso td.v2isoc{padding:0 3px 4px 0 !important}
+.eqa .abpg table.v2iso td.v2isoc + td.v2isoc{padding:0 0 4px 3px !important}
+.eqa .abpg .v2isob{padding:4px 3px;min-height:0}
+.eqa .abpg .v2isot{font-size:8pt;margin:0 0 1px 0}
+.eqa .abpg .v2isos{font-size:6.3pt;line-height:1.18}
+.eqa .abpg .v2why{margin:4px 0 0 0;padding:4px 0 0 0}
+.eqa .abpg .v2wi{margin:0 0 3px 0}
+.eqa .abpg .v2wi svg{width:13px;height:13px}
+.eqa .abpg .v2wt{font-size:7.1pt;line-height:1.16;margin:0 0 3px 0}
+.eqa .abpg .v2wd{font-size:6.3pt;line-height:1.22}
+.eqa .abpg .v2foot{margin:4px 0 0 0;padding:5px 10px;font-size:7pt}
+.eqa .abpg table.v2life{margin:0 0 5px 0}
+.eqa .abpg table.v2life td.v2lc{width:9.1%}
+.eqa .abpg table.v2life td.v2la{width:1.7%;line-height:20px;font-size:10pt}
+.eqa .abpg .v2ls{font-size:6.4pt;line-height:1.14;margin:2px 0 0 0}
+
+/* ============================================================================
+   S23 | CONTINUATION HEADER REDESIGN + CONTROLLED BODY FONT LIFT (append-only)
+
+   IMPORTANT -- wkhtmltopdf/QtWebKit quantises every font-size to whole 96 dpi
+   pixels: printed_pt = round(css_pt * 4/3) * 0.75. The usable ladder near 9 pt is
+   therefore  8.25 pt (11 px)  ->  9.00 pt (12 px)  ->  9.75 pt (13 px).
+   Consequences that drove the choices below:
+     - 8.5 pt and 8.6 pt both PRINT at 8.25 pt (no visible difference)
+     - 8.8 pt, 9 pt and 9.25 pt all PRINT at 9.00 pt
+     - the next distinct step above 9.00 pt is 9.75 pt, i.e. +0.75 pt
+   So "9 pt" and "9.25 pt" are the same printed size, and there is no such thing
+   as a +0.25 or +0.5 pt increase in this engine.
+
+   Already at target, therefore NOT changed:
+     .eqa .rt is 8.8 pt and already PRINTS at 9.00 pt. That rule feeds both the
+     Scope Included body and the Payment Terms body, both measured at 9.00 pt in
+     the PDF before this sprint. Touching them would have gained nothing.
+
+   Changed here (all verified against the generated PDF, not the DOM):
+     .eqa .commercial-sec .kv     8.6 pt -> 9 pt   printed 8.25 -> 9.00
+       NOTE: .kv is shared -- 5 uses in the Commercial Conditions grid and 4 in
+       the Annexure line-detail rows. An unscoped ".eqa .kv" also lifted the
+       Annexure rows and cost 00048 page 6 +11.11 mm (still 6 pages). The brief
+       named Commercial Conditions only and forbade global changes, so the rule
+       is scoped to .commercial-sec and the Annexure keeps printing at 8.25 pt.
+     .eqa .sec.tc .rt.small        8.5 pt -> 9 pt   printed 8.25 -> 9.00
+     .eqa .sec.tc .rt.small strong 9.25 pt          printed 8.25 -> 9.00 (bold)
+   The clause-heading rule is scoped to a direct strong child of a paragraph.
+   The Terms master renders as 14 x <p><strong>heading</strong><br>body</p>, so
+   this cannot catch inline bold used for dynamic values inside clause bodies.
+
+   Deliberately NOT touched: page-1 fonts, About Us page 2, Priced Schedule
+   descriptions, Qty/Rate/Amount cells, totals, amount-in-words, footer.
+   ========================================================================== */
+.eqa .commercial-sec .kv{font-size:9pt}
+.eqa .sec.tc .rt.small{font-size:9pt}
+.eqa .sec.tc .rt.small p > strong{font-size:9.25pt;font-weight:700}
+
+
+/* ============================================================================
+   S24 | CONTROLLED BODY FONT LIFT (append-only, narrowly scoped)
+
+   Engine quantisation (QtWebKit / wkhtmltopdf):
+       printed_pt = round(css_pt * 4/3) * 0.75
+   PRINTED 9.75pt requires round(css*4/3)=13, i.e. css in [9.375pt, 10.125pt)
+       verified: css 9.4pt and css 9.5pt both PRINT 9.75pt
+   PRINTED 10.50pt requires round(css*4/3)=14, i.e. css in [10.125pt, 10.875pt)
+       verified: css 10.25pt PRINTS 10.50pt
+   9.5pt is shipped (mid-band) rather than the 9.375pt band edge.
+
+   APPLIED (commercial run only):
+     Scope Included body        9.00 -> 9.75 printed
+     Commercial Conditions rows 9.00 -> 9.75 printed (labels and values)
+     Payment Terms value        9.00 -> 9.75 printed (bold preserved by S12)
+
+   NOT APPLIED / MEASURED CONSTRAINT (Contractual Terms):
+     A 9.75pt clause body (css 9.5pt) grew the Terms block from 229.66mm to
+     248.44mm; a 10.50pt clause heading alone grew it to 237.07mm. On
+     SAL-QTN-2026-00048 the Annexure-A intro block shares the Terms page and its
+     last line already sits at 259.29mm against an empirically bracketed page
+     break threshold of 259.6-261mm, i.e. under 1.5mm of headroom. Either lift
+     pushes that block onto the Annexure page, which then overflows by a few
+     tenths of a millimetre and emits a blank 7th page (00048 6 -> 7 pages).
+     Per instruction the clause body stays at the S23 9.00pt printed size and the
+     page is NOT compressed. The S23 Contractual Terms rules are untouched.
+
+   SCROLLBAR ARTEFACT FIX (required by the lift above):
+     Quill ships .ql-editor{height:100%;overflow-y:auto} in Frappe print.bundle,
+     and per CSS overflow rules an overflow-y of auto makes overflow-x compute to
+     auto as well. The Scope Included body is the only .ql-editor in the print
+     output. At 9.75pt its pre-wrap content overran the content box by a fraction
+     and QtWebKit painted a real horizontal scrollbar widget into the PDF, adding
+     about 7mm of dead height. overflow-x is pinned to hidden for that one
+     container. Both axes were already non-visible, so the block formatting
+     context, height and margins are unchanged.
+
+   Deliberately NOT touched: .eqa .rt (global), .eqa .kv (global),
+   .eqa .annex .kv, table.tbl / .idesc / .sh (Priced Schedule), .tot / .grand,
+   .inwords, page 1, .abpg (About Us), #header-html, #footer-html.
+   ========================================================================= */
+.eqa .sec.scope-sec > .rt{font-size:9.5pt}
+.eqa .commercial-sec .kv{font-size:9.5pt}
+.eqa .sec.payment-sec > .rt{font-size:9.5pt}
+.eqa .sec.scope-sec > .rt .ql-editor{overflow-x:hidden}
+
+
+/* ===== S25 | PAGE-1 METADATA COLUMN REALIGNMENT (append-only, widths only) =====
+   Reference: approved page-1 alignment mock (S25).
+   Measured delta against the S24 production PDF, expressed as a share of the
+   179.84mm content width (left edge 15.08mm, right edge 194.92mm):
+     column-1 value right edge   47.0pc  ->  52.2pc   (99.60mm  -> 108.96mm)
+     column-2 label left edge    53.1pc  ->  57.7pc   (110.60mm -> 118.85mm)
+     column-2 value right edge  100.0pc  -> 100.0pc   (unchanged, flush right)
+   The panel is the S13 fixed-layout CSS table (td.mc1 label, td.mc2 value,
+   td.mc3 gutter, td.mc4 label, td.mc5 value). Only the five declared column
+   widths move. Nothing else is touched: text-align stays left on the label
+   cells and right on the value cells, font-size/weight/tracking/colour of both
+   span.mlbl and the value cells are untouched, the 1px table hairlines and the
+   1px row separator are untouched, and the S15 row padding !important rule is
+   untouched, so every row keeps its exact height.
+   Widths sum to 100pc so table-layout:fixed resolves without redistribution.
+   Capacity check at the new widths (Liberation Sans, printed sizes):
+     mc1 43.16mm holds the longest label (QUOTATION NUMBER, approx 26mm)
+     mc2 50.36mm holds the longest value (SAL-QTN-2026-00071, 34.51mm measured)
+     mc4 32.37mm holds QUOTATION DATE (approx 24mm)
+     mc5 43.16mm holds a formatted date (17.58mm measured)
+   span.mlbl keeps white-space:nowrap, so no label can wrap and no row can grow.
+   Row count, row height and panel height are therefore invariant, so page 1
+   cannot reflow and no page count can change.
+   Scope: .eqa > .pg:first-child only. table.metat exists exclusively on page 1;
+   the first-child guard is kept anyway so the Annexure and About Us pages can
+   never be reached. No global td, .kv, .rt or .sec selector is introduced.
+   ===== */
+.eqa > .pg:first-child table.metat td.mc1{width:24%}
+.eqa > .pg:first-child table.metat td.mc2{width:28%}
+.eqa > .pg:first-child table.metat td.mc3{width:6%}
+.eqa > .pg:first-child table.metat td.mc4{width:18%}
+.eqa > .pg:first-child table.metat td.mc5{width:24%}
+
+
+/* ===== S26 | PAGE-1 MASTHEAD COMPACTION (append-only, page-1 only) =====
+   Brief: reduce the header margin on page 1 without affecting pages 2, 3 or any
+   later page.
+   MEASURED CONSTRAINT, recorded here so it is not re-attempted:
+   The blank strip above the logo is NOT authored by this format. Page-1 body
+   content-box top measures 20.90mm and the logo is clamped to it exactly
+   (logo 20.90 -> 37.31mm). Two independent probes proved this format cannot
+   move it:
+     probe 1  margin_top set 15 -> 8mm and stored as 8: logo top stayed 20.90,
+              page-2 header stayed 10.58, page count stayed 5. Field is inert.
+     probe 2  HEXheader-html given padding-bottom 12mm: logo top stayed 20.90,
+              page-2 header stayed 10.58, page count stayed 5. Band height does
+              not derive from header content height either.
+   Also, per the earlier S15 finding, content cannot be pulled up into that band:
+   the engine clamps the logo to the content-box top while rule and text do move,
+   and the header band paints an opaque white rectangle down to exactly the
+   content-box top, so anything above it is shaved out of the PDF.
+   The 20.90mm therefore requires a site-level Frappe PDF margin change, which by
+   definition applies to every page, so it is deliberately NOT attempted here.
+   WHAT THIS BLOCK DOES. It reclaims the space that IS authored here, below the
+   logo, so the navy rule and everything under it move up:
+     .mast padding-bottom  2.2mm -> 1.2mm   (-1.0mm, logo-to-rule gap)
+     .mast margin-bottom   2.8mm -> 2.0mm   (-0.8mm, rule-to-title gap)
+     .doctitle margin-top   .3mm -> 0       (-0.3mm)
+   Expected net lift of the document title and all page-1 content below it:
+   2.1mm. The logo, the company name, the five-line contact block, the 2pt navy
+   rule, all font sizes, weights, colours and the metadata panel are untouched.
+   No company information is removed. Scope is .eqa > .pg=first-child, the
+   combinator already proven in this engine to be unable to reach pages 2+.
+   .mast and .doctitle exist only on page 1 in any case. Page 1 carries ~121mm of
+   trailing whitespace, so shortening it cannot reflow anything and no page count
+   can change.
+   ===== */
+.eqa > .pg:first-child .mast{padding-bottom:1.2mm;margin-bottom:2mm}
+.eqa > .pg:first-child .doctitle{margin-top:0}
