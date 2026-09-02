@@ -412,8 +412,8 @@ fixtures = [
         "doctype": "Property Setter",
         "filters": [["module", "=", "BS Group"]]
     },
-    {"doctype": "Workflow"},
-    {"doctype": "Workflow Action Master"},
-    {"doctype": "Workflow State"},
-    {"doctype": "Role"},
+    # {"doctype": "Workflow"},
+    # {"doctype": "Workflow Action Master"},
+    # {"doctype": "Workflow State"},
+    # {"doctype": "Role"},
 ]
