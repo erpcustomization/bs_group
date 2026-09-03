@@ -31,6 +31,29 @@
         };
     }
 
+    // --- Show absolute date/time instead of relative "x ago" timestamps ---
+    // comment_when() (core) renders every timestamp — sidebar "Created By" /
+    // "Last Edited By", and the activity/comment timeline — as
+    // <span class="frappe-timestamp" data-timestamp="...">. Swap the
+    // rendered text for the raw timestamp instead of the relative text.
+    function applyRawTimestamps() {
+        $(".frappe-timestamp").each(function () {
+            const raw = $(this).attr("data-timestamp");
+            if (raw) {
+                $(this).text(raw.split(".")[0]);
+            }
+        });
+    }
+
+    // Sidebar and timeline re-render on route change, on timeline
+    // refresh (new comment/activity), and on frappe's own 60s
+    // relative-time refresh — reapply after each.
+    frappe.router.on("change", () => setTimeout(applyRawTimestamps, 300));
+    $(document).on("form-refresh form-rename timeline_refresh", () =>
+        setTimeout(applyRawTimestamps, 300)
+    );
+    setInterval(applyRawTimestamps, 60000);
+
     // --- Fallback via router event ---
     // In case the prototype patch missed the initial call, re-apply on every
     // route change: if sidebar landed on the wrong workspace and the stored
