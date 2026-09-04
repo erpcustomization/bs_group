@@ -6,6 +6,8 @@ from frappe.model.document import Document
 
 from bsgroup.utils.project_cost_baseline import (
 	carry_forward_revision,
+	mark_amended_from_superseded,
+	reset_approval_fields_for_draft,
 	set_baseline_amount_from_dcs,
 	set_remaining_amount,
 	supersede_previous_baselines,
@@ -20,6 +22,7 @@ class ProjectCostBaseline(Document):
 		carry_forward_revision(self)
 
 	def validate(self):
+		reset_approval_fields_for_draft(self)
 		validate_dcs_belongs_to_project(self)
 		validate_dcs_is_submitted(self)
 		set_baseline_amount_from_dcs(self)
@@ -33,6 +36,7 @@ class ProjectCostBaseline(Document):
 
 	def on_submit(self):
 		supersede_previous_baselines(self)
+		mark_amended_from_superseded(self)
 
 	def on_cancel(self):
-		self.status = "Cancelled"
+		self.db_set("status", "Cancelled", update_modified=False)

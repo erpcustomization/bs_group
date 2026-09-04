@@ -24,12 +24,31 @@ def validate_dcs_belongs_to_project(doc):
 		return
 
 	dcs_project = frappe.db.get_value("Deal Cost Sheet", doc.deal_cost_sheet, "project")
+	if not dcs_project:
+		frappe.throw(
+			_("Deal Cost Sheet {0} is not linked to any Project. Set the Project on the Deal Cost Sheet first.").format(
+				doc.deal_cost_sheet
+			)
+		)
 	if dcs_project != doc.project:
 		frappe.throw(
 			_("Deal Cost Sheet {0} belongs to Project {1}, not {2}").format(
-				doc.deal_cost_sheet, dcs_project or _("(none)"), doc.project
+				doc.deal_cost_sheet, dcs_project, doc.project
 			)
 		)
+
+
+def reset_approval_fields_for_draft(doc):
+	"""Amending a submitted/cancelled baseline copies its field values into a
+	new draft by default, which - without no_copy on status/approved_by/
+	approved_on - would leave the fresh draft displaying as an already
+	Approved document with an approver and timestamp, before anyone has
+	acted on it. no_copy=1 on the doctype already stops most of this; this
+	is a defensive second layer for any doc still docstatus 0."""
+	if doc.docstatus == 0:
+		doc.status = "Draft"
+		doc.approved_by = None
+		doc.approved_on = None
 
 
 def validate_dcs_is_submitted(doc):
@@ -106,6 +125,17 @@ def supersede_previous_baselines(doc):
 	)
 	for name in others:
 		frappe.db.set_value("Project Cost Baseline", name, "status", "Superseded")
+
+
+def mark_amended_from_superseded(doc):
+	"""The document this one amends is already Cancelled (on_cancel runs as
+	part of the amend flow, before this new doc is even created) - re-mark it
+	Superseded now that its replacement is actually Approved, so the amend
+	chain reads Draft -> Approved -> Superseded rather than staying stuck on
+	Cancelled. Runs after supersede_previous_baselines, whose docstatus=1
+	filter never touches the (docstatus=2) amended_from doc anyway."""
+	if doc.amended_from:
+		frappe.db.set_value("Project Cost Baseline", doc.amended_from, "status", "Superseded")
 
 
 def refresh_remaining_amount(project, extra_exposure=0):
@@ -338,6 +368,28 @@ def check_transaction_cost_overrun(doc, method=None):
 		extra_exposure = flt(getattr(doc, "base_grand_total", None) or getattr(doc, "grand_total", 0))
 
 	check_cost_overrun_for_project(doc.project, raise_from=f"{doc.doctype} {doc.name}", extra_exposure=extra_exposure)
+
+
+def recalculate_project_baseline(doc, method=None):
+	"""doc_events hook for `on_cancel`/`on_trash` on cost transactions (Purchase
+	Order, Purchase Invoice, Expense Claim). `validate` only fires on save/
+	submit, never on cancel, so remaining_amount was going stale - still
+	reflecting the cancelled transaction's exposure - until some unrelated
+	later transaction happened to save and recompute it. Recalculates only;
+	deliberately no overrun message here since a cancel can only reduce
+	exposure, never create a new overrun."""
+	project = getattr(doc, "project", None)
+	if not project:
+		return
+	refresh_remaining_amount(project)
+
+
+def recalculate_labor_preapproval_baseline(doc, method=None):
+	"""Same as recalculate_project_baseline, for Labor Preapproval, whose
+	Project link lives on `reference` (only when `source == "Project"`)."""
+	if doc.source != "Project" or not doc.reference:
+		return
+	refresh_remaining_amount(doc.reference)
 
 
 def check_labor_preapproval_cost_overrun(doc, method=None):

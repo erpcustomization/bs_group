@@ -365,12 +365,18 @@ doc_events = {
     },
     "Purchase Order": {
         "validate": "bsgroup.utils.project_cost_baseline.check_transaction_cost_overrun",
+        "on_cancel": "bsgroup.utils.project_cost_baseline.recalculate_project_baseline",
+        "on_trash": "bsgroup.utils.project_cost_baseline.recalculate_project_baseline",
     },
     "Purchase Invoice": {
         "validate": "bsgroup.utils.project_cost_baseline.check_transaction_cost_overrun",
+        "on_cancel": "bsgroup.utils.project_cost_baseline.recalculate_project_baseline",
+        "on_trash": "bsgroup.utils.project_cost_baseline.recalculate_project_baseline",
     },
     "Expense Claim": {
         "validate": "bsgroup.utils.project_cost_baseline.check_transaction_cost_overrun",
+        "on_cancel": "bsgroup.utils.project_cost_baseline.recalculate_project_baseline",
+        "on_trash": "bsgroup.utils.project_cost_baseline.recalculate_project_baseline",
     },
     "Labor Attendance": {
         "on_submit": "bsgroup.bs_group.doctype.labor_preapproval.labor_preapproval.sync_completion_status_from_attendance",
@@ -378,6 +384,8 @@ doc_events = {
     },
     "Labor Preapproval": {
         "validate": "bsgroup.utils.project_cost_baseline.check_labor_preapproval_cost_overrun",
+        "on_cancel": "bsgroup.utils.project_cost_baseline.recalculate_labor_preapproval_baseline",
+        "on_trash": "bsgroup.utils.project_cost_baseline.recalculate_labor_preapproval_baseline",
     },
 }
 
@@ -400,7 +408,8 @@ scheduler_events = {
     "daily": [
         "bsgroup.utils.opportunity.update_overdue_followup_for_all",
         "bsgroup.bs_group.doctype.presales_request.presales_request.calculate_due_date",
-        "bsgroup.utils.visa.update_employee_visa_status"
+        "bsgroup.utils.visa.update_employee_visa_status",
+        "bsgroup.utils.quotation.sync_expired_pipeline_stage",
     ]
 }
 

@@ -9,8 +9,7 @@ from frappe.utils import getdate, nowdate, now
 
 class PresalesRequest(Document):
 	def validate(self):
-		if self.site_visit_required and not self.site_visit:
-			frappe.throw(frappe._("Site Visit is mandatory when Site Visit Required is checked"))
+		self._validate_site_visit_required()
 
 	def autoname(self):
 		if self.customer:
@@ -33,6 +32,24 @@ class PresalesRequest(Document):
 				"status",
 				"Presales Request"
 			)
+
+	def _validate_site_visit_required(self):
+		if not (self.site_visit_required and not self.site_visit):
+			return
+
+		if self.is_new():
+			frappe.throw(frappe._("Site Visit is mandatory when Site Visit Required is checked"))
+			return
+
+		# Existing records created before this rule (or before any Site
+		# Visit was raised against them) would otherwise be permanently
+		# unsaveable - only enforce when the checkbox is actually being
+		# turned on in this save, not on every edit of a pre-existing
+		# record that was already left in this state.
+		before_save = self.get_doc_before_save()
+		was_already_required = bool(before_save and before_save.site_visit_required)
+		if not was_already_required:
+			frappe.throw(frappe._("Site Visit is mandatory when Site Visit Required is checked"))
 
 
 def calculate_quality_score(doc):

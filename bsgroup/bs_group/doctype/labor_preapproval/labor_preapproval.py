@@ -26,6 +26,32 @@ class LaborPreapproval(Document):
 		self.remaining_persons = 0
 		self.pending_attendance = 0
 
+		# Same belt-and-suspenders as above for the workflow itself: an
+		# amendment must restart at Draft, not carry in whatever state
+		# (Cancelled, Approved, ...) the document it amends was left in -
+		# no_copy on workflow_state already stops most of this (including
+		# frappe.copy_doc()'s default ignore_no_copy=True path used by
+		# scripted amends, which no_copy is what actually protects against).
+		if self.amended_from:
+			self.workflow_state = "Draft"
+
+	def before_submit(self):
+		# The workflow's own "Approve" transition is the only legitimate path
+		# to docstatus 1 (see apply_workflow() in frappe/model/workflow.py:
+		# it sets workflow_state to the transition's next_state, THEN calls
+		# doc.submit()). A plain PUT/API write of docstatus=1 skips that
+		# entirely and reaches here with workflow_state never having passed
+		# through "Pending Approval" via the Approve action - so this is what
+		# actually enforces "only Approve can submit", not the Submit button
+		# being hidden client-side.
+		before_save = self.get_doc_before_save()
+		previous_state = before_save.workflow_state if before_save else None
+		if previous_state != "Pending Approval":
+			frappe.throw(
+				_("Labor Preapproval can only be submitted via the workflow's 'Approve' action from Pending Approval"),
+				title=_("Workflow Bypass Blocked"),
+			)
+
 	def on_trash(self):
 		block_delete_and_amend_unless_system_manager(self, "delete")
 
@@ -62,6 +88,13 @@ class LaborPreapproval(Document):
 
 		if not self.company:
 			frappe.throw(_("Unable to resolve Company for this Labor Preapproval"))
+
+		# Most Projects don't carry their own cost centre, which left
+		# cost_center blank on every record - fall back to the Company
+		# default so labour cost is still attributable somewhere rather than
+		# silently unset.
+		if not self.cost_center:
+			self.cost_center = frappe.get_cached_value("Company", self.company, "cost_center")
 
 	def validate_labor_lines(self):
 		if not self.labor_line_items:

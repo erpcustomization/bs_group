@@ -7,3 +7,4 @@
 bsgroup.patches.migrate_tech_task_scheduler_status
 bsgroup.patches.set_missing_lead_company
 bsgroup.patches.share_existing_tech_task_scheduler_assignments
+# bsgroup.patches.backfill_quotation_pipeline_stage  # run manually when ready to backfill existing quotations
