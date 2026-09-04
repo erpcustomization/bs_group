@@ -1,0 +1,1489 @@
+<style>
+    /* @page {
+        size: A4;
+        margin: 30mm 15mm 18mm 15mm;
+    } */
+
+    [document-status] { display: none; }
+    .print-heading { display: none; }
+
+    @page {
+        size: A4;
+        margin: 0mm;
+    }
+
+    .page-number  {     
+        display: none!important;     
+    }
+
+    body {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 11px;
+        color: #222;
+        margin: 0;
+        padding: 0;
+    }
+
+    .print-container {
+        width: 100%;
+        margin: 0 auto;
+    }
+
+    /* =========================
+       ADDRESS SECTION
+       Bill To first - Ship To second
+       Stacked vertically, full width each.
+       ========================= */
+
+    .address-section {
+        width: 100%;
+        margin-bottom: 25px;
+    }
+
+    .bill-to {
+        width: 100%;
+        text-align: left;
+        margin-bottom: 20px;
+    }
+
+    .ship-to {
+        width: 100%;
+        text-align: left;
+    }
+
+    .section-title {
+        font-size: 11px;
+        font-weight: bold;
+        margin-bottom: 7px;
+    }
+
+    .address-content {
+        line-height: 1.45;
+    }
+
+    /* =========================
+       ORDER DATE
+       ========================= */
+
+    .order-date {
+        width: 100%;
+        text-align: right;
+        margin-bottom: 15px;
+        font-size: 11px;
+    }
+
+    /* =========================
+       ITEM TABLE
+       ========================= */
+
+    .items-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        margin-top: 8px;
+    }
+
+    /* Repeats the header row automatically on every page
+       when the item list spans multiple pages */
+    .items-table thead {
+        display: table-header-group;
+    }
+
+    .items-table tbody {
+        display: table-row-group;
+    }
+
+    .items-table th {
+        background: #555555;
+        color: white;
+        font-size: 10px;
+        font-weight: bold;
+        padding: 8px 6px;
+        border: 1px solid #555555;
+        text-align: center;
+    }
+
+    .items-table td {
+        font-size: 10px;
+        padding: 8px 6px;
+        border: 1px solid #cccccc;
+        vertical-align: top;
+    }
+
+    .col-no {
+        width: 5%;
+        text-align: center;
+    }
+
+    .col-description {
+        width: 39%;
+        text-align: left;
+    }
+
+    .col-qty {
+        width: 9%;
+        text-align: right;
+    }
+
+    .col-rate {
+        width: 12%;
+        text-align: right;
+    }
+
+    .col-tax-percent {
+        width: 10%;
+        text-align: right;
+    }
+
+    .col-tax {
+        width: 11%;
+        text-align: right;
+    }
+
+    .col-amount {
+        width: 14%;
+        text-align: right;
+    }
+
+    /* =========================
+       TOTALS
+       ========================= */
+
+    .totals-wrapper {
+        width: 100%;
+        margin-top: 15px;
+        page-break-inside: avoid;
+    }
+
+    .totals-table {
+        width: 45%;
+        margin-left: auto;
+        border-collapse: collapse;
+    }
+
+    .totals-table td {
+        padding: 5px 6px;
+        font-size: 10.5px;
+    }
+
+    .totals-label {
+        text-align: left;
+    }
+
+    .totals-value {
+        text-align: right;
+    }
+
+    .grand-total td {
+        font-weight: bold;
+        border-top: 1px solid #777777;
+        padding-top: 7px;
+    }
+
+    /* =========================
+       TAX SUMMARY
+       ========================= */
+
+    .tax-summary {
+        margin-top: 25px;
+        width: 100%;
+    }
+
+    .tax-summary-title {
+        font-size: 12px;
+        font-weight: bold;
+        margin-bottom: 8px;
+    }
+
+    .tax-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .tax-table th {
+        background: #eeeeee;
+        border: 1px solid #cccccc;
+        padding: 7px 6px;
+        font-size: 10px;
+        font-weight: bold;
+    }
+
+    .tax-table td {
+        border: 1px solid #cccccc;
+        padding: 7px 6px;
+        font-size: 10px;
+    }
+
+    .tax-left {
+        text-align: left;
+    }
+
+    .tax-right {
+        text-align: right;
+    }
+
+    .tax-total td {
+        font-weight: bold;
+    }
+
+    /* =========================
+       TERMS & CONDITIONS
+       ========================= */
+
+    .terms-section {
+        margin-top: 25px;
+        page-break-inside: avoid;
+    }
+
+    .terms-title {
+        font-size: 12px;
+        font-weight: bold;
+        margin-bottom: 7px;
+    }
+
+    .terms-content {
+        font-size: 10px;
+        line-height: 1.5;
+    }
+
+    /* =========================
+       PAGE NUMBER
+       (the contact-info footer itself now comes from the
+       "Order Letterhead" footer, repeated automatically)
+       ========================= */
+
+    .page-number {
+        text-align: right;
+        font-size: 9px;
+        color: #666666;
+        margin-top: 15px;
+    }
+
+    /* =========================
+       PRINT SETTINGS
+       ========================= */
+
+    .avoid-break {
+        page-break-inside: avoid;
+    }
+
+    tr {
+        page-break-inside: avoid;
+    }
+</style>
+
+
+<div class="print-container">
+
+    <!-- =========================
+         HEADER
+         Removed entirely: the logo AND the "Sales Order" title
+         + order number now both print from the "Order Letterhead"
+         Letter Head, in the same table row, above this block.
+         ========================= -->
+
+    <!-- =========================
+         BILL TO FIRST
+         SHIP TO SECOND
+         Stacked vertically (not side-by-side).
+         ========================= -->
+
+    <div class="address-section">
+
+        <!-- BILL TO -->
+        <div class="bill-to">
+
+            <div class="section-title">
+                Bill To
+            </div>
+
+            <div class="address-content">
+
+                {% if doc.customer_name %}
+                    <strong>{{ doc.customer_name }}</strong><br>
+                {% endif %}
+
+
+                {% if doc.billing_address_display %}
+
+                    {{ doc.billing_address_display }}
+
+                {% elif doc.address_display %}
+
+                    {{ doc.address_display }}
+
+                {% elif doc.customer_address %}
+
+                    {% set billing = frappe.get_doc(
+                        "Address",
+                        doc.customer_address
+                    ) %}
+
+                    {{ billing.address_line1 or "" }}<br>
+
+                    {% if billing.address_line2 %}
+                        {{ billing.address_line2 }}<br>
+                    {% endif %}
+
+                    {{ billing.city or "" }}
+
+                    {% if billing.state %}
+                        , {{ billing.state }}
+                    {% endif %}
+
+                    <br>
+
+                    {{ billing.country or "" }}
+
+
+                    {% if billing.tax_id %}
+                        <br>
+                        TRN {{ billing.tax_id }}
+                    {% endif %}
+
+                {% endif %}
+
+            </div>
+        </div>
+
+        <!-- SHIP TO -->
+        <div class="ship-to">
+            <div class="section-title">
+                Ship To
+            </div>
+
+            <div class="address-content">
+
+                {% if doc.shipping_address_display %}
+
+                    {{ doc.shipping_address_display }}
+
+                {% elif doc.shipping_address %}
+
+                    {# doc.shipping_address holds ready-to-print HTML
+                       text on Sales Order - it is NOT an Address
+                       link, so it must never be passed to
+                       frappe.get_doc(). The actual Address link
+                       field is shipping_address_name below. #}
+
+                    {{ doc.shipping_address }}
+
+                {% endif %}
+
+
+                {% if doc.shipping_address_name %}
+
+                    {% set shipping = frappe.get_doc(
+                        "Address",
+                        doc.shipping_address_name
+                    ) %}
+
+                    {% if shipping.tax_id %}
+                        <br>
+                        TRN {{ shipping.tax_id }}
+                    {% endif %}
+
+                {% endif %}
+
+            </div>
+        </div>
+
+    </div>
+
+
+
+    <!-- =========================
+         ORDER DATE
+         ========================= -->
+
+    <div class="order-date">
+        <strong>Order Date:</strong>
+        {{ frappe.utils.formatdate(doc.transaction_date) }}
+    </div>
+
+
+    <!-- =========================
+         ITEMS
+         Loops through every row in doc.items, so any number
+         of items is supported. The <thead> uses
+         "display: table-header-group" above, which makes the
+         grey header row repeat automatically at the top of
+         every page when the item list overflows onto page 2, 3...
+         ========================= -->
+
+    <table class="items-table">
+
+        <thead>
+            <tr>
+                <th class="col-no">#</th>
+                <th class="col-description">Item &amp; Description</th>
+                <th class="col-qty">Qty</th>
+                <th class="col-rate">Rate</th>
+                <th class="col-tax-percent">Tax %</th>
+                <th class="col-tax">Tax</th>
+                <th class="col-amount">Amount</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+            {% for item in doc.items %}
+
+                {% set ns = namespace(item_tax_percent=0, item_tax_amount=0) %}
+
+                {% for tax in doc.taxes %}
+
+                    {% if tax.rate %}
+                        {% set ns.item_tax_percent =
+                            ns.item_tax_percent + tax.rate %}
+                    {% endif %}
+
+                    {% if doc.total and doc.total != 0 %}
+
+                        {% set ns.item_tax_amount =
+                            ns.item_tax_amount +
+                            ((tax.tax_amount * item.amount) / doc.total) %}
+
+                    {% endif %}
+
+                {% endfor %}
+
+
+                <tr>
+
+                    <td class="col-no">
+                        {{ loop.index }}
+                    </td>
+
+
+                    <td class="col-description">
+
+                        {{ item.description or "" }}
+
+                    </td>
+
+
+                    <td class="col-qty">
+                        {{ frappe.utils.fmt_money(
+                            item.qty,
+                            precision=2
+                        ) }}
+                    </td>
+
+
+                    <td class="col-rate">
+                        {{ frappe.utils.fmt_money(
+                            item.rate,
+                            precision=2
+                        ) }}
+                    </td>
+
+
+                    <td class="col-tax-percent">
+                        {{ frappe.utils.fmt_money(
+                            ns.item_tax_percent,
+                            precision=2
+                        ) }}
+                    </td>
+
+
+                    <td class="col-tax">
+                        {{ frappe.utils.fmt_money(
+                            ns.item_tax_amount,
+                            precision=2
+                        ) }}
+                    </td>
+
+
+                    <td class="col-amount">
+                        {{ frappe.utils.fmt_money(
+                            item.amount,
+                            precision=2
+                        ) }}
+                    </td>
+
+                </tr>
+
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+
+    <!-- =========================
+         TOTALS
+         ========================= -->
+
+    <div class="totals-wrapper">
+
+        <table class="totals-table">
+
+            <tr>
+
+                <td class="totals-label">
+                    Sub Total
+                </td>
+
+                <td class="totals-value">
+                    {{ frappe.utils.fmt_money(
+                        doc.total,
+                        precision=2
+                    ) }}
+                </td>
+
+            </tr>
+
+
+            {% set ns_totals = namespace(total_tax=0) %}
+
+            {% for tax in doc.taxes %}
+
+                {% set ns_totals.total_tax =
+                    ns_totals.total_tax + (tax.tax_amount or 0) %}
+
+            {% endfor %}
+
+
+            <tr>
+
+                <td class="totals-label">
+                    VAT
+                </td>
+
+                <td class="totals-value">
+                    {{ frappe.utils.fmt_money(
+                        ns_totals.total_tax,
+                        precision=2
+                    ) }}
+                </td>
+
+            </tr>
+
+
+            <tr class="grand-total">
+
+                <td class="totals-label">
+                    Total
+                </td>
+
+                <td class="totals-value">
+                    {{ frappe.utils.fmt_money(
+                        doc.grand_total,
+                        precision=2
+                    ) }}
+                </td>
+
+            </tr>
+
+        </table>
+
+    </div>
+
+
+    <!-- =========================
+         TAX SUMMARY
+         ========================= -->
+
+    <div class="tax-summary avoid-break">
+
+        <div class="tax-summary-title">
+            Tax Summary
+        </div>
+
+
+        <table class="tax-table">
+
+            <thead>
+
+                <tr>
+
+                    <th class="tax-left">
+                        Tax Details
+                    </th>
+
+                    <th class="tax-right">
+                        Taxable Amount (AED)
+                    </th>
+
+                    <th class="tax-right">
+                        Tax Amount (AED)
+                    </th>
+
+                </tr>
+
+            </thead>
+
+
+            <tbody>
+
+                {% set ns_summary = namespace(summary_taxable=0, summary_tax=0) %}
+
+
+                {% for tax in doc.taxes %}
+
+                    {% set taxable_amount =
+                        tax.taxable_amount or doc.total %}
+
+                    {% set tax_amount =
+                        tax.tax_amount or 0 %}
+
+
+                    {% set ns_summary.summary_taxable =
+                        ns_summary.summary_taxable + taxable_amount %}
+
+                    {% set ns_summary.summary_tax =
+                        ns_summary.summary_tax + tax_amount %}
+
+
+                    <tr>
+
+                        <td class="tax-left">
+
+                            {% if tax.description %}
+
+                                {{ tax.description }}
+
+                            {% elif tax.account_head %}
+
+                                {{ tax.account_head }}
+
+                            {% else %}
+
+                                VAT
+
+                            {% endif %}
+
+                            {% if tax.rate %}
+                                ({{ tax.rate }}%)
+                            {% endif %}
+
+                        </td>
+
+
+                        <td class="tax-right">
+
+                            {{ frappe.utils.fmt_money(
+                                taxable_amount,
+                                precision=2
+                            ) }}
+
+                        </td>
+
+
+                        <td class="tax-right">
+
+                            {{ frappe.utils.fmt_money(
+                                tax_amount,
+                                precision=2
+                            ) }}
+
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+
+
+                <tr class="tax-total">
+
+                    <td class="tax-left">
+                        Total
+                    </td>
+
+                    <td class="tax-right">
+
+                        {{ frappe.utils.fmt_money(
+                            ns_summary.summary_taxable,
+                            precision=2
+                        ) }}
+
+                    </td>
+
+                    <td class="tax-right">
+
+                        {{ frappe.utils.fmt_money(
+                            ns_summary.summary_tax,
+                            precision=2
+                        ) }}
+
+                    </td>
+
+                </tr>
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+
+    <!-- =========================
+         TERMS & CONDITIONS
+         ========================= -->
+
+    <div class="terms-section avoid-break">
+
+        <div class="terms-title">
+            Terms &amp; Conditions
+        </div>
+
+
+        <div class="terms-content">
+
+            {% if doc.terms %}
+
+                {{ doc.terms }}
+
+            {% elif doc.tc_name %}
+
+                {% set terms_doc =
+                    frappe.get_doc(
+                        "Terms and Conditions",
+                        doc.tc_name
+                    ) %}
+
+                {{ terms_doc.terms }}
+
+            {% else %}
+
+                Due on Receipt
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================
+         PAGE NUMBER
+         The contact-info footer line (email / website with
+         icons) now comes from the "Order Letterhead" Letter
+         Head footer and repeats on every page automatically -
+         no need to duplicate it here.
+         ========================= -->
+
+    <div class="page-number">
+        Page <span class="page"></span>
+    </div>
+
+</div>
+
+<!-- -------------------------------------------------------------------------------------------- -->
+ <!-- Sales Invoice -->
+
+<style>
+    @page {
+        size: A4;
+        margin: 30mm 15mm 18mm 15mm;
+    }
+
+    [document-status] { display: none; }
+    .print-heading { display: none; }
+
+    .page-number {
+        display: none !important;
+    }
+
+    body {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 11px;
+        color: #222;
+        margin: 0;
+        padding: 0;
+    }
+
+    .print-container {
+        width: 100%;
+        margin: 0 auto;
+    }
+
+    /* =========================
+       COMPANY ADDRESS (left) / INVOICE META (right)
+       Logo + "Sales Invoice" title already print from the
+       "Order Letterhead" Letter Head above this block.
+       ========================= */
+
+    .top-row {
+        width: 100%;
+        display: table;
+        table-layout: fixed;
+        margin-bottom: 20px;
+    }
+
+    .top-left {
+        display: table-cell;
+        width: 55%;
+        vertical-align: top;
+        text-align: left;
+        line-height: 1.45;
+    }
+
+    .top-left strong {
+        font-size: 11.5px;
+    }
+
+    .top-right {
+        display: table-cell;
+        width: 45%;
+        vertical-align: top;
+        text-align: right;
+    }
+
+    .meta-line {
+        margin-bottom: 6px;
+    }
+
+    .meta-label {
+        color: #444;
+    }
+
+    /* =========================
+       BILL TO
+       ========================= */
+
+    .bill-to-section {
+        margin-bottom: 20px;
+    }
+
+    .section-title {
+        font-size: 11px;
+        font-weight: bold;
+        margin-bottom: 7px;
+    }
+
+    .address-content {
+        line-height: 1.45;
+    }
+
+    /* =========================
+       ITEM TABLE + TOTALS
+       (Sub Total / Total / Balance Due live inside this same
+       table as footer rows, matching the sample PDF, instead
+       of a separate totals block below)
+       ========================= */
+
+    .items-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        margin-top: 8px;
+    }
+
+    .items-table thead {
+        display: table-header-group;
+    }
+
+    .items-table tbody {
+        display: table-row-group;
+    }
+
+    .items-table th {
+        background: #4a86b8;
+        color: white;
+        font-size: 10px;
+        font-weight: bold;
+        padding: 8px 6px;
+        border: 1px solid #4a86b8;
+        text-align: center;
+    }
+
+    .items-table td {
+        font-size: 10px;
+        padding: 8px 6px;
+        border: 1px solid #cccccc;
+        vertical-align: top;
+    }
+
+    .col-no {
+        width: 6%;
+        text-align: center;
+    }
+
+    .col-description {
+        width: 42%;
+        text-align: left;
+    }
+
+    .col-qty {
+        width: 10%;
+        text-align: right;
+    }
+
+    .col-rate {
+        width: 12%;
+        text-align: right;
+    }
+
+    .col-vat {
+        width: 14%;
+        text-align: right;
+    }
+
+    .col-amount {
+        width: 16%;
+        text-align: right;
+    }
+
+    .vat-percent {
+        display: block;
+        font-size: 9px;
+        color: #666;
+        margin-top: 2px;
+    }
+
+    .footer-label {
+        text-align: right;
+        font-weight: bold;
+    }
+
+    .footer-value {
+        text-align: right;
+        font-weight: bold;
+    }
+
+    .subtotal-row td,
+    .total-row td,
+    .balance-row td {
+        border: none;
+        padding: 8px 6px;
+    }
+
+    .subtotal-row td {
+        border-bottom: 1px solid #cccccc;
+    }
+
+    .balance-row .footer-label,
+    .balance-row .footer-value {
+        background: #eef4f8;
+    }
+
+    /* =========================
+       TAX SUMMARY
+       ========================= */
+
+    .tax-summary {
+        margin-top: 25px;
+        width: 100%;
+    }
+
+    .tax-summary-title {
+        font-size: 12px;
+        font-weight: bold;
+        margin-bottom: 8px;
+    }
+
+    .tax-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .tax-table th {
+        background: #4a86b8;
+        color: white;
+        border: 1px solid #4a86b8;
+        padding: 7px 6px;
+        font-size: 10px;
+        font-weight: bold;
+    }
+
+    .tax-table td {
+        border: 1px solid #cccccc;
+        padding: 7px 6px;
+        font-size: 10px;
+    }
+
+    .tax-left {
+        text-align: left;
+    }
+
+    .tax-right {
+        text-align: right;
+    }
+
+    .tax-total td {
+        font-weight: bold;
+    }
+
+    /* =========================
+       ACCOUNT NAME
+       ========================= */
+
+    .account-name {
+        margin-top: 25px;
+        font-size: 10px;
+    }
+
+    /* =========================
+       TERMS & CONDITIONS
+       ========================= */
+
+    .terms-section {
+        margin-top: 20px;
+        page-break-inside: avoid;
+    }
+
+    .terms-title {
+        font-size: 12px;
+        font-weight: bold;
+        margin-bottom: 7px;
+    }
+
+    .terms-content {
+        font-size: 10px;
+        line-height: 1.5;
+    }
+
+    /* =========================
+       PRINT SETTINGS
+       ========================= */
+
+    tr {
+        page-break-inside: avoid;
+    }
+</style>
+
+
+<div class="print-container">
+
+    {% set company = frappe.get_doc("Company", doc.company) %}
+
+    <!-- =========================
+         COMPANY ADDRESS (left) / INVOICE META (right)
+         ========================= -->
+
+    <div class="top-row">
+
+        <div class="top-left">
+
+            <strong>{{ company.company_name or "" }}</strong><br>
+
+            {% if doc.company_address_display %}
+
+                {{ doc.company_address_display }}
+
+            {% elif doc.company_address %}
+
+                {% set company_addr = frappe.get_doc(
+                    "Address",
+                    doc.company_address
+                ) %}
+
+                {{ company_addr.address_line1 or "" }}<br>
+
+                {% if company_addr.address_line2 %}
+                    {{ company_addr.address_line2 }}<br>
+                {% endif %}
+
+                {{ company_addr.city or "" }}
+
+                {% if company_addr.state %}
+                    , {{ company_addr.state }}
+                {% endif %}
+
+                <br>
+
+                {{ company_addr.country or "" }}
+
+                {% if company_addr.tax_id %}
+                    <br>
+                    TRN {{ company_addr.tax_id }}
+                {% endif %}
+
+            {% endif %}
+
+        </div>
+
+        <div class="top-right">
+
+            <div class="meta-line">
+                <span class="meta-label">Invoice Date :</span>
+                {{ frappe.utils.formatdate(doc.posting_date) }}
+            </div>
+
+            {% set payment_terms = doc.get("payment_terms_template")
+                or doc.get("payment_terms") %}
+
+            <div class="meta-line">
+                <span class="meta-label">Payment Terms # :</span>
+                {{ payment_terms or "Due on Receipt" }}
+            </div>
+
+            <div class="meta-line">
+                <span class="meta-label">Due Date :</span>
+                {{ frappe.utils.formatdate(doc.due_date) }}
+            </div>
+
+            {% set customer_po = doc.get("po_no")
+                or doc.get("custom_customer_po") %}
+
+            {% if customer_po %}
+                <div class="meta-line">
+                    <span class="meta-label">Customer P.O.# :</span>
+                    {{ customer_po }}
+                </div>
+            {% endif %}
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================
+         BILL TO
+         ========================= -->
+
+    <div class="bill-to-section">
+
+        <div class="section-title">
+            Bill To
+        </div>
+
+        <div class="address-content">
+
+            {% if doc.customer_name %}
+                <strong>{{ doc.customer_name }}</strong><br>
+            {% endif %}
+
+            {% if doc.billing_address_display %}
+
+                {{ doc.billing_address_display }}
+
+            {% elif doc.address_display %}
+
+                {{ doc.address_display }}
+
+            {% elif doc.customer_address %}
+
+                {% set billing = frappe.get_doc(
+                    "Address",
+                    doc.customer_address
+                ) %}
+
+                {{ billing.address_line1 or "" }}<br>
+
+                {% if billing.address_line2 %}
+                    {{ billing.address_line2 }}<br>
+                {% endif %}
+
+                {{ billing.city or "" }}
+
+                {% if billing.state %}
+                    , {{ billing.state }}
+                {% endif %}
+
+                <br>
+
+                {{ billing.country or "" }}
+
+            {% endif %}
+
+            {% if doc.tax_id %}
+                <br>
+                TRN {{ doc.tax_id }}
+            {% endif %}
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================
+         ITEMS + TOTALS
+         Loops through every row in doc.items, so any number of
+         items is supported. The <thead> repeats automatically
+         on every page when the item list overflows.
+         The "Amount" column is TAX-INCLUSIVE (item net amount +
+         its allocated VAT), matching the sample PDF, so the
+         "Vat" column shows the per-line tax amount and rate,
+         and Sub Total / Total / Balance Due are appended as
+         footer rows in the same table.
+         ========================= -->
+
+    <table class="items-table">
+
+        <thead>
+            <tr>
+                <th class="col-no">#</th>
+                <th class="col-description">Item &amp; Description</th>
+                <th class="col-qty">Qty</th>
+                <th class="col-rate">Rate</th>
+                <th class="col-vat">Vat</th>
+                <th class="col-amount">Amount</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+            {% set ns_grand = namespace(total_tax=0, tax_inclusive_total=0) %}
+
+            {% for item in doc.items %}
+
+                {% set ns = namespace(item_tax_amount=0) %}
+
+                {% for tax in doc.taxes %}
+
+                    {% if doc.total and doc.total != 0 %}
+
+                        {% set ns.item_tax_amount =
+                            ns.item_tax_amount +
+                            ((tax.tax_amount * item.amount) / doc.total) %}
+
+                    {% endif %}
+
+                {% endfor %}
+
+                {# Derive the displayed % from the actual tax and net
+                   amounts rather than summing doc.taxes[].rate - that
+                   field can be blank/0 on some records (credit notes,
+                   manual tax rows) even though tax_amount is correct,
+                   which is what produced the wrong "0.00%" you saw. #}
+
+                {% set item_tax_percent =
+                    (ns.item_tax_amount / item.amount * 100)
+                    if item.amount else 0 %}
+
+                {% set line_total = item.amount + ns.item_tax_amount %}
+
+                {% set ns_grand.total_tax =
+                    ns_grand.total_tax + ns.item_tax_amount %}
+
+                {% set ns_grand.tax_inclusive_total =
+                    ns_grand.tax_inclusive_total + line_total %}
+
+                <tr>
+
+                    <td class="col-no">
+                        {{ loop.index }}
+                    </td>
+
+                    <td class="col-description">
+                        {{ item.description or item.item_name or "" }}
+                    </td>
+
+                    <td class="col-qty">
+                        {{ frappe.utils.fmt_money(
+                            item.qty,
+                            precision=2
+                        ) }}
+                    </td>
+
+                    <td class="col-rate">
+                        {{ frappe.utils.fmt_money(
+                            item.rate,
+                            precision=2
+                        ) }}
+                    </td>
+
+                    <td class="col-vat">
+                        {{ frappe.utils.fmt_money(
+                            ns.item_tax_amount,
+                            precision=2
+                        ) }}
+                        <span class="vat-percent">
+                            {{ frappe.utils.fmt_money(
+                                item_tax_percent,
+                                precision=2
+                            ) }}%
+                        </span>
+                    </td>
+
+                    <td class="col-amount">
+                        {{ frappe.utils.fmt_money(
+                            line_total,
+                            precision=2
+                        ) }}
+                    </td>
+
+                </tr>
+
+            {% endfor %}
+
+
+            <!-- SUB TOTAL -->
+            <tr class="subtotal-row">
+                <td colspan="3"></td>
+                <td class="footer-label">Sub Total</td>
+                <td class="footer-value">
+                    {{ frappe.utils.fmt_money(
+                        ns_grand.total_tax,
+                        precision=2
+                    ) }}
+                </td>
+                <td class="footer-value">
+                    {{ frappe.utils.fmt_money(
+                        ns_grand.tax_inclusive_total,
+                        precision=2
+                    ) }}
+                </td>
+            </tr>
+
+            <!-- TOTAL -->
+            <tr class="total-row">
+                <td colspan="4"></td>
+                <td class="footer-label">Total</td>
+                <td class="footer-value">
+                    {{ frappe.utils.fmt_money(
+                        doc.grand_total,
+                        precision=2
+                    ) }}
+                </td>
+            </tr>
+
+            <!-- BALANCE DUE -->
+            <tr class="balance-row">
+                <td colspan="4"></td>
+                <td class="footer-label">Balance Due</td>
+                <td class="footer-value">
+                    {{ frappe.utils.fmt_money(
+                        doc.outstanding_amount,
+                        precision=2
+                    ) }}
+                </td>
+            </tr>
+
+        </tbody>
+
+    </table>
+
+
+    <!-- =========================
+         TAX SUMMARY
+         ========================= -->
+
+    <div class="tax-summary">
+
+        <div class="tax-summary-title">
+            Tax Summary
+        </div>
+
+        <table class="tax-table">
+
+            <thead>
+                <tr>
+                    <th class="tax-left">Tax Details</th>
+                    <th class="tax-right">Taxable Amount (AED)</th>
+                    <th class="tax-right">Tax Amount (AED)</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% set ns_summary = namespace(summary_taxable=0, summary_tax=0) %}
+
+                {% for tax in doc.taxes %}
+
+                    {% set taxable_amount =
+                        tax.taxable_amount or doc.total %}
+
+                    {% set tax_amount =
+                        tax.tax_amount or 0 %}
+
+                    {% set ns_summary.summary_taxable =
+                        ns_summary.summary_taxable + taxable_amount %}
+
+                    {% set ns_summary.summary_tax =
+                        ns_summary.summary_tax + tax_amount %}
+
+                    <tr>
+
+                        <td class="tax-left">
+
+                            {% if tax.description %}
+                                {{ tax.description }}
+                            {% elif tax.account_head %}
+                                {{ tax.account_head }}
+                            {% else %}
+                                VAT
+                            {% endif %}
+
+                            {% if tax.rate %}
+                                ({{ tax.rate }}%)
+                            {% endif %}
+
+                        </td>
+
+                        <td class="tax-right">
+                            {{ frappe.utils.fmt_money(
+                                taxable_amount,
+                                precision=2
+                            ) }}
+                        </td>
+
+                        <td class="tax-right">
+                            {{ frappe.utils.fmt_money(
+                                tax_amount,
+                                precision=2
+                            ) }}
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+
+                <tr class="tax-total">
+                    <td class="tax-left">Total</td>
+                    <td class="tax-right">
+                        {{ frappe.utils.fmt_money(
+                            ns_summary.summary_taxable,
+                            precision=2
+                        ) }}
+                    </td>
+                    <td class="tax-right">
+                        {{ frappe.utils.fmt_money(
+                            ns_summary.summary_tax,
+                            precision=2
+                        ) }}
+                    </td>
+                </tr>
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+
+    <!-- =========================
+         ACCOUNT NAME
+         ========================= -->
+
+    <div class="account-name">
+        ACCOUNT NAME: <strong>{{ (company.company_name or "").upper() }}</strong>
+    </div>
+
+
+    <!-- =========================
+         TERMS & CONDITIONS
+         ========================= -->
+
+    <div class="terms-section">
+
+        <div class="terms-title">
+            Terms &amp; Conditions
+        </div>
+
+        <div class="terms-content">
+
+            {% if doc.terms %}
+
+                {{ doc.terms }}
+
+            {% elif doc.tc_name %}
+
+                {% set terms_doc =
+                    frappe.get_doc(
+                        "Terms and Conditions",
+                        doc.tc_name
+                    ) %}
+
+                {{ terms_doc.terms }}
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+</div>
