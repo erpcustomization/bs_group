@@ -1,6 +1,7 @@
 # Copyright (c) 2026, Tridots Tech and contributors
 # For license information, please see license.txt
 
+import re
 import time
 
 import frappe
@@ -147,6 +148,30 @@ def get_columns(filters=None) -> list[dict]:
 	return cols
 
 
+def _parse_coordinate(value):
+	"""Parse a latitude/longitude value that may be a plain number or a
+	string like "23.6038° N" / "72.5714 W" into a signed float. Returns
+	None if the value can't be parsed."""
+	if value is None or value == "":
+		return None
+	if isinstance(value, (int, float)):
+		return float(value)
+
+	text = str(value).strip().upper()
+	match = re.match(r"^(-?\d+(?:\.\d+)?)\s*[°\s]*\s*([NSEW]?)$", text)
+	if not match:
+		try:
+			return float(text)
+		except ValueError:
+			return None
+
+	number = float(match.group(1))
+	direction = match.group(2)
+	if direction in ("S", "W"):
+		number = -abs(number)
+	return number
+
+
 def get_head_offices():
 	"""All Head Office records with valid coordinates, for nearest-match lookup."""
 	rows = frappe.db.get_all(
@@ -154,22 +179,28 @@ def get_head_offices():
 		filters=[["latitude", "is", "set"], ["longitude", "is", "set"]],
 		fields=["name", "title", "latitude", "longitude", "allowd_distance_meters"],
 	)
-	return [r for r in rows if r.latitude and r.longitude]
+	offices = []
+	for r in rows:
+		r.latitude = _parse_coordinate(r.latitude)
+		r.longitude = _parse_coordinate(r.longitude)
+		if r.latitude is not None and r.longitude is not None:
+			offices.append(r)
+	return offices
 
 
 def get_place(latitude, longitude, head_offices):
 	"""Nearest Head Office name if the check-in falls within that office's
 	allowed radius; otherwise a real-world address via reverse geocoding.
 	Returns None only when there are no coordinates or geocoding fails."""
-	if not latitude or not longitude:
+	lat, lon = _parse_coordinate(latitude), _parse_coordinate(longitude)
+	if lat is None or lon is None:
 		return None
 
-	lat, lon = float(latitude), float(longitude)
 	nearest = None
 	nearest_distance = None
 
 	for ho in head_offices:
-		distance = _haversine_distance_meters(lat, lon, float(ho.latitude), float(ho.longitude))
+		distance = _haversine_distance_meters(lat, lon, ho.latitude, ho.longitude)
 		if nearest_distance is None or distance < nearest_distance:
 			nearest = ho
 			nearest_distance = distance
