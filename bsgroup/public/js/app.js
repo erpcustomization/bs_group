@@ -34,8 +34,11 @@
     // --- Show absolute date/time instead of relative "x ago" timestamps ---
     // comment_when() (core) renders every timestamp — sidebar "Created By" /
     // "Last Edited By", and the activity/comment timeline — as
-    // <span class="frappe-timestamp" data-timestamp="...">. Swap the
-    // rendered text for the raw timestamp instead of the relative text.
+    // <span class="frappe-timestamp" data-timestamp="...">. Core also runs
+    // frappe.datetime.refresh_when() on its own 60s setInterval, which
+    // re-renders these spans back to relative "x ago" text — racing our own
+    // reapply and usually winning. So patch refresh_when itself instead of
+    // polling against it.
     function applyRawTimestamps() {
         $(".frappe-timestamp").each(function () {
             const raw = $(this).attr("data-timestamp");
@@ -45,14 +48,17 @@
         });
     }
 
-    // Sidebar and timeline re-render on route change, on timeline
-    // refresh (new comment/activity), and on frappe's own 60s
-    // relative-time refresh — reapply after each.
+    if (frappe.datetime) {
+        frappe.datetime.refresh_when = applyRawTimestamps;
+    }
+
+    // Sidebar and timeline re-render on route change and on timeline
+    // refresh (new comment/activity) — reapply after each.
     frappe.router.on("change", () => setTimeout(applyRawTimestamps, 300));
     $(document).on("form-refresh form-rename timeline_refresh", () =>
         setTimeout(applyRawTimestamps, 300)
     );
-    setInterval(applyRawTimestamps, 60000);
+    applyRawTimestamps();
 
     // --- Fallback via router event ---
     // In case the prototype patch missed the initial call, re-apply on every
