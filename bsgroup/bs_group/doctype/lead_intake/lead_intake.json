@@ -1,0 +1,443 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:LI-{YYYY}-{#####}",
+ "creation": "2026-09-06 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sb_identity",
+  "full_name",
+  "organization_name",
+  "email",
+  "phone",
+  "country",
+  "cb_identity",
+  "normalized_email",
+  "normalized_phone",
+  "sb_source",
+  "source_channel",
+  "source_detail",
+  "source_url",
+  "sb_interaction",
+  "external_system",
+  "external_interaction_id",
+  "idempotency_key",
+  "direction",
+  "cb_interaction",
+  "interaction_started_on",
+  "interaction_ended_on",
+  "agent_extension",
+  "agent_name",
+  "sb_interaction_content",
+  "subject",
+  "transcript",
+  "sb_ai",
+  "ai_status",
+  "ai_intent",
+  "ai_qualification",
+  "ai_confidence",
+  "cb_ai",
+  "ai_next_action",
+  "ai_processed_on",
+  "ai_summary",
+  "sb_governance",
+  "status",
+  "priority",
+  "assigned_to",
+  "cb_governance",
+  "first_response_due_on",
+  "first_response_on",
+  "failure_reason",
+  "sb_routing",
+  "matched_lead",
+  "matched_contact",
+  "duplicate_of",
+  "cb_routing",
+  "converted_lead",
+  "converted_on",
+  "sb_audit",
+  "request_id",
+  "payload_hash",
+  "raw_payload_json"
+ ],
+ "fields": [
+  {
+   "fieldname": "sb_identity",
+   "fieldtype": "Section Break",
+   "label": "Identity"
+  },
+  {
+   "fieldname": "full_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Full Name"
+  },
+  {
+   "fieldname": "organization_name",
+   "fieldtype": "Data",
+   "label": "Organization Name"
+  },
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "label": "Email",
+   "options": "Email"
+  },
+  {
+   "fieldname": "phone",
+   "fieldtype": "Data",
+   "label": "Phone",
+   "options": "Phone"
+  },
+  {
+   "description": "ISO country code (e.g. AE, OM) — used as a hint for phone normalization.",
+   "fieldname": "country",
+   "fieldtype": "Data",
+   "label": "Country (ISO)"
+  },
+  {
+   "fieldname": "cb_identity",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Lower-cased, trimmed email used for duplicate matching.",
+   "fieldname": "normalized_email",
+   "fieldtype": "Data",
+   "label": "Normalized Email",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "description": "E.164-style phone used for duplicate matching.",
+   "fieldname": "normalized_phone",
+   "fieldtype": "Data",
+   "label": "Normalized Phone",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "sb_source",
+   "fieldtype": "Section Break",
+   "label": "Source"
+  },
+  {
+   "fieldname": "source_channel",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Source Channel",
+   "options": "Website Chat\nWhatsApp\nCall\nEmail\nWeb Form\nManual\nAPI"
+  },
+  {
+   "fieldname": "source_detail",
+   "fieldtype": "Data",
+   "label": "Source Detail"
+  },
+  {
+   "fieldname": "source_url",
+   "fieldtype": "Data",
+   "label": "Source URL"
+  },
+  {
+   "fieldname": "sb_interaction",
+   "fieldtype": "Section Break",
+   "label": "Interaction"
+  },
+  {
+   "default": "3CX",
+   "fieldname": "external_system",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "External System"
+  },
+  {
+   "fieldname": "external_interaction_id",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "External Interaction ID",
+   "search_index": 1
+  },
+  {
+   "description": "Uniqueness key = external_system + external_interaction_id. Enforces idempotency.",
+   "fieldname": "idempotency_key",
+   "fieldtype": "Data",
+   "label": "Idempotency Key",
+   "no_copy": 1,
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "direction",
+   "fieldtype": "Select",
+   "label": "Direction",
+   "options": "\nInbound\nOutbound\nUnknown"
+  },
+  {
+   "fieldname": "cb_interaction",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "interaction_started_on",
+   "fieldtype": "Datetime",
+   "label": "Interaction Started On"
+  },
+  {
+   "fieldname": "interaction_ended_on",
+   "fieldtype": "Datetime",
+   "label": "Interaction Ended On"
+  },
+  {
+   "fieldname": "agent_extension",
+   "fieldtype": "Data",
+   "label": "Agent Extension"
+  },
+  {
+   "fieldname": "agent_name",
+   "fieldtype": "Data",
+   "label": "Agent Name"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sb_interaction_content",
+   "fieldtype": "Section Break",
+   "label": "Interaction Content"
+  },
+  {
+   "fieldname": "subject",
+   "fieldtype": "Small Text",
+   "label": "Subject"
+  },
+  {
+   "description": "Transcript / message body. Treated as sensitive; excluded from integration logs.",
+   "fieldname": "transcript",
+   "fieldtype": "Long Text",
+   "label": "Transcript"
+  },
+  {
+   "fieldname": "sb_ai",
+   "fieldtype": "Section Break",
+   "label": "AI Enrichment"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "ai_status",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "AI Status",
+   "options": "Pending\nQueued\nProcessing\nCompleted\nSkipped\nFailed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_intent",
+   "fieldtype": "Data",
+   "label": "AI Intent",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_qualification",
+   "fieldtype": "Select",
+   "label": "AI Qualification",
+   "options": "\nQualified\nDisqualified\nNeeds Review",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_confidence",
+   "fieldtype": "Percent",
+   "label": "AI Confidence",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb_ai",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ai_next_action",
+   "fieldtype": "Small Text",
+   "label": "AI Next Action",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_processed_on",
+   "fieldtype": "Datetime",
+   "label": "AI Processed On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_summary",
+   "fieldtype": "Small Text",
+   "label": "AI Summary",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sb_governance",
+   "fieldtype": "Section Break",
+   "label": "Governance"
+  },
+  {
+   "default": "New",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "New\nProcessing\nQualified\nDisqualified\nDuplicate\nConverted\nFailed"
+  },
+  {
+   "default": "Medium",
+   "fieldname": "priority",
+   "fieldtype": "Select",
+   "label": "Priority",
+   "options": "\nLow\nMedium\nHigh\nUrgent"
+  },
+  {
+   "fieldname": "assigned_to",
+   "fieldtype": "Link",
+   "label": "Assigned To",
+   "options": "User"
+  },
+  {
+   "fieldname": "cb_governance",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "first_response_due_on",
+   "fieldtype": "Datetime",
+   "label": "First Response Due On"
+  },
+  {
+   "fieldname": "first_response_on",
+   "fieldtype": "Datetime",
+   "label": "First Response On"
+  },
+  {
+   "fieldname": "failure_reason",
+   "fieldtype": "Small Text",
+   "label": "Failure Reason"
+  },
+  {
+   "fieldname": "sb_routing",
+   "fieldtype": "Section Break",
+   "label": "Routing & Conversion"
+  },
+  {
+   "fieldname": "matched_lead",
+   "fieldtype": "Link",
+   "label": "Matched Lead",
+   "options": "Lead",
+   "read_only": 1
+  },
+  {
+   "fieldname": "matched_contact",
+   "fieldtype": "Link",
+   "label": "Matched Contact",
+   "options": "Contact",
+   "read_only": 1
+  },
+  {
+   "fieldname": "duplicate_of",
+   "fieldtype": "Link",
+   "label": "Duplicate Of",
+   "options": "Lead Intake",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb_routing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "converted_lead",
+   "fieldtype": "Link",
+   "label": "Converted Lead",
+   "options": "Lead",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "converted_on",
+   "fieldtype": "Datetime",
+   "label": "Converted On",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sb_audit",
+   "fieldtype": "Section Break",
+   "label": "Audit & Payload"
+  },
+  {
+   "fieldname": "request_id",
+   "fieldtype": "Data",
+   "label": "Request ID",
+   "read_only": 1
+  },
+  {
+   "description": "SHA-256 of the raw payload, used to detect changed re-submissions.",
+   "fieldname": "payload_hash",
+   "fieldtype": "Data",
+   "label": "Payload Hash",
+   "read_only": 1
+  },
+  {
+   "fieldname": "raw_payload_json",
+   "fieldtype": "Code",
+   "label": "Raw Payload JSON",
+   "options": "JSON",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-06 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "Lead Intake",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
