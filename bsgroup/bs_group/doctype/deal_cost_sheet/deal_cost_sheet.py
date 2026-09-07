@@ -21,8 +21,8 @@ class DealCostSheet(Document):
 		validate_deal_cost(self)
 
 	def validate(self):
-		if not self.project:
-			frappe.throw("Project is mandatory on the Deal Cost Sheet before it can be used as a Project Cost Baseline source.")
+		# if not self.project:
+		# 	frappe.throw("Project is mandatory on the Deal Cost Sheet before it can be used as a Project Cost Baseline source.")
 
 		if self.presales_request:
 			site_visit_required = frappe.db.get_value(
