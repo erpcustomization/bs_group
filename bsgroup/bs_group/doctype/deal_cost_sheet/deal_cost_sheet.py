@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
+import json
 import re
 from frappe.model.document import Document
 
@@ -479,7 +480,7 @@ def dcs_record_authority_guard(doc):
 				chg.append({"fieldname": "custom_record_authority", "field_label": "Record Authority", "target_doctype": "Deal Cost Sheet", "target_name": doc.name, "old_value": oldauth or "(blank)", "new_value": auth or "(blank)", "value_type": "Select"})
 			if oldsup != sup:
 				chg.append({"fieldname": "custom_superseded_by", "field_label": "Superseded By", "target_doctype": "Deal Cost Sheet", "target_name": doc.name, "old_value": oldsup or "(none)", "new_value": sup or "(none)", "value_type": "Link"})
-			ev = frappe.get_doc({"doctype": "DCS Governance Event", "dcs": doc.name, "event_code": "RECORD_AUTHORITY_SET", "action_label": "Record authority / supersession decision", "source_endpoint": "DCS Record Authority Guard", "actor": frappe.session.user, "event_timestamp": frappe.utils.now(), "outcome": "Success", "correlation_id": "AUTH-" + doc.name, "change_count": len(chg), "reason": doc.custom_supersession_reason or "(no reason recorded)", "changes": chg})
+			ev = frappe.get_doc({"doctype": "DCS Governance Event", "dcs": doc.name, "event_code": "RECORD_AUTHORITY_SET", "action_label": "Record authority / supersession decision", "source_endpoint": "DCS Record Authority Guard", "actor": frappe.session.user, "event_timestamp": frappe.utils.now(), "outcome": "Success", "correlation_id": "AUTH-" + doc.name, "change_count": len(chg), "reason": doc.custom_supersession_reason or "(no reason recorded)", "changes": json.dumps(chg)})
 			ev.flags.dcs_audit_write = 1
 			ev.insert(ignore_permissions=True)
 
