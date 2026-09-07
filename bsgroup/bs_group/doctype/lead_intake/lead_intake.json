@@ -2,7 +2,7 @@
  "actions": [],
  "allow_rename": 1,
  "autoname": "format:LI-{YYYY}-{#####}",
- "creation": "2026-09-06 00:00:00.000000",
+ "creation": "2026-09-06 00:00:00",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
@@ -92,7 +92,7 @@
    "options": "Phone"
   },
   {
-   "description": "ISO country code (e.g. AE, OM) — used as a hint for phone normalization.",
+   "description": "ISO country code (e.g. AE, OM) \u2014 used as a hint for phone normalization.",
    "fieldname": "country",
    "fieldtype": "Data",
    "label": "Country (ISO)"
@@ -350,8 +350,8 @@
    "fieldname": "converted_lead",
    "fieldtype": "Link",
    "label": "Converted Lead",
-   "options": "Lead",
    "no_copy": 1,
+   "options": "Lead",
    "read_only": 1
   },
   {
@@ -391,7 +391,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-06 00:00:00.000000",
+ "modified": "2026-09-07 17:23:41.942428",
  "modified_by": "Administrator",
  "module": "BS Group",
  "name": "Lead Intake",
@@ -439,5 +439,6 @@
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
- "track_changes": 1
+ "track_changes": 1,
+ "track_seen": 1
 }
