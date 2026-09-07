@@ -11,6 +11,9 @@
   "attachment_required_after_days",
   "project_costing_tab",
   "cost_overrun_policy",
+  "enable_dcs_one_active_guard",
+  "enable_dcs_governed_field_guard",
+  "enable_dcs_record_authority_guard",
   "geocoding_tab",
   "enable_reverse_geocoding",
   "nominatim_url",
@@ -54,6 +57,27 @@
    "fieldtype": "Select",
    "label": "Cost Overrun Policy",
    "options": "None\nWarn\nBlock"
+  },
+  {
+   "default": "0",
+   "description": "ODS-1: blocks creating or submitting a second independently active Deal Cost Sheet for the same Opportunity. Cancel -> Amend lineage is always permitted and never counted as a duplicate. Created disabled by default; activation is an owner decision.",
+   "fieldname": "enable_dcs_one_active_guard",
+   "fieldtype": "Check",
+   "label": "Enable One Active Deal Cost Sheet Per Opportunity Guard"
+  },
+  {
+   "default": "0",
+   "description": "Blocks direct Desk/REST edits to the Deal Cost Sheet commercial control fields (governed by the Negotiation, Approval, Award and Handover workspaces) and enforces the NRC-1 protected-field-name channel on Closure Notes. Created disabled by default; activation is an owner decision.",
+   "fieldname": "enable_dcs_governed_field_guard",
+   "fieldtype": "Check",
+   "label": "Enable Deal Cost Sheet Governed Field Guard"
+  },
+  {
+   "default": "0",
+   "description": "Validates Record Authority / Superseded By supersession metadata on Deal Cost Sheet and logs a DCS Governance Event on every authority change. Created disabled by default; activation is an owner decision.",
+   "fieldname": "enable_dcs_record_authority_guard",
+   "fieldtype": "Check",
+   "label": "Enable Deal Cost Sheet Record Authority Guard"
   },
   {
    "fieldname": "geocoding_tab",

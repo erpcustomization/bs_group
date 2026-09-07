@@ -14,11 +14,22 @@ class DealCostSheet(Document):
 
 			self.name = frappe.model.naming.make_autoname(f"DCS-{customer}-.###")
 
+	def before_insert(self):
+		dcs_company_default_insert(self)
+		dcs_one_active_guard_insert(self)
+
 	def before_save(self):
 		calculate_deal_financials(self)
+		dcs_governed_field_guard(self)
+		dcs_record_authority_guard(self)
 
 	def before_submit(self):
 		validate_deal_cost(self)
+		dcs_one_active_guard_submit(self)
+		dcs_submit_advance_presales_status(self)
+
+	def on_update(self):
+		dcs_margin_canonicalisation(self)
 
 	def validate(self):
 		# if not self.project:
@@ -146,6 +157,358 @@ def make_quotation(source_name):
 	quotation.insert(ignore_permissions=True, ignore_mandatory=True)
 	frappe.db.commit()
 	return quotation.name
+
+
+def dcs_company_default_insert(doc):
+	"""Before Insert: a new Deal Cost Sheet with a blank Company inherits the
+	Company of its linked Opportunity, exactly as stored on that Opportunity.
+
+	Reproduced from the live-site "dcs_company_default_insert" Server Script
+	(see "# DCS Presales Effort Metrics.txt"). Acts only on insert, only when
+	Company is blank, and never overwrites or reconciles an existing value.
+	Any failure leaves the document exactly as it arrived.
+	"""
+	try:
+		cur = (doc.get("company") or "").strip()
+		if cur:
+			return
+		opp = doc.get("opportunity")
+		if not opp:
+			return
+		oc = frappe.db.get_value("Opportunity", opp, "company")
+		if oc and str(oc).strip():
+			doc.company = str(oc).strip()
+	except Exception:
+		pass
+
+
+def dcs_margin_canonicalisation(doc):
+	"""After Save: single server-side authority for the persisted commercial
+	margin percentage.
+
+		gross_profit   = total_selling - total_cost
+		margin_percent = gross_profit / total_selling * 100
+
+	Reproduced from the live-site "DCS Margin Canonicalisation" Server Script.
+	Persists with update_modified=False so no further save/hook/Version entry
+	is triggered. Zero or absent selling yields 0. Precision is 3 decimals.
+
+	NOTE: this differs from the markup-style formula
+	((total_selling / total_cost) - 1) * 100 used by calculate_deal_financials()
+	above (GP / cost, not GP / selling). This after_save hook intentionally
+	overwrites that value with the canonical margin formula on every save, to
+	match the live site's behaviour. Flagged for review since it changes the
+	stored meaning of margin_percent going forward.
+	"""
+	sell = frappe.utils.flt(doc.total_selling or 0)
+	cost = frappe.utils.flt(doc.total_cost or 0)
+	if sell:
+		canonical = frappe.utils.flt(((sell - cost) / sell) * 100, 3)
+	else:
+		canonical = frappe.utils.flt(0)
+	if frappe.utils.flt(doc.margin_percent or 0, 3) != canonical:
+		frappe.db.set_value("Deal Cost Sheet", doc.name, "margin_percent", canonical, update_modified=False)
+		doc.margin_percent = canonical
+
+
+def _dcs_lineage_root(name, amended_from):
+	"""Walk amended_from back to the oldest ancestor, guarding against cycles.
+
+	Cancel -> Amend lineage (a cancelled DCS plus its amended successor) shares
+	one lineage root and must count as ONE active DCS, never two.
+	"""
+	root = name
+	cur = amended_from
+	seen = set()
+	while cur and cur not in seen:
+		seen.add(cur)
+		root = cur
+		cur = frappe.db.get_value("Deal Cost Sheet", cur, "amended_from")
+	return root
+
+
+def dcs_one_active_guard_insert(doc):
+	"""Before Insert (ODS-1): at most ONE independently active commercial Deal
+	Cost Sheet may exist per Opportunity at any one time.
+
+	Reproduced from the live-site "dcs_one_active_guard_insert" Server Script,
+	which was created disabled there ("activation is an owner decision").
+	Mirrored here behind BS Group Settings.enable_dcs_one_active_guard, which
+	defaults to unchecked so behaviour is unchanged until an owner opts in.
+
+	Fires only on insert of a brand new document, so it can never make a
+	pre-existing record fail to save, and never cancels/amends/merges/renames/
+	relinks/deletes anything. No role bypasses this control.
+	"""
+	if not frappe.db.get_single_value("BS Group Settings", "enable_dcs_one_active_guard"):
+		return
+
+	opp = doc.opportunity
+	if not opp:
+		return
+
+	frappe.db.get_value("Opportunity", opp, "name", for_update=True)
+
+	my_root = _dcs_lineage_root("(new-lineage)", doc.amended_from)
+
+	siblings = frappe.get_all(
+		"Deal Cost Sheet",
+		filters={"opportunity": opp, "docstatus": ["<", 2]},
+		fields=["name", "amended_from"],
+	)
+
+	blockers = [
+		s.name for s in siblings
+		if _dcs_lineage_root(s.name, s.amended_from) != my_root
+	]
+
+	if blockers:
+		frappe.throw(
+			"Opportunity {0} already has an active Deal Cost Sheet: {1}. "
+			"Only one independently active Deal Cost Sheet is permitted per Opportunity. "
+			"To change the commercial position, raise a DCS Revision on the existing sheet, "
+			"or cancel it and use Amend to create its successor.".format(opp, ", ".join(blockers)),
+			title="Duplicate Deal Cost Sheet",
+		)
+
+
+def dcs_one_active_guard_submit(doc):
+	"""Before Submit (ODS-1): companion to dcs_one_active_guard_insert.
+
+	Prevents a draft that predates the control from being promoted into a
+	second independently active commercial position. Only already-submitted
+	independent siblings block; drafts never block a submit.
+	"""
+	if not frappe.db.get_single_value("BS Group Settings", "enable_dcs_one_active_guard"):
+		return
+
+	opp = doc.opportunity
+	if not opp:
+		return
+
+	frappe.db.get_value("Opportunity", opp, "name", for_update=True)
+
+	my_root = _dcs_lineage_root(doc.name, doc.amended_from)
+
+	siblings = frappe.get_all(
+		"Deal Cost Sheet",
+		filters={"opportunity": opp, "docstatus": 1, "name": ["!=", doc.name]},
+		fields=["name", "amended_from"],
+	)
+
+	blockers = [
+		s.name for s in siblings
+		if _dcs_lineage_root(s.name, s.amended_from) != my_root
+	]
+
+	if blockers:
+		frappe.throw(
+			"Opportunity {0} already has a submitted, active Deal Cost Sheet: {1}. "
+			"Submitting this sheet would create a second independently active commercial position. "
+			"Cancel the superseded sheet first, or raise a DCS Revision on it instead.".format(
+				opp, ", ".join(blockers)
+			),
+			title="Duplicate Deal Cost Sheet",
+		)
+
+
+GOVERNED_TEXT = ["custom_approval_state", "custom_approval_required", "custom_approval_reason", "custom_margin_gate", "custom_margin_gate_reason", "custom_award_state", "custom_award_reference", "custom_award_evidence_type", "custom_awarded_by", "custom_awarded_on", "custom_approved_by", "custom_approved_on", "custom_endorsed_by", "custom_endorsed_on", "custom_last_decision_reason", "custom_po_reference", "custom_po_payment_terms", "custom_award_notes", "custom_po_scope_revision", "custom_po_value_match", "custom_po_scope_match", "custom_po_terms_match", "custom_po_recon_state", "custom_po_recon_by", "custom_po_recon_on", "custom_delivery_release_state", "custom_delivery_owner", "custom_delivery_released_by", "custom_delivery_released_on", "custom_delivery_release_note", "custom_delivery_override_reason", "custom_frozen_by", "custom_frozen_on", "custom_revision_reference", "custom_award_reversal_state", "custom_award_reversal_ref", "custom_award_reversed_by", "custom_award_reversed_on", "custom_award_reversal_reason", "custom_operational_review_state"]
+GOVERNED_NUM = ["custom_dcs_revision_no", "custom_working_total_cost", "custom_working_total_selling", "custom_working_margin_percent", "custom_baseline_selling", "custom_concession_percent_from_baseline", "custom_approved_revision_no", "custom_approved_total_cost", "custom_approved_total_selling", "custom_approved_margin_percent", "custom_baseline_frozen", "custom_frozen_revision_no", "custom_frozen_total_cost", "custom_frozen_total_selling", "custom_frozen_margin_percent", "custom_po_value", "custom_delivery_override", "custom_handover_condition_no", "custom_award_reversal_count", "custom_award_sequence_no"]
+
+
+def _dcs_absf(v):
+	if v < 0:
+		return 0 - v
+	return v
+
+
+def nrc_narrative_verdict(txt):
+	"""NRC-1 narrative guard, protected-field-name channel only.
+
+	Reproduced from the live-site "dcs_narrative_guard" logic's first half
+	(see "# DCS Presales Effort Metrics.txt" section 101-167). The second
+	half of the live logic delegates to a "dcs_narrative_guard" classifier
+	Server Script endpoint (contract NRC-1, mode=inspect) whose scoring rules
+	for free-text commercial-figure leakage are NEVER given anywhere in the
+	source file. That half is intentionally NOT implemented here pending the
+	real NRC-1 classifier rules -- do not invent them. As a result this guard
+	only catches the protected-field-name channel; it does not catch narrative
+	text that leaks commercial figures without naming a protected field.
+	"""
+	scope = ["Deal Cost Sheet", "Deal Cost Item", "DCS Handover Condition"]
+	pre_existing = ["products_selling_total", "services_selling_total", "total_selling", "selling_rate", "selling_amount"]
+	verdict = {"reject": 0, "why": "", "level": "clean", "err": ""}
+	t = str(txt or "").strip()
+	if t == "":
+		return verdict
+
+	# (1) protected field-name channel
+	low = t.lower()
+	names = []
+	try:
+		for r in frappe.get_all("Custom Field", filters={"dt": ["in", scope], "permlevel": [">", 0]}, fields=["fieldname"], limit_page_length=0):
+			names.append(str(r.get("fieldname") or "").lower())
+		for r in frappe.get_all("Property Setter", filters={"doc_type": ["in", scope], "property": "permlevel", "value": ["!=", "0"]}, fields=["field_name"], limit_page_length=0):
+			names.append(str(r.get("field_name") or "").lower())
+	except Exception as me:
+		verdict["err"] = "protected register unavailable: " + str(me)
+		return verdict
+	for x in pre_existing:
+		names.append(x)
+	hits = []
+	for n in names:
+		if len(n) > 6:
+			if n in low:
+				hits.append(n)
+	if len(hits) > 0:
+		verdict["reject"] = 1
+		verdict["why"] = "protected field names: " + ", ".join(hits[0:4])
+		return verdict
+
+	# (2) canonical NRC-1 classifier, delegated -- NOT IMPLEMENTED. See docstring.
+
+	return verdict
+
+
+def dcs_governed_field_guard(doc):
+	"""Before Save: refuse direct edits to the commercial control fields that
+	are owned by the DCS workspaces (Negotiation, Approval, Award, Handover),
+	plus the NRC-1 protected-field-name channel on custom_closure_notes.
+
+	Reproduced from the live-site "Deal Cost Sheet - Governed Field Guard"
+	Server Script. Opt-in via BS Group Settings.enable_dcs_governed_field_guard
+	(default unchecked) since this is a real behavioural change: it can block
+	edits to fields that may currently be freely editable.
+	"""
+	if not frappe.db.get_single_value("BS Group Settings", "enable_dcs_governed_field_guard"):
+		return
+
+	prev = doc.get_doc_before_save()
+	if prev is not None:
+		changed = []
+		for f in GOVERNED_TEXT:
+			a = prev.get(f)
+			b = doc.get(f)
+			if str(a or "") != str(b or ""):
+				changed.append(f)
+		for f in GOVERNED_NUM:
+			a = frappe.utils.flt(prev.get(f) or 0)
+			b = frappe.utils.flt(doc.get(f) or 0)
+			if _dcs_absf(a - b) > 0.0001:
+				changed.append(f)
+		if len(changed) > 0:
+			frappe.throw("These Deal Cost Sheet fields are governed by the commercial workspaces and cannot be edited directly: " + "; ".join(changed) + ". Use the Negotiation Workspace, the Approval Workspace or the Award and Handover Workspace. Direct edits are refused so that every commercial movement keeps an audit trail.")
+
+	# NRC-1 narrative enforcement -- evaluated only when the narrative actually changes.
+	narr_bad = []
+	for nf in ["custom_closure_notes"]:
+		newv = doc.get(nf)
+		oldv = None
+		if prev is not None:
+			oldv = prev.get(nf)
+		if str(newv or "") != str(oldv or ""):
+			v = nrc_narrative_verdict(newv)
+			if v.get("err"):
+				frappe.throw("The narrative guard (NRC-1) could not be reached, so this note was not saved: " + str(v.get("err")))
+			if v.get("reject") == 1:
+				narr_bad.append(nf + " -> " + str(v.get("why")))
+
+	if len(narr_bad) > 0:
+		frappe.throw("NRC-1 refused this Deal Cost Sheet narrative: " + " | ".join(narr_bad) + ". Commercial figures belong in the governed commercial fields, which are permission-level protected and audited. Describe the outcome in words instead of restating amounts or field names.")
+
+
+def dcs_record_authority_guard(doc):
+	"""Before Save: validates custom_record_authority / custom_superseded_by
+	supersession metadata and, on a real change, writes a DCS Governance
+	Event audit record.
+
+	Reproduced from the live-site "DCS Record Authority Guard" Server Script
+	(present twice, byte-identical, in the source file with no distinguishing
+	detail -- implemented once here). Never infers authority; never touches
+	financial, lifecycle, award, workflow or docstatus values. Opt-in via
+	BS Group Settings.enable_dcs_record_authority_guard (default unchecked),
+	as a distinct, independently-activatable control from the Governed Field
+	Guard.
+	"""
+	if not frappe.db.get_single_value("BS Group Settings", "enable_dcs_record_authority_guard"):
+		return
+
+	auth = doc.custom_record_authority or ""
+	sup = doc.custom_superseded_by or ""
+
+	if not (auth or sup):
+		return
+
+	if auth == "Superseded" and not sup:
+		frappe.throw("Record Authority Superseded requires a Superseded By record.")
+	if auth == "Current" and sup:
+		frappe.throw("Record Authority Current must not carry a Superseded By link.")
+	if auth == "Undetermined" and sup:
+		frappe.throw("Record Authority Undetermined must not carry a Superseded By link.")
+	if not auth and sup:
+		frappe.throw("Superseded By cannot be set unless Record Authority is Superseded.")
+	if sup:
+		if sup == doc.name:
+			frappe.throw("A Deal Cost Sheet cannot supersede itself.")
+		tgt = frappe.db.get_value("Deal Cost Sheet", sup, ["opportunity", "custom_record_authority"], as_dict=True)
+		if not tgt:
+			frappe.throw("Superseded By target does not exist: " + sup)
+		if (tgt.get("opportunity") or "") != (doc.opportunity or ""):
+			frappe.throw("Supersession must stay within one Opportunity. Cross-Opportunity links are rejected.")
+		if tgt.get("custom_record_authority") == "Superseded":
+			frappe.throw("The nominated target is itself Superseded. Point at the authoritative record.")
+		seen = [doc.name]
+		cur = sup
+		for hop in range(25):
+			if not cur:
+				break
+			if cur in seen:
+				frappe.throw("Circular supersession chain detected at " + cur)
+			seen.append(cur)
+			cur = frappe.db.get_value("Deal Cost Sheet", cur, "custom_superseded_by")
+
+	before = doc.get_doc_before_save()
+	if before:
+		oldauth = before.get("custom_record_authority") or ""
+		oldsup = before.get("custom_superseded_by") or ""
+		if oldauth != auth or oldsup != sup:
+			doc.custom_authority_decided_by = frappe.session.user
+			doc.custom_authority_decided_on = frappe.utils.now()
+			chg = []
+			if oldauth != auth:
+				chg.append({"fieldname": "custom_record_authority", "field_label": "Record Authority", "target_doctype": "Deal Cost Sheet", "target_name": doc.name, "old_value": oldauth or "(blank)", "new_value": auth or "(blank)", "value_type": "Select"})
+			if oldsup != sup:
+				chg.append({"fieldname": "custom_superseded_by", "field_label": "Superseded By", "target_doctype": "Deal Cost Sheet", "target_name": doc.name, "old_value": oldsup or "(none)", "new_value": sup or "(none)", "value_type": "Link"})
+			ev = frappe.get_doc({"doctype": "DCS Governance Event", "dcs": doc.name, "event_code": "RECORD_AUTHORITY_SET", "action_label": "Record authority / supersession decision", "source_endpoint": "DCS Record Authority Guard", "actor": frappe.session.user, "event_timestamp": frappe.utils.now(), "outcome": "Success", "correlation_id": "AUTH-" + doc.name, "change_count": len(chg), "reason": doc.custom_supersession_reason or "(no reason recorded)", "changes": chg})
+			ev.flags.dcs_audit_write = 1
+			ev.insert(ignore_permissions=True)
+
+
+def dcs_submit_advance_presales_status(doc):
+	"""Before Submit: advance the Deal Cost Sheet's own deal status, and the
+	linked Presales Request's status when it is still in an early stage.
+
+	Reproduced from the live-site "DCS Submit - Advance Presales Status"
+	Server Script (see "# DCS Presales Effort Metrics.txt" lines 60-91),
+	minus its trailing fan-out call to the canonical "dcs_presales_sync"
+	endpoint (mode unspecified, "source=submit"), whose projection/mapping
+	formula is NEVER given anywhere in the source file. That fan-out is
+	intentionally NOT implemented here pending the real dcs_presales_sync
+	formula -- do not invent it. The two business-status transitions below
+	do not depend on that endpoint and are implemented verbatim.
+	"""
+	frappe.db.set_value("Deal Cost Sheet", doc.name, "custom_deal_status", "Submitted to Sales", update_modified=False)
+	doc.custom_deal_status = "Submitted to Sales"
+
+	if not doc.presales_request:
+		return
+
+	cur = frappe.db.get_value("Presales Request", doc.presales_request, "status")
+	early = ["Draft", "Open", "Assigned", "In Progress", "Awaiting Sales Input", "Awaiting Customer Input", "Costing in Progress"]
+	if cur in early:
+		frappe.db.set_value("Presales Request", doc.presales_request, "status", "Submitted to Sales", update_modified=False)
+	# Canonical projection synchronisation (dcs_presales_sync fan-out) intentionally
+	# omitted -- see docstring above.
 
 
 def validate_deal_cost(doc):

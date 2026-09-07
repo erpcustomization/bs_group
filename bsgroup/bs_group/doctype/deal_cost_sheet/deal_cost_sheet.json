@@ -23,14 +23,15 @@
   "section_break_dsjr",
   "document_upload",
   "get_data",
+  "summary_section",
+  "commercial_summary_html",
+  "customer_notes",
+  "custom_deal_summary_dashboard",
   "section_break_jbpa",
   "subject",
   "items",
   "addtional_charges",
   "resources",
-  "summary_section",
-  "commercial_summary_html",
-  "customer_notes",
   "commercial_totals_section",
   "products_cost_total",
   "services_cost_total",
@@ -49,7 +50,118 @@
   "load_responsibilities",
   "responsibilities",
   "section_break_slkq",
-  "scope_overview"
+  "scope_overview",
+  "workflow_state",
+  "custom_lifecycle_section",
+  "custom_deal_stage",
+  "custom_deal_status_section",
+  "custom_deal_status",
+  "custom_record_authority_section",
+  "custom_presales_status",
+  "custom_presales_owner",
+  "custom_presales_completion_date",
+  "custom_opportunity_status",
+  "custom_quotation",
+  "custom_quotation_status",
+  "custom_record_authority",
+  "custom_authority_decided_by",
+  "custom_authority_decided_on",
+  "column_break_dxio",
+  "custom_lost_reason",
+  "custom_outcome_date",
+  "custom_sales_order",
+  "custom_closure_notes",
+  "custom_superseded_by",
+  "custom_supersession_reason",
+  "custom_presales_effort_section",
+  "custom_presales_estimated_hours",
+  "custom_presales_actual_hours",
+  "custom_margin_per_presales_hour",
+  "column_break_fkii",
+  "custom_presales_cost_vs_margin",
+  "custom_presales_cost",
+  "custom_presales_hourly_rate",
+  "custom_effort_verdict",
+  "custom_living_dcs_section",
+  "custom_dcs_revision_no",
+  "custom_revision_reference",
+  "custom_working_total_cost",
+  "custom_working_total_selling",
+  "custom_working_margin_percent",
+  "custom_baseline_selling",
+  "column_break_pcxv",
+  "custom_concession_percent_from_baseline",
+  "custom_margin_gate",
+  "custom_margin_gate_reason",
+  "custom_approved_position_section",
+  "custom_approval_state",
+  "custom_approved_total_cost",
+  "custom_approval_required",
+  "custom_approved_total_selling",
+  "custom_approved_margin_percent",
+  "custom_endorsed_by",
+  "custom_endorsed_on",
+  "column_break_rjoz",
+  "custom_approved_revision_no",
+  "custom_approved_by",
+  "custom_approved_on",
+  "custom_approval_reason",
+  "custom_last_decision_reason",
+  "custom_award_handover_section",
+  "custom_award_state",
+  "custom_award_sequence_no",
+  "custom_award_reference",
+  "custom_awarded_by",
+  "custom_awarded_on",
+  "custom_award_evidence_type",
+  "custom_award_notes",
+  "column_break_kglh",
+  "custom_baseline_frozen",
+  "custom_frozen_margin_percent",
+  "custom_frozen_on",
+  "custom_frozen_total_cost",
+  "custom_frozen_by",
+  "custom_frozen_total_selling",
+  "custom_frozen_revision_no",
+  "custom_award_history_section",
+  "custom_award_history_html",
+  "custom_award_reversal_section",
+  "custom_award_reversal_state",
+  "custom_award_reversal_count",
+  "custom_award_reversal_ref",
+  "custom_award_reversed_by",
+  "custom_award_reversed_on",
+  "column_break_wxud",
+  "custom_award_reversal_reason",
+  "custom_operational_review_state",
+  "custom_po_section",
+  "custom_po_reference",
+  "custom_po_value",
+  "custom_po_value_match",
+  "custom_po_scope_revision",
+  "custom_po_terms_match",
+  "custom_po_scope_match",
+  "column_break_yxdk",
+  "custom_po_payment_terms",
+  "custom_po_recon_on",
+  "custom_po_recon_by",
+  "custom_po_recon_state",
+  "custom_delivery_section",
+  "custom_delivery_owner",
+  "custom_delivery_release_state",
+  "custom_handover_condition_no",
+  "custom_delivery_released_by",
+  "custom_delivery_released_on",
+  "column_break_rvjn",
+  "custom_delivery_override",
+  "custom_delivery_override_reason",
+  "custom_delivery_release_note",
+  "custom_negotiation_section",
+  "custom_negotiation_html",
+  "custom_approval_history_section",
+  "custom_approval_html",
+  "custom_handover_conditions_section",
+  "custom_handover_html"
  ],
  "fields": [
   {
@@ -307,13 +419,763 @@
    "fieldtype": "Table",
    "label": "Addtional Charges",
    "options": "Additional Charges Item"
+  },
+  {
+   "fieldname": "custom_deal_summary_dashboard",
+   "fieldtype": "HTML",
+   "label": "Deal Summary Dashboard"
+  },
+  {
+   "fieldname": "workflow_state",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Workflow State",
+   "options": "Workflow State"
+  },
+  {
+   "fieldname": "custom_lifecycle_section",
+   "fieldtype": "Section Break",
+   "label": "Deal Lifecycle & Outcome"
+  },
+  {
+   "fieldname": "custom_deal_stage",
+   "fieldtype": "Select",
+   "label": "Deal Stage",
+   "options": "Draft\nCosting in Progress\nSubmitted to Sales\nQuoted\nWon\nLost"
+  },
+  {
+   "fieldname": "custom_deal_status_section",
+   "fieldtype": "Section Break",
+   "label": "Deal Status & Traceability"
+  },
+  {
+   "description": "Draft -> Submitted to Sales, advanced by the DCS Submit lifecycle hook. Options per live register (dcscustomfields.html).",
+   "fieldname": "custom_deal_status",
+   "fieldtype": "Select",
+   "label": "Deal Status",
+   "options": "Draft\nCosting in Progress\nSubmitted to Sales\nQuoted\nWon\nLost"
+  },
+  {
+   "fieldname": "custom_record_authority_section",
+   "fieldtype": "Section Break",
+   "label": "Record Authority & Supersession"
+  },
+  {
+   "fieldname": "custom_presales_status",
+   "fieldtype": "Data",
+   "label": "Presales Status",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_presales_owner",
+   "fieldtype": "Link",
+   "label": "Presales Owner",
+   "options": "User",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_presales_completion_date",
+   "fieldtype": "Date",
+   "label": "Presales Completion Date",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_opportunity_status",
+   "fieldtype": "Data",
+   "label": "Opportunity Status",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_quotation",
+   "fieldtype": "Link",
+   "label": "Quotation",
+   "options": "Quotation"
+  },
+  {
+   "fieldname": "custom_quotation_status",
+   "fieldtype": "Data",
+   "label": "Quotation Status",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_sales_order",
+   "fieldtype": "Link",
+   "label": "Sales Order",
+   "options": "Sales Order"
+  },
+  {
+   "fieldname": "custom_outcome_date",
+   "fieldtype": "Date",
+   "label": "Outcome Date"
+  },
+  {
+   "fieldname": "custom_lost_reason",
+   "fieldtype": "Link",
+   "label": "Lost Reason",
+   "options": "Opportunity Lost Reason"
+  },
+  {
+   "description": "Free narrative. Guarded by the NRC-1 protected-field-name channel on save.",
+   "fieldname": "custom_closure_notes",
+   "fieldtype": "Small Text",
+   "label": "Closure Notes"
+  },
+  {
+   "fieldname": "custom_record_authority",
+   "fieldtype": "Select",
+   "label": "Record Authority",
+   "options": "\nCurrent\nSuperseded\nUndetermined"
+  },
+  {
+   "fieldname": "custom_superseded_by",
+   "fieldtype": "Link",
+   "label": "Superseded By",
+   "options": "Deal Cost Sheet"
+  },
+  {
+   "fieldname": "custom_supersession_reason",
+   "fieldtype": "Small Text",
+   "label": "Supersession Reason"
+  },
+  {
+   "fieldname": "custom_authority_decided_by",
+   "fieldtype": "Link",
+   "label": "Authority Decided By",
+   "options": "User",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_authority_decided_on",
+   "fieldtype": "Datetime",
+   "label": "Authority Decided On",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_presales_effort_section",
+   "fieldtype": "Section Break",
+   "label": "Presales Effort & Justification"
+  },
+  {
+   "fieldname": "custom_presales_estimated_hours",
+   "fieldtype": "Float",
+   "label": "Presales Estimated Hours",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_presales_actual_hours",
+   "fieldtype": "Float",
+   "label": "Presales Actual Hours",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_presales_hourly_rate",
+   "fieldtype": "Currency",
+   "label": "Presales Hourly Rate",
+   "options": "currency"
+  },
+  {
+   "fieldname": "custom_presales_cost",
+   "fieldtype": "Currency",
+   "label": "Presales Cost",
+   "options": "currency",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_presales_cost_vs_margin",
+   "fieldtype": "Percent",
+   "label": "Presales Cost vs Margin",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_margin_per_presales_hour",
+   "fieldtype": "Currency",
+   "label": "Margin per Presales Hour",
+   "options": "currency",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_effort_verdict",
+   "fieldtype": "Data",
+   "label": "Effort Verdict",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_living_dcs_section",
+   "fieldtype": "Section Break",
+   "label": "Living Commercial Position"
+  },
+  {
+   "fieldname": "custom_dcs_revision_no",
+   "fieldtype": "Int",
+   "label": "DCS Revision No",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_revision_reference",
+   "fieldtype": "Data",
+   "label": "Revision Reference",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_working_total_cost",
+   "fieldtype": "Currency",
+   "label": "Working Total Cost",
+   "options": "currency",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_working_total_selling",
+   "fieldtype": "Currency",
+   "label": "Working Total Selling",
+   "options": "currency",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_working_margin_percent",
+   "fieldtype": "Percent",
+   "label": "Working Margin Percent",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_baseline_selling",
+   "fieldtype": "Currency",
+   "label": "Baseline Selling",
+   "options": "currency",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_concession_percent_from_baseline",
+   "fieldtype": "Percent",
+   "label": "Concession Percent From Baseline",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_margin_gate",
+   "fieldtype": "Select",
+   "label": "Margin Gate",
+   "options": "\nClear\nBlocked",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_margin_gate_reason",
+   "fieldtype": "Small Text",
+   "label": "Margin Gate Reason",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_approved_position_section",
+   "fieldtype": "Section Break",
+   "label": "Last Approved Commercial Position"
+  },
+  {
+   "description": "INCOMPLETE OPTION LIST: live register truncated this list with '...' after 'Pending Endorsement'. Additional options exist on the live site but were not visible in the register and were NOT guessed here. Verify against live site before relying on this Select for validation.",
+   "fieldname": "custom_approval_state",
+   "fieldtype": "Select",
+   "label": "Approval State",
+   "options": "\nNot Started\nIn Negotiation\nPending Endorsement",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_approval_required",
+   "fieldtype": "Select",
+   "label": "Approval Required",
+   "options": "\nNone\nManaging Director\nBlocked",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_approval_reason",
+   "fieldtype": "Small Text",
+   "label": "Approval Reason",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_approved_revision_no",
+   "fieldtype": "Int",
+   "label": "Approved Revision No",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_approved_total_cost",
+   "fieldtype": "Currency",
+   "label": "Approved Total Cost",
+   "options": "currency",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_approved_total_selling",
+   "fieldtype": "Currency",
+   "label": "Approved Total Selling",
+   "options": "currency",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_approved_margin_percent",
+   "fieldtype": "Percent",
+   "label": "Approved Margin Percent",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_endorsed_by",
+   "fieldtype": "Link",
+   "label": "Endorsed By",
+   "options": "User",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_endorsed_on",
+   "fieldtype": "Datetime",
+   "label": "Endorsed On",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_approved_by",
+   "fieldtype": "Link",
+   "label": "Approved By",
+   "options": "User",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_approved_on",
+   "fieldtype": "Datetime",
+   "label": "Approved On",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_last_decision_reason",
+   "fieldtype": "Small Text",
+   "label": "Last Decision Reason",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_award_handover_section",
+   "fieldtype": "Section Break",
+   "label": "Award and Handover"
+  },
+  {
+   "fieldname": "custom_award_state",
+   "fieldtype": "Select",
+   "label": "Award State",
+   "options": "\nNot Awarded\nAwarded",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_award_sequence_no",
+   "fieldtype": "Int",
+   "label": "Award Sequence No",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_award_reference",
+   "fieldtype": "Data",
+   "label": "Award Reference",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "description": "INCOMPLETE OPTION LIST: live register truncated this list with '...' after 'Email Confirmation'. Additional options exist on the live site but were not visible and were NOT guessed here.",
+   "fieldname": "custom_award_evidence_type",
+   "fieldtype": "Select",
+   "label": "Award Evidence Type",
+   "options": "\nCustomer PO\nLetter of Award\nEmail Confirmation",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_awarded_by",
+   "fieldtype": "Link",
+   "label": "Awarded By",
+   "options": "User",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_awarded_on",
+   "fieldtype": "Datetime",
+   "label": "Awarded On",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_award_notes",
+   "fieldtype": "Small Text",
+   "label": "Award Notes",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "custom_baseline_frozen",
+   "fieldtype": "Check",
+   "label": "Baseline Frozen",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_frozen_revision_no",
+   "fieldtype": "Int",
+   "label": "Frozen Revision No",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_frozen_total_cost",
+   "fieldtype": "Currency",
+   "label": "Frozen Total Cost",
+   "options": "currency",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_frozen_total_selling",
+   "fieldtype": "Currency",
+   "label": "Frozen Total Selling",
+   "options": "currency",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_frozen_margin_percent",
+   "fieldtype": "Percent",
+   "label": "Frozen Margin Percent",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_frozen_by",
+   "fieldtype": "Link",
+   "label": "Frozen By",
+   "options": "User",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_frozen_on",
+   "fieldtype": "Datetime",
+   "label": "Frozen On",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_award_reversal_section",
+   "fieldtype": "Section Break",
+   "label": "Award Reversal"
+  },
+  {
+   "fieldname": "custom_award_reversal_state",
+   "fieldtype": "Select",
+   "label": "Award Reversal State",
+   "options": "\nReversed",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_award_reversal_count",
+   "fieldtype": "Int",
+   "label": "Award Reversal Count",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_award_reversal_ref",
+   "fieldtype": "Link",
+   "label": "Award Reversal Ref",
+   "options": "DCS Award Reversal",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_award_reversed_by",
+   "fieldtype": "Link",
+   "label": "Award Reversed By",
+   "options": "User",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_award_reversed_on",
+   "fieldtype": "Datetime",
+   "label": "Award Reversed On",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_award_reversal_reason",
+   "fieldtype": "Small Text",
+   "label": "Award Reversal Reason",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "description": "INCOMPLETE OPTION LIST: live register truncated this list twice ('Required \u2013 Delivery Already...' and again with '...' after that). Real remaining option text was not visible and was NOT guessed here.",
+   "fieldname": "custom_operational_review_state",
+   "fieldtype": "Select",
+   "label": "Operational Review State",
+   "options": "\nNot Required\nRequired \u2013 Delivery Already",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_po_section",
+   "fieldtype": "Section Break",
+   "label": "PO Reconciliation"
+  },
+  {
+   "fieldname": "custom_po_reference",
+   "fieldtype": "Data",
+   "label": "PO Reference",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_po_value",
+   "fieldtype": "Currency",
+   "label": "PO Value",
+   "options": "currency",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_po_value_match",
+   "fieldtype": "Select",
+   "label": "PO Value Match",
+   "options": "\nNot Checked\nMatch\nMismatch",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_po_scope_revision",
+   "fieldtype": "Data",
+   "label": "PO Scope Revision",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "description": "INCOMPLETE OPTION LIST: live register truncated this list with '...' after 'Mismatch \u2013 Superseded'. Additional options were not visible and were NOT guessed here.",
+   "fieldname": "custom_po_scope_match",
+   "fieldtype": "Select",
+   "label": "PO Scope Match",
+   "options": "\nNot Checked\nMatch\nMismatch \u2013 Superseded",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_po_payment_terms",
+   "fieldtype": "Small Text",
+   "label": "PO Payment Terms",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_po_terms_match",
+   "fieldtype": "Select",
+   "label": "PO Terms Match",
+   "options": "\nNot Checked\nAccepted\nMismatch",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_po_recon_state",
+   "fieldtype": "Select",
+   "label": "PO Recon State",
+   "options": "\nNot Started\nReconciled\nMismatch",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_po_recon_by",
+   "fieldtype": "Link",
+   "label": "PO Recon By",
+   "options": "User",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_po_recon_on",
+   "fieldtype": "Datetime",
+   "label": "PO Recon On",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_delivery_section",
+   "fieldtype": "Section Break",
+   "label": "Delivery Release"
+  },
+  {
+   "fieldname": "custom_delivery_owner",
+   "fieldtype": "Link",
+   "label": "Delivery Owner",
+   "options": "User",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "description": "INCOMPLETE OPTION LIST: live register truncated this list with '...' after 'Released'. Additional options were not visible and were NOT guessed here.",
+   "fieldname": "custom_delivery_release_state",
+   "fieldtype": "Select",
+   "label": "Delivery Release State",
+   "options": "\nNot Applicable\nPending\nBlocked\nOn Hold\nReleased",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_handover_condition_no",
+   "fieldtype": "Int",
+   "label": "Handover Condition No",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_delivery_released_by",
+   "fieldtype": "Link",
+   "label": "Delivery Released By",
+   "options": "User",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_delivery_released_on",
+   "fieldtype": "Datetime",
+   "label": "Delivery Released On",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "custom_delivery_override",
+   "fieldtype": "Check",
+   "label": "Delivery Override",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_delivery_override_reason",
+   "fieldtype": "Small Text",
+   "label": "Delivery Override Reason",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_delivery_release_note",
+   "fieldtype": "Small Text",
+   "label": "Delivery Release Note",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_negotiation_section",
+   "fieldtype": "Section Break",
+   "label": "Negotiation"
+  },
+  {
+   "fieldname": "custom_negotiation_html",
+   "fieldtype": "HTML",
+   "label": "Negotiation"
+  },
+  {
+   "fieldname": "custom_approval_history_section",
+   "fieldtype": "Section Break",
+   "label": "Approval History"
+  },
+  {
+   "fieldname": "custom_approval_html",
+   "fieldtype": "HTML",
+   "label": "Approval"
+  },
+  {
+   "fieldname": "custom_award_history_section",
+   "fieldtype": "Section Break",
+   "label": "Award History"
+  },
+  {
+   "fieldname": "custom_award_history_html",
+   "fieldtype": "HTML",
+   "label": "Award History"
+  },
+  {
+   "fieldname": "custom_handover_conditions_section",
+   "fieldtype": "Section Break",
+   "label": "Handover Conditions"
+  },
+  {
+   "fieldname": "custom_handover_html",
+   "fieldtype": "HTML",
+   "label": "Handover"
+  },
+  {
+   "fieldname": "column_break_dxio",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_pcxv",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_rjoz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_wxud",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_yxdk",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_rvjn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_kglh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_fkii",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-08-27 19:24:07.859799",
+ "modified": "2026-09-07 15:00:20.828431",
  "modified_by": "Administrator",
  "module": "BS Group",
  "name": "Deal Cost Sheet",
