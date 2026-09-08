@@ -107,7 +107,7 @@
   },
   {
    "fieldname": "customer",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Customer",
    "options": "Customer",
@@ -328,6 +328,23 @@
    "share": 1,
    "submit": 1,
    "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Presales",
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales User"
   }
  ],
  "row_format": "Dynamic",

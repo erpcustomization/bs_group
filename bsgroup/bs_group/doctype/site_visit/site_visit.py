@@ -51,6 +51,21 @@ class SiteVisit(Document):
 	def on_cancel(self):
 		self.db_set("status", "Cancelled", update_modified=False)
 
+	def after_insert(self):
+		self._backlink_to_presales_request()
+
+	def _backlink_to_presales_request(self):
+		"""The link from Site Visit to Presales Request is set by the user,
+		but nothing pointed the other way - a Presales Request had no way to
+		show, from its own list, which requests already had a visit raised.
+		Set it once, right when the visit is created, rather than waiting
+		for submit."""
+		if not self.presales_request:
+			return
+		frappe.db.set_value(
+			"Presales Request", self.presales_request, "site_visit", self.name, update_modified=False
+		)
+
 	def _reset_amended_completion_fields(self):
 		"""A fresh amendment (docstatus 0, born from a cancelled Site Visit)
 		must not inherit the previous visit's completion signature - no_copy

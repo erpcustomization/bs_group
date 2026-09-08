@@ -8,6 +8,8 @@ from frappe.utils import getdate, nowdate, now
 
 
 class PresalesRequest(Document):
+	SITE_VISIT_CLOSING_STATUSES = ("Completed", "Won", "Lost")
+
 	def validate(self):
 		self._validate_site_visit_required()
 
@@ -40,6 +42,15 @@ class PresalesRequest(Document):
 		if self.is_new():
 			frappe.throw(frappe._("Site Visit is mandatory when Site Visit Required is checked"))
 			return
+
+		# A request cannot be closed out (Completed/Won/Lost) while a
+		# required Site Visit is still missing, regardless of when the
+		# checkbox was originally turned on - this is the gap that let a
+		# request be ticked and then closed without one ever being raised.
+		if self.status in self.SITE_VISIT_CLOSING_STATUSES:
+			frappe.throw(
+				frappe._("Site Visit is mandatory before this Presales Request can be set to {0}").format(self.status)
+			)
 
 		# Existing records created before this rule (or before any Site
 		# Visit was raised against them) would otherwise be permanently

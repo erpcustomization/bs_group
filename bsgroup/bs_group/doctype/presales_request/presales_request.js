@@ -10,11 +10,23 @@ frappe.ui.form.on("Presales Request", {
     opportunity(frm) {
         if (frm.doc.opportunity) {
             frappe.db.get_value("Opportunity", frm.doc.opportunity,
-                ["custom_organization_name", "party_name"]
+                ["opportunity_from", "party_name"]
             ).then(r => {
                 if (!r.message) return;
                 let opp = r.message;
-                frm.set_value("customer", opp.custom_organization_name || opp.party_name);
+                if (opp.opportunity_from === "Customer" && opp.party_name) {
+                    // party_name is a real Customer record only when the
+                    // Opportunity came from an existing Customer.
+                    frm.set_value("customer", opp.party_name);
+                    frm.set_value("is_new_customer", 0);
+                } else {
+                    // Opportunity_from is Lead (or unset) - there is no
+                    // Customer master record yet. Leave customer for the
+                    // user to pick/create and flag it as a new customer
+                    // instead of guessing a Customer link that doesn't exist.
+                    frm.set_value("customer", "");
+                    frm.set_value("is_new_customer", 1);
+                }
             });
         }
     },
