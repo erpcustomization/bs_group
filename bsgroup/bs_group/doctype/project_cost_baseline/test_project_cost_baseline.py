@@ -51,9 +51,21 @@ class IntegrationTestProjectCostBaseline(IntegrationTestCase):
 			dcs.submit()
 		return dcs
 
-	def test_dcs_without_project_fails(self):
+	def test_dcs_without_project_succeeds(self):
+		dcs = self.make_dcs(project=None, suffix="NoProj")
+		self.assertFalse(dcs.project)
+
+	def test_baseline_from_projectless_dcs_fails(self):
+		dcs = self.make_dcs(project=None, submit=True, suffix="PCB-NoProj")
+		project = self.make_project("PCB-NoProj")
+
+		baseline = frappe.get_doc({
+			"doctype": "Project Cost Baseline",
+			"project": project.name,
+			"deal_cost_sheet": dcs.name,
+		})
 		with self.assertRaises(frappe.ValidationError):
-			self.make_dcs(project=None, suffix="NoProj")
+			baseline.insert(ignore_permissions=True)
 
 	def test_dcs_with_project_succeeds(self):
 		project = self.make_project("DCS-OK")
