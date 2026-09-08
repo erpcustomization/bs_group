@@ -22,6 +22,7 @@ SITE_VISIT_TERMINAL_STATUSES = ("Completed", "Cancelled")
 
 class SiteVisit(Document):
 	def validate(self):
+		self._set_customer_from_presales_request()
 		self._reset_amended_completion_fields()
 		self._validate_status_transition()
 
@@ -40,6 +41,14 @@ class SiteVisit(Document):
 			# hasn't happened shouldn't carry a completion signature.
 			self.completed_by = None
 			self.completed_on = None
+
+	def _set_customer_from_presales_request(self):
+		if not self.presales_request:
+			return
+		customer = frappe.db.get_value("Presales Request", self.presales_request, "customer")
+		if not customer:
+			frappe.throw(_("Selected Presales Request has no Customer"))
+		self.customer = customer
 
 	def before_submit(self):
 		if self.status not in SITE_VISIT_TERMINAL_STATUSES:
