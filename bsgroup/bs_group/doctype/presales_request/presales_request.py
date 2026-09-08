@@ -9,9 +9,12 @@ from frappe.utils import getdate, nowdate, now
 
 class PresalesRequest(Document):
 	SITE_VISIT_CLOSING_STATUSES = ("Completed", "Won", "Lost")
+	EFFORT_LOGGING_CLOSING_STATUSES = ("Ready for Quotation", "Submitted to Sales", "Completed", "Won", "Lost")
+	COMPLETION_DATE_STATUSES = ("Completed", "Won", "Lost")
 
 	def validate(self):
 		self._validate_site_visit_required()
+		self._validate_effort_logged_before_closing()
 
 	def autoname(self):
 		if self.customer:
@@ -22,6 +25,10 @@ class PresalesRequest(Document):
 	
 	def before_save(self):
 		calculate_quality_score(self)
+
+	def on_update(self):
+		from bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet import dcs_presales_sync
+		dcs_presales_sync(self.name, source="interactive")
 
 	def on_cancel(self):
 		self.db_set("status", "Cancelled")
@@ -61,6 +68,19 @@ class PresalesRequest(Document):
 		was_already_required = bool(before_save and before_save.site_visit_required)
 		if not was_already_required:
 			frappe.throw(frappe._("Site Visit is mandatory when Site Visit Required is checked"))
+
+	def _validate_effort_logged_before_closing(self):
+		if self.status not in self.EFFORT_LOGGING_CLOSING_STATUSES:
+			return
+
+		if not self.actual_hours:
+			frappe.throw(
+				frappe._('Enter Actual Hours before moving this Presales Request to "{0}". '
+						'Presales effort must be logged so the deal can be evaluated.').format(self.status)
+			)
+
+		if self.status in self.COMPLETION_DATE_STATUSES and not self.completion_date:
+			self.completion_date = frappe.utils.nowdate()
 
 
 def calculate_quality_score(doc):

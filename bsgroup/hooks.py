@@ -302,10 +302,12 @@ doctype_js = {
     "Material Request": "public/js/material_request.js",
     # "HD Ticket": "public/js/hd_ticket.js",
     "HD Ticket": ["public/js/hd_ticket_service_report.js"],
+    "Tech Task Scheduler": "public/js/tech_task_scheduler.js",
 }
 
 doctype_list_js = {
     "Project": "public/js/project_list.js",
+    "Presales Request": "public/js/presales_request_list.js",
 }
 
 doc_events = {
@@ -323,6 +325,11 @@ doc_events = {
     },
     "Timesheet Detail": {
         "on_change": "bsgroup.overrides.timesheet.sync_row_status_on_change",
+    },
+    "Timesheet": {
+        "on_submit": "bsgroup.overrides.timesheet.sync_scheduler_execution_link_on_submit",
+        "on_update": "bsgroup.overrides.timesheet.sync_scheduler_execution_link_on_save",
+        "before_cancel": "bsgroup.overrides.timesheet.release_scheduler_execution_before_cancel",
     },
     "Leave Application": {
         "validate": "bsgroup.utils.leave_application.validate_medical_certificate",

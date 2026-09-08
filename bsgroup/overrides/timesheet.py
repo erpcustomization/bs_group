@@ -174,3 +174,70 @@ def sync_task_status(task, status):
 
 	if frappe.db.get_value("Task", task, "status") != task_status:
 		frappe.db.set_value("Task", task, "status", task_status, update_modified=False)
+
+
+def sync_scheduler_execution_link_on_submit(doc, method=None):
+	# ZZTEST POC - FIX 5: Timesheet link sync (After Submit)
+	# Relinks Scheduler Execution and scheduler rows to this Timesheet (including an amended one).
+	# Financial status NEVER changes operational status - only timesheet_condition is updated.
+	if (doc.title or "").startswith("ZZTEST") and frappe.utils.cint(doc.docstatus) != 2:
+		for d in doc.time_logs:
+			if d.custom_reference_type == "Scheduler Execution" and d.custom_reference:
+				if not frappe.db.exists("Scheduler Execution", d.custom_reference):
+					continue
+				cur_ts = frappe.db.get_value("Scheduler Execution", d.custom_reference, "timesheet")
+				if cur_ts and cur_ts != doc.name:
+					cur_ds = frappe.utils.cint(frappe.db.get_value("Timesheet", cur_ts, "docstatus") or 0)
+					if cur_ds != 2:
+						continue
+				frappe.db.set_value("Scheduler Execution", d.custom_reference, "timesheet", doc.name, update_modified=False)
+				frappe.db.set_value("Scheduler Execution", d.custom_reference, "timesheet_detail", d.name, update_modified=False)
+				frappe.db.set_value("Scheduler Execution", d.custom_reference, "timesheet_condition", "Submitted", update_modified=False)
+
+
+def sync_scheduler_execution_link_on_save(doc, method=None):
+	# ZZTEST POC - FIX 5: Timesheet link sync (After Save)
+	# Relinks Scheduler Execution and scheduler rows to this Timesheet (including an amended one).
+	# Financial status NEVER changes operational status - only timesheet_condition is updated.
+	if (doc.title or "").startswith("ZZTEST") and frappe.utils.cint(doc.docstatus) != 2:
+		for d in doc.time_logs:
+			if d.custom_reference_type == "Scheduler Execution" and d.custom_reference:
+				if not frappe.db.exists("Scheduler Execution", d.custom_reference):
+					continue
+				cur_ts = frappe.db.get_value("Scheduler Execution", d.custom_reference, "timesheet")
+				if cur_ts and cur_ts != doc.name:
+					cur_ds = frappe.utils.cint(frappe.db.get_value("Timesheet", cur_ts, "docstatus") or 0)
+					if cur_ds != 2:
+						continue
+				frappe.db.set_value("Scheduler Execution", d.custom_reference, "timesheet", doc.name, update_modified=False)
+				frappe.db.set_value("Scheduler Execution", d.custom_reference, "timesheet_detail", d.name, update_modified=False)
+				frappe.db.set_value("Scheduler Execution", d.custom_reference, "timesheet_condition", "OK", update_modified=False)
+
+
+def release_scheduler_execution_before_cancel(doc, method=None):
+	# ZZTEST POC - FIX 5: Timesheet cancellation support (Before Cancel)
+	# Clears the operational links to this Timesheet BEFORE Frappe runs its back-link check,
+	# so cancellation no longer fails with LinkExistsError and users never have to clear links by hand.
+	# It preserves traceability and NEVER changes Task, Ticket, Internal Task or scheduler operational status.
+	if (doc.title or "").startswith("ZZTEST"):
+		touched = []
+		for d in doc.time_logs:
+			if d.custom_reference_type == "Scheduler Execution" and d.custom_reference:
+				if not frappe.db.exists("Scheduler Execution", d.custom_reference):
+					continue
+				ed = frappe.get_doc("Scheduler Execution", d.custom_reference)
+				trace = ed.get("cancelled_timesheets") or ""
+				entry = doc.name + " (row " + str(d.name) + ", " + str(d.hours) + "h) cancelled by " + frappe.session.user + " on " + frappe.utils.now()
+				ed.cancelled_timesheets = (trace + "\n" + entry).strip()
+				ed.timesheet = None
+				ed.timesheet_detail = None
+				ed.timesheet_condition = "Cancelled - Correction Required"
+				ed.flags.scheduler_execution_action = "update_work"
+				ed.flags.ignore_permissions = True
+				ed.save()
+				touched.append(ed.name)
+		# also release any Scheduler Execution rows that still point at this Timesheet
+		for e in frappe.get_all("Scheduler Execution", filters={"timesheet": doc.name}, fields=["name"]):
+			frappe.db.set_value("Scheduler Execution", e.get("name"), "timesheet", None, update_modified=False)
+			frappe.db.set_value("Scheduler Execution", e.get("name"), "timesheet_detail", None, update_modified=False)
+			frappe.db.set_value("Scheduler Execution", e.get("name"), "timesheet_condition", "Cancelled - Correction Required", update_modified=False)

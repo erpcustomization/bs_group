@@ -1,0 +1,466 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "autoname": "SE-.YYYY.-.#####",
+ "creation": "2026-09-08 15:34:54.411140",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_jsxz",
+  "amended_from",
+  "scheduler",
+  "scheduler_row",
+  "execution_title",
+  "date",
+  "category",
+  "category_name",
+  "project",
+  "task",
+  "ticket",
+  "resource",
+  "employee",
+  "activity_details",
+  "company",
+  "planned_start",
+  "planned_end",
+  "planned_hours",
+  "assignment_type",
+  "operational_status",
+  "awaiting_verification_on",
+  "actual_start",
+  "actual_end",
+  "actual_hours",
+  "work_outcome",
+  "completion_note",
+  "work_completed",
+  "work_pending",
+  "blocker_category",
+  "blocker_details",
+  "blocker_owner",
+  "follow_up_required",
+  "follow_up_date",
+  "completion_evidence",
+  "verification_status",
+  "verified_by",
+  "verification_date",
+  "supervisor_comment",
+  "previous_execution",
+  "next_execution",
+  "productive_category",
+  "billable",
+  "team",
+  "location",
+  "timesheet",
+  "timesheet_detail",
+  "timesheet_condition",
+  "cancelled_timesheets"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_jsxz",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Scheduler Execution",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "scheduler",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Scheduler",
+   "options": "Tech Task Scheduler",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "scheduler_row",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Scheduler Row Reference",
+   "read_only": 1,
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "execution_title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Execution Title",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date",
+   "read_only": 1,
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "category",
+   "fieldtype": "Select",
+   "label": "Category",
+   "options": "Project\nHD Ticket\nOffice",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "category_name",
+   "fieldtype": "Dynamic Link",
+   "label": "Category Name",
+   "options": "category",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.category==\"Project\"",
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.category==\"Project\"",
+   "fieldname": "task",
+   "fieldtype": "Link",
+   "label": "Task",
+   "options": "Task",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.category==\"HD Ticket\"",
+   "fieldname": "ticket",
+   "fieldtype": "Link",
+   "label": "Ticket",
+   "options": "HD Ticket",
+   "read_only": 1
+  },
+  {
+   "fieldname": "resource",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Technician",
+   "options": "User",
+   "read_only": 1,
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "ignore_user_permissions": 1,
+   "label": "Employee",
+   "options": "Employee",
+   "read_only": 1
+  },
+  {
+   "fieldname": "activity_details",
+   "fieldtype": "Small Text",
+   "label": "Activity Details",
+   "read_only": 1,
+   "read_only_depends_on": "eval:doc.operational_status==\"Started\" || doc.operational_status==\"In Progress\" || doc.operational_status==\"Awaiting Verification\" || doc.operational_status==\"Verified and Closed\"",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "planned_start",
+   "fieldtype": "Time",
+   "label": "Planned Start",
+   "read_only": 1
+  },
+  {
+   "fieldname": "planned_end",
+   "fieldtype": "Time",
+   "label": "Planned End",
+   "read_only": 1
+  },
+  {
+   "fieldname": "planned_hours",
+   "fieldtype": "Float",
+   "label": "Planned Hours",
+   "read_only": 1
+  },
+  {
+   "fieldname": "assignment_type",
+   "fieldtype": "Select",
+   "label": "Assignment Type",
+   "options": "Primary\nSecondary\nSupervisory\nRemote Support\nTravel",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "operational_status",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Operational Status",
+   "options": "Scheduled\nIn Progress\nBlocked\nCompleted\nAwaiting Verification\nClosed\nCancelled",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "awaiting_verification_on",
+   "fieldtype": "Datetime",
+   "label": "Awaiting Verification Since",
+   "read_only": 1
+  },
+  {
+   "fieldname": "actual_start",
+   "fieldtype": "Datetime",
+   "label": "Actual Start",
+   "read_only": 1
+  },
+  {
+   "fieldname": "actual_end",
+   "fieldtype": "Datetime",
+   "label": "Actual End",
+   "read_only": 1
+  },
+  {
+   "fieldname": "actual_hours",
+   "fieldtype": "Float",
+   "label": "Actual Hours",
+   "read_only": 1
+  },
+  {
+   "fieldname": "work_outcome",
+   "fieldtype": "Select",
+   "label": "Work Outcome",
+   "options": "Fully Completed\nPartially Completed\nBlocked\nNo Work Possible\nCancelled by Operations",
+   "read_only": 1
+  },
+  {
+   "fieldname": "completion_note",
+   "fieldtype": "Small Text",
+   "label": "Completion Note",
+   "read_only": 1
+  },
+  {
+   "fieldname": "work_completed",
+   "fieldtype": "Small Text",
+   "label": "Work Completed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "work_pending",
+   "fieldtype": "Small Text",
+   "label": "Work Pending",
+   "read_only": 1
+  },
+  {
+   "fieldname": "blocker_category",
+   "fieldtype": "Select",
+   "label": "Blocker Category",
+   "options": "Awaiting Customer\nAwaiting Material\nAwaiting Approval\nAccess Issue\nEquipment Fault\nOther",
+   "read_only": 1
+  },
+  {
+   "fieldname": "blocker_details",
+   "fieldtype": "Small Text",
+   "label": "Blocker Details",
+   "read_only": 1
+  },
+  {
+   "fieldname": "blocker_owner",
+   "fieldtype": "Link",
+   "ignore_user_permissions": 1,
+   "label": "Blocker Owner",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "follow_up_required",
+   "fieldtype": "Check",
+   "label": "Follow Up Required",
+   "read_only": 1
+  },
+  {
+   "fieldname": "follow_up_date",
+   "fieldtype": "Date",
+   "label": "Follow Up Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "completion_evidence",
+   "fieldtype": "Attach",
+   "label": "Completion Evidence",
+   "read_only": 1
+  },
+  {
+   "default": "Pending Verification",
+   "fieldname": "verification_status",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Verification Status",
+   "options": "Pending Verification\nVerified\nRejected for Correction",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.verification_status==\"Verified\" || doc.verification_status==\"Rejected for Correction\"",
+   "fieldname": "verified_by",
+   "fieldtype": "Link",
+   "ignore_user_permissions": 1,
+   "label": "Verified By",
+   "mandatory_depends_on": "eval:doc.verification_status==\"Verified\" || doc.verification_status==\"Rejected for Correction\"",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.verification_status==\"Verified\" || doc.verification_status==\"Rejected for Correction\"",
+   "fieldname": "verification_date",
+   "fieldtype": "Datetime",
+   "label": "Verification Date",
+   "mandatory_depends_on": "eval:doc.verification_status==\"Verified\" || doc.verification_status==\"Rejected for Correction\"",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.verification_status==\"Verified\" || doc.verification_status==\"Rejected for Correction\"",
+   "fieldname": "supervisor_comment",
+   "fieldtype": "Small Text",
+   "label": "Supervisor Comment",
+   "mandatory_depends_on": "eval:doc.verification_status==\"Rejected for Correction\"",
+   "read_only": 1
+  },
+  {
+   "fieldname": "previous_execution",
+   "fieldtype": "Link",
+   "label": "Previous Execution",
+   "options": "Scheduler Execution",
+   "read_only": 1
+  },
+  {
+   "fieldname": "next_execution",
+   "fieldtype": "Link",
+   "label": "Next Execution",
+   "options": "Scheduler Execution",
+   "read_only": 1
+  },
+  {
+   "fieldname": "productive_category",
+   "fieldtype": "Select",
+   "label": "Productive Category",
+   "mandatory_depends_on": "eval:doc.operational_status==\"Awaiting Verification\" || doc.operational_status==\"Verified and Closed\" || doc.operational_status==\"Rejected for Correction\"",
+   "options": "Productive\nNon-Productive\nTravel\nWaiting\nRework\nAdministrative",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "billable",
+   "fieldtype": "Check",
+   "label": "Billable",
+   "read_only": 1
+  },
+  {
+   "fieldname": "team",
+   "fieldtype": "Data",
+   "label": "Team",
+   "read_only": 1
+  },
+  {
+   "fieldname": "location",
+   "fieldtype": "Data",
+   "label": "Location",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "timesheet",
+   "fieldtype": "Link",
+   "label": "Timesheet",
+   "no_copy": 1,
+   "options": "Timesheet",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "timesheet_detail",
+   "fieldtype": "Data",
+   "label": "Timesheet Detail Row",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "timesheet_condition",
+   "fieldtype": "Select",
+   "label": "Timesheet Condition",
+   "no_copy": 1,
+   "options": "\nSubmitted\nOK\nCancelled - Correction Required",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "cancelled_timesheets",
+   "fieldtype": "Small Text",
+   "label": "Cancelled Timesheets",
+   "no_copy": 1,
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-09-08 15:39:35.982378",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "Scheduler Execution",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Operations Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Technician",
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

@@ -1,0 +1,82 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "creation": "2026-09-08 15:57:12.131072",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "fieldname",
+  "field_label",
+  "target_doctype",
+  "target_name",
+  "old_value",
+  "new_value",
+  "value_type"
+ ],
+ "fields": [
+  {
+   "columns": 2,
+   "fieldname": "fieldname",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Fieldname",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "field_label",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Field Label"
+  },
+  {
+   "columns": 2,
+   "fieldname": "target_doctype",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Target DocType"
+  },
+  {
+   "fieldname": "target_name",
+   "fieldtype": "Data",
+   "label": "Target Name"
+  },
+  {
+   "columns": 2,
+   "fieldname": "old_value",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Old Value"
+  },
+  {
+   "columns": 2,
+   "fieldname": "new_value",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "New Value"
+  },
+  {
+   "columns": 1,
+   "fieldname": "value_type",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Value Type"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-08 15:57:24.944244",
+ "modified_by": "Administrator",
+ "module": "BS Group",
+ "name": "DCS Governance Event Change",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

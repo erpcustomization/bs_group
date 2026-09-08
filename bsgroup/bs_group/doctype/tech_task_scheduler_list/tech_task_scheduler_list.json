@@ -11,12 +11,18 @@
   "category_doctype",
   "category_name",
   "task",
+  "internal_task",
+  "project",
+  "ticket",
   "resource",
   "column_break_xedg",
   "status",
   "site_visit",
   "activity_details",
   "allocated_labor",
+  "assignment_id",
+  "custom_assignment_type",
+  "timesheet_condition",
   "section_break_mwvz",
   "next_action",
   "pending_details",
@@ -116,6 +122,45 @@
    "fieldname": "site_visit",
    "fieldtype": "Check",
    "label": "Site Visit"
+  },
+  {
+   "fieldname": "internal_task",
+   "fieldtype": "Link",
+   "label": "Internal Task",
+   "options": "Task",
+   "read_only_depends_on": "eval:doc.category != \"Office\""
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "ticket",
+   "fieldtype": "Link",
+   "label": "Ticket",
+   "options": "HD Ticket"
+  },
+  {
+   "fieldname": "assignment_id",
+   "fieldtype": "Data",
+   "label": "Assignment ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_assignment_type",
+   "fieldtype": "Select",
+   "label": "Assignment Type",
+   "options": "\nPrimary\nSecondary\nSupervisory\nRemote Support\nTravel"
+  },
+  {
+   "fieldname": "timesheet_condition",
+   "fieldtype": "Select",
+   "label": "Timesheet Condition",
+   "no_copy": 1,
+   "options": "\nMissing\nSubmitted\nOK\nCancelled - Correction Required",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,

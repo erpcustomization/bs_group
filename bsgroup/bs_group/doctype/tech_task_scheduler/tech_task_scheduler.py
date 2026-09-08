@@ -15,6 +15,7 @@ class TechTaskScheduler(Document):
 	def on_submit(self):
 		validate_labor_count(self)
 		sync_assignments(self)
+		dispatch_zztest_scheduler_rows(self)
 
 
 def sync_assignments(doc):
@@ -309,3 +310,157 @@ def validate_labor_count(doc):
 				"remaining_persons",
 				remaining
 			)
+
+
+def dispatch_zztest_scheduler_rows(doc):
+	"""doc_events hook for Tech Task Scheduler's on_submit.
+
+	ZZTEST POC v2: this performs NO action at all unless the row resolves to a ZZTEST
+	Project (directly, or via the Office row's Internal Task's project) or a ZZTEST
+	Helpdesk Ticket. It normalises a few row fields and creates the standard Frappe
+	assignment (ToDo) for the resource on the operational Task. It does NOT create a
+	Scheduler Execution - that is done on demand via generate_scheduler_execution.
+	"""
+
+	for row in doc.tech_task_scheduler_list:
+		row_project = row.project
+		row_ticket = row.ticket
+		if row.category == "Project" and not row_project and row.category_name:
+			row_project = row.category_name
+		if row.category == "HD Ticket" and not row_ticket and row.category_name:
+			row_ticket = row.category_name
+
+		op_task = None
+		if row.category == "Project":
+			op_task = row.task
+		elif row.category == "Office":
+			op_task = row.internal_task
+
+		guard_project = row_project
+		if not guard_project and op_task:
+			guard_project = frappe.db.get_value("Task", op_task, "project")
+
+		is_zztest = False
+		if guard_project:
+			pn = frappe.db.get_value("Project", guard_project, "project_name") or ""
+			if pn.startswith("ZZTEST"):
+				is_zztest = True
+		if row_ticket:
+			sj = frappe.db.get_value("HD Ticket", row_ticket, "subject") or ""
+			if sj.startswith("ZZTEST"):
+				is_zztest = True
+
+		if not is_zztest:
+			continue
+
+		if not row.assignment_id:
+			frappe.db.set_value("Tech Task Scheduler List", row.name, "assignment_id", row.name, update_modified=False)
+		if row.category == "Project" and not row.project and row_project:
+			frappe.db.set_value("Tech Task Scheduler List", row.name, "project", row_project, update_modified=False)
+		if row.category == "HD Ticket" and not row.ticket and row_ticket:
+			frappe.db.set_value("Tech Task Scheduler List", row.name, "ticket", row_ticket, update_modified=False)
+		if row.category == "Office" and not row.project and guard_project:
+			frappe.db.set_value("Tech Task Scheduler List", row.name, "project", guard_project, update_modified=False)
+		if not row.custom_assignment_type:
+			frappe.db.set_value("Tech Task Scheduler List", row.name, "custom_assignment_type", "Primary", update_modified=False)
+		if not row.status or row.status in ("Draft", ""):
+			frappe.db.set_value("Tech Task Scheduler List", row.name, "status", "Scheduled", update_modified=False)
+		frappe.db.set_value("Tech Task Scheduler List", row.name, "timesheet_condition", "Missing", update_modified=False)
+
+		# standard Frappe assignment of the operational Task (Project Task or Internal Task)
+		if op_task and row.resource:
+			already = frappe.db.exists("ToDo", {
+				"reference_type": "Task",
+				"reference_name": op_task,
+				"allocated_to": row.resource,
+				"status": "Open"
+			})
+			if not already:
+				todo = frappe.get_doc({
+					"doctype": "ToDo",
+					"allocated_to": row.resource,
+					"reference_type": "Task",
+					"reference_name": op_task,
+					"status": "Open",
+					"priority": "Medium",
+					"date": row.date,
+					"assigned_by": frappe.session.user,
+					"description": "ZZTEST POC scheduler assignment " + row.name + " - " + (row.activity_details or "")
+				})
+				todo.flags.ignore_permissions = True
+				todo.insert(ignore_permissions=True)
+
+
+@frappe.whitelist()
+def generate_scheduler_execution(scheduler, scheduler_row):
+	"""Create and submit a Scheduler Execution for one Tech Task Scheduler row.
+
+	Called from the "Generate Scheduler Execution" button on a submitted Tech Task
+	Scheduler. A row may only ever produce one Scheduler Execution - enforced by the
+	unique index on Scheduler Execution.scheduler_row, re-checked here up front so the
+	caller gets a clean message instead of a raw DuplicateEntryError.
+	"""
+
+	frappe.has_permission("Scheduler Execution", "create", throw=True)
+
+	if frappe.db.exists("Scheduler Execution", {"scheduler_row": scheduler_row}):
+		frappe.throw(_("A Scheduler Execution has already been generated for this row."))
+
+	ts = frappe.get_doc("Tech Task Scheduler", scheduler)
+	row = next((r for r in ts.tech_task_scheduler_list if r.name == scheduler_row), None)
+	if not row:
+		frappe.throw(_("Scheduler row {0} was not found on {1}.").format(scheduler_row, scheduler))
+
+	if row.category not in ("Project", "HD Ticket"):
+		frappe.throw(_(
+			"Scheduler Execution can only be generated for Project or HD Ticket rows, not {0}."
+		).format(row.category or _("(no category)")))
+
+	if not row.resource:
+		frappe.throw(_("Row {0} has no Resource assigned.").format(row.name))
+
+	project = row.project
+	ticket = row.ticket
+	if row.category == "Project" and not project and row.category_name:
+		project = row.category_name
+	if row.category == "HD Ticket" and not ticket and row.category_name:
+		ticket = row.category_name
+
+	task = row.task if row.category == "Project" else None
+
+	if row.category == "Project" and not project and task:
+		project = frappe.db.get_value("Task", task, "project")
+
+	if row.category == "Project" and not project:
+		frappe.throw(_("Row {0} has no Project.").format(row.name))
+	if row.category == "HD Ticket" and not ticket:
+		frappe.throw(_("Row {0} has no Ticket.").format(row.name))
+
+	company = frappe.db.get_value("Project", project, "company") if project else None
+	company = company or frappe.defaults.get_user_default("company")
+	if not company:
+		frappe.throw(_("Could not determine a Company for this Scheduler Execution."))
+
+	se = frappe.new_doc("Scheduler Execution")
+	se.scheduler = ts.name
+	se.scheduler_row = row.name
+	se.execution_title = (row.activity_details or row.category_name or row.category or "Scheduled Execution")[:140]
+	se.date = row.date or frappe.utils.nowdate()
+	se.category = row.category
+	se.category_name = project if row.category == "Project" else ticket
+	se.project = project if row.category == "Project" else None
+	se.task = task
+	se.ticket = ticket if row.category == "HD Ticket" else None
+	se.resource = row.resource
+	se.company = company
+	se.assignment_type = row.custom_assignment_type or "Primary"
+	se.operational_status = "Scheduled"
+	se.verification_status = "Pending Verification"
+	se.activity_details = row.activity_details or row.next_action or _("Scheduled execution")
+	se.insert(ignore_permissions=True)
+	se.submit()
+
+	return {
+		"execution_name": se.name,
+		"message": _("Scheduler Execution {0} created.").format(se.name),
+	}

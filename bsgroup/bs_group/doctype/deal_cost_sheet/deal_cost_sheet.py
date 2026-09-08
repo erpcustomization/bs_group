@@ -19,6 +19,10 @@ class DealCostSheet(Document):
 		dcs_company_default_insert(self)
 		dcs_one_active_guard_insert(self)
 
+	def after_insert(self):
+		if self.presales_request:
+			dcs_presales_sync(self.presales_request, source="dcs_created")
+
 	def before_save(self):
 		calculate_deal_financials(self)
 		dcs_governed_field_guard(self)
@@ -490,13 +494,11 @@ def dcs_submit_advance_presales_status(doc):
 	linked Presales Request's status when it is still in an early stage.
 
 	Reproduced from the live-site "DCS Submit - Advance Presales Status"
-	Server Script (see "# DCS Presales Effort Metrics.txt" lines 60-91),
-	minus its trailing fan-out call to the canonical "dcs_presales_sync"
-	endpoint (mode unspecified, "source=submit"), whose projection/mapping
-	formula is NEVER given anywhere in the source file. That fan-out is
-	intentionally NOT implemented here pending the real dcs_presales_sync
-	formula -- do not invent it. The two business-status transitions below
-	do not depend on that endpoint and are implemented verbatim.
+	Server Script (see "# DCS Presales Effort Metrics.txt" lines 60-91).
+	The two business-status transitions below are implemented verbatim; the
+	trailing fan-out to dcs_presales_sync is now wired below too, using only
+	the unambiguous direct-mapping fields (see dcs_presales_sync docstring
+	for the fields still pending the real cost/margin formula).
 	"""
 	frappe.db.set_value("Deal Cost Sheet", doc.name, "custom_deal_status", "Submitted to Sales", update_modified=False)
 	doc.custom_deal_status = "Submitted to Sales"
@@ -508,8 +510,93 @@ def dcs_submit_advance_presales_status(doc):
 	early = ["Draft", "Open", "Assigned", "In Progress", "Awaiting Sales Input", "Awaiting Customer Input", "Costing in Progress"]
 	if cur in early:
 		frappe.db.set_value("Presales Request", doc.presales_request, "status", "Submitted to Sales", update_modified=False)
-	# Canonical projection synchronisation (dcs_presales_sync fan-out) intentionally
-	# omitted -- see docstring above.
+
+	dcs_presales_sync(doc.presales_request, source="submit")
+
+
+# Fields with an unambiguous 1:1 mapping from Presales Request. custom_presales_hourly_rate,
+# custom_presales_cost, custom_presales_cost_vs_margin, custom_margin_per_presales_hour and
+# custom_effort_verdict are intentionally NOT synced here - their source (a rate) and formula
+# (cost/margin/verdict calculation) were never specified anywhere and must not be invented.
+PRESALES_SYNC_FIELD_MAP = {
+	"custom_presales_status": "status",
+	"custom_presales_owner": "presales_owner",
+	"custom_presales_completion_date": "completion_date",
+	"custom_presales_estimated_hours": "estimated_hours",
+	"custom_presales_actual_hours": "actual_hours",
+}
+
+
+@frappe.whitelist()
+def dcs_presales_sync(presales_request, source="interactive"):
+	"""Refresh the presales projection held on every active (non-cancelled) Deal Cost
+	Sheet linked to `presales_request`. Only the direct-mapping fields in
+	PRESALES_SYNC_FIELD_MAP are written; only genuinely changed values are written;
+	update_modified is left False; one DCS Governance Event is recorded per sheet
+	that actually changed.
+	"""
+
+	pr = frappe.db.get_value(
+		"Presales Request",
+		presales_request,
+		list(PRESALES_SYNC_FIELD_MAP.values()),
+		as_dict=True,
+	)
+	if not pr:
+		return {"error": f"Presales Request {presales_request} not found."}
+
+	sheets = frappe.get_all(
+		"Deal Cost Sheet",
+		filters={"presales_request": presales_request, "docstatus": ["!=", 2]},
+		fields=["name"] + list(PRESALES_SYNC_FIELD_MAP.keys()),
+	)
+
+	synced = []
+	for sheet in sheets:
+		changed = {}
+		for dcs_field, pr_field in PRESALES_SYNC_FIELD_MAP.items():
+			new_value = pr.get(pr_field)
+			if (sheet.get(dcs_field) or None) != (new_value or None):
+				changed[dcs_field] = new_value
+
+		if not changed:
+			continue
+
+		frappe.db.set_value("Deal Cost Sheet", sheet.name, changed, update_modified=False)
+		_record_presales_sync_event(sheet.name, changed, source)
+		synced.append(sheet.name)
+
+	return {"synced": synced, "source": source}
+
+
+def _record_presales_sync_event(dcs_name, changed, source):
+	chg = [
+		{
+			"fieldname": fieldname,
+			"field_label": fieldname,
+			"target_doctype": "Deal Cost Sheet",
+			"target_name": dcs_name,
+			"new_value": str(new_value) if new_value is not None else "(blank)",
+			"value_type": "Data",
+		}
+		for fieldname, new_value in changed.items()
+	]
+	ev = frappe.get_doc({
+		"doctype": "DCS Governance Event",
+		"dcs": dcs_name,
+		"event_code": "PRESALES_SYNC",
+		"action_label": "Presales projection synchronisation",
+		"source_endpoint": "dcs_presales_sync",
+		"actor": frappe.session.user,
+		"event_timestamp": frappe.utils.now(),
+		"outcome": "Success",
+		"correlation_id": "PSYNC-" + dcs_name,
+		"change_count": len(chg),
+		"reason": f"source={source}",
+		"changes": json.dumps(chg),
+	})
+	ev.flags.dcs_audit_write = 1
+	ev.insert(ignore_permissions=True)
 
 
 def validate_deal_cost(doc):
@@ -717,4 +804,3 @@ def read_deal_cost_sheet(file_url, docname):
 	doc.save(ignore_permissions=True)
 
 	return "Success"
-	
