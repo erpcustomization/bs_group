@@ -247,10 +247,10 @@ function render_summary(frm, currency) {
 		resource_cost_total += flt(row.cost_amount);
 	});
 
-	const total_cost_calc    = prod_cost + svc_cost + charges_total + resource_cost_total;
-	const total_selling_calc = prod_sell + svc_sell;
-	const total_margin_calc  = total_selling_calc - total_cost_calc;
-	const total_margin_pct   = total_selling_calc ? (total_margin_calc / total_selling_calc) * 100 : 0;
+	const total_cost_calc    = flt(doc.total_cost);
+	const total_selling_calc = flt(doc.total_selling);
+	const total_margin_calc  = flt(doc.margin_value);
+        const total_margin_pct   = flt(doc.margin_percent);
 
 	const th = (label, align = "right") =>
 		`<th style="text-align:${align}; padding:8px 12px; background:#f0f4f8; font-weight:600; font-size:12px; color:#4a5568;">${label}</th>`;
