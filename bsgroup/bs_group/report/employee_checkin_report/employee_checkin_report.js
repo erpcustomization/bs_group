@@ -27,7 +27,7 @@ frappe.query_reports["Employee Checkin Report"] = {
 			fieldname: "checkin_status",
 			label: __("Status"),
 			fieldtype: "Select",
-			options: "\nPresent\nHalf Day\nAbsent\nWeekend",
+			options: "\nPresent\nHalf Day\nAbsent\nWeekend\nHoliday",
 		},
 	],
 

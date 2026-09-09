@@ -333,8 +333,11 @@ def get_data(filters=None):
 	holiday_dates_by_list = {}
 
 	def get_holiday_dates(holiday_list_name):
+		"""Returns {date_str: status} for every Holiday date in the list -
+		"Weekend" for the weekly off, "Holiday" for a named holiday - matching
+		how Employee Monthly Attendance distinguishes the two."""
 		if not holiday_list_name:
-			return set()
+			return {}
 		if holiday_list_name not in holiday_dates_by_list:
 			rows = frappe.db.get_all(
 				"Holiday",
@@ -342,9 +345,11 @@ def get_data(filters=None):
 					"parent": holiday_list_name,
 					"holiday_date": ["between", [from_date, to_date]],
 				},
-				fields=["holiday_date"],
+				fields=["holiday_date", "weekly_off"],
 			)
-			holiday_dates_by_list[holiday_list_name] = {str(r.holiday_date) for r in rows}
+			holiday_dates_by_list[holiday_list_name] = {
+				str(r.holiday_date): ("Weekend" if r.weekly_off else "Holiday") for r in rows
+			}
 		return holiday_dates_by_list[holiday_list_name]
 
 	company_default_holiday_list = {}
@@ -392,7 +397,7 @@ def get_data(filters=None):
 			elif checkin:
 				status = "Present"
 			elif date_str in holiday_dates:
-				status = "Weekend"
+				status = holiday_dates[date_str]
 			else:
 				status = "Absent"
 
