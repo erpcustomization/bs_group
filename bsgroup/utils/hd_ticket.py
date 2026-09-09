@@ -44,6 +44,101 @@ def sync_tts_status(doc, method=None):
 		)
 
 
+def _domain_from_email(email):
+	if not email or "@" not in email:
+		return None
+	return email.rsplit("@", 1)[-1].strip().lower()
+
+
+def _find_customer_by_domain(domain):
+	"""Match `domain` against HD Customer.domain. That field is stored
+	inconsistently across existing records - sometimes a bare domain
+	("alamar.com"), sometimes a full email ("support@alamar.com") - so
+	compare on the domain part of whatever is stored, not the raw value."""
+
+	if not domain:
+		return None
+
+	customers = frappe.get_all("HD Customer", filters={"domain": ["!=", ""]}, fields=["name", "domain"])
+	for c in customers:
+		stored_domain = _domain_from_email(c.domain) or (c.domain or "").strip().lower()
+		if stored_domain == domain:
+			return c.name
+
+	return None
+
+
+def set_customer_from_domain(doc, method=None):
+	"""Auto-populate HD Ticket.customer from HD Customer.domain, matched against
+	the raised_by email's domain, whenever no customer is set yet."""
+
+	if doc.customer:
+		return
+
+	domain = _domain_from_email(doc.raised_by)
+	customer = _find_customer_by_domain(domain)
+	if customer:
+		doc.customer = customer
+
+
+@frappe.whitelist()
+def get_customer_by_domain(email):
+	"""Return the HD Customer name whose domain matches `email`'s domain, or None."""
+	return _find_customer_by_domain(_domain_from_email(email))
+
+
+def sync_zztest_scheduler_status(doc, method=None):
+	"""ZZTEST POC v2: derive Tech Task Scheduler List status from the linked
+	Scheduler Execution and the HD Ticket itself ONLY - never from whether the
+	Timesheet is Draft, Submitted or Cancelled.
+
+	Performs NO action unless the ticket's subject starts with "ZZTEST"."""
+
+	if not (doc.subject or "").startswith("ZZTEST"):
+		return
+
+	rows = frappe.get_all(
+		"Tech Task Scheduler List",
+		filters={"ticket": doc.name},
+		fields=["name", "status"],
+	)
+
+	for row in rows:
+		if row.status in ("Cancelled", "Cancelled/Reassigned"):
+			continue
+
+		execution = frappe.db.get_value(
+			"Scheduler Execution",
+			{"scheduler_row": row.name},
+			["name", "actual_start", "actual_end", "blocker_category", "blocker_details", "operational_status"],
+			as_dict=True,
+		)
+
+		if doc.status in ("Resolved", "Closed"):
+			new_status = "Closed"
+		elif not execution:
+			new_status = "Scheduled"
+		elif execution.operational_status == "Cancelled":
+			new_status = "Cancelled/Reassigned"
+		elif execution.blocker_category or execution.blocker_details:
+			new_status = "Pending/Blocked"
+		elif execution.actual_end:
+			new_status = "Work Logged"
+		elif execution.actual_start:
+			new_status = "In Progress"
+		else:
+			new_status = "Scheduled"
+
+		if new_status != row.status:
+			frappe.db.set_value(
+				"Tech Task Scheduler List",
+				row.name,
+				"status",
+				new_status,
+				update_modified=False,
+			)
+
+
 def _clean_subject(subject):
 	"""Strip Re:/Fwd: prefixes and any [#...] ticket references."""
 	subject = re.sub(r'\[#[^\]]+\]', '', subject or '')

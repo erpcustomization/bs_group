@@ -335,11 +335,15 @@ doc_events = {
         "validate": "bsgroup.utils.leave_application.validate_medical_certificate",
     },
     "HD Ticket": {
+        "validate": [
+            "bsgroup.utils.hd_ticket.set_customer_from_domain",
+        ],
         "after_insert": [
             "bsgroup.utils.hd_ticket.thread_email_to_existing_ticket",
         ],
         "on_update": [
             "bsgroup.utils.hd_ticket.sync_tts_status",
+            "bsgroup.utils.hd_ticket.sync_zztest_scheduler_status",
         ],
     },
     "Quotation": {

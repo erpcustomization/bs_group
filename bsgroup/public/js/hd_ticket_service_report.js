@@ -16,4 +16,18 @@ frappe.ui.form.on("HD Ticket", {
 			});
 		}, __("Create"));
 	},
+
+	raised_by(frm) {
+		if (frm.doc.customer) return;
+
+		frappe.call({
+			method: "bsgroup.utils.hd_ticket.get_customer_by_domain",
+			args: { email: frm.doc.raised_by },
+			callback(r) {
+				if (r.message && !frm.doc.customer) {
+					frm.set_value("customer", r.message);
+				}
+			},
+		});
+	},
 });
