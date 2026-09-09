@@ -198,3 +198,54 @@ function hdSetupResCheck() {
   }
   hdCheckResolution();
 }
+
+frappe.ui.form.on('HD Ticket', {
+    refresh(frm) {
+        frm.add_custom_button('<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiB3aWR0aD0iMTYiIGhlaWdodD0iMTYiPjxkZWZzPjxyYWRpYWxHcmFkaWVudCBpZD0iYWlyYWciIGN4PSI1MCUiIGN5PSI2MCUiIHI9IjU1JSIgZng9IjUwJSIgZnk9IjcwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzAwZTVjYyIvPjxzdG9wIG9mZnNldD0iNTAlIiBzdG9wLWNvbG9yPSIjM2I2ZWY4Ii8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjN2IzZmU0Ii8+PC9yYWRpYWxHcmFkaWVudD48L2RlZnM+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDgiIGZpbGw9InVybCgjYWlyYWcpIi8+PHBhdGggZD0iTTI1IDc1IEw1MCAyNSBMNzUgNzUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZmlsbD0ibm9uZSIvPjxwb2x5Z29uIHBvaW50cz0iNTAsNTIgNTMsNTggNTksNTggNTQsNjIgNTYsNjggNTAsNjQgNDQsNjggNDYsNjIgNDEsNTggNDcsNTgiIGZpbGw9IndoaXRlIiBvcGFjaXR5PSIwLjkiLz48L3N2Zz4=" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;border-radius:50%"> Ask AIRA', function() {
+            let subject     = frm.doc.subject      || '';
+            let description = frm.doc.description  || '';
+            let clean_desc  = description.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+            if (!clean_desc && !subject) {
+                frappe.msgprint('Please fill in the ticket subject and description first.');
+                return;
+            }
+
+            frappe.show_progress('AIRA is thinking...', 30, 100, 'Loading AI config...');
+
+            // ── Step 1: Get config from gateway (auth required, key from DB) ──
+            frappe.call({
+                method: 'aira_ai_gateway',
+                args: {
+                    caller: 'helpdesk_reply',
+                    max_tokens: 1024,
+                    system_prompt: 'You are a helpful IT support agent for Bits Secure IT using ERPNext. Write professional, concise email replies.',
+                    user_message: 'Subject: ' + subject + '\nDescription: ' + clean_desc
+                },
+                callback: function(r) {
+                    frappe.hide_progress();
+                    const res = r.message || {};
+                    if (res.success && res.text) {
+                        // Inject AI reply into reply editor
+                        const replyBox = document.querySelector('.ql-editor[contenteditable="true"]')
+                                      || document.querySelector('.reply-box .ql-editor')
+                                      || document.querySelector('[data-fieldname="reply"] .ql-editor');
+                        if (replyBox) {
+                            replyBox.innerHTML = res.text.replace(/\n/g, '<br>');
+                            replyBox.dispatchEvent(new Event('input', { bubbles: true }));
+                            frappe.show_alert({ message: '✅ Reply generated via ' + (res.provider_used || 'AI'), indicator: 'green' }, 5);
+                        } else {
+                            frappe.msgprint({ title: '🤖 AI Reply (' + (res.provider_used || 'AI') + ')', message: res.text.replace(/\n/g, '<br>'), indicator: 'green' });
+                        }
+                    } else {
+                        frappe.show_alert({ message: '❌ AI failed: ' + (res.error || 'No response'), indicator: 'red' }, 6);
+                    }
+                },
+                error: function() {
+                    frappe.hide_progress();
+                    frappe.show_alert({ message: '❌ AI gateway error', indicator: 'red' }, 5);
+                }
+            });
+        }, 'AIRA');
+    }
+});

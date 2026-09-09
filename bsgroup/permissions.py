@@ -139,6 +139,61 @@ def has_customer_permission(doc, ptype=None, user=None):
     return customer_has_sales_team_access(doc.name, user)
 
 
+def get_sales_target_gp_entry_allowed_sales_persons(user=None):
+    """Sales Person names visible to `user` for Sales Target GP Entry, derived
+    ONLY from the Employee reporting hierarchy: user -> Employee (via user_id)
+    -> subordinates (Employee.reports_to, recursive) -> Sales Person (via
+    Sales Person.employee). A manager sees their own + all reportees (any
+    depth); a plain salesperson sees only their own. Returns None for
+    System Manager / Administrator, meaning "no restriction"."""
+    if not user:
+        user = frappe.session.user
+
+    if user == "Administrator" or "System Manager" in frappe.get_roles(user):
+        return None
+
+    employee = frappe.db.get_value("Employee", {"user_id": user}, "name")
+    if not employee:
+        return []
+
+    emp_ids = set()
+    frontier = [employee]
+    while frontier:
+        emp_ids.update(frontier)
+        children = frappe.get_all(
+            "Employee",
+            filters=[["reports_to", "in", frontier]],
+            pluck="name",
+        )
+        frontier = [c for c in children if c not in emp_ids]
+
+    return frappe.get_all(
+        "Sales Person",
+        filters=[["employee", "in", list(emp_ids)]],
+        pluck="name",
+    )
+
+
+def get_sales_target_gp_entry_query_conditions(user):
+    """permission_query_conditions for Sales Target GP Entry: access is
+    derived ONLY from the Employee reporting hierarchy (see
+    get_sales_target_gp_entry_allowed_sales_persons). System Manager /
+    Administrator see all; an Employee with no linked Sales Person, or no
+    Employee mapping at all, sees only records they created."""
+    if not user:
+        user = frappe.session.user
+
+    allowed = get_sales_target_gp_entry_allowed_sales_persons(user)
+    if allowed is None:
+        return ""
+
+    if not allowed:
+        return f"`tabSales Target GP Entry`.owner = {frappe.db.escape(user)}"
+
+    escaped = ", ".join(frappe.db.escape(a) for a in allowed)
+    return f"`tabSales Target GP Entry`.salesperson in ({escaped})"
+
+
 def get_deal_cost_sheet_query_conditions(user):
     if not user:
         user = frappe.session.user

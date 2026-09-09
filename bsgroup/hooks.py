@@ -273,6 +273,7 @@ permission_query_conditions = {
     "Deal Cost Sheet": "bsgroup.permissions.get_deal_cost_sheet_query_conditions",
     "Quotation": "bsgroup.permissions.get_common_conditions",
     "Customer": "bsgroup.permissions.get_customer_query_conditions",
+    "Sales Target GP Entry": "bsgroup.permissions.get_sales_target_gp_entry_query_conditions",
     "*": "bsgroup.utils.company_access.global_company_condition",
 }
 
@@ -300,14 +301,14 @@ doctype_js = {
     "Timesheet": "public/js/timesheet.js",
     "Leave Application": "public/js/leave_application.js",
     "Material Request": "public/js/material_request.js",
-    # "HD Ticket": "public/js/hd_ticket.js",
-    "HD Ticket": ["public/js/hd_ticket_service_report.js"],
+    "HD Ticket": ["public/js/hd_ticket_service_report.js", "public/js/hd_ticket.js"],
     "Tech Task Scheduler": "public/js/tech_task_scheduler.js",
 }
 
 doctype_list_js = {
     "Project": "public/js/project_list.js",
     "Presales Request": "public/js/presales_request_list.js",
+    "PPM Management": "public/js/ppm_management_list.js",
 }
 
 doc_events = {
@@ -333,6 +334,25 @@ doc_events = {
     },
     "Leave Application": {
         "validate": "bsgroup.utils.leave_application.validate_medical_certificate",
+    },
+    "Sales Person": {
+        "validate": "bsgroup.utils.sales_person.validate_targets",
+    },
+    "Task": {
+        "before_validate": [
+            # Must run before core Task.validate() -> validate_status() ->
+            # close_all_assignments(), which clears _assign as soon as status
+            # becomes Completed. This guard needs to read _assign as it was
+            # BEFORE that happens, so it cannot run as a "validate" hook.
+            "bsgroup.utils.task.validate_zztest_task_closure_authority",
+        ],
+        "validate": [
+            "bsgroup.utils.task.validate_completion_from_blocked_status",
+            "bsgroup.utils.task.validate_milestone_requirements",
+        ],
+        "on_update": [
+            "bsgroup.utils.task.sync_zztest_task_scheduler_status",
+        ],
     },
     "HD Ticket": {
         "validate": [

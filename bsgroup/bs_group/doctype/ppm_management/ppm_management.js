@@ -18,4 +18,24 @@ frappe.ui.form.on("PPM Management", {
 			});
 		}, __("Create"));
 	},
+	frequency: generate_ppm_schedule,
+	contract_start_date: generate_ppm_schedule,
 });
+
+function generate_ppm_schedule(frm) {
+	// PPM Visit Schedule fields: visit_date, assigned_engineer, status
+	// (Scheduled\nCompleted\nMissed) - no visit_label/planned_date/"Planned".
+	const map = { 'Monthly': 12, 'Quarterly': 4, 'Half-Yearly': 2, 'Yearly': 1 };
+	const n = map[frm.doc.frequency];
+	if (!n || !frm.doc.contract_start_date) return;
+	const step = 12 / n; // months between visits
+	frm.clear_table('ppm_schedule');
+	for (let i = 0; i < n; i++) {
+		const d = frappe.datetime.add_months(frm.doc.contract_start_date, step * (i + 1));
+		const row = frm.add_child('ppm_schedule');
+		row.visit_date = d;
+		row.assigned_engineer = frm.doc.assigned_engineer;
+		row.status = 'Scheduled';
+	}
+	frm.refresh_field('ppm_schedule');
+}
