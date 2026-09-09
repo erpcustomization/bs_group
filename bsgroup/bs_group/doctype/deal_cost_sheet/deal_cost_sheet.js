@@ -458,7 +458,7 @@ function recalc_parent(frm) {
 	const total_cost = products_cost_total + services_cost_total + additional_charges_total + total_resource_cost;
 	const total_selling = products_selling_total + services_selling_total;
 	const margin_value = total_selling - total_cost;
-	const margin_percent = total_cost ? ((total_selling / total_cost) - 1) * 100 : 0;
+	const margin_percent = total_selling ? (margin_value / total_selling) * 100 : 0;
 
 	frm.doc.products_cost_total    = products_cost_total;
 	frm.doc.products_selling_total = products_selling_total;
