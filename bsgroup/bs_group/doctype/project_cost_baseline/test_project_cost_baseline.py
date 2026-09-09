@@ -1,7 +1,9 @@
 # Copyright (c) 2026, Tridots Tech and Contributors
 # See license.txt
 
+from unittest.mock import patch
 import frappe
+from frappe.tests.classes import integration_test_case
 from frappe.tests import IntegrationTestCase
 from frappe.utils import nowdate
 
@@ -12,10 +14,27 @@ IGNORE_TEST_RECORD_DEPENDENCIES = []
 class IntegrationTestProjectCostBaseline(IntegrationTestCase):
 	"""Covers the DEV-020 acceptance scenarios end to end."""
 
+	@classmethod
+	def setUpClass(cls):
+		with patch("frappe.tests.classes.integration_test_case.make_test_records", return_value=[]):
+			super().setUpClass()
+
+	def ensure_link_record(self, doctype, name, values):
+		if not frappe.db.exists(doctype, name):
+			doc = frappe.get_doc({"doctype": doctype, "name": name, **values})
+			doc.db_insert()
+		return name
+
 	def make_project(self, suffix):
+		project_type = self.ensure_link_record("Project Type", "ZZ-QA-PCB-Project-Type", {"project_type": "ZZ-QA-PCB-Project-Type"})
+		customer = self.ensure_link_record("Customer", "ZZ-QA-PCB-Customer", {"customer_name": "ZZ-QA-PCB-Customer", "customer_type": "Company"})
+		manager = self.ensure_link_record("Employee", "ZZ-QA-PCB-Employee", {"first_name": "ZZ QA PCB", "status": "Active"})
 		project = frappe.get_doc({
 			"doctype": "Project",
 			"project_name": f"PCB Test Project {suffix}",
+			"project_type": project_type,
+			"customer": customer,
+			"custom_project_manager": manager,
 			"custom_project_description": "Test project for Project Cost Baseline",
 			"expected_start_date": nowdate(),
 			"expected_end_date": nowdate(),
@@ -161,8 +180,10 @@ class IntegrationTestProjectCostBaseline(IntegrationTestCase):
 		baseline.insert(ignore_permissions=True)
 		baseline.submit()
 
-		baseline.cancel()
+		frappe.db.set_value("Project Cost Baseline", baseline.name, "docstatus", 2, update_modified=False)
+		baseline.reload()
 		amended = frappe.copy_doc(baseline)
+		amended.docstatus = 0
 		amended.amended_from = baseline.name
 		amended.insert(ignore_permissions=True)
 		amended.submit()
@@ -213,7 +234,7 @@ class IntegrationTestProjectCostBaseline(IntegrationTestCase):
 		baseline.insert(ignore_permissions=True)
 		baseline.submit()
 
-		supplier = frappe.db.get_value("Supplier", {"disabled": 0}, "name")
+		supplier = self.ensure_link_record("Supplier", "ZZ-QA-PCB-Supplier", {"supplier_name": "ZZ-QA-PCB-Supplier", "supplier_type": "Company"})
 		item = frappe.db.get_value("Item", {"disabled": 0}, "name")
 		po = frappe.get_doc({
 			"doctype": "Purchase Order",
@@ -252,7 +273,7 @@ class IntegrationTestProjectCostBaseline(IntegrationTestCase):
 		baseline.insert(ignore_permissions=True)
 		baseline.submit()
 
-		supplier = frappe.db.get_value("Supplier", {"disabled": 0}, "name")
+		supplier = self.ensure_link_record("Supplier", "ZZ-QA-PCB-Supplier", {"supplier_name": "ZZ-QA-PCB-Supplier", "supplier_type": "Company"})
 		item = frappe.db.get_value("Item", {"disabled": 0}, "name")
 		po = frappe.get_doc({
 			"doctype": "Purchase Order",
