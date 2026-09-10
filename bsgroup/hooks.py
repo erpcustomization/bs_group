@@ -312,6 +312,9 @@ doctype_list_js = {
 }
 
 doc_events = {
+    "DCS Governance Event": {
+        "before_insert": "bsgroup.dcs.governance_event_guard.before_insert",
+    },
     "Attendance": {
         "on_submit": "bsgroup.utils.attendance.create_comp_off_on_attendance_submit",
     },
