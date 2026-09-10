@@ -42,10 +42,15 @@ def before_insert(doc, method=None):
 		target_doctype = row.get("target_doctype") or "Deal Cost Sheet"
 		df = frappe.get_meta(target_doctype).get_field(fieldname) if fieldname else None
 
-		if not row.get("field_label"):
-			row["field_label"] = df.label if df else fieldname
-		if not row.get("value_type"):
-			row["value_type"] = df.fieldtype if df else type(row.get("new_value")).__name__
+		# Callers that don't know the real label/type (e.g. dcs_presales_sync)
+		# fall back to the fieldname itself / a generic "Data" type -- prefer
+		# real doctype metadata over those placeholders whenever it's available.
+		if df:
+			row["field_label"] = df.label or row.get("field_label") or fieldname
+			row["value_type"] = df.fieldtype
+		else:
+			row.setdefault("field_label", fieldname)
+			row.setdefault("value_type", type(row.get("new_value")).__name__)
 
 	doc.change_count = len(changes)
 	doc.changes = json.dumps(changes)
