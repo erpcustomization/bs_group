@@ -28,3 +28,18 @@ package) has a fixed reference for each script.
 | DCS_Revision_Immutability_Guard.py / DCS_Revision_Deletion_Guard.py | DocType Event guards | bsgroup/bs_group/doctype/dcs_revision/dcs_revision.py |
 | DCS_Handover_Condition_*_Guard.py | DocType Event guards | bsgroup/bs_group/doctype/dcs_handover_condition/dcs_handover_condition.py (already ported in ead9e4c) |
 | HD_Partner_Email_Threading_Communication_Before_Insert.py | DocType Event | compared with bsgroup.utils.communication.hd_partner_email_threading (W-2, decision pending staging) |
+
+## Production Server Script inventory and disposition register (read 12 Sep 2026 00:5x UAE, Frappe Cloud read-only SQL Playground)
+
+* `server_scripts_251.psv` - all 251 production Server Scripts (177 disabled / 74 enabled):
+  `name|script_type|reference_doctype|doctype_event|api_method|event_frequency|disabled|len(script)|creation|modified|modified_by`.
+* `script_disposition_register.csv` - every script assigned one of the four release states:
+  1. Replacement in rel-1 (36) - verified in staging per the S-Ret reference, then retired one at a time;
+  2. Documented exception (57) - 7 kept enabled by decision (dcs_narrative_guard etc.), 39 enabled but outside
+     the DCS register, 11 disabled by the 8-10 Sep migration with app replacements outside this release;
+  3. Obsolete, disabled, on the deletion manifest (154);
+  4. Blocked pending owner decision (4): DCS Presales Effort Metrics x2 (M-8), SI Bypass Project Customer Validation,
+     Block Duplicate Quotation.
+* `deletion_manifest.csv` - the 154 obsolete scripts. Deletion only after 30 stable production days following the
+  release, and only after exporting each body (Server Script > Export JSON) to the release evidence folder; several are
+  large one-off migrations (zoho_bill_migrate 65 KB, zoho_payment_migrate 28 KB) whose code has no other copy.
