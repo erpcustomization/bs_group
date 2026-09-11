@@ -1,0 +1,37 @@
+# Production erp-bitssecureit.u.frappe.cloud, Frappe Cloud read-only SQL Playground, DB time 2026-09-11 21:07-21:20 (site clock; UAE ~01:07-01:20 12 Sep)
+# Freeze check V-10: 0 Version rows for Server Script / Custom Field / Property Setter / DocType / Client Script / Workflow / Role / DocPerm / System Settings after 2026-09-11 18:35; Server Script max(modified)=2026-09-11 18:34:13
+# Backup taken for staging: "Backup on Sat, Sep 12, 2026 12:58 AM" DB 75.15 MB, public 5.32 MB, private 652.22 MB, files=yes
+DocType|1105|2026-09-09 22:21:59.806959
+CustomField|421|2026-09-09 17:28:30.255914
+PropertySetter|408|2026-09-10 12:12:18.876044
+ServerScript|251|177|2026-09-11 18:34:13.222141
+ClientScript|43|2026-09-11 18:34:10.011538
+DocPerm_DCS|5
+DocPerm_PR|3
+DocPerm_PCB|3
+DocPerm_GE|1
+DocPerm_HC|4
+CustomDocPerm_all|491
+PR|106|5|2026-09-12 00:00:09.493767
+PR_badcustomer|63
+PR_duedate|102
+DCS|162|11|94|57|2026-09-11 17:35:34.995808
+DCS_dangling_PR|4
+GovEvent|86|10|2026-09-11 17:36:09.717776
+HandoverCond|20|2026-09-11 17:33:09.254448
+Revision|54|2026-09-11 17:31:27.047755
+AwardReversal|3
+PCB|0
+Opportunity|225
+Customer|931
+Lead|858
+Project|2366
+Quotation|1179
+HDTicket|758
+Communication|3745
+EmailAccount|4|1|2
+Webhook|4|1
+HC_doctype|1|Custom|format:{dcs}-HC{condition_no}
+BSGS|cost_overrun_policy|Warn
+BSGS|dcs_addtional_item|
+# note: PR max(modified) 2026-09-12 00:00:09 = nightly calculate_due_date bumping modified (R4-2), not a configuration change
