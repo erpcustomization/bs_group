@@ -11,3 +11,5 @@ bsgroup.patches.share_existing_tech_task_scheduler_assignments
 # bsgroup.patches.backfill_quotation_pipeline_stage  # run manually when ready to backfill existing quotations
 bsgroup.patches.v0_1.verify_handover_condition_doctype
 bsgroup.patches.v0_1.drop_orphan_governance_change
+bsgroup.patches.v0_1.lock_pcb_until_g_pcb
+bsgroup.patches.v0_1.backfill_party_fields
