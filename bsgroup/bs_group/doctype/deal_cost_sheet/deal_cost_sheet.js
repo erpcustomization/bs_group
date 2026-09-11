@@ -2970,9 +2970,33 @@ function dcs_set_html(frm, field, html) {
 	if (f && f.$wrapper) { f.$wrapper.html(html); }
 }
 
+// A-14: governed DCS services now live in app code (bsgroup/api/dcs). Every
+// workspace call resolves through this map to the dotted app method; the bare
+// Server Script names are no longer called from the client.
+var DCS_METHODS = {
+	dcs_apply_revision: 'bsgroup.api.dcs.negotiation.dcs_apply_revision',
+	dcs_screen3: 'bsgroup.api.dcs.negotiation.dcs_screen3',
+	dcs_approval_decision: 'bsgroup.api.dcs.approval.dcs_approval_decision',
+	dcs_screen4: 'bsgroup.api.dcs.approval.dcs_screen4',
+	dcs_record_award: 'bsgroup.api.dcs.award.dcs_record_award',
+	dcs_award_reversal: 'bsgroup.api.dcs.award.dcs_award_reversal',
+	dcs_po_reconcile: 'bsgroup.api.dcs.award.dcs_po_reconcile',
+	dcs_set_delivery_owner: 'bsgroup.api.dcs.handover.dcs_set_delivery_owner',
+	dcs_handover_action: 'bsgroup.api.dcs.handover.dcs_handover_action',
+	dcs_delivery_release: 'bsgroup.api.dcs.handover.dcs_delivery_release',
+	dcs_screen5: 'bsgroup.api.dcs.handover.dcs_screen5'
+};
+
+function dcs_method(name) {
+	if (!DCS_METHODS[name]) {
+		throw new Error('Unknown governed DCS service: ' + name);
+	}
+	return DCS_METHODS[name];
+}
+
 function dcs_call(method, args) {
 	return new Promise(function (resolve) {
-		frappe.call({ method: method, args: args, callback: function (r) { resolve((r && r.message) || {}); }, error: function () { resolve({}); } });
+		frappe.call({ method: dcs_method(method), args: args, callback: function (r) { resolve((r && r.message) || {}); }, error: function () { resolve({}); } });
 	});
 }
 
@@ -3169,7 +3193,7 @@ function dcs_render_handover(frm, s5) {
 
 function dcs_run(frm, method, args, dlg) {
 	frappe.call({
-		method: method,
+		method: dcs_method(method),
 		args: args,
 		freeze: true,
 		freeze_message: __('Applying...'),
@@ -3180,7 +3204,11 @@ function dcs_run(frm, method, args, dlg) {
 				return;
 			}
 			if (dlg) { dlg.hide(); }
-			frappe.show_alert({ message: __('Recorded'), indicator: 'green' });
+			if (m.idempotent_replay) {
+				frappe.show_alert({ message: __('Already recorded - nothing changed again'), indicator: 'blue' });
+			} else {
+				frappe.show_alert({ message: __('Recorded'), indicator: 'green' });
+			}
 			frm.reload_doc();
 		}
 	});
