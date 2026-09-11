@@ -16,7 +16,11 @@
   "correlation_id",
   "change_count",
   "reason",
-  "changes"
+  "changes",
+  "source_event_id",
+  "revision_no",
+  "revision_reference",
+  "evidence_reference"
  ],
  "fields": [
   {
@@ -56,25 +60,32 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Actor",
-   "options": "User"
+   "options": "User",
+   "reqd": 1,
+   "read_only": 1
   },
   {
    "fieldname": "event_timestamp",
    "fieldtype": "Datetime",
    "in_list_view": 1,
-   "label": "Event Timestamp"
+   "label": "Event Timestamp",
+   "reqd": 1,
+   "read_only": 1
   },
   {
    "default": "Success",
    "fieldname": "outcome",
    "fieldtype": "Select",
    "label": "Outcome",
-   "options": "Success\nFailure"
+   "options": "Success\nFailure",
+   "read_only": 1
   },
   {
    "fieldname": "correlation_id",
    "fieldtype": "Data",
-   "label": "Correlation ID"
+   "label": "Correlation ID",
+   "reqd": 1,
+   "read_only": 1
   },
   {
    "fieldname": "change_count",
@@ -89,14 +100,41 @@
   {
    "fieldname": "changes",
    "fieldtype": "JSON",
-   "label": "Changes"
+   "label": "Changes",
+   "reqd": 1
+  },
+  {
+   "fieldname": "source_event_id",
+   "fieldtype": "Data",
+   "label": "Request Key",
+   "read_only": 1,
+   "description": "Idempotency key of the business request that produced this event. One key, one event.",
+   "search_index": 1
+  },
+  {
+   "fieldname": "revision_no",
+   "fieldtype": "Int",
+   "label": "Revision No",
+   "read_only": 1
+  },
+  {
+   "fieldname": "revision_reference",
+   "fieldtype": "Data",
+   "label": "Revision Reference",
+   "read_only": 1
+  },
+  {
+   "fieldname": "evidence_reference",
+   "fieldtype": "Data",
+   "label": "Evidence Reference",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "in_create": 1,
  "links": [],
- "modified": "2026-09-07 00:00:00.000000",
+ "modified": "2026-09-11 21:00:00.000000",
  "modified_by": "Administrator",
  "module": "BS Group",
  "name": "DCS Governance Event",
@@ -105,16 +143,28 @@
  "owner": "Administrator",
  "permissions": [
   {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
+   "role": "System Manager",
+   "read": 1,
    "export": 1,
    "print": 1,
-   "read": 1,
    "report": 1,
-   "role": "System Manager",
-   "share": 1,
-   "write": 1
+   "email": 1,
+   "share": 1
+  },
+  {
+   "role": "Sales Manager",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Commercial Controller",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Managing Director",
+   "read": 1,
+   "report": 1
   }
  ],
  "row_format": "Dynamic",

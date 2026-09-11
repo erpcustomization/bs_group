@@ -448,7 +448,12 @@ scheduler_events = {
 }
 
 
-before_request = ["bsgroup.utils.email_threading.apply_patches"]
+before_request = [
+    "bsgroup.utils.email_threading.apply_patches",
+    # A-13: one governance correlation id per request; never reused across requests.
+    "bsgroup.dcs.governance.reset_correlation_id",
+]
+before_job = ["bsgroup.dcs.governance.reset_correlation_id"]
 
 fixtures = [
     {

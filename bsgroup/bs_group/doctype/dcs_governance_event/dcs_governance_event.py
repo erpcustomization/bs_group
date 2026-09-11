@@ -4,20 +4,24 @@
 import frappe
 from frappe.model.document import Document
 
+from bsgroup.dcs.governance_event_guard import before_insert as _guard_before_insert
+
 
 class DCSGovernanceEvent(Document):
+	"""Append-only governed audit trail.
+
+	The trust boundary lives in ``bsgroup.dcs.governance_event_guard`` and is
+	wired both through ``hooks.doc_events`` and here, so removing either
+	registration alone cannot open the DocType to direct inserts.
+	"""
+
 	def before_insert(self):
-		# Written only by audit-guard code paths (e.g. DCS Record Authority
-		# Guard) via `ev.flags.dcs_audit_write = 1; ev.insert(ignore_permissions=True)`.
-		# This is a simple append-only log doctype: no submit, no update.
-		pass
+		_guard_before_insert(self)
 
 	def validate(self):
 		# DCS Governance Event - Immutability Guard (D2a).
 		# The canonical governed audit trail is append-only. A recorded event is never edited.
-		prev = self.get_doc_before_save()
-
-		if prev is not None:
+		if not self.is_new():
 			frappe.throw(
 				"DCS Governance Event "
 				+ str(self.name)

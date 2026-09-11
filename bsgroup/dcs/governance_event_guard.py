@@ -1,16 +1,28 @@
-"""Guard for DCS Governance Event.
+"""Trust boundary for DCS Governance Event.
 
-Only code paths that explicitly set ``doc.flags.dcs_audit_write = 1`` before
-calling ``insert()`` may create these records, and every record must carry a
-non-empty change set.
+Registered on ``doc_events["DCS Governance Event"]["before_insert"]`` in
+``hooks.py`` and also called from the DocType controller so the boundary
+holds even if the hook registration were ever lost.
 
-``changes`` is a JSON field (a JSON-encoded list of dicts), not a child
-table -- it must be decoded, never iterated as rows.
+* Insert is permitted only when ``doc.flags.dcs_audit_write == 1``. The flag
+  cannot be set over REST, so ``/api/resource`` and ``frappe.client.insert``
+  are refused with ``PermissionError``.
+* ``actor``, ``event_timestamp``, ``outcome`` and ``correlation_id`` are
+  overwritten from the server context. Whatever the caller put in them is
+  discarded.
+* ``changes`` is a JSON-encoded list of dicts (never a child table); an empty
+  or malformed change set is rejected after being logged.
+* ``source_event_id`` (idempotency key) must not already exist.
 """
 
 import json
 
 import frappe
+from frappe.utils import now
+
+from bsgroup.dcs.governance import get_correlation_id
+
+VALID_OUTCOMES = ("Success", "Failure")
 
 
 def before_insert(doc, method=None):
@@ -21,6 +33,24 @@ def before_insert(doc, method=None):
 			frappe.PermissionError,
 		)
 
+	# --- server-derived identity: never trust the caller ---------------------
+	doc.actor = frappe.session.user
+	doc.event_timestamp = now()
+	doc.correlation_id = get_correlation_id()
+	if doc.outcome not in VALID_OUTCOMES:
+		doc.outcome = "Success"
+
+	# --- idempotency -----------------------------------------------------------
+	if doc.source_event_id:
+		dup = frappe.db.get_value("DCS Governance Event", {"source_event_id": doc.source_event_id}, "name")
+		if dup:
+			frappe.throw(
+				f"A governance event for this request already exists ({dup}). "
+				"Repeated identical requests are not recorded twice.",
+				frappe.DuplicateEntryError,
+			)
+
+	# --- change set ------------------------------------------------------------
 	changes = _load_changes(doc.changes)
 
 	if not changes:
@@ -40,7 +70,9 @@ def before_insert(doc, method=None):
 	for row in changes:
 		fieldname = row.get("fieldname")
 		target_doctype = row.get("target_doctype") or "Deal Cost Sheet"
-		df = frappe.get_meta(target_doctype).get_field(fieldname) if fieldname else None
+		df = None
+		if fieldname and frappe.db.exists("DocType", target_doctype):
+			df = frappe.get_meta(target_doctype).get_field(fieldname)
 
 		# Callers that don't know the real label/type (e.g. dcs_presales_sync)
 		# fall back to the fieldname itself / a generic "Data" type -- prefer
