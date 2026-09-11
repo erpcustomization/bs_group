@@ -22,6 +22,14 @@ class DealCostSheet(Document):
 	def after_insert(self):
 		if self.presales_request:
 			dcs_presales_sync(self.presales_request, source="dcs_created")
+			# Reflect the projection dcs_presales_sync just persisted onto this
+			# in-memory doc, so the sheet the user just created is already
+			# correct without needing a further save/reload.
+			fresh = frappe.db.get_value(
+				"Deal Cost Sheet", self.name, list(PRESALES_SYNC_FIELD_MAP.keys()), as_dict=True
+			) or {}
+			for f in PRESALES_SYNC_FIELD_MAP:
+				self.set(f, fresh.get(f))
 
 	def before_save(self):
 		calculate_deal_financials(self)
