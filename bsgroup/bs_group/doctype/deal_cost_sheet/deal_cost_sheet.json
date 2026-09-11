@@ -11,6 +11,9 @@
   "currency",
   "opportunity",
   "presales_request",
+  "party_type",
+  "party",
+  "organisation_name",
   "customer",
   "site_visit",
   "project",
@@ -191,9 +194,39 @@
    "options": "Presales Request"
   },
   {
-   "fieldname": "customer",
+   "fieldname": "party_type",
+   "fieldtype": "Select",
+   "label": "Party Type",
+   "options": "Lead\nCustomer",
+   "reqd": 1,
+   "in_standard_filter": 1,
+   "description": "Who the request is for. A Lead may be costed; a Customer record is required before the deal is Won or a Project is linked (D3)."
+  },
+  {
+   "fieldname": "party",
+   "fieldtype": "Dynamic Link",
+   "label": "Party",
+   "options": "party_type",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "organisation_name",
    "fieldtype": "Data",
-   "label": "Customer"
+   "label": "Organisation Name",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "description": "Derived on the server from Lead.company_name or Customer.customer_name. Used for naming."
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer",
+   "read_only": 1,
+   "description": "Set automatically from Party when Party Type is Customer. A Project may be linked only when a Customer is set (D3)."
   },
   {
    "fetch_from": "presales_request.site_visit",
@@ -1176,11 +1209,11 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-09-08 17:48:18.907639",
+ "modified": "2026-09-11 21:05:00.000000",
  "modified_by": "Administrator",
  "module": "BS Group",
  "name": "Deal Cost Sheet",
- "naming_rule": "By \"Naming Series\" field",
+ "naming_rule": "Expression (old style)",
  "owner": "Administrator",
  "permissions": [
   {

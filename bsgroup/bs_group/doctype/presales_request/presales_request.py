@@ -2,27 +2,70 @@
 # For license information, please see license.txt
 
 import frappe
-import re
+from frappe import _
 from frappe.model.document import Document
-from frappe.utils import getdate, nowdate, now
+from frappe.utils import getdate, nowdate
+
+from bsgroup.utils.party import apply_party_model, require_customer, slug
 
 
 class PresalesRequest(Document):
 	SITE_VISIT_CLOSING_STATUSES = ("Completed", "Won", "Lost")
 	EFFORT_LOGGING_CLOSING_STATUSES = ("Ready for Quotation", "Submitted to Sales", "Completed", "Won", "Lost")
 	COMPLETION_DATE_STATUSES = ("Completed", "Won", "Lost")
+	# D3: these outcomes commit the business to a counterparty; a Customer record must exist.
+	CUSTOMER_REQUIRED_STATUSES = ("Won",)
+	# Statuses the daily overdue scheduler leaves alone (A-8).
+	CLOSED_STATUSES = ("Completed", "Won", "Lost", "Cancelled")
 
 	def validate(self):
+		apply_party_model(self)
+		self._validate_customer_before_award()
+		self._validate_unique_per_opportunity()
 		self._validate_site_visit_required()
 		self._validate_effort_logged_before_closing()
 
 	def autoname(self):
-		if self.customer:
-			customer = re.sub(r'[^a-zA-Z0-9\s]', '', self.customer)  # keep uppercase too
-			customer = re.sub(r'\s+', '-', customer.strip())
+		# Named after the organisation (D2); identical slug rule to the historical
+		# customer-based name so existing PR-<slug>-### names stay consistent.
+		apply_party_model(self)
+		base = slug(self.organisation_name or self.customer)
+		if base:
+			self.name = frappe.model.naming.make_autoname(f"PR-{base}-.###")
 
-			self.name = frappe.model.naming.make_autoname(f"PR-{customer}-.###")
-	
+	def _validate_customer_before_award(self):
+		if self.status in self.CUSTOMER_REQUIRED_STATUSES:
+			require_customer(self, _("the request is set to {0}").format(self.status))
+
+	def _validate_unique_per_opportunity(self):
+		"""A-7: one live Presales Request per Opportunity.
+
+		Enforced only when the Opportunity link is being set or changed, so a
+		pre-existing duplicate (historical remediation H-2) stays saveable.
+		"""
+		if not self.opportunity:
+			return
+		before = self.get_doc_before_save()
+		if before is not None and before.opportunity == self.opportunity:
+			return
+		frappe.db.get_value("Opportunity", self.opportunity, "name", for_update=True)
+		other = frappe.db.get_value(
+			"Presales Request",
+			{
+				"opportunity": self.opportunity,
+				"docstatus": ["<", 2],
+				"status": ["!=", "Cancelled"],
+				"name": ["!=", self.name or ""],
+			},
+			"name",
+		)
+		if other:
+			frappe.throw(
+				_("Opportunity {0} already has an active Presales Request: {1}. Only one Presales Request may be open per Opportunity.")
+				.format(self.opportunity, other),
+				title=_("Duplicate Presales Request"),
+			)
+
 	def before_save(self):
 		calculate_quality_score(self)
 
@@ -100,25 +143,40 @@ def calculate_quality_score(doc):
 		doc.quality_score = score
 
 def calculate_due_date():
-    presales_requests = frappe.get_all(
-        "Presales Request",
-        fields=["name", "due_date"]
-    )
+	"""Daily scheduler (A-8): keep `overdue` / `delay_days` current on live requests.
 
-    today = getdate(nowdate())
-
-    for pre in presales_requests:
-        if pre.due_date:
-            due_date = getdate(pre.due_date)
-
-            overdue = 1 if due_date < today else 0
-            delay_days = (today - due_date).days if overdue else 0
-
-            frappe.db.set_value(
-                "Presales Request",
-                pre.name,
-                {
-                    "overdue": overdue,
-                    "delay_days": delay_days
-                }
-            )
+	Only open, uncancelled requests with a due date are considered; a record is
+	written only when the stored values actually differ; `modified` is never
+	bumped by this housekeeping; one failing record never stops the run.
+	"""
+	today = getdate(nowdate())
+	rows = frappe.get_all(
+		"Presales Request",
+		filters={
+			"docstatus": ["<", 2],
+			"status": ["not in", list(PresalesRequest.CLOSED_STATUSES)],
+			"due_date": ["is", "set"],
+		},
+		fields=["name", "due_date", "overdue", "delay_days"],
+		limit_page_length=0,
+	)
+	scanned = updated = failed = 0
+	for pre in rows:
+		scanned += 1
+		try:
+			due_date = getdate(pre.due_date)
+			overdue = 1 if due_date < today else 0
+			delay_days = (today - due_date).days if overdue else 0
+			if frappe.utils.cint(pre.overdue) == overdue and frappe.utils.cint(pre.delay_days) == delay_days:
+				continue
+			frappe.db.set_value(
+				"Presales Request", pre.name, {"overdue": overdue, "delay_days": delay_days}, update_modified=False
+			)
+			updated += 1
+		except Exception:
+			failed += 1
+			frappe.log_error(title="Presales Request overdue scheduler", message=frappe.get_traceback())
+	frappe.logger("bsgroup").info(
+		f"calculate_due_date: scanned={scanned} updated={updated} failed={failed} today={today}"
+	)
+	return {"scanned": scanned, "updated": updated, "failed": failed}

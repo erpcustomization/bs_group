@@ -2,19 +2,20 @@
 # For license information, please see license.txt
 
 import frappe
-import re
 from frappe.model.document import Document
 
 from bsgroup.dcs.governance import record_governance_event
+from bsgroup.utils.party import apply_party_model, require_customer, slug
 
 
 class DealCostSheet(Document):
 	def autoname(self):
-		if self.customer:
-			customer = re.sub(r'[^a-zA-Z0-9\s]', '', self.customer)
-			customer = re.sub(r'\s+', '-', customer.strip())
-
-			self.name = frappe.model.naming.make_autoname(f"DCS-{customer}-.###")
+		# Named after the organisation (D2) with the same slug rule the customer
+		# text used, so DCS-<slug>-### names are unchanged for existing parties.
+		apply_party_model(self)
+		base = slug(self.organisation_name or self.customer)
+		if base:
+			self.name = frappe.model.naming.make_autoname(f"DCS-{base}-.###")
 
 	def before_insert(self):
 		dcs_company_default_insert(self)
@@ -46,8 +47,11 @@ class DealCostSheet(Document):
 		dcs_margin_canonicalisation(self)
 
 	def validate(self):
-		# if not self.project:
-		# 	frappe.throw("Project is mandatory on the Deal Cost Sheet before it can be used as a Project Cost Baseline source.")
+		apply_party_model(self)
+		# D3: a Project (and therefore a Project Cost Baseline) may only hang off a
+		# sheet whose party is a real Customer record.
+		if self.project:
+			require_customer(self, "a Project is linked to this Deal Cost Sheet")
 
 		if self.presales_request:
 			site_visit_required = frappe.db.get_value(

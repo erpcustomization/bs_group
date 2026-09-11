@@ -8,27 +8,34 @@ frappe.ui.form.on("Presales Request", {
         }
     },
     opportunity(frm) {
-        if (frm.doc.opportunity) {
-            frappe.db.get_value("Opportunity", frm.doc.opportunity,
-                ["opportunity_from", "party_name"]
-            ).then(r => {
-                if (!r.message) return;
-                let opp = r.message;
-                if (opp.opportunity_from === "Customer" && opp.party_name) {
-                    // party_name is a real Customer record only when the
-                    // Opportunity came from an existing Customer.
-                    frm.set_value("customer", opp.party_name);
-                    frm.set_value("is_new_customer", 0);
-                } else {
-                    // Opportunity_from is Lead (or unset) - there is no
-                    // Customer master record yet. Leave customer for the
-                    // user to pick/create and flag it as a new customer
-                    // instead of guessing a Customer link that doesn't exist.
-                    frm.set_value("customer", "");
-                    frm.set_value("is_new_customer", 1);
-                }
-            });
+        // A-6: the party comes from the Opportunity as recorded there. `customer`
+        // is derived on the server from the party and is never set here.
+        if (!frm.doc.opportunity) return;
+        frappe.db.get_value("Opportunity", frm.doc.opportunity,
+            ["opportunity_from", "party_name", "custom_organization_name"]
+        ).then(r => {
+            if (!r.message) return;
+            let opp = r.message;
+            if ((opp.opportunity_from === "Customer" || opp.opportunity_from === "Lead") && opp.party_name) {
+                frm.set_value("party_type", opp.opportunity_from);
+                frm.set_value("party", opp.party_name);
+                frm.set_value("organisation_name", opp.custom_organization_name || "");
+                frm.set_value("is_new_customer", opp.opportunity_from === "Lead" ? 1 : 0);
+            }
+        });
+    },
+    party_type(frm) {
+        if (frm.doc.party && frm.doc.party_type) {
+            // party is a Dynamic Link: a change of type invalidates the value.
+            frm.set_value("party", "");
         }
+    },
+    party(frm) {
+        if (!frm.doc.party || !frm.doc.party_type) return;
+        let field = frm.doc.party_type === "Customer" ? "customer_name" : "company_name";
+        frappe.db.get_value(frm.doc.party_type, frm.doc.party, field).then(r => {
+            if (r.message) frm.set_value("organisation_name", r.message[field] || frm.doc.party);
+        });
     },
     refresh(frm){
         set_completion_date(frm);
@@ -41,7 +48,9 @@ frappe.ui.form.on("Presales Request", {
                 frappe.new_doc("Deal Cost Sheet", {
                     opportunity: frm.doc.opportunity,
                     presales_request : frm.doc.name,
-                    customer: frm.doc.customer,
+                    party_type: frm.doc.party_type,
+                    party: frm.doc.party,
+                    organisation_name: frm.doc.organisation_name,
                     deal_owner: frm.doc.requested_by,
                     company: frm.doc.company,
                     subject: frm.doc.subject
