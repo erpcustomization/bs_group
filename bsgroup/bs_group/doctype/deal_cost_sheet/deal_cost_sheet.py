@@ -2,9 +2,10 @@
 # For license information, please see license.txt
 
 import frappe
-import json
 import re
 from frappe.model.document import Document
+
+from bsgroup.dcs.governance import record_governance_event
 
 
 class DealCostSheet(Document):
@@ -60,6 +61,9 @@ class DealCostSheet(Document):
 
 @frappe.whitelist()
 def make_quotation(source_name):
+	# A-12: the caller must be allowed to read this sheet and to create a Quotation.
+	frappe.has_permission("Deal Cost Sheet", "read", source_name, throw=True)
+	frappe.has_permission("Quotation", "create", throw=True)
 	source = frappe.get_doc("Deal Cost Sheet", source_name)
 
 	opp = frappe.db.get_value(
@@ -246,16 +250,13 @@ def dcs_one_active_guard_insert(doc):
 
 	Reproduced from the live-site "dcs_one_active_guard_insert" Server Script,
 	which was created disabled there ("activation is an owner decision").
-	Mirrored here behind BS Group Settings.enable_dcs_one_active_guard, which
-	defaults to unchecked so behaviour is unchanged until an owner opts in.
+	Always on since rel-1 (A-3): the BS Group Settings gate that could leave
+	this control silently off has been removed.
 
 	Fires only on insert of a brand new document, so it can never make a
 	pre-existing record fail to save, and never cancels/amends/merges/renames/
 	relinks/deletes anything. No role bypasses this control.
 	"""
-	if not frappe.db.get_single_value("BS Group Settings", "enable_dcs_one_active_guard"):
-		return
-
 	opp = doc.opportunity
 	if not opp:
 		return
@@ -292,9 +293,6 @@ def dcs_one_active_guard_submit(doc):
 	second independently active commercial position. Only already-submitted
 	independent siblings block; drafts never block a submit.
 	"""
-	if not frappe.db.get_single_value("BS Group Settings", "enable_dcs_one_active_guard"):
-		return
-
 	opp = doc.opportunity
 	if not opp:
 		return
@@ -389,13 +387,9 @@ def dcs_governed_field_guard(doc):
 	plus the NRC-1 protected-field-name channel on custom_closure_notes.
 
 	Reproduced from the live-site "Deal Cost Sheet - Governed Field Guard"
-	Server Script. Opt-in via BS Group Settings.enable_dcs_governed_field_guard
-	(default unchecked) since this is a real behavioural change: it can block
-	edits to fields that may currently be freely editable.
+	Server Script. Always on since rel-1 (A-3): the app copy is the control,
+	not an opt-in mirror of the script.
 	"""
-	if not frappe.db.get_single_value("BS Group Settings", "enable_dcs_governed_field_guard"):
-		return
-
 	prev = doc.get_doc_before_save()
 	if prev is not None:
 		changed = []
@@ -438,14 +432,9 @@ def dcs_record_authority_guard(doc):
 	Reproduced from the live-site "DCS Record Authority Guard" Server Script
 	(present twice, byte-identical, in the source file with no distinguishing
 	detail -- implemented once here). Never infers authority; never touches
-	financial, lifecycle, award, workflow or docstatus values. Opt-in via
-	BS Group Settings.enable_dcs_record_authority_guard (default unchecked),
-	as a distinct, independently-activatable control from the Governed Field
-	Guard.
+	financial, lifecycle, award, workflow or docstatus values. Always on since
+	rel-1 (A-3).
 	"""
-	if not frappe.db.get_single_value("BS Group Settings", "enable_dcs_record_authority_guard"):
-		return
-
 	auth = doc.custom_record_authority or ""
 	sup = doc.custom_superseded_by or ""
 
@@ -487,14 +476,20 @@ def dcs_record_authority_guard(doc):
 		if oldauth != auth or oldsup != sup:
 			doc.custom_authority_decided_by = frappe.session.user
 			doc.custom_authority_decided_on = frappe.utils.now()
-			chg = []
-			if oldauth != auth:
-				chg.append({"fieldname": "custom_record_authority", "field_label": "Record Authority", "target_doctype": "Deal Cost Sheet", "target_name": doc.name, "old_value": oldauth or "(blank)", "new_value": auth or "(blank)", "value_type": "Select"})
-			if oldsup != sup:
-				chg.append({"fieldname": "custom_superseded_by", "field_label": "Superseded By", "target_doctype": "Deal Cost Sheet", "target_name": doc.name, "old_value": oldsup or "(none)", "new_value": sup or "(none)", "value_type": "Link"})
-			ev = frappe.get_doc({"doctype": "DCS Governance Event", "dcs": doc.name, "event_code": "RECORD_AUTHORITY_SET", "action_label": "Record authority / supersession decision", "source_endpoint": "DCS Record Authority Guard", "actor": frappe.session.user, "event_timestamp": frappe.utils.now(), "outcome": "Success", "correlation_id": "AUTH-" + doc.name, "change_count": len(chg), "reason": doc.custom_supersession_reason or "(no reason recorded)", "changes": json.dumps(chg)})
-			ev.flags.dcs_audit_write = 1
-			ev.insert(ignore_permissions=True)
+			chg = [
+				{"field": "custom_record_authority", "old": oldauth, "new": auth},
+				{"field": "custom_superseded_by", "old": oldsup, "new": sup},
+			]
+			# Single governance writer (A-3): actor, timestamp and the per-request
+			# correlation id are derived server side; unchanged rows are dropped.
+			record_governance_event(
+				doc.name,
+				"RECORD_AUTHORITY_SET",
+				action_label="Record authority / supersession decision",
+				source_endpoint="DCS Record Authority Guard",
+				reason=doc.custom_supersession_reason or "(no reason recorded)",
+				changes=chg,
+			)
 
 
 def dcs_submit_advance_presales_status(doc):
@@ -535,14 +530,23 @@ PRESALES_SYNC_FIELD_MAP = {
 }
 
 
-@frappe.whitelist()
+PRESALES_SYNC_SOURCES = ("interactive", "dcs_created", "submit")
+
+
 def dcs_presales_sync(presales_request, source="interactive"):
 	"""Refresh the presales projection held on every active (non-cancelled) Deal Cost
 	Sheet linked to `presales_request`. Only the direct-mapping fields in
 	PRESALES_SYNC_FIELD_MAP are written; only genuinely changed values are written;
 	update_modified is left False; one DCS Governance Event is recorded per sheet
 	that actually changed.
+
+	Internal only (A-2). This function is deliberately NOT whitelisted: it is
+	called from PresalesRequest.on_update, DealCostSheet.after_insert and
+	DealCostSheet.before_submit, each of which has already passed the
+	permission check of the document being saved. `source` is an internal enum.
 	"""
+	if source not in PRESALES_SYNC_SOURCES:
+		frappe.throw(f"dcs_presales_sync: unknown source '{source}'.")
 
 	pr = frappe.db.get_value(
 		"Presales Request",
@@ -562,49 +566,29 @@ def dcs_presales_sync(presales_request, source="interactive"):
 	synced = []
 	for sheet in sheets:
 		changed = {}
+		rows = []
 		for dcs_field, pr_field in PRESALES_SYNC_FIELD_MAP.items():
 			new_value = pr.get(pr_field)
-			if (sheet.get(dcs_field) or None) != (new_value or None):
+			old_value = sheet.get(dcs_field)
+			if (old_value or None) != (new_value or None):
 				changed[dcs_field] = new_value
+				rows.append({"field": dcs_field, "old": old_value, "new": new_value})
 
 		if not changed:
 			continue
 
 		frappe.db.set_value("Deal Cost Sheet", sheet.name, changed, update_modified=False)
-		_record_presales_sync_event(sheet.name, changed, source)
+		record_governance_event(
+			sheet.name,
+			"PRESALES_SYNC",
+			action_label="Presales projection synchronisation",
+			source_endpoint="dcs_presales_sync",
+			reason=f"source={source}",
+			changes=rows,
+		)
 		synced.append(sheet.name)
 
 	return {"synced": synced, "source": source}
-
-
-def _record_presales_sync_event(dcs_name, changed, source):
-	chg = [
-		{
-			"fieldname": fieldname,
-			"field_label": fieldname,
-			"target_doctype": "Deal Cost Sheet",
-			"target_name": dcs_name,
-			"new_value": str(new_value) if new_value is not None else "(blank)",
-			"value_type": "Data",
-		}
-		for fieldname, new_value in changed.items()
-	]
-	ev = frappe.get_doc({
-		"doctype": "DCS Governance Event",
-		"dcs": dcs_name,
-		"event_code": "PRESALES_SYNC",
-		"action_label": "Presales projection synchronisation",
-		"source_endpoint": "dcs_presales_sync",
-		"actor": frappe.session.user,
-		"event_timestamp": frappe.utils.now(),
-		"outcome": "Success",
-		"correlation_id": "PSYNC-" + dcs_name,
-		"change_count": len(chg),
-		"reason": f"source={source}",
-		"changes": json.dumps(chg),
-	})
-	ev.flags.dcs_audit_write = 1
-	ev.insert(ignore_permissions=True)
 
 
 def validate_deal_cost(doc):
@@ -692,6 +676,8 @@ def get_site_visit_evidence(site_visit):
 	if not site_visit:
 		return {}
 
+	# A-12: evidence is returned only to a user who may read the Site Visit itself.
+	frappe.has_permission("Site Visit", "read", site_visit, throw=True)
 	doc = frappe.get_doc("Site Visit", site_visit)
 
 	return {
@@ -734,6 +720,8 @@ def read_deal_cost_sheet(file_url, docname):
 	if docname.startswith("new-"):
 		frappe.throw("Please save the document before importing.")
 
+	# A-12: importing lines rewrites the sheet, so write permission on it is required.
+	frappe.has_permission("Deal Cost Sheet", "write", docname, throw=True)
 	doc = frappe.get_doc("Deal Cost Sheet", docname)
 	doc.set("items", [])
 

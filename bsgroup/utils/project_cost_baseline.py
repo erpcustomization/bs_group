@@ -413,4 +413,6 @@ def check_labor_preapproval_cost_overrun(doc, method=None):
 @frappe.whitelist()
 def get_cost_summary(project):
 	"""Whitelisted read-only entry point for dashboards/reports."""
+	# A-12: a project's cost position is returned only to a user who may read that Project.
+	frappe.has_permission("Project", "read", project, throw=True)
 	return get_project_cost_summary(project)
