@@ -1,0 +1,6 @@
+# Approved Frappe Cloud backup for the rel-1 staging cycle (site erp-bitssecureit.u.frappe.cloud)
+# "Backup on Sat, Sep 12, 2026 12:58 AM" - taken from the dashboard; sizes as shown there (MB, decimal)
+# kind  exact_filename                                   size_bytes  (fill exact filenames from the dashboard download links before phase 1)
+db      FILL-EXACT-FILENAME-database.sql.gz              75150000
+public  FILL-EXACT-FILENAME-files.tar                     5320000
+private FILL-EXACT-FILENAME-private-files.tar           652220000

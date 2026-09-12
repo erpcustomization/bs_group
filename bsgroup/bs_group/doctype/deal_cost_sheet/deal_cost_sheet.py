@@ -4,7 +4,7 @@
 import frappe
 from frappe.model.document import Document
 
-from bsgroup.dcs.governance import record_governance_event
+from bsgroup.dcs.governance import make_request_key, record_governance_event
 from bsgroup.utils.party import apply_party_model, require_customer, slug
 
 
@@ -493,6 +493,8 @@ def dcs_record_authority_guard(doc):
 				source_endpoint="DCS Record Authority Guard",
 				reason=doc.custom_supersession_reason or "(no reason recorded)",
 				changes=chg,
+				# one key per saved decision: the same move re-applied on a later save is a new event
+				request_key=make_request_key("record_authority", {"dcs": doc.name, "changes": chg, "saved": str(before.modified)}),
 			)
 
 
@@ -555,11 +557,12 @@ def dcs_presales_sync(presales_request, source="interactive"):
 	pr = frappe.db.get_value(
 		"Presales Request",
 		presales_request,
-		list(PRESALES_SYNC_FIELD_MAP.values()),
+		list(PRESALES_SYNC_FIELD_MAP.values()) + ["modified"],
 		as_dict=True,
 	)
 	if not pr:
 		return {"error": f"Presales Request {presales_request} not found."}
+	pr_modified = pr.pop("modified", None)
 
 	sheets = frappe.get_all(
 		"Deal Cost Sheet",
@@ -589,6 +592,8 @@ def dcs_presales_sync(presales_request, source="interactive"):
 			source_endpoint="dcs_presales_sync",
 			reason=f"source={source}",
 			changes=rows,
+			# one key per distinct projection change (an identical re-sync is a no-op and never gets here)
+			request_key=make_request_key("dcs_presales_sync", {"pr": presales_request, "dcs": sheet.name, "changes": rows, "pr_modified": str(pr_modified)}),
 		)
 		synced.append(sheet.name)
 

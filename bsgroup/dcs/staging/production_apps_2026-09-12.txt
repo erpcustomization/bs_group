@@ -1,0 +1,9 @@
+# Production bench apps (Frappe Cloud > Site > Apps, read 12 Sep 2026) - the staging bench must be at exactly these commits
+frappe          frappe/frappe                 version-16  33bf510   v16.33.0
+erpnext         frappe/erpnext                version-16  0b50853   v16.34.1
+hrms            frappe/hrms                   version-16  e1481b5   v16.17.1
+telephony       frappe/telephony              develop     039cf39
+helpdesk        frappe/helpdesk               main        1c3361c   v1.30.1
+print_designer  frappe/print_designer         main        9d62227
+zoho_migration  TridotsTech/ZohoMigration     main        d9c4056   (private repository - not on BITS-ERP)
+bsgroup         erpcustomization/bs_group     main        231ff58
