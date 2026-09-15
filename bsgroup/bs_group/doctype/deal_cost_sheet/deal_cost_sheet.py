@@ -635,7 +635,15 @@ def calculate_deal_financials(doc):
 		d.cost_amount = qty * cost_rate
 		d.selling_amount = qty * selling_rate
 		d.gp_value = d.selling_amount - d.cost_amount
-		d.gp_percent = (d.gp_value / d.selling_amount) * 100 if d.selling_amount else 0
+		# Rounded to the field's own precision (Percent, 2dp): Frappe stores the rounded
+		# value, so an unrounded recomputation never matches it and every save of a
+		# submitted sheet - including the permitted deal_owner edit - was refused with
+		# UpdateAfterSubmitError on GP %.
+		d.gp_percent = (
+			frappe.utils.flt((d.gp_value / d.selling_amount) * 100, d.precision("gp_percent"))
+			if d.selling_amount
+			else 0
+		)
 
 		is_stock_item = frappe.db.get_value("Item", d.item_code, "is_stock_item") if d.item_code else 1
 
