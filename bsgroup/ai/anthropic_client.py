@@ -115,25 +115,24 @@ def generate(system_prompt, user_message, config=None, timeout=REQUEST_TIMEOUT):
 			timeout=timeout,
 		)
 	except requests.exceptions.RequestException as exc:
-		# Sanitised: the user sees a generic network message; the detail (which
-		# can contain the endpoint URL and query, though never the api-key
-		# header) is logged server-side only.
+		# Sanitised logging: only the exception TYPE is recorded. The request
+		# payload (the prompt, which carries customer data), the endpoint URL
+		# and the api-key header are never logged.
 		_update_status(config, ok=False, note="network error")
-		frappe.log_error(title="BSG-AI-QUOTATION network error", message=str(exc)[:500])
+		frappe.log_error(title="BSG-AI-QUOTATION network error", message=type(exc).__name__)
 		raise AIProviderError(_("Could not reach the AI provider (network error). Please try again."))
 
 	if response.status_code != 200:
-		# Surface only the HTTP status to the user. The provider's error body is
-		# logged server-side, key-free, and never returned to the caller. A 404 /
-		# model error is called out so a bad model in AI Provider Settings is
-		# actionable without leaking the raw payload.
-		detail = _safe_error_detail(response)
+		# Log only the HTTP status, the configured model, and the provider's
+		# error *type* code (e.g. "authentication_error", "not_found_error") -
+		# never the response body or the request payload.
+		error_type = _provider_error_type(response)
 		_update_status(config, ok=False, note=f"HTTP {response.status_code}")
 		frappe.log_error(
 			title="BSG-AI-QUOTATION provider error",
-			message=f"status={response.status_code} model={config.get('model')} detail={detail}",
+			message=f"status={response.status_code} model={config.get('model')} type={error_type}",
 		)
-		if response.status_code == 404 or "model" in detail.lower():
+		if response.status_code == 404 or "not_found" in error_type or "model" in error_type:
 			raise AIProviderError(
 				_("The AI model configured in AI Provider Settings was not accepted by the provider. Check the Model Name.")
 			)
@@ -157,9 +156,9 @@ def generate(system_prompt, user_message, config=None, timeout=REQUEST_TIMEOUT):
 			"stop_reason": body.get("stop_reason", ""),
 		}
 	except (ValueError, AttributeError, KeyError) as exc:
-		# Sanitised: generic to the user, detail to the server log only.
+		# Sanitised: generic to the user, only the exception type server-side.
 		_update_status(config, ok=False, note="bad response")
-		frappe.log_error(title="BSG-AI-QUOTATION unreadable response", message=str(exc)[:300])
+		frappe.log_error(title="BSG-AI-QUOTATION unreadable response", message=type(exc).__name__)
 		raise AIProviderError(_("The AI provider returned an unreadable response."))
 
 	if not result["text"]:
@@ -170,14 +169,15 @@ def generate(system_prompt, user_message, config=None, timeout=REQUEST_TIMEOUT):
 	return result
 
 
-def _safe_error_detail(response):
-	"""Extract a short, key-free description of a provider error."""
+def _provider_error_type(response):
+	"""Return only the provider's error *type* code (e.g. "authentication_error",
+	"not_found_error"), never the free-text message or body - so nothing from the
+	request or response payload can reach a log."""
 	try:
-		data = response.json()
-		err = data.get("error") or {}
-		return f"{err.get('type', '')}: {str(err.get('message', ''))[:160]}"
+		err = (response.json() or {}).get("error") or {}
+		return str(err.get("type", "") or "")[:60]
 	except ValueError:
-		return (response.text or "")[:160]
+		return ""
 
 
 def _update_status(config, ok, note):

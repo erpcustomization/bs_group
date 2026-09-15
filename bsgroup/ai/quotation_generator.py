@@ -2,26 +2,29 @@
 # For license information, please see license.txt
 """Server-side, AI-assisted DCS -> Quotation draft generation.
 
-What this does and, just as importantly, what it does not:
+Guarantees:
 
-* It builds the Quotation from the Deal Cost Sheet **atomically** - the items,
-  company-specific taxes and the AI narrative are all assembled in memory and
-  written with a single ``insert``. There is no mid-flow commit, so a failure
-  at any point leaves no half-built draft behind.
-* Every figure - rates, quantities, amounts, taxes, company currency,
-  additional charges - is computed here from the DCS exactly as the existing
-  ``Deal Cost Sheet.make_quotation`` does. The model never supplies a number.
-* Claude is asked only for *narrative* (subject, scope overview, customer notes,
-  per-line customer descriptions). Its output is applied only to those
-  descriptive fields, after ``[NEEDS INPUT]`` markers are stripped and reported.
-* Missing/zero costs and an unresolved company tax template are flagged, never
-  invented or guessed.
-* Existing permissions, the DCS margin gate and the commercial approval state
-  are enforced before anything is created.
-* The result is always a **draft** Quotation (docstatus 0).
+* **No automatic bypass.** A blocked margin gate, an in-progress approval,
+  missing costs, or an unresolved company tax template all stop generation.
+  A privileged user (System Manager / Sales Manager) can proceed only by
+  passing the matching explicit override flag - holding the role is never
+  enough on its own - and every override is written to the Quotation timeline.
+* **Submitted DCS only.** A draft or cancelled Deal Cost Sheet is refused; this
+  is never overridable.
+* **Permissions and mandatory fields enforced.** The Quotation is inserted with
+  permission checks and mandatory-field validation on (no ``ignore_permissions``
+  / ``ignore_mandatory``); a validation or permission failure rolls back with no
+  orphan draft.
+* **Every figure is the ERP's.** Rates, quantities, amounts, taxes and each
+  additional charge are computed from the DCS. The model only writes narrative.
+* **All additional charges preserved.** Each additional-charge row becomes its
+  own quotation line (description + amount), not one collapsed total.
+* **Atomic.** Items, taxes and narrative are assembled in memory and written in
+  a single insert inside a savepoint.
+* **Draft only** (docstatus 0). Nothing is submitted or sent.
 
 Public whitelisted endpoints:
-* ``preview_dcs_readiness(source_name)`` - read-only; reports blockers.
+* ``preview_dcs_readiness(source_name)`` - read-only; reports every blocker.
 * ``generate_quotation_from_dcs(source_name, ...)`` - creates the draft.
 """
 
@@ -31,8 +34,8 @@ from frappe.utils import flt
 
 from bsgroup.ai import narrative
 
-# Roles allowed to override the approval / margin-gate block and to proceed
-# despite flagged missing costs. Deliberately narrow. Every override is audited.
+# Roles that MAY override a block - but only when the caller also passes the
+# matching explicit override flag. The role alone never bypasses anything.
 OVERRIDE_ROLES = ("System Manager", "Sales Manager")
 
 
@@ -78,38 +81,54 @@ def _dcs_as_dict(dcs):
 
 
 def _readiness(source_name):
-	"""Shared read-only assessment used by both the preview and the generator.
-
-	Returns ``(dcs_doc, header, items, block_reason_or_None, missing_costs)``.
-	Enforces read permission on the DCS.
-	"""
+	"""Shared read-only assessment. Enforces DCS read permission and returns a
+	dict of every blocker so the preview and the generator agree."""
 	frappe.has_permission("Deal Cost Sheet", "read", source_name, throw=True)
 	dcs = frappe.get_doc("Deal Cost Sheet", source_name)
 
 	header, items, resources, charges = _dcs_as_dict(dcs.as_dict())
 
-	block_reason = narrative.approval_gate_block_reason(header)
+	# Submitted-DCS status validation (never overridable).
+	status_block = None
+	if dcs.docstatus == 0:
+		status_block = "The deal cost sheet is still a draft. Submit it before quoting."
+	elif dcs.docstatus == 2:
+		status_block = "The deal cost sheet is cancelled and cannot be quoted."
+
+	approval_block = narrative.approval_gate_block_reason(header)
 
 	dcs_addtional_item = frappe.db.get_single_value("BS Group Settings", "dcs_addtional_item")
 	missing = narrative.detect_missing_costs(
 		items, resources, charges, dcs_addtional_item_configured=bool(dcs_addtional_item)
 	)
-	return dcs, header, items, block_reason, missing
+
+	tax_template, tax_warning = _resolve_company_tax_template(dcs.company)
+
+	return {
+		"dcs": dcs,
+		"header": header,
+		"items": items,
+		"status_block": status_block,
+		"approval_block": approval_block,
+		"missing": missing,
+		"tax_template": tax_template,
+		"tax_block": tax_warning,  # None when a template resolved cleanly
+	}
 
 
 @frappe.whitelist()
 def preview_dcs_readiness(source_name):
-	"""Read-only. Report whether a DCS is ready for AI quotation generation:
-	the approval/gate block (if any), the missing-cost flags, the company tax
-	template status, and whether the current user could override. Creates
+	"""Read-only. Report every blocker (status, approval, missing costs, taxes)
+	and whether the current user could override the overridable ones. Creates
 	nothing."""
-	dcs, header, _items, block_reason, missing = _readiness(source_name)
-	_template, tax_warning = _resolve_company_tax_template(dcs.company)
+	rd = _readiness(source_name)
+	overridable_blocked = bool(rd["approval_block"] or rd["missing"] or rd["tax_block"])
 	return {
-		"ok": not block_reason and not missing,
-		"block_reason": block_reason,
-		"missing_costs": missing,
-		"tax_warning": tax_warning,
+		"ok": not (rd["status_block"] or overridable_blocked),
+		"status_block": rd["status_block"],
+		"block_reason": rd["approval_block"],
+		"missing_costs": rd["missing"],
+		"tax_block": rd["tax_block"],
 		"can_override": _can_override(),
 	}
 
@@ -119,108 +138,121 @@ def generate_quotation_from_dcs(
 	source_name,
 	instructions=None,
 	overwrite_narrative=0,
+	override_approval=0,
 	ignore_missing_costs=0,
+	override_tax=0,
 ):
-	"""Create a **draft** Quotation from a Deal Cost Sheet, atomically, with
-	AI-written narrative applied on top of the deterministic figures.
+	"""Create a **draft** Quotation from a submitted Deal Cost Sheet.
 
-	Args:
-		source_name: Deal Cost Sheet name.
-		instructions: optional free-text steer for the narrative (no figures).
-		overwrite_narrative: if truthy, replace existing subject/scope/notes/line
-			descriptions; otherwise only blank fields are filled.
-		ignore_missing_costs: if truthy AND the caller holds an override role,
-			proceed despite flagged missing costs (they are still reported).
-
-	Returns a result dict; on a hard block, ``ok`` is 0 and ``quotation`` is None.
+	Overrides (``override_approval`` / ``ignore_missing_costs`` / ``override_tax``)
+	are honoured only when the caller both passes the flag and holds an override
+	role; each applied override is audited. A draft/cancelled DCS is always
+	refused.
 	"""
 	overwrite_narrative = frappe.utils.cint(overwrite_narrative)
+	override_approval = frappe.utils.cint(override_approval)
 	ignore_missing_costs = frappe.utils.cint(ignore_missing_costs)
+	override_tax = frappe.utils.cint(override_tax)
+	can_override = _can_override()
 
-	# --- permissions: read the DCS, create (and later write) a Quotation ------
+	# --- permissions: read the DCS, create the Quotation ---------------------
 	frappe.has_permission("Quotation", "create", throw=True)
-	dcs, header, items, block_reason, missing = _readiness(source_name)
+	rd = _readiness(source_name)
 
-	# --- approval / margin-gate guard (preserve commercial approvals) --------
-	if block_reason and not _can_override():
-		return _blocked("approval_gate", block_reason, missing_costs=missing)
+	# --- submitted-DCS status (never overridable) ----------------------------
+	if rd["status_block"]:
+		return _blocked("dcs_status", rd["status_block"])
 
-	# --- missing-cost guard: flag, never invent ------------------------------
-	if missing and not (ignore_missing_costs and _can_override()):
+	# --- approval / margin-gate guard (explicit override only) ---------------
+	if rd["approval_block"] and not (override_approval and can_override):
+		return _blocked("approval_gate", rd["approval_block"], missing_costs=rd["missing"])
+
+	# --- missing-cost guard (explicit override only) -------------------------
+	if rd["missing"] and not (ignore_missing_costs and can_override):
 		return _blocked(
 			"missing_costs",
-			_("This deal cost sheet has missing or zero costs. Fill them in, or ask a Sales Manager to override."),
-			missing_costs=missing,
+			_("This deal cost sheet has missing or zero costs. Fill them in, or a Sales Manager may override."),
+			missing_costs=rd["missing"],
 		)
 
-	# --- build the draft in memory (all figures + company taxes) -------------
-	quotation, tax_warnings = _build_quotation_doc(dcs)
+	# --- tax validation (explicit override only) -----------------------------
+	if rd["tax_block"] and not (override_tax and can_override):
+		return _blocked("tax_unresolved", rd["tax_block"])
+
+	applied_overrides = []
+	if rd["approval_block"] and override_approval and can_override:
+		applied_overrides.append(f"approval: {rd['approval_block']}")
+	if rd["missing"] and ignore_missing_costs and can_override:
+		applied_overrides.append(f"missing costs: {len(rd['missing'])} flag(s)")
+	if rd["tax_block"] and override_tax and can_override:
+		applied_overrides.append(f"tax: {rd['tax_block']}")
+
+	# --- build the draft in memory (figures + company taxes + all charges) ---
+	quotation, build_warnings = _build_quotation_doc(rd["dcs"], rd["tax_template"])
 
 	result = {
 		"ok": 1,
 		"quotation": None,
 		"docstatus": 0,
-		"block_reason": block_reason or None,  # recorded when overridden
-		"missing_costs": missing,
-		"tax_warnings": tax_warnings,
+		"applied_overrides": applied_overrides,
+		"missing_costs": rd["missing"],
+		"warnings": build_warnings,
 		"ai_used": False,
 		"ai_error": None,
 		"model": None,
 		"fields_updated": [],
 		"item_lines_updated": [],
-		"needs_input": list(tax_warnings),
+		"needs_input": list(build_warnings),
 	}
 
 	# --- AI narrative enrichment (best-effort; never fabricates) --------------
-	# Runs entirely against the in-memory doc, before the single insert, so a
-	# failure here can never create a partial draft.
 	try:
 		from bsgroup.ai import anthropic_client
 
 		config = anthropic_client.get_active_config()
-		context = narrative.build_ai_context(header, items)
+		context = narrative.build_ai_context(rd["header"], rd["items"])
 		system_prompt, user_message = narrative.build_prompt(context, instructions)
 		ai = anthropic_client.generate(system_prompt, user_message, config=config)
 		parsed = narrative.parse_ai_response(ai["text"])
 
 		field_updates, item_updates, needs_input = narrative.select_narrative_updates(
-			parsed, existing=quotation.as_dict(), items=items, overwrite=bool(overwrite_narrative)
+			parsed, existing=quotation.as_dict(), items=rd["items"], overwrite=bool(overwrite_narrative)
 		)
 		for field, value in field_updates.items():
 			quotation.set(field, value)
-		applied_lines = _apply_item_descriptions(quotation, items, item_updates, overwrite=bool(overwrite_narrative))
+		applied_lines = _apply_item_descriptions(quotation, rd["items"], item_updates, overwrite=bool(overwrite_narrative))
 
 		result.update({
 			"ai_used": True,
 			"model": ai.get("model"),
 			"fields_updated": sorted(field_updates.keys()),
 			"item_lines_updated": applied_lines,
-			"needs_input": list(tax_warnings) + needs_input,
+			"needs_input": list(build_warnings) + needs_input,
 		})
 	except Exception as exc:
-		# AI is an enhancement, not a gate. Surface a sanitised reason and carry
-		# on with the deterministic draft. anthropic_client already raises safe,
-		# generic AIProviderError messages; anything else is logged server-side
-		# and reported generically here.
+		# AI is an enhancement, not a gate. Report a sanitised reason; log only
+		# the exception TYPE server-side (never the prompt, customer data, config
+		# or key - a full traceback could carry locals in developer mode).
 		from bsgroup.ai.anthropic_client import AIProviderError
 
 		if isinstance(exc, AIProviderError):
 			result["ai_error"] = str(exc)
 		else:
-			frappe.log_error(title="BSG-AI-QUOTATION enrichment failed", message=frappe.get_traceback())
+			frappe.log_error(title="BSG-AI-QUOTATION enrichment failed", message=type(exc).__name__)
 			result["ai_error"] = _("AI enrichment could not run (internal error).")
 		frappe.clear_last_message()
 
-	# --- single atomic insert + audit ----------------------------------------
-	frappe.has_permission("Quotation", "create", throw=True)
+	# --- single atomic insert (permissions + mandatory enforced) -------------
 	frappe.db.savepoint("bsg_ai_quotation")
 	try:
-		quotation.insert(ignore_permissions=True, ignore_mandatory=True)
-	except Exception:
+		quotation.insert()
+	except Exception as exc:
 		frappe.db.rollback(save_point="bsg_ai_quotation")
-		frappe.log_error(title="BSG-AI-QUOTATION insert failed", message=frappe.get_traceback())
+		# Validation/permission messages are safe to surface and log; no
+		# traceback (which could carry commercial data as locals).
+		frappe.log_error(title="BSG-AI-QUOTATION insert failed", message=f"{type(exc).__name__}: {str(exc)[:200]}")
 		frappe.clear_last_message()
-		return _blocked("insert_failed", _("The draft quotation could not be created. Nothing was saved."), missing_costs=missing)
+		return _blocked("insert_failed", _("The draft quotation could not be created: {0}").format(str(exc)[:200]))
 
 	result["quotation"] = quotation.name
 	result["docstatus"] = quotation.docstatus
@@ -232,13 +264,13 @@ def _resolve_company_tax_template(company):
 	"""Resolve the sales-tax template for a company without hardcoding a
 	country. Returns ``(template_name_or_None, warning_or_None)``.
 
-	Order: the company's default template, else its only template. If a company
-	has no template, or more than one and none marked default, we return no
-	template and a warning - taxes are left for a human rather than guessed, so
-	this is correct for both the AE and OM companies.
+	Order: the company's default template, else its only template. No template,
+	or several with none default -> return none and a warning, so taxes are
+	validated by a human rather than guessed. Correct for both the AE and OM
+	companies.
 	"""
 	if not company:
-		return None, "No company on the deal cost sheet; taxes not applied."
+		return None, "No company on the deal cost sheet; taxes cannot be applied."
 
 	default_template = frappe.db.get_value(
 		"Sales Taxes and Charges Template", {"company": company, "is_default": 1}, "name"
@@ -246,26 +278,26 @@ def _resolve_company_tax_template(company):
 	if default_template:
 		return default_template, None
 
-	templates = frappe.get_all(
-		"Sales Taxes and Charges Template", filters={"company": company}, pluck="name"
-	)
+	templates = frappe.get_all("Sales Taxes and Charges Template", filters={"company": company}, pluck="name")
 	if len(templates) == 1:
 		return templates[0], None
 	if not templates:
 		return None, f"No sales-tax template exists for company '{company}'; set taxes on the draft manually."
-	return None, f"Company '{company}' has multiple sales-tax templates and no default; set taxes on the draft manually."
+	return None, f"Company '{company}' has multiple sales-tax templates and no default; choose the tax template manually."
 
 
-def _build_quotation_doc(dcs):
+def _build_quotation_doc(dcs, tax_template):
 	"""Build (but do not insert) a Quotation from the DCS.
 
-	Mirrors ``bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet.make_quotation``
-	figure-for-figure, with two deliberate differences that fix reviewed
-	blockers: the tax template is resolved per company (not hardcoded to UAE
-	VAT), and nothing is committed here (the caller inserts once, atomically).
+	Figure-for-figure with the existing
+	``deal_cost_sheet.make_quotation``, with three deliberate differences that
+	address reviewed blockers: the tax template is resolved per company (passed
+	in), each additional charge is preserved as its own line rather than
+	collapsed into one total, and nothing is committed here.
 
-	Returns ``(quotation_doc, tax_warnings)``.
+	Returns ``(quotation_doc, warnings)``.
 	"""
+	warnings = []
 	opp = frappe.db.get_value(
 		"Opportunity",
 		dcs.opportunity,
@@ -282,20 +314,15 @@ def _build_quotation_doc(dcs):
 	if company_currency:
 		quotation.currency = company_currency
 
-	tax_warnings = []
-	if dcs.company:
-		tax_template, warning = _resolve_company_tax_template(dcs.company)
-		if warning:
-			tax_warnings.append(warning)
-		if tax_template:
-			quotation.taxes_and_charges = tax_template
-			for tax in frappe.get_all(
-				"Sales Taxes and Charges",
-				filters={"parent": tax_template},
-				fields=["charge_type", "account_head", "description", "rate", "included_in_print_rate"],
-				order_by="idx",
-			):
-				quotation.append("taxes", tax)
+	if tax_template:
+		quotation.taxes_and_charges = tax_template
+		for tax in frappe.get_all(
+			"Sales Taxes and Charges",
+			filters={"parent": tax_template},
+			fields=["charge_type", "account_head", "description", "rate", "included_in_print_rate"],
+			order_by="idx",
+		):
+			quotation.append("taxes", tax)
 
 	quotation.quotation_to = "Customer" if opp.get("opportunity_from") == "Customer" else "Lead"
 	quotation.party_name = opp.get("party_name")
@@ -337,40 +364,39 @@ def _build_quotation_doc(dcs):
 			"amount": qty * selling_rate,
 		})
 
-	additional_charges_total = sum(flt(c.amount) for c in dcs.addtional_charges or [])
-	if additional_charges_total:
+	# Additional charges: preserve EVERY charge as its own line (description +
+	# amount), not one summed total, so nothing is lost on the quotation.
+	charges = [c for c in (dcs.addtional_charges or []) if flt(c.amount)]
+	if charges:
 		dcs_addtional_item = frappe.db.get_single_value("BS Group Settings", "dcs_addtional_item")
-		# Readiness has already flagged an unconfigured item as a missing cost;
-		# if we are here it is configured (or an override was granted).
 		if dcs_addtional_item:
-			item = frappe.db.get_value("Item", dcs_addtional_item, ["item_name", "stock_uom"], as_dict=True) or {}
-			quotation.append("items", {
-				"item_code": dcs_addtional_item,
-				"item_name": item.get("item_name") or dcs_addtional_item,
-				"uom": item.get("stock_uom"),
-				"stock_uom": item.get("stock_uom"),
-				"description": item.get("item_name") or dcs_addtional_item,
-				"qty": 1,
-				"price_list_rate": additional_charges_total,
-				"discount_percentage": 0,
-				"rate": additional_charges_total,
-				"amount": additional_charges_total,
-			})
+			ai = frappe.db.get_value("Item", dcs_addtional_item, ["item_name", "stock_uom"], as_dict=True) or {}
+			for c in charges:
+				amt = flt(c.amount)
+				quotation.append("items", {
+					"item_code": dcs_addtional_item,
+					"item_name": ai.get("item_name") or dcs_addtional_item,
+					"uom": ai.get("stock_uom"),
+					"stock_uom": ai.get("stock_uom"),
+					"description": (c.description or "").strip() or ai.get("item_name") or dcs_addtional_item,
+					"qty": 1,
+					"price_list_rate": amt,
+					"discount_percentage": 0,
+					"rate": amt,
+					"amount": amt,
+				})
 		else:
-			tax_warnings.append("Additional charges present but 'DCS Addtional Item' is not configured; they were not transferred.")
+			# Readiness flags this as a missing cost and blocks by default; if an
+			# override brought us here, do not silently drop the charges.
+			warnings.append("Additional charges present but 'DCS Addtional Item' is not configured; they were NOT transferred.")
 
-	return quotation, tax_warnings
+	return quotation, warnings
 
 
 def _apply_item_descriptions(quotation, dcs_items, item_updates, overwrite):
-	"""Map context line numbers (over all DCS items) to the quotation's item
-	rows and write descriptions onto matching rows only.
-
-	Quotation rows are built one per DCS item that has an ``item_code``, in
-	order, plus possibly a trailing additional-charges row. We walk both in
-	order so a line description can never land on the wrong product, and we
-	verify the item_code matches before writing.
-	"""
+	"""Map context line numbers (over all DCS items) to the quotation's product
+	rows and write descriptions onto matching rows only, walking both in order
+	and verifying item_code so a description never lands on the wrong product."""
 	if not item_updates:
 		return []
 
@@ -407,10 +433,10 @@ def _audit(quotation, result):
 			f"Fields updated: {', '.join(result['fields_updated']) or 'none'}",
 			f"Item lines updated: {', '.join(map(str, result['item_lines_updated'])) or 'none'}",
 		]
-		if result.get("block_reason"):
-			lines.append(f"Approval/gate override in effect: {result['block_reason']}")
-		if result.get("missing_costs"):
-			lines.append(f"Missing-cost flags at generation: {len(result['missing_costs'])}")
+		if result.get("applied_overrides"):
+			lines.append("Overrides applied: " + "; ".join(result["applied_overrides"]))
+		if result.get("warnings"):
+			lines.append("Warnings: " + "; ".join(result["warnings"]))
 		if result.get("needs_input"):
 			lines.append("Needs input: " + "; ".join(result["needs_input"]))
 		if result.get("ai_error"):

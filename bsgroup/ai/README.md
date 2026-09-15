@@ -16,15 +16,17 @@ number comes from the ERP, not the model.
 | Requirement | How it is met |
 |---|---|
 | API keys stay secure | Key lives only in `AI Provider Settings` (encrypted `Password`). Read server-side via `get_password`, never returned to the browser, logged, or put in a URL (`anthropic_client.py`). |
-| Enforce permissions | `has_permission` gates on DCS `read` and Quotation `create` before anything is built, re-checked immediately before insert (`quotation_generator.py`). |
-| Atomic draft creation | Items, company taxes and AI narrative are assembled in memory and written with a single `insert` inside a savepoint — no mid-flow commit, so a failure leaves no half-built draft (verified by `TestAtomicRollback`). |
-| Company-specific taxes | The sales-tax template is resolved per company: the company default, else its only template, else a warning and no taxes (never a hardcoded UAE template). Works for the AE and OM companies. |
-| Enforce calculations | Figures are computed from the DCS exactly as `Deal Cost Sheet.make_quotation` does (rates, qty, amounts, additional-charge item, currency). |
-| Enforce approvals | Generation is blocked when the DCS margin gate is `Blocked`, MD/Blocked approval is required but not recorded, or an approval is in progress (`Pending Endorsement` / `In Negotiation`) — overridable only by System Manager / Sales Manager, and every override is audited (`narrative.approval_gate_block_reason`). |
-| Supported model | Default model is `claude-sonnet-4-5` (the site's configured model); the settings value always takes precedence. A provider "model" / 404 error is surfaced as a clear "check the Model Name" message. |
+| Enforce permissions & mandatory fields | `has_permission` gates on DCS `read` and Quotation `create`; the Quotation is inserted **with permission checks and mandatory-field validation on** (no `ignore_permissions` / `ignore_mandatory`). A denied user or a missing mandatory field fails and rolls back. |
+| No automatic bypass | A block (approval, missing costs, tax) is cleared only when the caller **both** holds an override role **and** passes the matching explicit flag (`override_approval` / `ignore_missing_costs` / `override_tax`). Holding the role is never enough; each applied override is audited. |
+| Submitted-DCS validation | A draft or cancelled Deal Cost Sheet is refused (`dcs_status`) — never overridable. |
+| Atomic draft creation | Items, taxes, all charges and AI narrative are assembled in memory and written with a single `insert` inside a savepoint; a failure after the write rolls back with no orphan draft (`TestAtomicRollback`, real and forced). |
+| Company-specific taxes | Resolved per company (default → sole template → warn). An unresolved template **blocks** generation (`tax_unresolved`) unless explicitly overridden. Never a hardcoded UAE template. |
+| Preserve all additional charges | Each additional-charge row becomes its **own** quotation line (description + amount), not one collapsed total. |
+| Enforce calculations | Figures are computed from the DCS (rates, qty, amounts, additional charges, currency). |
+| Supported model | Default model is `claude-sonnet-4-5` (the site's configured model); the settings value always takes precedence. A provider "model" / 404 error surfaces as "check the Model Name". |
+| Sanitised logs | Failures log only the exception **type** (and HTTP status / provider error-type code); never the prompt, customer data, response body, config or API key, and never a full traceback (which could carry locals in developer mode). |
 | Flag missing costs, never invent | `narrative.detect_missing_costs` reports zero/blank costs, quantities and unconfigured additional-charge item; by default this **stops** generation. The model is told to emit `[NEEDS INPUT: …]` rather than fabricate, and any such marker is stripped and reported, never written to the customer document. |
 | No figures to/from the model | `narrative.build_ai_context` sends descriptive fields only — no cost, selling, margin, GP or quantity. |
-| Sanitised provider errors | Network / HTTP / parse failures return a generic message to the user; the detail is logged server-side only, and the API key never appears in a return value, log, error or URL. |
 | Save as draft | The result is always a Quotation at `docstatus 0`; nothing is submitted or sent. |
 
 ## Endpoints
@@ -32,7 +34,9 @@ number comes from the ERP, not the model.
 - `preview_dcs_readiness(source_name)` — read-only; returns block reason and
   missing-cost flags. Creates nothing.
 - `generate_quotation_from_dcs(source_name, instructions=None,
-  overwrite_narrative=0, ignore_missing_costs=0)` — creates the draft.
+  overwrite_narrative=0, override_approval=0, ignore_missing_costs=0,
+  override_tax=0)` — creates the draft. Each `override_*` flag takes effect
+  only for an override-role caller and is audited.
 
 ## Layout
 
