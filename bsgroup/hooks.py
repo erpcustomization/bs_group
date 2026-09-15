@@ -352,6 +352,7 @@ doc_events = {
         "validate": [
             "bsgroup.utils.task.validate_completion_from_blocked_status",
             "bsgroup.utils.task.validate_milestone_requirements",
+            "bsgroup.utils.task.stamp_completed_on",
         ],
         "on_update": [
             "bsgroup.utils.task.sync_zztest_task_scheduler_status",

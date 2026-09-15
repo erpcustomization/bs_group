@@ -415,7 +415,7 @@
    "description": null,
    "docstatus": 0,
    "dt": "Sales Order",
-   "fetch_from": "company_address.emirate",
+   "fetch_from": null,
    "fetch_if_empty": 0,
    "fieldname": "vat_emirate",
    "fieldtype": "Select",

@@ -27,6 +27,20 @@ def validate_completion_from_blocked_status(doc, method=None):
 		)
 
 
+def stamp_completed_on(doc, method=None):
+	"""Core Frappe only sets completed_on when a Task is completed through the
+	standard form/API save. Any status change that bypasses that (db_set,
+	migration, script) leaves completed_on empty, which makes the task
+	silently disappear from Weekly Project Governance Report's "Completed"
+	count. Stamp it here so status == Completed always implies completed_on
+	is set, regardless of how the status got there."""
+
+	if doc.status == "Completed" and not doc.completed_on:
+		doc.completed_on = frappe.utils.getdate()
+	elif doc.status != "Completed":
+		doc.completed_on = None
+
+
 def validate_milestone_requirements(doc, method=None):
 	"""A Milestone Task must carry a Project and an Expected End Date."""
 

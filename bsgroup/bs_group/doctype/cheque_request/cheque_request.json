@@ -12,6 +12,7 @@
   "company",
   "department",
   "project",
+  "customer",
   "purpose",
   "column_break_sveq",
   "status",
@@ -82,8 +83,10 @@
   {
    "fieldname": "project",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Project",
-   "options": "Project"
+   "options": "Project",
+   "reqd": 1
   },
   {
    "fieldname": "payee_name",
@@ -323,13 +326,19 @@
    "print_hide": 1,
    "read_only": 1,
    "search_index": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-04-17 11:09:09.692526",
+ "modified": "2026-09-15 16:54:36.982132",
  "modified_by": "Administrator",
  "module": "BS Group",
  "name": "Cheque Request",
