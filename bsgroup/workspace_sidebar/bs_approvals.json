@@ -52,9 +52,21 @@
    "link_type": "DocType",
    "show_arrow": 0,
    "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "git-pull-request",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Cheque Request",
+   "link_to": "Cheque Request",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
   }
  ],
- "modified": "2026-06-26 11:18:06.113431",
+ "modified": "2026-09-15 19:09:52.944950",
  "modified_by": "Administrator",
  "module": "BS Group",
  "name": "BS Approvals",
