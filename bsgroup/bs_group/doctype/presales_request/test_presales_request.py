@@ -42,7 +42,14 @@ class IntegrationTestPresalesRequest(IntegrationTestCase):
 		self.assertEqual(pr.party_type, "Customer")
 		self.assertEqual(pr.customer, pr.party)
 		self.assertTrue(pr.organisation_name)
-		self.assertTrue(pr.name.startswith("PR-ZZTEST-Customer-"))
+		# The name follows the documented rule PR-<slug(organisation_name)>-###. slug()
+		# strips non-alphanumerics before turning whitespace into hyphens, which is what
+		# names "Abela & Co" as PR-Abela-Co-001, so a fixture called
+		# "ZZTEST-Customer-<suffix>" correctly loses its own hyphens.
+		from bsgroup.utils.party import slug
+
+		self.assertTrue(pr.name.startswith(f"PR-{slug(pr.organisation_name)}-"), pr.name)
+		self.assertNotIn("ZZTEST-Customer", pr.name)
 
 	def test_lead_sourced_request_has_no_customer(self):
 		pr = self.make_pr("Lead")
