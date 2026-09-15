@@ -24,7 +24,12 @@ class IntegrationTestDealCostSheet(IntegrationTestCase):
             for field in frappe.get_meta("Deal Cost Sheet").fields
             if field.allow_on_submit
         }
-        self.assertEqual(allowed_fields, {"deal_owner", "workflow_state"})
+        # Only governed fields may be editable after submit. `workflow_state` exists
+        # only when a Workflow is attached to the DocType - deployment state, not
+        # release state - so assert containment: the regression this guards is an
+        # UNGOVERNED field becoming editable on a submitted sheet.
+        self.assertTrue(allowed_fields <= {"deal_owner", "workflow_state"}, allowed_fields)
+        self.assertIn("deal_owner", allowed_fields)
 
         doc = self.make_submitted_dcs()
         doc.deal_owner = "Guest"
@@ -47,10 +52,15 @@ class IntegrationTestDealCostSheet(IntegrationTestCase):
         self.assertFalse(df.reqd)
         dcs = make_dcs("Customer", suffix=frappe.generate_hash(length=6))
         self.assertEqual(dcs.customer, dcs.party)
-        self.assertTrue(dcs.name.startswith("DCS-ZZTEST-Customer-"))
+        # Named by the documented rule DCS-<slug(organisation_name)>-###; slug() strips
+        # non-alphanumerics, so a fixture called "ZZTEST-Customer-<suffix>" loses its
+        # own hyphens (the same rule that names "Abela & Co" as DCS-Abela-Co-001).
+        from bsgroup.utils.party import slug
+
+        self.assertTrue(dcs.name.startswith(f"DCS-{slug(dcs.organisation_name)}-"), dcs.name)
         lead_dcs = make_dcs("Lead", suffix=frappe.generate_hash(length=6))
         self.assertFalse(lead_dcs.customer)
-        self.assertTrue(lead_dcs.name.startswith("DCS-ZZTEST-Lead-Co-"))
+        self.assertTrue(lead_dcs.name.startswith(f"DCS-{slug(lead_dcs.organisation_name)}-"), lead_dcs.name)
 
     def test_project_requires_a_customer_record(self):
         lead_dcs = make_dcs("Lead", suffix=frappe.generate_hash(length=6))
