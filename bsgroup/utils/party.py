@@ -57,7 +57,14 @@ def apply_party_model(doc):
 	* sets ``customer`` = party when party_type is Customer, clears it otherwise;
 	* refuses a customer that does not match the party.
 	"""
-	if not doc.get("party_type") and not doc.get("party") and doc.get("opportunity"):
+	# The Opportunity is the authority for the party (D2), so derive whenever no party
+	# has been chosen - not only when party_type is blank as well. party_type is a
+	# Select, and Frappe fills an unset Select with its FIRST option ("Lead") inside
+	# Document._set_defaults(), which runs BEFORE autoname and validate. Keying the
+	# derivation on party_type therefore skipped it for every server-side insert and
+	# raised "Party is required when Party Type is set." even for a Customer
+	# Opportunity. A party the caller actually chose is never overridden here.
+	if doc.get("opportunity") and not doc.get("party"):
 		pt, p = party_from_opportunity(doc.opportunity)
 		if pt:
 			doc.party_type, doc.party = pt, p
