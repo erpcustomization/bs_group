@@ -12,7 +12,7 @@ from frappe.tests import IntegrationTestCase
 
 from bsgroup.api.dcs import ENDPOINTS, approval, award, handover, negotiation
 from bsgroup.dcs import governance
-from bsgroup.tests.dcs_fixtures import ensure, make_dcs, make_user
+from bsgroup.tests.dcs_fixtures import ensure, initialise_living_position, make_dcs, make_user
 
 COMMERCIAL_ROLES = ["Sales Manager", "Commercial Controller", "Managing Director"]
 
@@ -67,6 +67,48 @@ class IntegrationTestDCSApi(IntegrationTestCase):
 		r = award.dcs_record_award(dcs=self.dcs.name, award_reference="PO-1", evidence_type="Customer PO")
 		self.assertEqual(r["ok"], 0)
 		self.assertIn("commercial action", r["error"])
+
+	# --- R1: the permission response contract, both directions ----------------------
+	def test_readonly_role_is_refused_structurally_and_never_raises(self):
+		"""A role that may read the sheet but not write it must get the documented
+		{ok: 0, ...} refusal - not a leaked PermissionError - and must change nothing."""
+		frappe.set_user(self.md)
+		initialise_living_position(self.dcs.name)
+		before = frappe.db.count("DCS Governance Event", {"dcs": self.dcs.name})
+		rev_before = frappe.db.get_value("Deal Cost Sheet", self.dcs.name, "custom_dcs_revision_no")
+
+		frappe.set_user(self.tech)
+		self.assertTrue(frappe.has_permission("Deal Cost Sheet", "read"))
+		self.assertFalse(frappe.has_permission("Deal Cost Sheet", "write"))
+		r = negotiation.dcs_apply_revision(dcs=self.dcs.name, source="Technical", reason="tech", new_total_cost=900)
+		self.assertIsInstance(r, dict)
+		self.assertEqual(r["ok"], 0)
+		self.assertIn("commercial-edit role", r["error"])
+		self.assertEqual(r.get("permission_denied"), 1)
+		a = award.dcs_record_award(dcs=self.dcs.name, award_reference="PO-X", evidence_type="Customer PO")
+		self.assertEqual(a["ok"], 0)
+		self.assertIn("commercial action", a["error"])
+
+		frappe.set_user("Administrator")
+		self.assertEqual(frappe.db.count("DCS Governance Event", {"dcs": self.dcs.name}), before)
+		self.assertEqual(frappe.db.get_value("Deal Cost Sheet", self.dcs.name, "custom_dcs_revision_no"), rev_before)
+
+	def test_authorised_commercial_role_passes_the_same_gate(self):
+		"""The same endpoint, for a role that does hold write authority, still works."""
+		frappe.set_user(self.md)
+		self.assertTrue(frappe.has_permission("Deal Cost Sheet", "write"))
+		r = negotiation.dcs_apply_revision(
+			dcs=self.dcs.name, source="Customer", reason="ZZTEST authorised", new_total_selling=1450
+		)
+		self.assertEqual(r["ok"], 1, r.get("error"))
+		self.assertNotIn("permission_denied", r)
+		self.assertGreaterEqual(frappe.db.get_value("Deal Cost Sheet", self.dcs.name, "custom_dcs_revision_no") or 0, 1)
+
+	def test_no_dcs_permission_still_raises_permission_error(self):
+		"""The access-control boundary is unchanged: no read access still raises."""
+		frappe.set_user(self.nobody)
+		with self.assertRaises(frappe.PermissionError):
+			negotiation.dcs_apply_revision(dcs=self.dcs.name, source="Customer", reason="x", new_total_selling=1400)
 
 	# --- lifecycle validation -----------------------------------------------------
 	def test_release_is_refused_before_award_and_without_owner(self):
@@ -139,6 +181,12 @@ class IntegrationTestDCSApi(IntegrationTestCase):
 
 	def test_award_then_owner_then_release_records_three_events(self):
 		frappe.set_user(self.md)
+		# R2: award freezes the LIVING commercial position, so one must exist first. This is
+		# the production control working as designed, not a test shortcut - the fixture now
+		# performs the same lifecycle step a commercial user would.
+		lp = initialise_living_position(self.dcs.name)
+		self.assertEqual(lp["ok"], 1, lp.get("error"))
+		self.assertGreaterEqual(lp["revision_no"] or 0, 1)
 		r1 = award.dcs_record_award(dcs=self.dcs.name, award_reference="ZZTEST-PO", evidence_type="Customer PO")
 		self.assertEqual(r1["ok"], 1, r1.get("error"))
 		self.assertEqual(frappe.db.get_value("Deal Cost Sheet", self.dcs.name, "custom_award_state"), "Awarded")

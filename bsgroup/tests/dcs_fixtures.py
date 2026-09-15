@@ -79,6 +79,36 @@ def _any_item():
 	return item
 
 
+def initialise_living_position(dcs_name, new_total_selling=1450, reason="ZZTEST initialise living position"):
+	"""Give a submitted DCS a living commercial position.
+
+	``dcs_record_award`` and ``dcs_approval_decision`` both refuse while
+	``custom_dcs_revision_no < 1`` ("The living commercial position has not been
+	initialised. There is nothing to freeze."). That control is correct and is NOT
+	weakened: only ``dcs_apply_revision`` creates the living position, so any test that
+	exercises the award/handover lifecycle must perform that step first, as a real
+	commercial user would. The caller must already be an authorised commercial user.
+	"""
+	from bsgroup.api.dcs import approval, negotiation
+
+	r = negotiation.dcs_apply_revision(
+		dcs=dcs_name, source="Customer", reason=reason, new_total_selling=new_total_selling
+	)
+	if r.get("ok") != 1:
+		return r
+	required = frappe.db.get_value("Deal Cost Sheet", dcs_name, "custom_approval_required")
+	state = frappe.db.get_value("Deal Cost Sheet", dcs_name, "custom_approval_state")
+	if required not in (None, "", "None") and state != "Approved":
+		a = approval.dcs_approval_decision(dcs=dcs_name, action="Approve", reason=reason)
+		if a.get("ok") != 1:
+			return a
+	return {
+		"ok": 1,
+		"revision_no": frappe.db.get_value("Deal Cost Sheet", dcs_name, "custom_dcs_revision_no"),
+		"approval_required": required,
+	}
+
+
 def make_user(email, roles):
 	if not frappe.db.exists("User", email):
 		user = frappe.get_doc({"doctype": "User", "email": email, "first_name": email.split("@")[0], "send_welcome_email": 0})
