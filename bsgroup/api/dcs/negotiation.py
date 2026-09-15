@@ -119,7 +119,13 @@ D2A_FIELDS = [
 ]
 
 
-@governed_endpoint("dcs_apply_revision", ptype="write")
+NO_COMMERCIAL_EDIT = (
+	"You do not hold a commercial-edit role. Technical roles and System Manager "
+	"administration cannot revise a commercial position."
+)
+
+
+@governed_endpoint("dcs_apply_revision", ptype="write", denied_message=NO_COMMERCIAL_EDIT)
 def dcs_apply_revision(args):
 	result = {"ok": 0, "error": "", "revision": "", "initialised": 0, "state": {}}
 
@@ -177,7 +183,7 @@ def dcs_apply_revision(args):
 		cost_moved = 1 if new_cost != prev_cost else 0
 
 		if can_customer == 0 and can_vendor == 0:
-			result["error"] = "You do not hold a commercial-edit role. Technical roles and System Manager administration cannot revise a commercial position."
+			result["error"] = NO_COMMERCIAL_EDIT
 		elif sell_moved == 1 and can_customer == 0:
 			result["error"] = "Your role may not move the customer-side selling position. Presales may revise buying cost only."
 		elif cost_moved == 1 and can_vendor == 0:

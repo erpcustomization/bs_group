@@ -86,7 +86,13 @@ def _clean_args(kwargs):
 	return {k: v for k, v in (kwargs or {}).items() if k not in _SKIP_ARGS}
 
 
-def governed_endpoint(endpoint, perm_doctype="Deal Cost Sheet", ptype="read", idempotent=True):
+DENIED_DEFAULT = (
+	"You do not have permission to perform this action on the Deal Cost Sheet. "
+	"This action requires a role with write authority on the governed document."
+)
+
+
+def governed_endpoint(endpoint, perm_doctype="Deal Cost Sheet", ptype="read", idempotent=True, denied_message=None):
 	"""Wrap a ported service.
 
 	``fn(args)`` receives the request arguments as a dict (the script used
@@ -99,8 +105,22 @@ def governed_endpoint(endpoint, perm_doctype="Deal Cost Sheet", ptype="read", id
 		@functools.wraps(fn)
 		def wrapper(*a, **kwargs):
 			args = _clean_args(kwargs)
-			if frappe.session.user == "Guest" or not frappe.has_permission(perm_doctype, ptype):
+			# Access control: Guest, or no read access at all to the governed DocType, is an
+			# access violation and still raises - unchanged from the original contract.
+			if frappe.session.user == "Guest" or not frappe.has_permission(perm_doctype, "read"):
 				frappe.throw(_("Not permitted"), frappe.PermissionError)
+			# Authority refusal (R1): a caller who may READ the governed DocType but does not
+			# hold the write permission this endpoint requires is refused with the documented
+			# structured response instead of a leaked PermissionError. The business code still
+			# never runs, and nothing is mutated.
+			if ptype != "read" and not frappe.has_permission(perm_doctype, ptype):
+				return {
+					"ok": 0,
+					"error": denied_message or DENIED_DEFAULT,
+					"state": {},
+					"permission_denied": 1,
+					"endpoint": endpoint,
+				}
 
 			request_key = None
 			if idempotent:

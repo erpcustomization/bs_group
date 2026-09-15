@@ -45,7 +45,13 @@ def clear_reversal_block(sheet_name, new_ref):
 	return done
 
 
-@governed_endpoint("dcs_record_award", ptype="write")
+NOT_A_COMMERCIAL_ACTOR = (
+	"Recording a customer award is a commercial action. Technical roles and System Manager "
+	"administration cannot record an award."
+)
+
+
+@governed_endpoint("dcs_record_award", ptype="write", denied_message=NOT_A_COMMERCIAL_ACTOR)
 def dcs_record_award(args):
 	result = {"ok": 0, "error": "", "state": {}, "conditions_raised": []}
 
@@ -64,7 +70,7 @@ def dcs_record_award(args):
 	if not dcs_exists_and_open(dcs_name, result):
 		pass
 	elif has_any(roles, COMMERCIAL_ROLES) == 0:
-		result["error"] = "Recording a customer award is a commercial action. Technical roles and System Manager administration cannot record an award."
+		result["error"] = NOT_A_COMMERCIAL_ACTOR
 	elif evidence not in VALID_EVIDENCE:
 		result["error"] = "evidence_type must be one of Customer PO, Letter of Award, Email Confirmation, Verbal - Not Evidenced, Not Provided."
 	elif nrc_chk["block"] != "":
