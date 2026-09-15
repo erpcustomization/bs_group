@@ -260,7 +260,7 @@ def s19_delete_pr_linked_from_dcs():
 		return exc_code(e), str(e)[:160]
 
 
-@probe("S-21", prefix="TWO_EVENTS_SHARED_KEYS", postfix="TWO_EVENTS_DISTINCT_KEYS_ONE_CORRELATION")
+@probe("S-21", prefix="TWO_EVENTS_SHARED_KEYS", postfix="ONE_APP_OWNED_EVENT")
 def s21_dcs_on_pr_event_count():
 	opp, _ = customer_opportunity()
 	pr = new_pr(opp, presales_owner="Administrator", estimated_hours=3)
@@ -268,6 +268,16 @@ def s21_dcs_on_pr_event_count():
 	d = new_dcs(opp, presales_request=pr.name)
 	evs = frappe.get_all("DCS Governance Event", {"dcs": d.name}, ["name", "event_code", "reason", "correlation_id", "source_event_id"] if frappe.get_meta("DCS Governance Event").has_field("source_event_id") else ["name", "event_code", "reason", "correlation_id"])
 	detail = [(e.event_code, e.reason, e.correlation_id, e.get("source_event_id")) for e in evs]
+	if len(evs) == 1:
+		# Post-retirement: the app's single writer is the only writer left. It stamps a
+		# request key and a server-generated correlation id; the legacy Server Scripts
+		# set neither, so this distinguishes an app-owned event from a script-owned one.
+		e = evs[0]
+		key = e.get("source_event_id")
+		corr = e.get("correlation_id")
+		if key and corr and not str(corr).startswith("AUTH-"):
+			return "ONE_APP_OWNED_EVENT", str(detail)
+		return "ONE_EVENT_NOT_APP_OWNED", str(detail)
 	if len(evs) != 2:
 		return f"EVENTS_{len(evs)}", str(detail)
 	corr = {e.correlation_id for e in evs}
