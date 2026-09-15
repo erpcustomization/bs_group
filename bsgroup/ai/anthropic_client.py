@@ -25,7 +25,11 @@ from frappe import _
 ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages"
 ANTHROPIC_VERSION = "2023-06-01"
 ANTHROPIC_PROVIDER = "Anthropic (Claude)"
-DEFAULT_MODEL = "claude-3-5-haiku-20241022"
+# Default model when AI Provider Settings has none. Kept in step with the model
+# the site is actually configured with (claude-sonnet-4-5) and the example shown
+# in the Deal Cost Sheet AI dialog. The settings value always takes precedence;
+# this is only the fallback so a blank field never sends a retired snapshot id.
+DEFAULT_MODEL = "claude-sonnet-4-5"
 DEFAULT_MAX_TOKENS = 2000
 # Hard ceiling so a mis-configured settings value cannot run away with cost.
 MAX_TOKENS_CEILING = 8000
@@ -111,21 +115,30 @@ def generate(system_prompt, user_message, config=None, timeout=REQUEST_TIMEOUT):
 			timeout=timeout,
 		)
 	except requests.exceptions.RequestException as exc:
-		# str(exc) can include the URL but never the api-key header.
+		# Sanitised: the user sees a generic network message; the detail (which
+		# can contain the endpoint URL and query, though never the api-key
+		# header) is logged server-side only.
 		_update_status(config, ok=False, note="network error")
-		raise AIProviderError(_("Could not reach the AI provider: {0}").format(str(exc)[:200]))
+		frappe.log_error(title="BSG-AI-QUOTATION network error", message=str(exc)[:500])
+		raise AIProviderError(_("Could not reach the AI provider (network error). Please try again."))
 
 	if response.status_code != 200:
-		# Surface the provider's error *type* only, not the raw body (which we
-		# also keep out of logs beyond a short, key-free snippet).
+		# Surface only the HTTP status to the user. The provider's error body is
+		# logged server-side, key-free, and never returned to the caller. A 404 /
+		# model error is called out so a bad model in AI Provider Settings is
+		# actionable without leaking the raw payload.
 		detail = _safe_error_detail(response)
 		_update_status(config, ok=False, note=f"HTTP {response.status_code}")
 		frappe.log_error(
 			title="BSG-AI-QUOTATION provider error",
-			message=f"status={response.status_code} detail={detail}",
+			message=f"status={response.status_code} model={config.get('model')} detail={detail}",
 		)
+		if response.status_code == 404 or "model" in detail.lower():
+			raise AIProviderError(
+				_("The AI model configured in AI Provider Settings was not accepted by the provider. Check the Model Name.")
+			)
 		raise AIProviderError(
-			_("The AI provider returned an error ({0}). Please try again or check AI Provider Settings.").format(
+			_("The AI provider returned an error (HTTP {0}). Please try again or check AI Provider Settings.").format(
 				response.status_code
 			)
 		)
@@ -144,8 +157,10 @@ def generate(system_prompt, user_message, config=None, timeout=REQUEST_TIMEOUT):
 			"stop_reason": body.get("stop_reason", ""),
 		}
 	except (ValueError, AttributeError, KeyError) as exc:
+		# Sanitised: generic to the user, detail to the server log only.
 		_update_status(config, ok=False, note="bad response")
-		raise AIProviderError(_("The AI provider returned an unreadable response: {0}").format(str(exc)[:120]))
+		frappe.log_error(title="BSG-AI-QUOTATION unreadable response", message=str(exc)[:300])
+		raise AIProviderError(_("The AI provider returned an unreadable response."))
 
 	if not result["text"]:
 		_update_status(config, ok=False, note="empty response")

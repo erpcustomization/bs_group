@@ -75,6 +75,23 @@ class TestApprovalGate(unittest.TestCase):
 			)
 		)
 
+	def test_pending_endorsement_blocks(self):
+		self.assertIsNotNone(
+			narrative.approval_gate_block_reason({"custom_approval_state": "Pending Endorsement", "custom_approved_on": ""})
+		)
+
+	def test_in_negotiation_blocks(self):
+		self.assertIsNotNone(
+			narrative.approval_gate_block_reason({"custom_approval_state": "In Negotiation", "custom_approved_on": ""})
+		)
+
+	def test_approval_state_with_recorded_approval_passes(self):
+		self.assertIsNone(
+			narrative.approval_gate_block_reason(
+				{"custom_approval_state": "Pending Endorsement", "custom_approved_on": "2026-09-15 10:00:00"}
+			)
+		)
+
 
 class TestContextRedaction(unittest.TestCase):
 	def test_no_figures_reach_the_model(self):

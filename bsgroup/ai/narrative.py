@@ -85,10 +85,13 @@ def approval_gate_block_reason(dcs):
 
 	* margin gate is ``Blocked`` -> block;
 	* approval is required (``Managing Director`` / ``Blocked``) but no
-	  approval has been recorded (``custom_approved_on`` empty) -> block.
+	  approval has been recorded (``custom_approved_on`` empty) -> block;
+	* an approval is actively in progress (``custom_approval_state`` is
+	  ``Pending Endorsement`` or ``In Negotiation``) -> block, so a quotation is
+	  never generated out from under a sign-off that is still being decided.
 
 	A caller holding an override role may bypass this (decided in
-	quotation_generator, not here).
+	quotation_generator, not here), and the override is always audited.
 	"""
 	gate = (dcs.get("custom_margin_gate") or "").strip()
 	if gate == "Blocked":
@@ -99,6 +102,10 @@ def approval_gate_block_reason(dcs):
 	approved_on = (dcs.get("custom_approved_on") or "")
 	if approval_required in ("Managing Director", "Blocked") and not approved_on:
 		return f"Approval required ({approval_required}) but not yet recorded."
+
+	approval_state = (dcs.get("custom_approval_state") or "").strip()
+	if approval_state in ("Pending Endorsement", "In Negotiation") and not approved_on:
+		return f"A commercial approval is in progress ({approval_state})."
 
 	return None
 
