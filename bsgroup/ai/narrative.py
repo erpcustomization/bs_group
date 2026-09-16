@@ -29,6 +29,23 @@ NEEDS_INPUT_MARKER = "[NEEDS INPUT"
 # level-0, descriptive fields - never a rate, quantity, amount or tax field.
 NARRATIVE_FIELDS = ("custom_subject", "custom_scope_overview", "custom_customer_notes")
 
+# The AI writes prose only, but we cannot *guarantee* it never states a figure
+# in that prose. This pattern flags money-shaped text (currency codes/symbols,
+# decimal amounts, thousands-separated numbers) so a human verifies it against
+# the costed figures before the quotation is sent. It intentionally ignores
+# plain small integers like "5 access points".
+_MONEY_RE = re.compile(
+	r"\bAED\b|\bOMR\b|\bUSD\b|\bSAR\b|[$€£]"           # currency tokens
+	r"|\d[\d,]*\.\d{2}\b"                                # decimal amounts (12.50)
+	r"|\b\d{1,3}(?:,\d{3})+\b",                          # thousands (1,200)
+	re.IGNORECASE,
+)
+
+# Always surfaced when AI narrative is applied: the draft must be read by a
+# person before it is sent. We never claim the structured-field separation
+# guarantees the prose is figure-free or free of invented claims.
+REVIEW_NOTE = "AI-generated narrative — read and verify the draft before sending."
+
 
 def _flt(value):
 	try:
@@ -267,6 +284,21 @@ def select_narrative_updates(parsed, existing, items, overwrite=False):
 # ---------------------------------------------------------------------------
 # small internal helpers
 # ---------------------------------------------------------------------------
+
+def money_flags(field_updates, item_updates):
+	"""Return review warnings for any applied narrative text that looks like it
+	states a monetary figure. This does NOT block or edit the text - it flags it
+	for the human who must review the draft, because prose figure-freedom cannot
+	be guaranteed from the structured-field separation alone."""
+	warnings = []
+	for field, value in (field_updates or {}).items():
+		if _MONEY_RE.search(value or ""):
+			warnings.append(f"{field}: narrative appears to contain a figure — verify against the costed values")
+	for upd in item_updates or []:
+		if _MONEY_RE.search(upd.get("text") or ""):
+			warnings.append(f"item line {upd.get('line')}: narrative appears to contain a figure — verify against the costed values")
+	return warnings
+
 
 def _as_str(value):
 	if value is None:

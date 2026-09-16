@@ -34,13 +34,26 @@ from frappe.utils import flt
 
 from bsgroup.ai import narrative
 
-# Roles that MAY override a block - but only when the caller also passes the
-# matching explicit override flag. The role alone never bypasses anything.
+# Roles that MAY override an operational block (missing costs, unresolved tax) -
+# but only when the caller also passes the matching explicit flag AND supplies a
+# reason. The role alone never bypasses anything.
 OVERRIDE_ROLES = ("System Manager", "Sales Manager")
+
+# Overriding a COMMERCIAL APPROVAL block is a higher bar: only an authority that
+# could itself grant the DCS approval may do it, so a Sales Manager cannot wave
+# through an MD-level approval. Matches the DCS approval model (MD / superuser).
+APPROVAL_OVERRIDE_ROLES = ("System Manager", "Managing Director")
+
+# Minimum length for an override reason, so overrides carry a real justification.
+MIN_OVERRIDE_REASON = 5
 
 
 def _can_override():
 	return bool(set(frappe.get_roles()) & set(OVERRIDE_ROLES))
+
+
+def _can_override_approval():
+	return bool(set(frappe.get_roles()) & set(APPROVAL_OVERRIDE_ROLES))
 
 
 def _dcs_as_dict(dcs):
@@ -149,6 +162,7 @@ def preview_dcs_readiness(source_name):
 		"missing_costs": rd["missing"],
 		"tax_block": rd["tax_block"],
 		"can_override": _can_override(),
+		"can_override_approval": _can_override_approval(),
 	}
 
 
@@ -160,19 +174,24 @@ def generate_quotation_from_dcs(
 	override_approval=0,
 	ignore_missing_costs=0,
 	override_tax=0,
+	override_reason=None,
 ):
 	"""Create a **draft** Quotation from a submitted Deal Cost Sheet.
 
-	Overrides (``override_approval`` / ``ignore_missing_costs`` / ``override_tax``)
-	are honoured only when the caller both passes the flag and holds an override
-	role; each applied override is audited. A draft/cancelled DCS is always
-	refused.
+	Overrides are honoured only when the caller passes the flag, holds the
+	authority for that specific override, AND supplies ``override_reason``. An
+	approval override requires an approval-level authority (not merely a Sales
+	Manager), matching the DCS approval model. Each applied override, with its
+	reason, is audited atomically with the insert. A draft/cancelled DCS is
+	always refused.
 	"""
 	overwrite_narrative = frappe.utils.cint(overwrite_narrative)
 	override_approval = frappe.utils.cint(override_approval)
 	ignore_missing_costs = frappe.utils.cint(ignore_missing_costs)
 	override_tax = frappe.utils.cint(override_tax)
+	override_reason = (override_reason or "").strip()
 	can_override = _can_override()
+	can_override_approval = _can_override_approval()
 
 	# --- permissions: read the DCS, create the Quotation ---------------------
 	frappe.has_permission("Quotation", "create", throw=True)
@@ -186,8 +205,13 @@ def generate_quotation_from_dcs(
 	if rd["charge_block"]:
 		return _blocked("charge_item_unmapped", rd["charge_block"])
 
-	# --- approval / margin-gate guard (explicit override only) ---------------
-	if rd["approval_block"] and not (override_approval and can_override):
+	# --- an override was requested: require a reason before evaluating it -----
+	override_requested = bool(override_approval or ignore_missing_costs or override_tax)
+	if override_requested and len(override_reason) < MIN_OVERRIDE_REASON:
+		return _blocked("override_reason_required", _("An override reason is required to proceed past a block."))
+
+	# --- approval / margin-gate guard (approval-authority override only) ------
+	if rd["approval_block"] and not (override_approval and can_override_approval):
 		return _blocked("approval_gate", rd["approval_block"], missing_costs=rd["missing"])
 
 	# --- missing-cost guard (explicit override only) -------------------------
@@ -203,12 +227,12 @@ def generate_quotation_from_dcs(
 		return _blocked("tax_unresolved", rd["tax_block"])
 
 	applied_overrides = []
-	if rd["approval_block"] and override_approval and can_override:
-		applied_overrides.append(f"approval: {rd['approval_block']}")
+	if rd["approval_block"] and override_approval and can_override_approval:
+		applied_overrides.append(f"approval [{override_reason}]: {rd['approval_block']}")
 	if rd["missing"] and ignore_missing_costs and can_override:
-		applied_overrides.append(f"missing costs: {len(rd['missing'])} flag(s)")
+		applied_overrides.append(f"missing costs [{override_reason}]: {len(rd['missing'])} flag(s)")
 	if rd["tax_block"] and override_tax and can_override:
-		applied_overrides.append(f"tax: {rd['tax_block']}")
+		applied_overrides.append(f"tax [{override_reason}]: {rd['tax_block']}")
 
 	# --- build the draft in memory (figures + company taxes + all charges) ---
 	quotation, build_warnings = _build_quotation_doc(rd["dcs"], rd["tax_template"])
@@ -245,12 +269,16 @@ def generate_quotation_from_dcs(
 			quotation.set(field, value)
 		applied_lines = _apply_item_descriptions(quotation, rd["items"], item_updates, overwrite=bool(overwrite_narrative))
 
+		# Finding: prose figure-freedom cannot be guaranteed. Flag money-shaped
+		# narrative for the human reviewer, and always require human review of the
+		# draft - never claim the field separation makes the prose safe.
+		money = narrative.money_flags(field_updates, [u for u in item_updates if u["line"] in applied_lines])
 		result.update({
 			"ai_used": True,
 			"model": ai.get("model"),
 			"fields_updated": sorted(field_updates.keys()),
 			"item_lines_updated": applied_lines,
-			"needs_input": list(build_warnings) + needs_input,
+			"needs_input": list(build_warnings) + needs_input + money + [narrative.REVIEW_NOTE],
 		})
 	except Exception as exc:
 		# AI is an enhancement, not a gate. Report a sanitised reason; log only
@@ -278,14 +306,32 @@ def generate_quotation_from_dcs(
 	except Exception as exc:
 		frappe.db.rollback(save_point="bsg_ai_quotation")
 		result["quotation"] = None
-		# Log only the type (no traceback / no locals); surface a sanitised,
-		# tag-free validation message to help the user fix the source data.
+		# Log only the type (no traceback / no locals). Surface the underlying
+		# message ONLY for deliberately chosen, safe validation exception types
+		# (mandatory/link/permission); every other, unexpected error returns a
+		# generic controlled message so nothing internal leaks to the user.
 		frappe.log_error(title="BSG-AI-QUOTATION insert/audit failed", message=type(exc).__name__)
 		frappe.clear_last_message()
-		safe = frappe.utils.strip_html_tags(str(exc))[:200]
-		return _blocked("insert_failed", _("The draft quotation could not be created: {0}").format(safe))
+		return _blocked("insert_failed", _insert_failure_message(exc))
 
 	return result
+
+
+# Exception types whose message is safe and useful to show the user verbatim
+# (they name a missing mandatory field, a bad link, or a permission gap).
+_SAFE_INSERT_EXCEPTIONS = (
+	frappe.MandatoryError,
+	frappe.LinkValidationError,
+	frappe.PermissionError,
+)
+
+
+def _insert_failure_message(exc):
+	if isinstance(exc, _SAFE_INSERT_EXCEPTIONS):
+		safe = frappe.utils.strip_html_tags(str(exc))[:200].strip()
+		if safe:
+			return _("The draft quotation could not be created: {0}").format(safe)
+	return _("The draft quotation could not be created due to an unexpected error. Please try again or contact support.")
 
 
 def _resolve_company_tax_template(company):
@@ -346,13 +392,7 @@ def _build_quotation_doc(dcs, tax_template):
 
 	if tax_template:
 		quotation.taxes_and_charges = tax_template
-		for tax in frappe.get_all(
-			"Sales Taxes and Charges",
-			filters={"parent": tax_template},
-			fields=["charge_type", "account_head", "description", "rate", "included_in_print_rate"],
-			order_by="idx",
-		):
-			quotation.append("taxes", tax)
+		_append_template_taxes(quotation, tax_template)
 
 	quotation.quotation_to = "Customer" if opp.get("opportunity_from") == "Customer" else "Lead"
 	quotation.party_name = opp.get("party_name")
@@ -419,6 +459,40 @@ def _build_quotation_doc(dcs, tax_template):
 			})
 
 	return quotation, warnings
+
+
+def _append_template_taxes(quotation, tax_template):
+	"""Copy the template's tax rows onto the quotation completely.
+
+	Uses ERPNext's own ``get_taxes_and_charges`` so every field is preserved -
+	charge_type, row_id (for 'On Previous Row Amount/Total'), rate, tax_amount
+	(for 'Actual'), cost_center, included_in_print_rate, etc. - rather than a
+	hand-picked subset that would silently break previous-row-dependent or
+	Actual-amount templates. Falls back to a full-field manual copy only if that
+	helper is unavailable.
+	"""
+	try:
+		from erpnext.controllers.accounts_controller import get_taxes_and_charges
+
+		for tax in get_taxes_and_charges("Sales Taxes and Charges Template", tax_template) or []:
+			quotation.append("taxes", tax)
+		return
+	except Exception:
+		frappe.clear_last_message()
+
+	# Fallback: copy the full row, not a subset (keeps row_id / charge_type /
+	# tax_amount so dependent and Actual rows still compute correctly).
+	rows = frappe.get_all(
+		"Sales Taxes and Charges",
+		filters={"parent": tax_template, "parenttype": "Sales Taxes and Charges Template"},
+		fields=[
+			"charge_type", "row_id", "account_head", "description", "cost_center",
+			"rate", "tax_amount", "included_in_print_rate",
+		],
+		order_by="idx",
+	)
+	for tax in rows:
+		quotation.append("taxes", tax)
 
 
 def _apply_item_descriptions(quotation, dcs_items, item_updates, overwrite):

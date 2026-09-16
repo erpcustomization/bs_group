@@ -168,13 +168,30 @@ class TestNoAutomaticOverride(AIQuotationTestBase):
 
 	@patch("bsgroup.ai.anthropic_client.generate", _fake_generate)
 	@patch("bsgroup.ai.anthropic_client.get_active_config", _fake_config)
-	@patch("bsgroup.ai.quotation_generator._can_override", return_value=True)
-	def test_explicit_override_proceeds_and_is_audited(self, _ov):
+	@patch("bsgroup.ai.quotation_generator._can_override_approval", return_value=True)
+	def test_explicit_approval_override_with_reason_proceeds_and_is_audited(self, _ov):
 		dcs = self._make_dcs(margin_gate="Blocked", submit=True)
-		res = quotation_generator.generate_quotation_from_dcs(dcs, override_approval=1)
+		res = quotation_generator.generate_quotation_from_dcs(dcs, override_approval=1, override_reason="MD verbally approved")
 		self.assertEqual(res["ok"], 1)
-		self.assertTrue(any("approval" in o for o in res["applied_overrides"]))
+		self.assertTrue(any("approval" in o and "MD verbally approved" in o for o in res["applied_overrides"]))
 		self.assertEqual(frappe.get_doc("Quotation", res["quotation"]).docstatus, 0)
+
+	@patch("bsgroup.ai.quotation_generator._can_override_approval", return_value=True)
+	def test_override_without_reason_is_blocked(self, _ov):
+		dcs = self._make_dcs(margin_gate="Blocked", submit=True)
+		res = quotation_generator.generate_quotation_from_dcs(dcs, override_approval=1)  # no reason
+		self.assertEqual(res["ok"], 0)
+		self.assertEqual(res["blocked"], "override_reason_required")
+
+	@patch("bsgroup.ai.quotation_generator._can_override", return_value=True)           # missing/tax authority
+	@patch("bsgroup.ai.quotation_generator._can_override_approval", return_value=False)  # NOT approval authority
+	def test_approval_override_needs_approval_authority(self, _oa, _ov):
+		# A user who can override missing costs/tax but lacks approval authority
+		# (e.g. a Sales Manager) cannot wave through a commercial-approval block.
+		dcs = self._make_dcs(margin_gate="Blocked", submit=True)
+		res = quotation_generator.generate_quotation_from_dcs(dcs, override_approval=1, override_reason="please")
+		self.assertEqual(res["ok"], 0)
+		self.assertEqual(res["blocked"], "approval_gate")
 
 
 class TestRealDeniedUser(AIQuotationTestBase):
@@ -252,16 +269,29 @@ class TestAtomicRollback(AIQuotationTestBase):
 
 	@patch("bsgroup.ai.anthropic_client.get_active_config", side_effect=AIProviderError("AI off"))
 	def test_audit_failure_rolls_back_after_actual_write(self, _cfg):
-		# The quotation is REALLY inserted (a database write), then the audit
+		# The quotation is REALLY inserted (a database write), THEN the audit
 		# step fails; the savepoint must roll back the inserted row so an
-		# override can never persist unaudited.
+		# override can never persist unaudited. The spy proves the audit was
+		# actually reached *after* the row existed in the database.
 		dcs = self._make_dcs(submit=True)
 		before = frappe.db.count("Quotation")
-		with patch("bsgroup.ai.quotation_generator._audit", side_effect=frappe.ValidationError("audit boom")):
+		seen = {}
+
+		def spy_audit(quotation, result):
+			seen["name"] = quotation.name
+			# the row is really persisted at this point (post-insert, pre-commit)
+			seen["existed_at_audit"] = bool(quotation.name) and frappe.db.exists("Quotation", quotation.name)
+			raise frappe.ValidationError("audit boom")
+
+		with patch("bsgroup.ai.quotation_generator._audit", side_effect=spy_audit):
 			res = quotation_generator.generate_quotation_from_dcs(dcs)
+
+		self.assertTrue(seen.get("name"), "audit must run with an inserted quotation")
+		self.assertTrue(seen.get("existed_at_audit"), "the quotation must have been written before the audit ran")
 		self.assertEqual(res["ok"], 0)
 		self.assertEqual(res["blocked"], "insert_failed")
 		self.assertIsNone(res["quotation"])
+		self.assertFalse(frappe.db.exists("Quotation", seen["name"]), "the inserted row must be rolled back")
 		self.assertEqual(frappe.db.count("Quotation"), before, "a failed audit must roll back the actual insert")
 
 

@@ -17,17 +17,19 @@ number comes from the ERP, not the model.
 |---|---|
 | API keys stay secure | Key lives only in `AI Provider Settings` (encrypted `Password`). Read server-side via `get_password`, never returned to the browser, logged, or put in a URL (`anthropic_client.py`). |
 | Enforce permissions & mandatory fields | `has_permission` gates on DCS `read` and Quotation `create`; the Quotation is inserted **with permission checks and mandatory-field validation on** (no `ignore_permissions` / `ignore_mandatory`). A denied user or a missing mandatory field fails and rolls back. |
-| No automatic bypass | A block (approval, missing costs, tax) is cleared only when the caller **both** holds an override role **and** passes the matching explicit flag (`override_approval` / `ignore_missing_costs` / `override_tax`). Holding the role is never enough; each applied override is audited. |
+| No automatic bypass | A block is cleared only when the caller passes the matching explicit flag, holds the authority for it, **and** supplies `override_reason` (min length enforced). Missing-cost / tax overrides need `System Manager` / `Sales Manager`; an **approval** override needs an **approval-level authority** (`System Manager` / `Managing Director`) — a Sales Manager cannot wave through a commercial-approval block, matching the DCS approval model. Every applied override records its reason. |
+| Override auditing atomic | The audit note recording the override + reason is written in the same savepoint as the insert; if it can't be written, the whole thing rolls back. |
 | Submitted-DCS validation | A draft or cancelled Deal Cost Sheet is refused (`dcs_status`) — never overridable. |
 | Atomic draft + atomic override audit | Items, taxes, all charges and AI narrative are inserted in one `insert`, and the audit note (which records any applied override) is written in the **same savepoint**; if the insert *or* the audit fails, everything rolls back — an override never persists unaudited (`TestAtomicRollback`, incl. a real rollback after an actual write). |
 | Company-specific taxes | Resolved per company from the **enabled** templates (default → sole → warn). An unresolved template **blocks** generation (`tax_unresolved`) unless explicitly overridden. Never a hardcoded UAE template. |
+| Complete tax-row copy | Tax rows are copied via ERPNext's own `get_taxes_and_charges`, preserving `charge_type`, `row_id` (On Previous Row Amount/Total), `rate`, `tax_amount` (Actual) and print flags — not a hand-picked subset that would break dependent/Actual templates. |
 | Preserve all additional charges | Each additional-charge row becomes its **own** quotation line (description + amount). If the charges cannot be mapped to a valid, existing item, generation is **hard-blocked** (`charge_item_unmapped`, never overridable) — charges are never silently dropped. |
 | Enforce calculations | Figures are computed from the DCS (rates, qty, amounts, additional charges, currency). |
 | Supported model | Default model is `claude-sonnet-4-5` (the site's configured model); the settings value always takes precedence. A provider "model" / 404 error surfaces as "check the Model Name". |
-| Sanitised logs | Failures log only the exception **type** (and HTTP status / provider error-type code); never the prompt, customer data, response body, config or API key, and never a full traceback (which could carry locals in developer mode). |
-| Flag missing costs, never invent | `narrative.detect_missing_costs` reports zero/blank costs, quantities and unconfigured additional-charge item; by default this **stops** generation. The model is told to emit `[NEEDS INPUT: …]` rather than fabricate, and any such marker is stripped and reported, never written to the customer document. |
-| No figures to/from the model | `narrative.build_ai_context` sends descriptive fields only — no cost, selling, margin, GP or quantity. |
-| Save as draft | The result is always a Quotation at `docstatus 0`; nothing is submitted or sent. |
+| Sanitised logs & controlled errors | Failures log only the exception **type** (plus HTTP status / provider error-type code) — never the prompt, customer data, response body, config, key, or a traceback. The user sees the underlying message only for deliberately chosen safe validation types (mandatory / link / permission); every other unexpected error returns a generic controlled message. |
+| Flag missing costs, never invent | `narrative.detect_missing_costs` reports zero/blank item and resource costs; by default this **stops** generation. The model is told to emit `[NEEDS INPUT: …]` rather than fabricate, and any such marker is stripped and reported, never written to the customer document. |
+| Figures not sourced from the model, prose still reviewed | The model is sent descriptive fields only (no cost/selling/margin/GP/quantity) and instructed to write prose without figures — but this is **not** claimed as a guarantee. Any money-shaped text in the returned narrative is flagged for review, and the draft **always** carries an "AI-generated narrative — read and verify before sending" note. A human reviews every draft. |
+| Save as draft (human review) | The result is always a Quotation at `docstatus 0`; nothing is submitted or sent, so a person reviews and edits before it goes out. |
 
 ## Endpoints
 
@@ -35,8 +37,10 @@ number comes from the ERP, not the model.
   missing-cost flags. Creates nothing.
 - `generate_quotation_from_dcs(source_name, instructions=None,
   overwrite_narrative=0, override_approval=0, ignore_missing_costs=0,
-  override_tax=0)` — creates the draft. Each `override_*` flag takes effect
-  only for an override-role caller and is audited.
+  override_tax=0, override_reason=None)` — creates the draft. An `override_*`
+  flag takes effect only for a caller with the authority for that block
+  (approval needs approval-level authority) and only with a non-empty
+  `override_reason`, which is audited.
 
 ## Layout
 

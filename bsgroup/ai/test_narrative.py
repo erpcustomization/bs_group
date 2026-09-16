@@ -152,5 +152,24 @@ class TestSelectNarrativeUpdates(unittest.TestCase):
 		self.assertEqual(item_updates, [])
 
 
+class TestMoneyFlags(unittest.TestCase):
+	def test_flags_currency_and_amounts(self):
+		fu = {"custom_scope_overview": "<p>Total is AED 12,500 for the works.</p>"}
+		flags = narrative.money_flags(fu, [])
+		self.assertTrue(any("custom_scope_overview" in f for f in flags))
+
+	def test_flags_decimal_amount_in_line(self):
+		flags = narrative.money_flags({}, [{"line": 2, "text": "Support at 1,250.00 per year"}])
+		self.assertTrue(any("line 2" in f for f in flags))
+
+	def test_ignores_plain_small_integers(self):
+		fu = {"custom_subject": "Supply of 5 access points and 2 switches"}
+		self.assertEqual(narrative.money_flags(fu, []), [])
+
+	def test_clean_text_no_flags(self):
+		fu = {"custom_customer_notes": "Delivery and installation included."}
+		self.assertEqual(narrative.money_flags(fu, []), [])
+
+
 if __name__ == "__main__":
 	unittest.main()

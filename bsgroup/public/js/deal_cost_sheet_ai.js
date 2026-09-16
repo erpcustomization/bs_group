@@ -54,8 +54,13 @@ function bsg_ai_create_quotation(frm) {
 			(p.missing_costs || []).forEach(m => blocks.push({ key: "missing", label: m.ref + " — " + m.issue }));
 			if (p.tax_block) blocks.push({ key: "tax", label: p.tax_block });
 
-			if (blocks.length && !p.can_override) {
-				const rows = blocks.map(b => "<li>" + bsg_ai_esc(b.label) + "</li>").join("");
+			// A block is only overridable if the user holds the right authority
+			// for it: approval needs approval-authority, the rest need can_override.
+			const canClear = b => (b.key === "approval" ? p.can_override_approval : p.can_override);
+			if (blocks.length && !blocks.every(canClear)) {
+				const rows = blocks.map(b =>
+					"<li>" + bsg_ai_esc(b.label) + (canClear(b) ? "" : " <i>(" + __("you cannot override this") + ")</i>") + "</li>"
+				).join("");
 				frappe.msgprint({
 					title: __("Not ready to quote — resolve these first"),
 					message: "<ul>" + rows + "</ul>",
@@ -69,10 +74,10 @@ function bsg_ai_create_quotation(frm) {
 }
 
 function bsg_ai_quote_dialog(frm, preview, blocks) {
-	const hasApproval = !!preview.block_reason;
-	const hasMissing = (preview.missing_costs || []).length > 0;
-	const hasTax = !!preview.tax_block;
-	const canOverride = !!preview.can_override;
+	const hasApproval = !!preview.block_reason && !!preview.can_override_approval;
+	const hasMissing = (preview.missing_costs || []).length > 0 && !!preview.can_override;
+	const hasTax = !!preview.tax_block && !!preview.can_override;
+	const anyOverride = hasApproval || hasMissing || hasTax;
 
 	const fields = [];
 	if (blocks.length) {
@@ -82,20 +87,23 @@ function bsg_ai_quote_dialog(frm, preview, blocks) {
 			options:
 				'<div style="background:#fff4e5;border:1px solid #ffd8a8;padding:8px 10px;border-radius:6px;margin-bottom:8px;font-size:12px">' +
 				"<b>" + __("These normally block a quotation:") + "</b><ul style=\"margin:4px 0 0 16px\">" + rows + "</ul>" +
-				(canOverride ? "<div style=\"margin-top:6px\">" + __("Tick the matching override below to proceed anyway (recorded on the quotation).") + "</div>" : "") +
+				(anyOverride ? "<div style=\"margin-top:6px\">" + __("Tick the matching override AND give a reason to proceed (recorded on the quotation).") + "</div>" : "") +
 				"</div>",
 		});
 	}
 	fields.push({ fieldtype: "Small Text", fieldname: "instructions", label: __("Extra guidance for the narrative (optional, no prices)") });
 	fields.push({ fieldtype: "Check", fieldname: "overwrite_narrative", label: __("Overwrite existing subject / scope / notes"), default: 0 });
-	if (canOverride && hasApproval) {
+	if (hasApproval) {
 		fields.push({ fieldtype: "Check", fieldname: "override_approval", label: __("Override commercial approval block"), default: 0 });
 	}
-	if (canOverride && hasMissing) {
+	if (hasMissing) {
 		fields.push({ fieldtype: "Check", fieldname: "ignore_missing_costs", label: __("Proceed despite missing costs"), default: 0 });
 	}
-	if (canOverride && hasTax) {
+	if (hasTax) {
 		fields.push({ fieldtype: "Check", fieldname: "override_tax", label: __("Proceed without a resolved tax template"), default: 0 });
+	}
+	if (anyOverride) {
+		fields.push({ fieldtype: "Small Text", fieldname: "override_reason", label: __("Override reason (required)"), reqd: 1 });
 	}
 
 	const d = new frappe.ui.Dialog({
@@ -116,6 +124,10 @@ function bsg_ai_quote_dialog(frm, preview, blocks) {
 				frappe.msgprint({ title: __("Override required"), message: __("Tick 'Proceed without a resolved tax template' to proceed."), indicator: "orange" });
 				return;
 			}
+			if (anyOverride && !(values.override_reason || "").trim()) {
+				frappe.msgprint({ title: __("Reason required"), message: __("Give a reason for the override."), indicator: "orange" });
+				return;
+			}
 			d.hide();
 			frappe.call({
 				method: "bsgroup.ai.quotation_generator.generate_quotation_from_dcs",
@@ -126,6 +138,7 @@ function bsg_ai_quote_dialog(frm, preview, blocks) {
 					override_approval: values.override_approval ? 1 : 0,
 					ignore_missing_costs: values.ignore_missing_costs ? 1 : 0,
 					override_tax: values.override_tax ? 1 : 0,
+					override_reason: values.override_reason || "",
 				},
 				freeze: true,
 				freeze_message: __("Generating draft quotation..."),
