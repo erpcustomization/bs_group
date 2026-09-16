@@ -272,6 +272,9 @@ permission_query_conditions = {
     "Presales Request": "bsgroup.permissions.get_common_conditions",
     "Deal Cost Sheet": "bsgroup.permissions.get_deal_cost_sheet_query_conditions",
     "Quotation": "bsgroup.permissions.get_common_conditions",
+    "Sales Order": "bsgroup.permissions.get_common_conditions",
+    "Sales Invoice": "bsgroup.permissions.get_common_conditions",
+    "Delivery Note": "bsgroup.permissions.get_common_conditions",
     "Customer": "bsgroup.permissions.get_customer_query_conditions",
     "Sales Target GP Entry": "bsgroup.permissions.get_sales_target_gp_entry_query_conditions",
     "*": "bsgroup.utils.company_access.global_company_condition",
@@ -371,7 +374,10 @@ doc_events = {
         ],
     },
     "Quotation": {
-        "validate": "bsgroup.utils.quotation.validate_pipeline_stage",
+        "validate": [
+            "bsgroup.utils.quotation.validate_pipeline_stage",
+            "bsgroup.utils.quotation.set_sales_person_from_customer",
+        ],
         "on_update": "bsgroup.utils.quotation.sync_pipeline_result",
         "before_update_after_submit": "bsgroup.utils.quotation.validate_pipeline_stage",
         "on_update_after_submit": "bsgroup.utils.quotation.sync_pipeline_result",

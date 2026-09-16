@@ -24,6 +24,23 @@ def make_quotation(source_name, target_doc=None):
 	return quotation
 
 
+def set_sales_person_from_customer(doc, method=None):
+	"""Quotation has no native Sales Team child table (unlike Sales Order/Sales
+	Invoice/Delivery Note), so mirror the Customer's primary Sales Person
+	(highest allocation row) onto custom_sales_person for permission
+	filtering and reporting. Only applies when quotation_to is Customer."""
+	if doc.quotation_to != "Customer" or not doc.party_name:
+		return
+
+	sales_person = frappe.db.get_value(
+		"Sales Team",
+		{"parenttype": "Customer", "parent": doc.party_name},
+		"sales_person",
+		order_by="allocated_percentage desc",
+	)
+	doc.custom_sales_person = sales_person or ""
+
+
 LOST_REASON_STAGES = ("Lost", "Cancelled")
 
 # Stages a Quotation may only ever be submitted (docstatus 1) to reach -
