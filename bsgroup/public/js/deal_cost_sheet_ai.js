@@ -38,9 +38,14 @@ function bsg_ai_create_quotation(frm) {
 		callback(r) {
 			const p = r.message || {};
 
-			// Status block (draft/cancelled DCS) is never overridable.
+			// Hard blocks (never overridable): draft/cancelled DCS, and additional
+			// charges that cannot be mapped to a valid item.
 			if (p.status_block) {
 				frappe.msgprint({ title: __("Cannot quote this deal cost sheet"), message: bsg_ai_esc(p.status_block), indicator: "red" });
+				return;
+			}
+			if (p.charge_block) {
+				frappe.msgprint({ title: __("Additional charges cannot be placed"), message: bsg_ai_esc(p.charge_block), indicator: "red" });
 				return;
 			}
 

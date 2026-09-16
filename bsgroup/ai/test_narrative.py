@@ -36,15 +36,6 @@ class TestDetectMissingCosts(unittest.TestCase):
 		issues = narrative.detect_missing_costs(items)
 		self.assertTrue(any("no item and no description" in i["issue"] for i in issues))
 
-	def test_additional_charges_need_configured_item(self):
-		items = [{"item_code": "X", "item_name": "X", "qty": 1, "cost_rate": 1, "selling_rate": 2}]
-		charges = [{"amount": 500}]
-		issues = narrative.detect_missing_costs(items, charges=charges, dcs_addtional_item_configured=False)
-		self.assertTrue(any(i["area"] == "additional_charges" for i in issues))
-		# configured -> no such issue
-		issues2 = narrative.detect_missing_costs(items, charges=charges, dcs_addtional_item_configured=True)
-		self.assertFalse(any(i["area"] == "additional_charges" for i in issues2))
-
 	def test_resource_zero_cost_flagged(self):
 		items = [{"item_code": "X", "item_name": "X", "qty": 1, "cost_rate": 1, "selling_rate": 2}]
 		resources = [{"role": "Engineer", "cost_rate": 0, "cost_amount": 0}]

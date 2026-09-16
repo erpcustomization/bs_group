@@ -250,6 +250,20 @@ class TestAtomicRollback(AIQuotationTestBase):
 		self.assertEqual(res["blocked"], "insert_failed")
 		self.assertEqual(frappe.db.count("Quotation"), before)
 
+	@patch("bsgroup.ai.anthropic_client.get_active_config", side_effect=AIProviderError("AI off"))
+	def test_audit_failure_rolls_back_after_actual_write(self, _cfg):
+		# The quotation is REALLY inserted (a database write), then the audit
+		# step fails; the savepoint must roll back the inserted row so an
+		# override can never persist unaudited.
+		dcs = self._make_dcs(submit=True)
+		before = frappe.db.count("Quotation")
+		with patch("bsgroup.ai.quotation_generator._audit", side_effect=frappe.ValidationError("audit boom")):
+			res = quotation_generator.generate_quotation_from_dcs(dcs)
+		self.assertEqual(res["ok"], 0)
+		self.assertEqual(res["blocked"], "insert_failed")
+		self.assertIsNone(res["quotation"])
+		self.assertEqual(frappe.db.count("Quotation"), before, "a failed audit must roll back the actual insert")
+
 
 class TestCompanyTaxResolution(AIQuotationTestBase):
 	def test_prefers_company_default_template(self):
@@ -321,6 +335,34 @@ class TestAdditionalChargesPreserved(AIQuotationTestBase):
 		self.assertIn("Site handover", descs)
 		amounts = sorted(float(r.amount or 0) for r in charge_rows)
 		self.assertEqual(amounts, [250.0, 500.0])
+
+
+class TestChargeMapping(AIQuotationTestBase):
+	def setUp(self):
+		if self.skip:
+			self.skipTest("required masters unavailable")
+
+	@patch("bsgroup.ai.anthropic_client.get_active_config", side_effect=AIProviderError("AI off"))
+	@patch("bsgroup.ai.quotation_generator._can_override", return_value=True)
+	def test_charges_without_item_are_hard_blocked(self, _ov, _cfg):
+		# No configured additional-charge item, but the deal has charges.
+		frappe.db.set_single_value("BS Group Settings", "dcs_addtional_item", None)
+		dcs = self._make_dcs(charges=[{"description": "Mobilisation", "amount": 500}], submit=True)
+		before = frappe.db.count("Quotation")
+		# Even a privileged user passing every override flag cannot bypass it.
+		res = quotation_generator.generate_quotation_from_dcs(
+			dcs, override_approval=1, ignore_missing_costs=1, override_tax=1
+		)
+		self.assertEqual(res["ok"], 0)
+		self.assertEqual(res["blocked"], "charge_item_unmapped")
+		self.assertEqual(frappe.db.count("Quotation"), before, "charges must never be silently dropped")
+
+	@patch("bsgroup.ai.anthropic_client.get_active_config", side_effect=AIProviderError("AI off"))
+	def test_configured_but_missing_item_is_blocked(self, _cfg):
+		frappe.db.set_single_value("BS Group Settings", "dcs_addtional_item", f"{PREFIX}-DOES-NOT-EXIST")
+		dcs = self._make_dcs(charges=[{"description": "X", "amount": 100}], submit=True)
+		res = quotation_generator.generate_quotation_from_dcs(dcs)
+		self.assertEqual(res["blocked"], "charge_item_unmapped")
 
 
 class TestGeneration(AIQuotationTestBase):

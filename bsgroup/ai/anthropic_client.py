@@ -165,6 +165,14 @@ def generate(system_prompt, user_message, config=None, timeout=REQUEST_TIMEOUT):
 		_update_status(config, ok=False, note="empty response")
 		raise AIProviderError(_("The AI provider returned an empty response."))
 
+	if result["stop_reason"] == "max_tokens":
+		# The narrative JSON was very likely cut off mid-object. Surface a clear,
+		# sanitised, actionable message instead of letting the parse fail opaquely.
+		_update_status(config, ok=False, note="truncated")
+		raise AIProviderError(
+			_("The AI response was cut off (Max Tokens is too low). Increase 'Max Tokens per Request' in AI Provider Settings.")
+		)
+
 	_update_status(config, ok=True, note="ok")
 	return result
 

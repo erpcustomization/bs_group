@@ -37,17 +37,18 @@ def _flt(value):
 		return 0.0
 
 
-def detect_missing_costs(items, resources=None, charges=None, dcs_addtional_item_configured=True):
-	"""Return a list of missing/zero-cost issues found on a DCS.
+def detect_missing_costs(items, resources=None):
+	"""Return a list of missing/zero-cost issues found on a DCS's items and
+	resources.
 
 	Each issue is a dict: ``{"area", "ref", "issue"}``. An empty list means
-	every priced row carries a cost and a selling figure and nothing needs a
-	human before a quotation is produced. This function never fills a value -
-	it only reports.
+	every priced row carries a cost and a selling figure. This function never
+	fills a value - it only reports. (The additional-charge item mapping is a
+	hard block handled in quotation_generator, not a soft missing-cost flag,
+	so it is deliberately not evaluated here.)
 	"""
 	issues = []
 	resources = resources or []
-	charges = charges or []
 
 	for idx, row in enumerate(items or [], start=1):
 		ref = row.get("item_code") or row.get("item_name") or f"Item row {idx}"
@@ -65,14 +66,6 @@ def detect_missing_costs(items, resources=None, charges=None, dcs_addtional_item
 		ref = row.get("role") or row.get("description") or f"Resource row {idx}"
 		if _flt(row.get("cost_rate")) <= 0 and _flt(row.get("cost_amount")) <= 0:
 			issues.append({"area": "resource", "ref": ref, "issue": "Resource cost is zero or blank."})
-
-	total_charges = sum(_flt(c.get("amount")) for c in charges)
-	if total_charges and not dcs_addtional_item_configured:
-		issues.append({
-			"area": "additional_charges",
-			"ref": "BS Group Settings",
-			"issue": "Additional charges exist but 'DCS Addtional Item' is not configured, so they cannot be transferred.",
-		})
 
 	return issues
 

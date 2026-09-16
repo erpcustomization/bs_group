@@ -97,10 +97,12 @@ def _readiness(source_name):
 
 	approval_block = narrative.approval_gate_block_reason(header)
 
-	dcs_addtional_item = frappe.db.get_single_value("BS Group Settings", "dcs_addtional_item")
-	missing = narrative.detect_missing_costs(
-		items, resources, charges, dcs_addtional_item_configured=bool(dcs_addtional_item)
-	)
+	missing = narrative.detect_missing_costs(items, resources)
+
+	# Charge-item mapping is a HARD block (never overridable): additional
+	# charges cannot be placed on a quotation without a valid mapped item, and
+	# they must never be silently dropped.
+	charge_block = _charge_mapping_block(charges)
 
 	tax_template, tax_warning = _resolve_company_tax_template(dcs.company)
 
@@ -111,9 +113,24 @@ def _readiness(source_name):
 		"status_block": status_block,
 		"approval_block": approval_block,
 		"missing": missing,
+		"charge_block": charge_block,
 		"tax_template": tax_template,
 		"tax_block": tax_warning,  # None when a template resolved cleanly
 	}
+
+
+def _charge_mapping_block(charges):
+	"""Return a reason string if additional charges exist but cannot be mapped
+	to a valid item, else None. Checks both that ``dcs_addtional_item`` is
+	configured and that the configured Item actually exists."""
+	if not any(flt(c.get("amount")) for c in (charges or [])):
+		return None
+	dcs_addtional_item = frappe.db.get_single_value("BS Group Settings", "dcs_addtional_item")
+	if not dcs_addtional_item:
+		return "This deal has additional charges but 'DCS Addtional Item' is not configured in BS Group Settings; the charges cannot be placed on a quotation."
+	if not frappe.db.exists("Item", dcs_addtional_item):
+		return f"The configured 'DCS Addtional Item' ({dcs_addtional_item}) does not exist; additional charges cannot be placed on a quotation."
+	return None
 
 
 @frappe.whitelist()
@@ -123,9 +140,11 @@ def preview_dcs_readiness(source_name):
 	nothing."""
 	rd = _readiness(source_name)
 	overridable_blocked = bool(rd["approval_block"] or rd["missing"] or rd["tax_block"])
+	hard_blocked = bool(rd["status_block"] or rd["charge_block"])
 	return {
-		"ok": not (rd["status_block"] or overridable_blocked),
+		"ok": not (hard_blocked or overridable_blocked),
 		"status_block": rd["status_block"],
+		"charge_block": rd["charge_block"],
 		"block_reason": rd["approval_block"],
 		"missing_costs": rd["missing"],
 		"tax_block": rd["tax_block"],
@@ -162,6 +181,10 @@ def generate_quotation_from_dcs(
 	# --- submitted-DCS status (never overridable) ----------------------------
 	if rd["status_block"]:
 		return _blocked("dcs_status", rd["status_block"])
+
+	# --- charge-item mapping (hard block, never overridable) -----------------
+	if rd["charge_block"]:
+		return _blocked("charge_item_unmapped", rd["charge_block"])
 
 	# --- approval / margin-gate guard (explicit override only) ---------------
 	if rd["approval_block"] and not (override_approval and can_override):
@@ -242,21 +265,26 @@ def generate_quotation_from_dcs(
 			result["ai_error"] = _("AI enrichment could not run (internal error).")
 		frappe.clear_last_message()
 
-	# --- single atomic insert (permissions + mandatory enforced) -------------
+	# --- single atomic insert + audit (permissions + mandatory enforced) -----
+	# The audit (which records any applied override) is written inside the same
+	# savepoint as the insert: if the audit cannot be written, the quotation is
+	# rolled back too, so an override can never persist unaudited.
 	frappe.db.savepoint("bsg_ai_quotation")
 	try:
 		quotation.insert()
+		result["quotation"] = quotation.name
+		result["docstatus"] = quotation.docstatus
+		_audit(quotation, result)
 	except Exception as exc:
 		frappe.db.rollback(save_point="bsg_ai_quotation")
-		# Validation/permission messages are safe to surface and log; no
-		# traceback (which could carry commercial data as locals).
-		frappe.log_error(title="BSG-AI-QUOTATION insert failed", message=f"{type(exc).__name__}: {str(exc)[:200]}")
+		result["quotation"] = None
+		# Log only the type (no traceback / no locals); surface a sanitised,
+		# tag-free validation message to help the user fix the source data.
+		frappe.log_error(title="BSG-AI-QUOTATION insert/audit failed", message=type(exc).__name__)
 		frappe.clear_last_message()
-		return _blocked("insert_failed", _("The draft quotation could not be created: {0}").format(str(exc)[:200]))
+		safe = frappe.utils.strip_html_tags(str(exc))[:200]
+		return _blocked("insert_failed", _("The draft quotation could not be created: {0}").format(safe))
 
-	result["quotation"] = quotation.name
-	result["docstatus"] = quotation.docstatus
-	_audit(quotation, result)
 	return result
 
 
@@ -273,12 +301,14 @@ def _resolve_company_tax_template(company):
 		return None, "No company on the deal cost sheet; taxes cannot be applied."
 
 	default_template = frappe.db.get_value(
-		"Sales Taxes and Charges Template", {"company": company, "is_default": 1}, "name"
+		"Sales Taxes and Charges Template", {"company": company, "is_default": 1, "disabled": 0}, "name"
 	)
 	if default_template:
 		return default_template, None
 
-	templates = frappe.get_all("Sales Taxes and Charges Template", filters={"company": company}, pluck="name")
+	templates = frappe.get_all(
+		"Sales Taxes and Charges Template", filters={"company": company, "disabled": 0}, pluck="name"
+	)
 	if len(templates) == 1:
 		return templates[0], None
 	if not templates:
@@ -365,30 +395,28 @@ def _build_quotation_doc(dcs, tax_template):
 		})
 
 	# Additional charges: preserve EVERY charge as its own line (description +
-	# amount), not one summed total, so nothing is lost on the quotation.
+	# amount), not one summed total, so nothing is lost on the quotation. The
+	# charge-item mapping is validated as a hard block before we get here, so
+	# the item is guaranteed configured and to exist - charges are never
+	# silently dropped.
 	charges = [c for c in (dcs.addtional_charges or []) if flt(c.amount)]
 	if charges:
 		dcs_addtional_item = frappe.db.get_single_value("BS Group Settings", "dcs_addtional_item")
-		if dcs_addtional_item:
-			ai = frappe.db.get_value("Item", dcs_addtional_item, ["item_name", "stock_uom"], as_dict=True) or {}
-			for c in charges:
-				amt = flt(c.amount)
-				quotation.append("items", {
-					"item_code": dcs_addtional_item,
-					"item_name": ai.get("item_name") or dcs_addtional_item,
-					"uom": ai.get("stock_uom"),
-					"stock_uom": ai.get("stock_uom"),
-					"description": (c.description or "").strip() or ai.get("item_name") or dcs_addtional_item,
-					"qty": 1,
-					"price_list_rate": amt,
-					"discount_percentage": 0,
-					"rate": amt,
-					"amount": amt,
-				})
-		else:
-			# Readiness flags this as a missing cost and blocks by default; if an
-			# override brought us here, do not silently drop the charges.
-			warnings.append("Additional charges present but 'DCS Addtional Item' is not configured; they were NOT transferred.")
+		ai = frappe.db.get_value("Item", dcs_addtional_item, ["item_name", "stock_uom"], as_dict=True) or {}
+		for c in charges:
+			amt = flt(c.amount)
+			quotation.append("items", {
+				"item_code": dcs_addtional_item,
+				"item_name": ai.get("item_name") or dcs_addtional_item,
+				"uom": ai.get("stock_uom"),
+				"stock_uom": ai.get("stock_uom"),
+				"description": (c.description or "").strip() or ai.get("item_name") or dcs_addtional_item,
+				"qty": 1,
+				"price_list_rate": amt,
+				"discount_percentage": 0,
+				"rate": amt,
+				"amount": amt,
+			})
 
 	return quotation, warnings
 
@@ -425,25 +453,27 @@ def _apply_item_descriptions(quotation, dcs_items, item_updates, overwrite):
 
 
 def _audit(quotation, result):
-	"""Record what the AI step did on the Quotation's timeline. No secrets."""
-	try:
-		lines = [
-			f"AI quotation assist ({'enrichment applied' if result['ai_used'] else 'deterministic only'})",
-			f"Model: {result.get('model') or 'n/a'}",
-			f"Fields updated: {', '.join(result['fields_updated']) or 'none'}",
-			f"Item lines updated: {', '.join(map(str, result['item_lines_updated'])) or 'none'}",
-		]
-		if result.get("applied_overrides"):
-			lines.append("Overrides applied: " + "; ".join(result["applied_overrides"]))
-		if result.get("warnings"):
-			lines.append("Warnings: " + "; ".join(result["warnings"]))
-		if result.get("needs_input"):
-			lines.append("Needs input: " + "; ".join(result["needs_input"]))
-		if result.get("ai_error"):
-			lines.append(f"AI enrichment note: {result['ai_error']}")
-		quotation.add_comment("Info", "\n".join(lines))
-	except Exception:
-		frappe.clear_last_message()
+	"""Record what the AI step did on the Quotation's timeline. No secrets.
+
+	Exceptions are intentionally NOT swallowed: this runs inside the insert's
+	savepoint so that if the audit (which records any applied override) cannot
+	be written, the whole quotation is rolled back - an override never persists
+	without its audit trail."""
+	lines = [
+		f"AI quotation assist ({'enrichment applied' if result['ai_used'] else 'deterministic only'})",
+		f"Model: {result.get('model') or 'n/a'}",
+		f"Fields updated: {', '.join(result['fields_updated']) or 'none'}",
+		f"Item lines updated: {', '.join(map(str, result['item_lines_updated'])) or 'none'}",
+	]
+	if result.get("applied_overrides"):
+		lines.append("Overrides applied: " + "; ".join(result["applied_overrides"]))
+	if result.get("warnings"):
+		lines.append("Warnings: " + "; ".join(result["warnings"]))
+	if result.get("needs_input"):
+		lines.append("Needs input: " + "; ".join(result["needs_input"]))
+	if result.get("ai_error"):
+		lines.append(f"AI enrichment note: {result['ai_error']}")
+	quotation.add_comment("Info", "\n".join(lines))
 
 
 def _blocked(kind, message, missing_costs=None):
