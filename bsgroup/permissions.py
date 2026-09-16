@@ -28,6 +28,16 @@ def get_reporting_team_users(user):
     return team_users
 
 
+# Transaction doctypes whose Sales Team based Customer access should also be
+# honoured, mapped to the fieldname on the doctype that holds the Customer.
+CUSTOMER_FIELD_BY_DOCTYPE = {
+    "Quotation": "party_name",
+    "Sales Order": "customer",
+    "Sales Invoice": "customer",
+    "Delivery Note": "customer",
+}
+
+
 def get_team_records_condition(user, doctype):
     if not doctype:
         return ""
@@ -52,8 +62,22 @@ def get_team_records_condition(user, doctype):
         users_list = "', '".join(team_users)
         return f"(`tab{doctype}`.`{field}` IN ('{users_list}') OR {assigned_condition})"
 
-    # Sales User / Presales User: records they created OR are assigned to
-    return f"(`tab{doctype}`.`owner` = '{user}' OR {assigned_condition})"
+    # Sales User / Presales User: records they created OR are assigned to,
+    # OR (for Quotation/Sales Order/Sales Invoice/Delivery Note) belong to a
+    # Customer whose Sales Team lists the user's Sales Person.
+    base_condition = f"(`tab{doctype}`.`owner` = '{user}' OR {assigned_condition})"
+
+    customer_field = CUSTOMER_FIELD_BY_DOCTYPE.get(doctype)
+    if not customer_field:
+        return base_condition
+
+    customers = get_user_customers(user)
+    if not customers:
+        return base_condition
+
+    escaped_customers = ", ".join(frappe.db.escape(c) for c in customers)
+    customer_condition = f"`tab{doctype}`.`{customer_field}` IN ({escaped_customers})"
+    return f"({base_condition} OR {customer_condition})"
 
 
 def get_user_sales_person(user):
@@ -66,6 +90,29 @@ def get_user_sales_person(user):
         return None
 
     return frappe.db.get_value("Sales Person", {"employee": employee}, "name")
+
+
+def get_user_customers(user=None):
+    """
+    Common helper (per Sales Person -> Customer access requirement): returns
+    the list of Customer names where the logged-in user's Sales Person is
+    listed in that Customer's Sales Team child table. Returns an empty list
+    if the user has no linked Sales Person, or is not mapped to any Customer.
+    Used to restrict both document access (has_permission / permission_query_conditions)
+    and custom report data (see get_user_customers usage in bsgroup reports).
+    """
+    if not user:
+        user = frappe.session.user
+
+    sales_person = get_user_sales_person(user)
+    if not sales_person:
+        return []
+
+    return frappe.get_all(
+        "Sales Team",
+        filters={"parenttype": "Customer", "sales_person": sales_person},
+        pluck="parent",
+    )
 
 
 def customer_has_sales_team_access(customer, user=None):
