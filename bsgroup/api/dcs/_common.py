@@ -15,6 +15,7 @@ correlation value. Role checks read ``Has Role`` exactly as the scripts did.
 """
 
 import functools
+import inspect
 
 import frappe
 from frappe import _
@@ -101,8 +102,6 @@ def governed_endpoint(endpoint, perm_doctype="Deal Cost Sheet", ptype="read", id
 	"""
 
 	def decorator(fn):
-		@frappe.whitelist()
-		@functools.wraps(fn)
 		def wrapper(*a, **kwargs):
 			args = _clean_args(kwargs)
 			# Access control: Guest, or no read access at all to the governed DocType, is an
@@ -145,8 +144,24 @@ def governed_endpoint(endpoint, perm_doctype="Deal Cost Sheet", ptype="read", id
 				result.setdefault("request_key", request_key)
 			return result
 
+		# Preserve the metadata Frappe and error messages rely on, but do NOT
+		# copy fn's ``(args)`` signature onto the wrapper. Frappe binds RPC/HTTP
+		# arguments from ``inspect.signature`` (see ``frappe.get_newargs``); a
+		# masked ``(args)`` signature -- which ``functools.wraps`` installs via
+		# ``__wrapped__`` -- makes every real request field be dropped, so the
+		# service always saw an empty ``args`` dict over RPC. Advertising the
+		# wrapper's true ``**kwargs`` signature lets every public endpoint
+		# parameter bind. Access / idempotency / correlation / event controls
+		# above are unchanged.
+		wrapper.__name__ = fn.__name__
+		wrapper.__qualname__ = fn.__qualname__
+		wrapper.__doc__ = fn.__doc__
+		wrapper.__module__ = fn.__module__
 		wrapper.__wrapped_service__ = fn
-		return wrapper
+		wrapper.__signature__ = inspect.Signature(
+			parameters=[inspect.Parameter("kwargs", inspect.Parameter.VAR_KEYWORD)]
+		)
+		return frappe.whitelist()(wrapper)
 
 	return decorator
 
