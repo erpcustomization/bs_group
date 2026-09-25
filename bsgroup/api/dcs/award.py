@@ -376,14 +376,14 @@ def dcs_po_reconcile(args):
 			v_state = "Match" if absf(po_val - frozen_sell) <= 0.01 else "Mismatch"
 
 			cited = str(po_scope).strip()
-			s_state = "Mismatch - Different Scope"
+			s_state = "Mismatch – Different Scope"
 			if cited == str(frozen_ref):
 				s_state = "Match"
 			else:
 				known = frappe.get_all("DCS Revision", filters={"dcs": dcs_name, "name": cited}, fields=["revision_no"], limit_page_length=1)
 				for k in known:
 					if (k.get("revision_no") or 0) < frozen_no:
-						s_state = "Mismatch - Superseded"
+						s_state = "Mismatch – Superseded"
 
 			t_state = "Not Checked"
 			if terms_ok in (1, "1", "true", True):

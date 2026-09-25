@@ -1024,7 +1024,7 @@
    "fieldname": "custom_po_scope_match",
    "fieldtype": "Select",
    "label": "PO Scope Match",
-   "options": "\nNot Checked\nMatch\nMismatch \u2013 Superseded",
+   "options": "\nNot Checked\nMatch\nMismatch \u2013 Superseded\nMismatch \u2013 Different Scope",
    "permlevel": 1,
    "read_only": 1
   },
@@ -1209,7 +1209,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-09-11 21:05:00.000000",
+ "modified": "2026-09-25 07:16:11.162102",
  "modified_by": "Administrator",
  "module": "BS Group",
  "name": "Deal Cost Sheet",
