@@ -21,8 +21,11 @@ Modes
 * dry run (default): nothing is written; a CSV of every proposed change is
   saved under the site's private files and a summary is logged to Error Log
   ``BSG-REL-1``. This is what runs on an ordinary ``bench migrate``.
-* apply: set ``bsg_apply_party_backfill: 1`` in site config, or run
+* apply (retired for production): only an explicit, non-production
   ``bench --site <site> execute bsgroup.patches.v0_1.backfill_party_fields.execute --kwargs '{"apply": true}'``.
+  The ``bsg_apply_party_backfill`` site-config flag no longer drives this patch; it gates
+  the per-record manifest runner ``bsgroup.utils.party_backfill`` (Party Backfill Run),
+  which is how production party data is corrected (REL-1 corrective release 2).
   Re-running after a successful apply changes nothing (idempotent).
 """
 
@@ -80,9 +83,13 @@ def _proposal(doctype, row):
 	}
 
 
-def execute(apply=None):
-	if apply is None:
-		apply = bool(frappe.utils.cint(frappe.conf.get("bsg_apply_party_backfill")))
+def execute(apply=False):
+	# Since the per-record manifest runner (bsgroup.utils.party_backfill) took over
+	# production corrections, ``bsg_apply_party_backfill`` in site config gates ONLY that
+	# runner: an ordinary ``bench migrate`` can never bulk-write party data. Bulk apply
+	# survives solely as an explicit, non-production
+	# ``bench execute ... --kwargs '{"apply": true}'``.
+	apply = bool(apply)
 	mode = "apply" if apply else "dry-run"
 
 	proposals = []
