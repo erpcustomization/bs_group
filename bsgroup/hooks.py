@@ -258,6 +258,7 @@ app_include_js = [
 ]
 app_include_css = [
     "/assets/bsgroup/css/sidebar.css",
+    "/assets/bsgroup/css/labor_preapproval.css",
     # "/assets/bsgroup/css/bs_welcome_banner.css",
 ]
 
