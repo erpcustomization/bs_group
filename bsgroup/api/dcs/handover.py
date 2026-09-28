@@ -312,7 +312,13 @@ def has_frozen_award(s):
 
 
 def pre_award_position_note(s):
-	"""Neutral, informational note for an un-awarded sheet whose living position differs from the submitted totals."""
+	"""Neutral, informational note for a sheet with NO ACTIVE award whose living position differs from the
+	submitted totals. It never instructs anyone to reverse or re-award. Two cases, stated accurately:
+
+	- never frozen: no award is recorded and no baseline is frozen;
+	- frozen baseline retained (award reversed): the frozen baseline stays as history and does not govern
+	  release, so the note must not claim that no baseline is frozen.
+	"""
 	lv_rev = int(s.custom_dcs_revision_no or 0)
 	if lv_rev < 1 or has_frozen_award(s):
 		return ""
@@ -320,13 +326,22 @@ def pre_award_position_note(s):
 	lv_cost = float(s.custom_working_total_cost or 0)
 	sb_sell = float(s.total_selling or 0)
 	sb_cost = float(s.total_cost or 0)
-	if absf(lv_sell - sb_sell) > 0.005 or absf(lv_cost - sb_cost) > 0.005:
-		return (
-			"The living position (cost " + str(r2(lv_cost)) + ", selling " + str(r2(lv_sell)) + ", revision "
-			+ str(lv_rev) + ") differs from the submitted baseline (cost " + str(r2(sb_cost)) + ", selling "
-			+ str(r2(sb_sell)) + "). No award is recorded and no baseline is frozen; the award, when recorded, freezes the living position."
+	if absf(lv_sell - sb_sell) <= 0.005 and absf(lv_cost - sb_cost) <= 0.005:
+		return ""
+	head = (
+		"The living position (cost " + str(r2(lv_cost)) + ", selling " + str(r2(lv_sell)) + ", revision "
+		+ str(lv_rev) + ") differs from the submitted baseline (cost " + str(r2(sb_cost)) + ", selling "
+		+ str(r2(sb_sell)) + "). "
+	)
+	if int(s.custom_baseline_frozen or 0) == 1:
+		origin = "of the reversed award" if s.custom_award_reversal_state == "Reversed" else "from an earlier award"
+		return head + (
+			"No award is currently recorded. The frozen baseline " + origin + " (revision "
+			+ str(int(s.custom_frozen_revision_no or 0)) + ", cost " + str(r2(s.custom_frozen_total_cost)) + ", selling "
+			+ str(r2(s.custom_frozen_total_selling))
+			+ ") is retained as history and does not govern release; a re-award freezes the living position again."
 		)
-	return ""
+	return head + "No award is recorded and no baseline is frozen; the award, when recorded, freezes the living position."
 
 
 def release_drift(s):

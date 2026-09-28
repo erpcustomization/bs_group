@@ -1,25 +1,24 @@
 """Regression tests for the DCS vendor-revision defect report (DCS-Alamar-008-1, 28 Sep 2026).
 
-Every governed action is driven through Frappe's real RPC binding
-(``frappe.call(dotted_path, **fields)`` - the seam ``frappe.handler`` uses for the
-form's ``frappe.call``), exactly as the Deal Cost Sheet form does. Document actions
-(cancel / amend / submit) go through the document API the form uses.
+TWO KINDS OF TEST LIVE HERE - do not read one as the other:
 
-Guarded:
-1. an un-awarded sheet never shows the award-drift text; a neutral pre-award note is
-   returned instead; a genuinely awarded, frozen sheet still shows drift; after an award
-   reversal the drift text is gone again;
-2. a cost-only amendment of a Quoted sheet whose Quotation relationship is intact stays
-   Quoted; a selling change, or another sheet's quotation, still advances to
-   "Submitted to Sales"; Won / Lost are never reset; a sheet without a quotation still
-   advances exactly as before;
-3. the amendment re-points its OWN Quotation's back-link and records exactly one
-   governance event; a quotation of another sheet is never touched;
-4. vendor revision before and after award, award reversal, idempotent replay,
-   exactly one event per state change, unchanged selling on a vendor revision,
-   unchanged approval routing on a customer revision, no second award.
+``IntegrationTestDCSVendorRevisionBinding`` - Python-side *binding* tests (unit coverage).
+	Endpoints are invoked with ``frappe.call(dotted_path, **fields)``, i.e. through
+	``frappe.get_newargs`` - the same argument binding ``frappe.handler`` applies to an HTTP
+	request - but NOT through HTTP: no web server, session, CSRF, JSON transport or browser is
+	involved. Fixtures take shortcuts (``ignore_links`` / ``ignore_mandatory`` on inserts, a
+	direct-row fallback for the Quotation fixture, direct ``db.set_value`` on fixture fields) so
+	that each control can be exercised in isolation.
 
-Run on staging / local only:
+``IntegrationTestDCSAmendmentFlow`` - the real amendment flow, strict.
+	Quotation and Deal Cost Sheet go through the document API exactly as a saved form does:
+	no ``ignore_links``, no ``ignore_mandatory``, no ``db_insert`` fallback, no direct field writes
+	on the records under test. Cancel -> amend -> save -> submit as the desk does.
+
+Neither class drives a browser. Browser/HTTP verification (form JS, ``frappe.call`` over
+``/api/method``, the headline rendering) is a manual post-deploy check on a real desk session.
+
+Run on staging / local only, sequentially (never two runs against one database):
 	bench --site rel1-test.local run-tests --module bsgroup.api.dcs.test_dcs_vendor_revision
 """
 
@@ -27,10 +26,11 @@ from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
+from frappe.utils import add_days, nowdate
 
 from bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet import quotation_relationship_intact
 from bsgroup.dcs import governance
-from bsgroup.tests.dcs_fixtures import PREFIX, ensure, initialise_living_position, make_dcs, make_user
+from bsgroup.tests.dcs_fixtures import PREFIX, ensure, initialise_living_position, make_customer, make_dcs, make_user
 
 COMMERCIAL_ROLES = ["Sales Manager", "Commercial Controller", "Managing Director"]
 APPLY_REVISION = "bsgroup.api.dcs.negotiation.dcs_apply_revision"
@@ -39,6 +39,7 @@ RECORD_AWARD = "bsgroup.api.dcs.award.dcs_record_award"
 AWARD_REVERSAL = "bsgroup.api.dcs.award.dcs_award_reversal"
 DRIFT_TEXT = "frozen baseline that was awarded"
 LINKBACK = "DCS_AMEND_QUOTATION_LINKBACK"
+STALE_TEXT = "was not re-pointed automatically"
 
 
 def events(dcs_name, code=None):
@@ -48,53 +49,83 @@ def events(dcs_name, code=None):
 	return frappe.db.count("DCS Governance Event", f)
 
 
-def make_quotation_for(dcs, total=None):
-	"""A Draft Quotation linked both ways, on the same Opportunity, quoting the sheet's
-	selling total - the state make_quotation + the retained link-back script leave behind.
-	Inserted through the document API; if ERPNext's selling validations reject the bare
-	fixture on this site, fall back to a direct row insert with the same totals."""
-	total = total if total is not None else dcs.total_selling
+def stale_reports(dcs_name):
+	return frappe.db.count("Comment", {"reference_doctype": "Deal Cost Sheet", "reference_name": dcs_name, "comment_type": "Info", "content": ["like", "%" + STALE_TEXT + "%"]})
+
+
+def quotation_versions(qname):
+	return frappe.db.count("Version", {"ref_doctype": "Quotation", "docname": qname, "data": ["like", "%custom_deal_cost_sheet%"]})
+
+
+def quotation_values(dcs, total):
+	"""Field set a saved Quotation form carries for this sheet's deal."""
+	company = dcs.company or frappe.db.get_single_value("Global Defaults", "default_company")
+	currency = frappe.db.get_value("Company", company, "default_currency")
+	price_list = frappe.db.get_single_value("Selling Settings", "selling_price_list") or frappe.db.get_value("Price List", {"selling": 1, "enabled": 1}, "name")
+	plc = frappe.db.get_value("Price List", price_list, "currency") or currency
 	item = dcs.items[0].item_code
-	values = {
+	uom = frappe.db.get_value("Item", item, "stock_uom")
+	# site-mandatory on Quotation: a Sales Taxes and Charges Template (property setter) and the
+	# custom Payment Terms text - filled the way the app's make_quotation / the desk form fill them
+	vat_template = frappe.db.get_value("Sales Taxes and Charges Template", {"company": company, "name": ["like", "%UAE VAT 5%%"]}, "name")
+	taxes = frappe.get_all(
+		"Sales Taxes and Charges", filters={"parent": vat_template},
+		fields=["charge_type", "account_head", "description", "rate", "included_in_print_rate"], order_by="idx",
+	) if vat_template else []
+	return {
 		"doctype": "Quotation",
-		"quotation_to": "Customer",
+		"quotation_to": dcs.party_type,
 		"party_name": dcs.party,
 		"customer_name": dcs.party,
+		"order_type": "Sales",
+		"transaction_date": nowdate(),
+		"valid_till": add_days(nowdate(), 30),
 		"opportunity": dcs.opportunity,
-		"company": dcs.company,
+		"company": company,
+		"currency": currency,
+		"conversion_rate": 1,
+		"selling_price_list": price_list,
+		"price_list_currency": plc,
+		"plc_conversion_rate": 1,
+		"ignore_pricing_rule": 1,
 		"custom_deal_cost_sheet": dcs.name,
 		"custom_subject": f"{PREFIX} quotation {dcs.name}",
-		"items": [{"item_code": item, "qty": 1, "rate": total, "amount": total}],
+		"custom_payment_terms": f"{PREFIX} 100% on delivery",
+		"taxes_and_charges": vat_template,
+		"taxes": taxes,
+		"items": [{"item_code": item, "qty": 1, "uom": uom, "stock_uom": uom, "conversion_factor": 1, "rate": total, "price_list_rate": total}],
 	}
+
+
+# ============================================================================ unit coverage
+def make_quotation_for(dcs, total=None):
+	"""FIXTURE SHORTCUT (unit coverage only): a Draft Quotation linked both ways, on the same
+	Opportunity, quoting the sheet's selling total. Document insert with ignore_links /
+	ignore_mandatory; if the site's selling validations still reject it, a direct row insert with the
+	same totals. The strict flow class below does none of this."""
+	total = total if total is not None else dcs.total_selling
+	values = quotation_values(dcs, total)
 	q = frappe.get_doc(values)
 	q.flags.ignore_links = True
 	frappe.db.savepoint("zz_q")
 	try:
 		q.insert(ignore_permissions=True, ignore_mandatory=True)
-	except Exception:  # noqa: BLE001 - site-specific selling validation; totals are what matter here
+	except Exception:  # noqa: BLE001
 		frappe.db.rollback(save_point="zz_q")
 		q = frappe.get_doc(values)
-		q.total = total
-		q.net_total = total
-		q.grand_total = total
-		q.base_total = total
-		q.base_net_total = total
-		q.base_grand_total = total
+		for f in ("total", "net_total", "grand_total", "base_total", "base_net_total", "base_grand_total"):
+			q.set(f, total)
 		q.flags.ignore_links = True
 		q.db_insert()
 		for row in q.items:
-			row.parent = q.name
-			row.parenttype = "Quotation"
-			row.parentfield = "items"
+			row.parent, row.parenttype, row.parentfield = q.name, "Quotation", "items"
 			row.db_insert()
 	frappe.db.set_value("Deal Cost Sheet", dcs.name, {"custom_quotation": q.name, "custom_deal_status": "Quoted"}, update_modified=False)
 	return q
 
 
 def amend(dcs):
-	"""Cancel and amend through the document API (what the form's Cancel -> Amend does).
-	The form always works from the stored record, so reload first: the fixture's direct
-	writes (quotation link, Quoted status) must be what the amendment copies."""
+	"""FIXTURE SHORTCUT: cancel and amend with ignore_links (the strict class uses amend_strict)."""
 	dcs.reload()
 	dcs.flags.ignore_links = True
 	dcs.cancel()
@@ -113,7 +144,9 @@ def submit(doc):
 	return doc
 
 
-class IntegrationTestDCSVendorRevision(IntegrationTestCase):
+class IntegrationTestDCSVendorRevisionBinding(IntegrationTestCase):
+	"""Python-side frappe.call binding tests + fixture shortcuts. NOT an HTTP / browser test."""
+
 	@classmethod
 	def setUpClass(cls):
 		with patch("frappe.tests.classes.integration_test_case.make_test_records", return_value=[]):
@@ -147,10 +180,11 @@ class IntegrationTestDCSVendorRevision(IntegrationTestCase):
 		self.assertEqual(int(s5["states"]["commercial_baseline_frozen"] or 0), 0)
 		self.assertNotIn(DRIFT_TEXT, rr["note"])
 		self.assertEqual(rr["awarded_and_frozen"], 0)
-		self.assertIn("No award is recorded", rr["pre_award_note"])
 		self.assertIn("differs from the submitted baseline", rr["pre_award_note"])
+		self.assertIn("No award is recorded and no baseline is frozen", rr["pre_award_note"])
+		self.assertNotIn("retained as history", rr["pre_award_note"])
 
-	def test_awarded_frozen_sheet_still_shows_drift_and_reversal_clears_it(self):
+	def test_awarded_frozen_sheet_still_shows_drift_and_reversal_clears_it_with_an_accurate_note(self):
 		frappe.set_user(self.md)
 		self.assertEqual(initialise_living_position(self.dcs.name).get("ok"), 1)
 		a = frappe.call(RECORD_AWARD, dcs=self.dcs.name, award_reference="PO-ZZ-1", evidence_type="Customer PO", notes="ZZTEST award")
@@ -167,36 +201,44 @@ class IntegrationTestDCSVendorRevision(IntegrationTestCase):
 		s5 = frappe.call(SCREEN5, dcs=self.dcs.name)
 		self.assertIn(DRIFT_TEXT, s5["release_readiness"]["note"])
 		self.assertEqual(s5["release_readiness"]["pre_award_note"], "")
-		# award reversal (MD): no active award -> the award-drift instruction is gone
+		# award reversal (MD): no active award -> no award-drift instruction; the frozen baseline stays as history
 		n1 = events(self.dcs.name)
 		rv = frappe.call(AWARD_REVERSAL, dcs=self.dcs.name, reason="ZZTEST reversal", acknowledge="YES", mode="reverse")
 		self.assertEqual(rv.get("ok"), 1, rv.get("error"))
 		self.assertEqual(events(self.dcs.name), n1 + 1)
 		s5 = frappe.call(SCREEN5, dcs=self.dcs.name)
 		self.assertEqual(s5["states"]["customer_award"], "Not Awarded")
+		self.assertEqual(int(s5["states"]["commercial_baseline_frozen"] or 0), 1)  # history retained
 		self.assertNotIn(DRIFT_TEXT, s5["release_readiness"]["note"])
 		self.assertEqual(s5["release_readiness"]["awarded_and_frozen"], 0)
+		note = s5["release_readiness"]["pre_award_note"]
+		self.assertIn("No award is currently recorded", note)
+		self.assertIn("frozen baseline of the reversed award", note)
+		self.assertIn("retained as history", note)
+		self.assertNotIn("no baseline is frozen", note)
 
 	# ------------------------------------------------------------------ findings 2 + 3
-	def test_cost_only_amendment_keeps_quoted_and_repoints_own_quotation_once(self):
+	def test_cost_only_amendment_keeps_quoted_and_repoints_own_draft_quotation_once(self):
 		q = make_quotation_for(self.dcs)
 		self.assertTrue(quotation_relationship_intact(frappe.get_doc("Deal Cost Sheet", self.dcs.name)))
+		m0 = frappe.db.get_value("Quotation", q.name, "modified")
 		new = amend(self.dcs)
 		new.items[0].cost_rate = 1200  # cost only; selling stays 1500 = quotation total
 		new.save(ignore_permissions=True)
 		self.assertEqual(new.custom_deal_status, "Quoted")
-		self.assertEqual(new.custom_quotation, q.name)
 		submit(new)
 		self.assertEqual(new.docstatus, 1)
 		self.assertEqual(new.custom_deal_status, "Quoted")
 		self.assertEqual(new.custom_quotation, q.name)
 		self.assertEqual(frappe.db.get_value("Quotation", q.name, "custom_deal_cost_sheet"), new.name)
+		self.assertGreater(frappe.db.get_value("Quotation", q.name, "modified"), m0)  # stale form saves are refused
 		self.assertEqual(events(new.name, LINKBACK), 1)
-		ev = frappe.get_all("DCS Governance Event", filters={"dcs": new.name, "event_code": LINKBACK}, fields=["name", "actor", "source_endpoint", "source_event_id"])[0]
+		self.assertEqual(quotation_versions(q.name), 1)
+		self.assertEqual(stale_reports(new.name), 0)
+		ev = frappe.get_all("DCS Governance Event", filters={"dcs": new.name, "event_code": LINKBACK}, fields=["source_endpoint", "source_event_id"])[0]
 		self.assertEqual(ev["source_endpoint"], "deal_cost_sheet.on_submit")
 		self.assertTrue(ev["source_event_id"])
 		self.assertEqual(frappe.db.get_value("Deal Cost Sheet", self.dcs.name, "docstatus"), 2)
-		# submitted baseline of the amendment reflects the new cost; selling unchanged
 		self.assertEqual(float(new.total_cost), 1200.0)
 		self.assertEqual(float(new.total_selling), 1500.0)
 
@@ -207,11 +249,47 @@ class IntegrationTestDCSVendorRevision(IntegrationTestCase):
 		new.save(ignore_permissions=True)
 		submit(new)
 		self.assertEqual(new.custom_deal_status, "Submitted to Sales")
-		# the quotation is still the sheet's own quotation, so its back-link follows the amendment
+		# still the sheet's own Draft Quotation with verified identity, so the back-link follows the amendment
 		self.assertEqual(frappe.db.get_value("Quotation", q.name, "custom_deal_cost_sheet"), new.name)
 		self.assertEqual(events(new.name, LINKBACK), 1)
 
-	def test_another_sheets_quotation_is_not_intact_and_never_repointed(self):
+	def test_submitted_quotation_is_reported_not_repointed(self):
+		q = make_quotation_for(self.dcs)
+		frappe.db.set_value("Quotation", q.name, "docstatus", 1, update_modified=False)  # fixture shortcut
+		new = amend(self.dcs)
+		submit(new)
+		self.assertEqual(frappe.db.get_value("Quotation", q.name, "custom_deal_cost_sheet"), self.dcs.name)  # unchanged
+		self.assertEqual(events(new.name, LINKBACK), 0)
+		self.assertEqual(quotation_versions(q.name), 0)
+		self.assertEqual(stale_reports(new.name), 1)
+		c = frappe.get_all("Comment", filters={"reference_name": new.name, "comment_type": "Info"}, fields=["content"])[0]["content"]
+		self.assertIn("submitted and is never changed automatically", c)
+
+	def test_quotation_on_another_opportunity_is_reported_not_repointed(self):
+		q = make_quotation_for(self.dcs)
+		other = make_dcs(suffix=frappe.generate_hash(length=6), submit=False)
+		frappe.db.set_value("Quotation", q.name, "opportunity", other.opportunity, update_modified=False)  # fixture shortcut
+		self.assertFalse(quotation_relationship_intact(frappe.get_doc("Deal Cost Sheet", self.dcs.name)))
+		new = amend(self.dcs)
+		submit(new)
+		self.assertEqual(new.custom_deal_status, "Submitted to Sales")
+		self.assertEqual(frappe.db.get_value("Quotation", q.name, "custom_deal_cost_sheet"), self.dcs.name)
+		self.assertEqual(events(new.name, LINKBACK), 0)
+		self.assertEqual(stale_reports(new.name), 1)
+		c = frappe.get_all("Comment", filters={"reference_name": new.name, "comment_type": "Info"}, fields=["content"])[0]["content"]
+		self.assertIn("not on this sheet's Opportunity", c)
+
+	def test_quotation_on_the_opportunity_party_is_compatible_when_sheet_party_moved(self):
+		q = make_quotation_for(self.dcs)
+		moved = make_customer("MOVED")
+		frappe.db.set_value("Deal Cost Sheet", self.dcs.name, {"party": moved, "customer": moved}, update_modified=False)  # fixture shortcut
+		new = amend(self.dcs)
+		submit(new)
+		self.assertEqual(frappe.db.get_value("Quotation", q.name, "custom_deal_cost_sheet"), new.name)
+		self.assertEqual(events(new.name, LINKBACK), 1)
+		self.assertEqual(stale_reports(new.name), 0)
+
+	def test_another_sheets_quotation_is_neither_repointed_nor_reported(self):
 		q = make_quotation_for(self.dcs)
 		other = make_dcs(suffix=frappe.generate_hash(length=6), submit=True)
 		frappe.db.set_value("Quotation", q.name, "custom_deal_cost_sheet", other.name, update_modified=False)
@@ -221,6 +299,7 @@ class IntegrationTestDCSVendorRevision(IntegrationTestCase):
 		self.assertEqual(new.custom_deal_status, "Submitted to Sales")
 		self.assertEqual(frappe.db.get_value("Quotation", q.name, "custom_deal_cost_sheet"), other.name)
 		self.assertEqual(events(new.name, LINKBACK), 0)
+		self.assertEqual(stale_reports(new.name), 0)
 
 	def test_cancelled_quotation_is_not_intact(self):
 		q = make_quotation_for(self.dcs)
@@ -298,3 +377,70 @@ class IntegrationTestDCSVendorRevision(IntegrationTestCase):
 		self.assertEqual(a2.get("ok"), 0)
 		self.assertIn("already recorded", a2.get("error"))
 		self.assertEqual(events(self.dcs.name), n)
+
+
+# ============================================================================ strict flow
+class IntegrationTestDCSAmendmentFlow(IntegrationTestCase):
+	"""The real amendment flow through the document API: no ignore_links, no ignore_mandatory, no
+	db_insert fallback, no direct field writes on the records under test. Still not a browser test."""
+
+	@classmethod
+	def setUpClass(cls):
+		with patch("frappe.tests.classes.integration_test_case.make_test_records", return_value=[]):
+			super().setUpClass()
+
+	def setUp(self):
+		super().setUp()
+		frappe.set_user("Administrator")
+		governance.reset_correlation_id()
+
+	def test_cost_only_amendment_flow_keeps_quoted_and_repoints_the_draft_quotation(self):
+		# base sheet: fixture scaffolding (Customer / Opportunity rows), then a real, flag-free submit
+		dcs = make_dcs(suffix="FLOW-" + frappe.generate_hash(length=5), submit=False)
+		dcs.submit()
+		dcs.reload()
+		self.assertEqual(dcs.docstatus, 1)
+		self.assertEqual(dcs.custom_deal_status, "Submitted to Sales")
+
+		# the Quotation exactly as a saved form leaves it - strict document insert
+		q = frappe.get_doc(quotation_values(dcs, dcs.total_selling))
+		q.insert()
+		q.reload()
+		self.assertEqual(q.docstatus, 0)
+		self.assertEqual(float(q.total), float(dcs.total_selling))
+		self.assertEqual(q.custom_deal_cost_sheet, dcs.name)
+		# the two-way link and the Quoted status come from the retained "Quotation - Link Back to DCS"
+		# Server Script (After Save on Quotation) exactly as in production; no direct write here
+		dcs.reload()
+		if dcs.custom_quotation != q.name or dcs.custom_deal_status != "Quoted":
+			self.skipTest("this site did not run the Quotation After-Save link-back script (server scripts disabled or script absent); the production flow cannot be reproduced without it")
+		self.assertTrue(quotation_relationship_intact(dcs))
+		m0 = frappe.db.get_value("Quotation", q.name, "modified")
+
+		# cancel -> amend -> save -> submit, exactly as the desk does, no flags
+		dcs.cancel()
+		new = frappe.copy_doc(dcs)
+		new.amended_from = dcs.name
+		new.docstatus = 0
+		new.items[0].cost_rate = float(dcs.items[0].cost_rate) + 795  # the report's cost-only change
+		new.insert()
+		self.assertEqual(new.name, dcs.name + "-1")
+		self.assertEqual(new.custom_deal_status, "Quoted")
+		self.assertEqual(new.custom_quotation, q.name)
+		new.submit()
+		new.reload()
+
+		self.assertEqual(new.docstatus, 1)
+		self.assertEqual(float(new.total_cost), float(dcs.total_cost) + 795)
+		self.assertEqual(float(new.total_selling), float(dcs.total_selling))
+		self.assertEqual(new.custom_deal_status, "Quoted")
+		self.assertEqual(frappe.db.get_value("Quotation", q.name, "custom_deal_cost_sheet"), new.name)
+		self.assertEqual(frappe.db.get_value("Quotation", q.name, "docstatus"), 0)
+		self.assertGreater(frappe.db.get_value("Quotation", q.name, "modified"), m0)
+		self.assertEqual(events(new.name, LINKBACK), 1)
+		self.assertEqual(quotation_versions(q.name), 1)
+		self.assertEqual(stale_reports(new.name), 0)
+		# the Quotation still saves normally afterwards (no dangling link to a cancelled sheet)
+		q.reload()
+		q.save()
+		self.assertEqual(frappe.db.get_value("Quotation", q.name, "custom_deal_cost_sheet"), new.name)
