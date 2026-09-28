@@ -1,0 +1,232 @@
+/* Labor Preapproval form: readable Labor Line Items and highlighted totals.
+ * Everything is scoped to the Labor Preapproval form page so nothing leaks
+ * into other doctypes. The line-item card list (.lpre-lines) is a phone-only
+ * companion to the grid; the totals summary shows at every width.
+ */
+
+:root {
+	--lpre-total-fg: #0b6e4f;
+	--lpre-total-bg: #e6f6ee;
+	--lpre-total-border: #b7e4cc;
+	--lpre-card-bg: var(--card-bg, #ffffff);
+	--lpre-card-border: var(--border-color, #e2e6ea);
+	--lpre-muted: var(--text-muted, #6b7280);
+	--lpre-text: var(--text-color, #1f2937);
+}
+
+[data-theme="dark"] {
+	--lpre-total-fg: #5ed3a4;
+	--lpre-total-bg: rgba(20, 110, 78, 0.28);
+	--lpre-total-border: rgba(94, 211, 164, 0.4);
+	--lpre-card-bg: var(--card-bg, #1c1f24);
+	--lpre-card-border: var(--border-color, #2f343b);
+}
+
+/* ---- Grid: bold, contrasting Total Cost column (heading + every row) ---- */
+[data-page-route^="Form/Labor Preapproval"] .frappe-control[data-fieldname="labor_line_items"] .grid-static-col[data-fieldname="total_cost"],
+[data-page-route^="Form/Labor Preapproval"] .frappe-control[data-fieldname="labor_line_items"] .grid-static-col[data-fieldname="total_cost"] .static-area {
+	font-weight: 700;
+	color: var(--lpre-total-fg);
+}
+
+[data-page-route^="Form/Labor Preapproval"] .frappe-control[data-fieldname="labor_line_items"] .grid-body .grid-static-col[data-fieldname="total_cost"] {
+	background: var(--lpre-total-bg);
+}
+
+/* ---- Grid: keep headings and values legible on phones ---- */
+@media (max-width: 767px) {
+	[data-page-route^="Form/Labor Preapproval"] .frappe-control[data-fieldname="labor_line_items"] .grid-heading-row .grid-static-col,
+	[data-page-route^="Form/Labor Preapproval"] .frappe-control[data-fieldname="labor_line_items"] .grid-heading-row .grid-static-col .static-area {
+		height: auto;
+		min-height: 34px;
+		white-space: normal;
+		overflow: visible;
+		text-overflow: clip;
+		line-height: 1.2;
+		font-size: 11px;
+		padding-top: 6px;
+		padding-bottom: 6px;
+	}
+
+	[data-page-route^="Form/Labor Preapproval"] .frappe-control[data-fieldname="labor_line_items"] .grid-body .grid-static-col .static-area {
+		font-size: 12px;
+	}
+}
+
+/* ---- Total Labor Cost field in the totals section ---- */
+[data-page-route^="Form/Labor Preapproval"] .frappe-control[data-fieldname="total_labor_cost"] .control-value {
+	font-weight: 700;
+	font-size: 1.15em;
+	color: var(--lpre-total-fg);
+}
+
+/* ---- Rendered summary block (labor_lines_summary_html) ---- */
+.lpre-lines-summary {
+	margin: 4px 0 6px;
+	color: var(--lpre-text);
+}
+
+.lpre-lines-summary .lpre-summary-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	align-items: stretch;
+}
+
+.lpre-lines-summary .lpre-total-card {
+	flex: 1 1 220px;
+	border: 1px solid var(--lpre-total-border);
+	background: var(--lpre-total-bg);
+	border-radius: 10px;
+	padding: 12px 16px;
+}
+
+.lpre-lines-summary .lpre-total-label {
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--lpre-total-fg);
+	margin-bottom: 4px;
+}
+
+.lpre-lines-summary .lpre-total-value {
+	font-size: 24px;
+	font-weight: 800;
+	line-height: 1.15;
+	color: var(--lpre-total-fg);
+	font-variant-numeric: tabular-nums;
+	word-break: break-word;
+}
+
+.lpre-lines-summary .lpre-chips {
+	flex: 1 1 200px;
+	display: flex;
+	gap: 10px;
+}
+
+.lpre-lines-summary .lpre-chip {
+	flex: 1 1 0;
+	border: 1px solid var(--lpre-card-border);
+	background: var(--lpre-card-bg);
+	border-radius: 10px;
+	padding: 12px 14px;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+}
+
+.lpre-lines-summary .lpre-chip-value {
+	font-size: 20px;
+	font-weight: 700;
+	line-height: 1.15;
+	font-variant-numeric: tabular-nums;
+}
+
+.lpre-lines-summary .lpre-chip-label {
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--lpre-muted);
+	margin-top: 2px;
+}
+
+.lpre-lines-summary .lpre-empty {
+	color: var(--lpre-muted);
+	font-size: 12px;
+}
+
+/* Phone-only line item cards: one card per Labor Line Item row */
+.lpre-lines-summary .lpre-lines {
+	display: none;
+	margin-top: 12px;
+}
+
+.lpre-lines-summary .lpre-lines-title {
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--lpre-muted);
+	margin-bottom: 6px;
+}
+
+.lpre-lines-summary .lpre-line {
+	border: 1px solid var(--lpre-card-border);
+	background: var(--lpre-card-bg);
+	border-radius: 10px;
+	padding: 10px 12px;
+	margin-bottom: 8px;
+}
+
+.lpre-lines-summary .lpre-line-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+
+.lpre-lines-summary .lpre-line-idx {
+	font-size: 11px;
+	color: var(--lpre-muted);
+	flex: 0 0 auto;
+}
+
+.lpre-lines-summary .lpre-line-role {
+	font-size: 14px;
+	font-weight: 600;
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.lpre-lines-summary .lpre-line-total {
+	flex: 0 0 auto;
+	font-size: 15px;
+	font-weight: 700;
+	color: var(--lpre-total-fg);
+	background: var(--lpre-total-bg);
+	border: 1px solid var(--lpre-total-border);
+	border-radius: 999px;
+	padding: 3px 10px;
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+}
+
+.lpre-lines-summary .lpre-line-meta {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 8px;
+}
+
+.lpre-lines-summary .lpre-line-label {
+	display: block;
+	font-size: 10px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--lpre-muted);
+}
+
+.lpre-lines-summary .lpre-line-value {
+	display: block;
+	font-size: 14px;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	overflow-wrap: anywhere;
+}
+
+@media (max-width: 767px) {
+	.lpre-lines-summary .lpre-lines {
+		display: block;
+	}
+
+	.lpre-lines-summary .lpre-total-card {
+		flex-basis: 100%;
+	}
+
+	.lpre-lines-summary .lpre-total-value {
+		font-size: 26px;
+	}
+}
