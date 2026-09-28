@@ -3048,6 +3048,9 @@ function dcs_headline(frm, s5) {
 	var rr = s5.release_readiness || {};
 	if (rr.note) {
 		h += '<div class="text-muted" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border-color)">' + dcs_esc(rr.note) + '</div>';
+	} else if (rr.pre_award_note) {
+		// Informational only: no award recorded, no frozen baseline - never an instruction to reverse an award.
+		h += '<div class="text-muted" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border-color)">' + dcs_esc(rr.pre_award_note) + '</div>';
 	}
 	frm.dashboard.set_headline(h);
 }

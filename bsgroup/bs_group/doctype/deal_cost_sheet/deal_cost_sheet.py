@@ -46,6 +46,9 @@ class DealCostSheet(Document):
 	def on_update(self):
 		dcs_margin_canonicalisation(self)
 
+	def on_submit(self):
+		dcs_amend_quotation_linkback(self)
+
 	def validate(self):
 		apply_party_model(self)
 		# D3: a Project (and therefore a Project Cost Baseline) may only hang off a
@@ -509,8 +512,9 @@ def dcs_submit_advance_presales_status(doc):
 	the unambiguous direct-mapping fields (see dcs_presales_sync docstring
 	for the fields still pending the real cost/margin formula).
 	"""
-	frappe.db.set_value("Deal Cost Sheet", doc.name, "custom_deal_status", "Submitted to Sales", update_modified=False)
-	doc.custom_deal_status = "Submitted to Sales"
+	if not deal_status_preserved_on_submit(doc):
+		frappe.db.set_value("Deal Cost Sheet", doc.name, "custom_deal_status", "Submitted to Sales", update_modified=False)
+		doc.custom_deal_status = "Submitted to Sales"
 
 	if not doc.presales_request:
 		return
@@ -521,6 +525,71 @@ def dcs_submit_advance_presales_status(doc):
 		frappe.db.set_value("Presales Request", doc.presales_request, "status", "Submitted to Sales", update_modified=False)
 
 	dcs_presales_sync(doc.presales_request, source="submit")
+
+
+DEAL_STATUS_KEPT_ON_SUBMIT = ("Won", "Lost")
+
+
+def quotation_relationship_intact(doc):
+	"""True when the sheet's own Quotation still stands for this commercial position.
+
+	The Quotation must be linked from the sheet, exist, not be cancelled, belong to the same
+	Opportunity, link back to this sheet or to the sheet this one amends, and quote the same
+	selling total (a cost-only revision or amendment leaves selling unchanged). Any other
+	situation - selling moved, quotation cancelled, quotation of another sheet - is NOT intact,
+	and the sheet advances to "Submitted to Sales" exactly as before.
+	"""
+	if not doc.custom_quotation:
+		return False
+	q = frappe.db.get_value(
+		"Quotation", doc.custom_quotation,
+		["docstatus", "opportunity", "custom_deal_cost_sheet", "total"], as_dict=True,
+	)
+	if not q or q.docstatus == 2:
+		return False
+	if q.opportunity and doc.opportunity and q.opportunity != doc.opportunity:
+		return False
+	if not q.custom_deal_cost_sheet or q.custom_deal_cost_sheet not in (doc.name, doc.amended_from):
+		return False
+	return abs(frappe.utils.flt(q.total) - frappe.utils.flt(doc.total_selling)) <= 0.005
+
+
+def deal_status_preserved_on_submit(doc):
+	"""Won and Lost are never reset by a re-submit; Quoted is kept while the quotation relationship is intact."""
+	status = doc.custom_deal_status
+	if status in DEAL_STATUS_KEPT_ON_SUBMIT:
+		return True
+	if status == "Quoted" and quotation_relationship_intact(doc):
+		return True
+	return False
+
+
+def dcs_amend_quotation_linkback(doc):
+	"""On Submit of an amendment: re-point the sheet's OWN Quotation from the cancelled predecessor to this sheet.
+
+	Only the Quotation named in ``custom_quotation`` is touched, only when it still points at
+	``amended_from`` and is not cancelled. Any Quotation pointing elsewhere (another sheet, a
+	historical sheet) is left alone. One governance event records the re-point.
+	"""
+	if not (doc.amended_from and doc.custom_quotation):
+		return
+	q = frappe.db.get_value(
+		"Quotation", doc.custom_quotation, ["name", "docstatus", "custom_deal_cost_sheet"], as_dict=True
+	)
+	if not q or q.docstatus == 2 or q.custom_deal_cost_sheet != doc.amended_from:
+		return
+	frappe.db.set_value("Quotation", q.name, "custom_deal_cost_sheet", doc.name, update_modified=False)
+	record_governance_event(
+		doc.name,
+		"DCS_AMEND_QUOTATION_LINKBACK",
+		action_label="Re-point the sheet's Quotation from the cancelled predecessor to this amendment",
+		source_endpoint="deal_cost_sheet.on_submit",
+		reason=f"amended from {doc.amended_from}",
+		revision_no=doc.custom_dcs_revision_no or 0,
+		revision_reference=doc.custom_revision_reference or "",
+		changes=[{"field": "custom_deal_cost_sheet", "old": doc.amended_from, "new": doc.name, "dt": "Quotation", "dn": q.name}],
+		request_key=make_request_key("dcs_amend_quotation_linkback", {"dcs": doc.name, "quotation": q.name}),
+	)
 
 
 # Fields with an unambiguous 1:1 mapping from Presales Request. custom_presales_hourly_rate,
