@@ -46,6 +46,9 @@ class DealCostSheet(Document):
 	def on_update(self):
 		dcs_margin_canonicalisation(self)
 
+	def on_submit(self):
+		dcs_amend_quotation_linkback(self)
+
 	def validate(self):
 		apply_party_model(self)
 		# D3: a Project (and therefore a Project Cost Baseline) may only hang off a
@@ -509,8 +512,9 @@ def dcs_submit_advance_presales_status(doc):
 	the unambiguous direct-mapping fields (see dcs_presales_sync docstring
 	for the fields still pending the real cost/margin formula).
 	"""
-	frappe.db.set_value("Deal Cost Sheet", doc.name, "custom_deal_status", "Submitted to Sales", update_modified=False)
-	doc.custom_deal_status = "Submitted to Sales"
+	if not deal_status_preserved_on_submit(doc):
+		frappe.db.set_value("Deal Cost Sheet", doc.name, "custom_deal_status", "Submitted to Sales", update_modified=False)
+		doc.custom_deal_status = "Submitted to Sales"
 
 	if not doc.presales_request:
 		return
@@ -521,6 +525,146 @@ def dcs_submit_advance_presales_status(doc):
 		frappe.db.set_value("Presales Request", doc.presales_request, "status", "Submitted to Sales", update_modified=False)
 
 	dcs_presales_sync(doc.presales_request, source="submit")
+
+
+DEAL_STATUS_KEPT_ON_SUBMIT = ("Won", "Lost")
+
+QUOTATION_LINK_FIELDS = [
+	"name", "docstatus", "opportunity", "quotation_to", "party_name", "company", "custom_deal_cost_sheet", "total", "modified",
+]
+
+
+def quotation_deal_identity(doc, q):
+	"""Return "" when Quotation ``q`` verifiably belongs to this sheet's deal, otherwise the reason it does not.
+
+	Deal identity = the same NON-EMPTY Opportunity, the same company, and a compatible party: the sheet's
+	own (party_type, party), or the Opportunity's (opportunity_from, party_name) - a Quotation may still sit
+	on the Lead an Opportunity was raised from while the sheet already carries the Customer.
+	"""
+	if not doc.opportunity or not q.get("opportunity") or q.get("opportunity") != doc.opportunity:
+		return (
+			"the Quotation is not on this sheet's Opportunity (Quotation: " + str(q.get("opportunity") or "none")
+			+ ", sheet: " + str(doc.opportunity or "none") + ")"
+		)
+	if (q.get("company") or "") != (doc.company or ""):
+		return "company differs (Quotation: " + str(q.get("company") or "none") + ", sheet: " + str(doc.company or "none") + ")"
+	pair = (q.get("quotation_to") or "", q.get("party_name") or "")
+	if pair[1] and pair == ((doc.party_type or ""), (doc.party or "")):
+		return ""
+	opp = frappe.db.get_value("Opportunity", doc.opportunity, ["opportunity_from", "party_name"], as_dict=True) or {}
+	if pair[1] and pair == ((opp.get("opportunity_from") or ""), (opp.get("party_name") or "")):
+		return ""
+	return (
+		"party differs (Quotation: " + pair[0] + " " + pair[1] + "; sheet: " + str(doc.party_type or "") + " "
+		+ str(doc.party or "") + "; Opportunity: " + str(opp.get("opportunity_from") or "") + " " + str(opp.get("party_name") or "") + ")"
+	)
+
+
+def quotation_relationship_intact(doc):
+	"""True when the sheet's own Quotation still stands for this commercial position.
+
+	The Quotation must be linked from the sheet, exist, not be cancelled, carry the verified deal identity
+	(same non-empty Opportunity, compatible party, same company), link back to this sheet or to the sheet
+	this one amends, and quote the same selling total (a cost-only revision or amendment leaves selling
+	unchanged). Any other situation - selling moved, quotation cancelled, quotation of another sheet or
+	deal - is NOT intact, and the sheet advances to "Submitted to Sales" exactly as before.
+	"""
+	if not doc.custom_quotation:
+		return False
+	q = frappe.db.get_value("Quotation", doc.custom_quotation, QUOTATION_LINK_FIELDS, as_dict=True)
+	if not q or q.docstatus == 2:
+		return False
+	if quotation_deal_identity(doc, q):
+		return False
+	if not q.custom_deal_cost_sheet or q.custom_deal_cost_sheet not in (doc.name, doc.amended_from):
+		return False
+	return abs(frappe.utils.flt(q.total) - frappe.utils.flt(doc.total_selling)) <= 0.005
+
+
+def deal_status_preserved_on_submit(doc):
+	"""Won and Lost are never reset by a re-submit; Quoted is kept while the quotation relationship is intact."""
+	status = doc.custom_deal_status
+	if status in DEAL_STATUS_KEPT_ON_SUBMIT:
+		return True
+	if status == "Quoted" and quotation_relationship_intact(doc):
+		return True
+	return False
+
+
+def amendment_linkback_refusal(doc, q):
+	"""Why a stale back-link is NOT re-pointed automatically ("" = eligible).
+
+	Only a Draft Quotation with verified deal identity is ever changed; a submitted or cancelled Quotation,
+	or one whose deal identity cannot be verified, is left exactly as it is and reported instead.
+	"""
+	if q.docstatus != 0:
+		return "the Quotation is " + ("submitted" if q.docstatus == 1 else "cancelled") + " and is never changed automatically"
+	why = quotation_deal_identity(doc, q)
+	if why:
+		return "deal identity could not be verified: " + why
+	return ""
+
+
+def report_stale_quotation_link(doc, q, why):
+	"""Report a stale back-link that was deliberately left unchanged: an Info comment on the amendment
+	(auditable, visible in its timeline) and a message to the submitting user. Nothing is written to the Quotation."""
+	msg = (
+		"Quotation " + str(q.get("name")) + " still links the cancelled predecessor " + str(doc.amended_from)
+		+ " and was not re-pointed automatically: " + why + ". Review the Quotation and correct the link manually if appropriate."
+	)
+	frappe.get_doc({
+		"doctype": "Comment", "comment_type": "Info", "reference_doctype": "Deal Cost Sheet",
+		"reference_name": doc.name, "content": msg,
+	}).insert(ignore_permissions=True)
+	frappe.msgprint(msg, title="Quotation link not updated", indicator="orange")
+
+
+def dcs_amend_quotation_linkback(doc):
+	"""On Submit of an amendment: re-point the sheet's OWN Quotation from the cancelled predecessor to this sheet.
+
+	Scope: only the Quotation named in ``custom_quotation``; only while it still points at ``amended_from``;
+	only when it is a Draft with verified deal identity (``amendment_linkback_refusal``). Any other Quotation
+	(another sheet, a historical sheet, already this sheet) is not touched and not reported; a stale link that
+	fails the scope is left unchanged and reported.
+
+	Concurrency: the Quotation row is locked (SELECT ... FOR UPDATE) and re-checked on the locked row before
+	the single column is written; only ``custom_deal_cost_sheet`` is written (no whole-document save, so no
+	other field is overwritten) and ``modified`` is advanced so that a form save based on the older version is
+	refused by Frappe's timestamp check instead of silently reverting the link. Exactly one governance event
+	(request-keyed, so it can never be written twice) and one Version row on the Quotation record the change.
+	"""
+	if not (doc.amended_from and doc.custom_quotation):
+		return
+	q = frappe.db.get_value("Quotation", doc.custom_quotation, QUOTATION_LINK_FIELDS, as_dict=True)
+	if not q or q.custom_deal_cost_sheet != doc.amended_from:
+		return
+	why = amendment_linkback_refusal(doc, q)
+	if why:
+		report_stale_quotation_link(doc, q, why)
+		return
+	locked = frappe.db.get_value("Quotation", q.name, QUOTATION_LINK_FIELDS, as_dict=True, for_update=True)
+	if not locked or locked.custom_deal_cost_sheet != doc.amended_from or amendment_linkback_refusal(doc, locked):
+		report_stale_quotation_link(doc, locked or q, "the Quotation changed while this sheet was being submitted; nothing was written")
+		return
+	frappe.db.set_value("Quotation", q.name, "custom_deal_cost_sheet", doc.name, update_modified=True)
+	frappe.get_doc({
+		"doctype": "Version", "ref_doctype": "Quotation", "docname": q.name,
+		"data": frappe.as_json({
+			"added": [], "removed": [], "row_changed": [], "data_import": None, "updater_reference": None,
+			"changed": [["custom_deal_cost_sheet", doc.amended_from, doc.name]],
+		}),
+	}).insert(ignore_permissions=True)
+	record_governance_event(
+		doc.name,
+		"DCS_AMEND_QUOTATION_LINKBACK",
+		action_label="Re-point the sheet's Quotation from the cancelled predecessor to this amendment",
+		source_endpoint="deal_cost_sheet.on_submit",
+		reason=f"amended from {doc.amended_from}",
+		revision_no=doc.custom_dcs_revision_no or 0,
+		revision_reference=doc.custom_revision_reference or "",
+		changes=[{"field": "custom_deal_cost_sheet", "old": doc.amended_from, "new": doc.name, "dt": "Quotation", "dn": q.name}],
+		request_key=make_request_key("dcs_amend_quotation_linkback", {"dcs": doc.name, "quotation": q.name}),
+	)
 
 
 # Fields with an unambiguous 1:1 mapping from Presales Request. custom_presales_hourly_rate,

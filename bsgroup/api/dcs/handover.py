@@ -302,14 +302,60 @@ RELEASE_FIELDS = [
 ]
 
 
+def has_frozen_award(s):
+	"""A sheet can only drift from an awarded baseline when an award is recorded AND the baseline is frozen.
+
+	Before that, ``custom_frozen_total_*`` are simply empty, so comparing the living position against
+	them reads as "different" and produced an award-drift instruction on un-awarded sheets.
+	"""
+	return 1 if (s.custom_award_state == "Awarded" and int(s.custom_baseline_frozen or 0) == 1) else 0
+
+
+def pre_award_position_note(s):
+	"""Neutral, informational note for a sheet with NO ACTIVE award whose living position differs from the
+	submitted totals. It never instructs anyone to reverse or re-award. Two cases, stated accurately:
+
+	- never frozen: no award is recorded and no baseline is frozen;
+	- frozen baseline retained (award reversed): the frozen baseline stays as history and does not govern
+	  release, so the note must not claim that no baseline is frozen.
+	"""
+	lv_rev = int(s.custom_dcs_revision_no or 0)
+	if lv_rev < 1 or has_frozen_award(s):
+		return ""
+	lv_sell = float(s.custom_working_total_selling or 0)
+	lv_cost = float(s.custom_working_total_cost or 0)
+	sb_sell = float(s.total_selling or 0)
+	sb_cost = float(s.total_cost or 0)
+	if absf(lv_sell - sb_sell) <= 0.005 and absf(lv_cost - sb_cost) <= 0.005:
+		return ""
+	head = (
+		"The living position (cost " + str(r2(lv_cost)) + ", selling " + str(r2(lv_sell)) + ", revision "
+		+ str(lv_rev) + ") differs from the submitted baseline (cost " + str(r2(sb_cost)) + ", selling "
+		+ str(r2(sb_sell)) + "). "
+	)
+	if int(s.custom_baseline_frozen or 0) == 1:
+		origin = "of the reversed award" if s.custom_award_reversal_state == "Reversed" else "from an earlier award"
+		return head + (
+			"No award is currently recorded. The frozen baseline " + origin + " (revision "
+			+ str(int(s.custom_frozen_revision_no or 0)) + ", cost " + str(r2(s.custom_frozen_total_cost)) + ", selling "
+			+ str(r2(s.custom_frozen_total_selling))
+			+ ") is retained as history and does not govern release; a re-award freezes the living position again."
+		)
+	return head + "No award is recorded and no baseline is frozen; the award, when recorded, freezes the living position."
+
+
 def release_drift(s):
-	"""Post-award commercial drift check shared by the release service and the screen-5 readiness note."""
+	"""Post-award commercial drift check shared by the release service and the screen-5 readiness note.
+
+	The living-vs-frozen comparison is evaluated only against a genuine award with a frozen baseline
+	(``has_frozen_award``). PO-scope and pending-approval checks are unchanged.
+	"""
 	lv_rev = int(s.custom_dcs_revision_no or 0)
 	fz_sell = float(s.custom_frozen_total_selling or 0)
 	fz_cost = float(s.custom_frozen_total_cost or 0)
 	lv_sell = float(s.custom_working_total_selling or 0)
 	lv_cost = float(s.custom_working_total_cost or 0)
-	if lv_rev > 0 and (absf(lv_sell - fz_sell) > 0.005 or absf(lv_cost - fz_cost) > 0.005):
+	if has_frozen_award(s) and lv_rev > 0 and (absf(lv_sell - fz_sell) > 0.005 or absf(lv_cost - fz_cost) > 0.005):
 		return "living"
 	if (
 		s.custom_po_recon_state == "Reconciled" and s.custom_po_scope_revision and s.custom_revision_reference
@@ -555,6 +601,8 @@ def dcs_screen5(args):
 	result["release_readiness"] = {
 		"commercially_aligned": rr_ready, "note": rr_note,
 		"basis": "Frozen baseline, reconciled customer PO and living position must still agree at the moment of release.",
+		"awarded_and_frozen": has_frozen_award(s),
+		"pre_award_note": pre_award_position_note(s),
 	}
 	result["states"] = {
 		"customer_award": s.custom_award_state or "Not Awarded",
