@@ -7,30 +7,15 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "tab_costing",
   "section_break_giph",
   "currency",
-  "opportunity",
-  "presales_request",
-  "party_type",
-  "party",
   "organisation_name",
-  "customer",
-  "site_visit",
-  "project",
-  "column_break_wlnj",
-  "company",
-  "territory",
-  "deal_owner",
-  "apply_exclude_to_all_items",
-  "site_visit_evidence_section",
-  "site_visit_evidence_html",
+  "column_break_ref",
+  "dcs_reference_html",
   "section_break_dsjr",
   "document_upload",
   "get_data",
-  "summary_section",
-  "commercial_summary_html",
-  "customer_notes",
-  "custom_deal_summary_dashboard",
   "section_break_jbpa",
   "subject",
   "items",
@@ -47,7 +32,26 @@
   "services_selling_total",
   "total_selling",
   "margin_percent",
-  "amended_from",
+  "summary_section",
+  "commercial_summary_html",
+  "customer_notes",
+  "custom_deal_summary_dashboard",
+  "section_deal_details",
+  "opportunity",
+  "presales_request",
+  "party_type",
+  "party",
+  "customer",
+  "site_visit",
+  "project",
+  "column_break_wlnj",
+  "company",
+  "territory",
+  "deal_owner",
+  "apply_exclude_to_all_items",
+  "tab_solution_scope",
+  "site_visit_evidence_section",
+  "site_visit_evidence_html",
   "section_break_ozlr",
   "solution_responsibility_matrix",
   "solutions",
@@ -56,36 +60,7 @@
   "section_break_slkq",
   "scope_overview",
   "workflow_state",
-  "custom_lifecycle_section",
-  "custom_deal_stage",
-  "custom_deal_status_section",
-  "custom_deal_status",
-  "custom_record_authority_section",
-  "custom_presales_status",
-  "custom_presales_owner",
-  "custom_presales_completion_date",
-  "custom_opportunity_status",
-  "custom_quotation",
-  "custom_quotation_status",
-  "custom_record_authority",
-  "custom_authority_decided_by",
-  "custom_authority_decided_on",
-  "column_break_dxio",
-  "custom_lost_reason",
-  "custom_outcome_date",
-  "custom_sales_order",
-  "custom_closure_notes",
-  "custom_superseded_by",
-  "custom_supersession_reason",
-  "custom_presales_effort_section",
-  "custom_presales_estimated_hours",
-  "custom_presales_actual_hours",
-  "custom_margin_per_presales_hour",
-  "column_break_fkii",
-  "custom_presales_cost_vs_margin",
-  "custom_presales_cost",
-  "custom_presales_hourly_rate",
-  "custom_effort_verdict",
+  "tab_negotiation_approval",
   "custom_living_dcs_section",
   "custom_dcs_revision_no",
   "custom_revision_reference",
@@ -111,6 +86,11 @@
   "custom_approved_on",
   "custom_approval_reason",
   "custom_last_decision_reason",
+  "custom_negotiation_section",
+  "custom_negotiation_html",
+  "custom_approval_history_section",
+  "custom_approval_html",
+  "tab_award_handover",
   "custom_award_handover_section",
   "custom_award_state",
   "custom_award_sequence_no",
@@ -160,12 +140,39 @@
   "custom_delivery_override",
   "custom_delivery_override_reason",
   "custom_delivery_release_note",
-  "custom_negotiation_section",
-  "custom_negotiation_html",
-  "custom_approval_history_section",
-  "custom_approval_html",
   "custom_handover_conditions_section",
-  "custom_handover_html"
+  "custom_handover_html",
+  "tab_traceability",
+  "custom_deal_status_section",
+  "custom_deal_status",
+  "custom_deal_stage",
+  "amended_from",
+  "custom_record_authority_section",
+  "custom_presales_status",
+  "custom_presales_owner",
+  "custom_presales_completion_date",
+  "custom_opportunity_status",
+  "custom_quotation",
+  "custom_quotation_status",
+  "custom_record_authority",
+  "custom_authority_decided_by",
+  "custom_authority_decided_on",
+  "column_break_dxio",
+  "custom_lost_reason",
+  "custom_outcome_date",
+  "custom_sales_order",
+  "custom_closure_notes",
+  "custom_superseded_by",
+  "custom_supersession_reason",
+  "custom_presales_effort_section",
+  "custom_presales_estimated_hours",
+  "custom_presales_actual_hours",
+  "custom_margin_per_presales_hour",
+  "column_break_fkii",
+  "custom_presales_cost_vs_margin",
+  "custom_presales_cost",
+  "custom_presales_hourly_rate",
+  "custom_effort_verdict"
  ],
  "fields": [
   {
@@ -194,39 +201,39 @@
    "options": "Presales Request"
   },
   {
+   "description": "A Lead may be costed. A Customer is required before the deal is Won or a Project is linked.",
    "fieldname": "party_type",
    "fieldtype": "Select",
+   "in_standard_filter": 1,
    "label": "Party Type",
    "options": "Lead\nCustomer",
-   "reqd": 1,
-   "in_standard_filter": 1,
-   "description": "Who the request is for. A Lead may be costed; a Customer record is required before the deal is Won or a Project is linked (D3)."
+   "reqd": 1
   },
   {
    "fieldname": "party",
    "fieldtype": "Dynamic Link",
+   "in_list_view": 1,
    "label": "Party",
    "options": "party_type",
-   "reqd": 1,
-   "in_list_view": 1
+   "reqd": 1
   },
   {
+   "description": "Taken from the Lead or Customer name.",
    "fieldname": "organisation_name",
    "fieldtype": "Data",
-   "label": "Organisation Name",
-   "reqd": 1,
-   "read_only": 1,
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "description": "Derived on the server from Lead.company_name or Customer.customer_name. Used for naming."
+   "label": "Organisation Name",
+   "read_only": 1,
+   "reqd": 1
   },
   {
+   "description": "Set from Party when Party Type is Customer. A Project can be linked only once a Customer is set.",
    "fieldname": "customer",
    "fieldtype": "Link",
    "label": "Customer",
    "options": "Customer",
-   "read_only": 1,
-   "description": "Set automatically from Party when Party Type is Customer. A Project may be linked only when a Customer is set (D3)."
+   "read_only": 1
   },
   {
    "fetch_from": "presales_request.site_visit",
@@ -292,7 +299,6 @@
    "label": "Site Visit Evidence"
   },
   {
-   "collapsible": 1,
    "fieldname": "commercial_totals_section",
    "fieldtype": "Section Break",
    "label": "Commercial Totals"
@@ -406,7 +412,7 @@
   {
    "fieldname": "solution_responsibility_matrix",
    "fieldtype": "HTML",
-   "label": "Solution Responsibility Matrix "
+   "label": "Solution Responsibility Matrix"
   },
   {
    "fieldname": "solutions",
@@ -451,7 +457,7 @@
   {
    "fieldname": "addtional_charges",
    "fieldtype": "Table",
-   "label": "Addtional Charges",
+   "label": "Additional Charges",
    "options": "Additional Charges Item"
   },
   {
@@ -467,13 +473,10 @@
    "options": "Workflow State"
   },
   {
-   "fieldname": "custom_lifecycle_section",
-   "fieldtype": "Section Break",
-   "label": "Deal Lifecycle & Outcome"
-  },
-  {
+   "description": "Duplicate of Deal Status, kept for historical data only.",
    "fieldname": "custom_deal_stage",
    "fieldtype": "Select",
+   "hidden": 1,
    "label": "Deal Stage",
    "options": "Draft\nCosting in Progress\nSubmitted to Sales\nQuoted\nWon\nLost"
   },
@@ -483,7 +486,6 @@
    "label": "Deal Status & Traceability"
   },
   {
-   "description": "Draft -> Submitted to Sales, advanced by the DCS Submit lifecycle hook. Options per live register (dcscustomfields.html).",
    "fieldname": "custom_deal_status",
    "fieldtype": "Select",
    "label": "Deal Status",
@@ -554,7 +556,6 @@
    "options": "Opportunity Lost Reason"
   },
   {
-   "description": "Free narrative. Guarded by the NRC-1 protected-field-name channel on save.",
    "fieldname": "custom_closure_notes",
    "fieldtype": "Small Text",
    "label": "Closure Notes"
@@ -724,7 +725,6 @@
    "label": "Last Approved Commercial Position"
   },
   {
-   "description": "INCOMPLETE OPTION LIST: live register truncated this list with '...' after 'Pending Endorsement'. Additional options exist on the live site but were not visible in the register and were NOT guessed here. Verify against live site before relying on this Select for validation.",
    "fieldname": "custom_approval_state",
    "fieldtype": "Select",
    "label": "Approval State",
@@ -842,7 +842,6 @@
    "read_only": 1
   },
   {
-   "description": "INCOMPLETE OPTION LIST: live register truncated this list with '...' after 'Email Confirmation'. Additional options exist on the live site but were not visible and were NOT guessed here.",
    "fieldname": "custom_award_evidence_type",
    "fieldtype": "Select",
    "label": "Award Evidence Type",
@@ -976,7 +975,6 @@
    "read_only": 1
   },
   {
-   "description": "INCOMPLETE OPTION LIST: live register truncated this list twice ('Required \u2013 Delivery Already...' and again with '...' after that). Real remaining option text was not visible and was NOT guessed here.",
    "fieldname": "custom_operational_review_state",
    "fieldtype": "Select",
    "label": "Operational Review State",
@@ -1020,7 +1018,6 @@
    "read_only": 1
   },
   {
-   "description": "INCOMPLETE OPTION LIST: live register truncated this list with '...' after 'Mismatch \u2013 Superseded'. Additional options were not visible and were NOT guessed here.",
    "fieldname": "custom_po_scope_match",
    "fieldtype": "Select",
    "label": "PO Scope Match",
@@ -1046,7 +1043,7 @@
   {
    "fieldname": "custom_po_recon_state",
    "fieldtype": "Select",
-   "label": "PO Recon State",
+   "label": "PO Reconciliation State",
    "options": "\nNot Started\nReconciled\nMismatch",
    "permlevel": 1,
    "read_only": 1
@@ -1054,7 +1051,7 @@
   {
    "fieldname": "custom_po_recon_by",
    "fieldtype": "Link",
-   "label": "PO Recon By",
+   "label": "PO Reconciled By",
    "options": "User",
    "permlevel": 1,
    "read_only": 1
@@ -1062,7 +1059,7 @@
   {
    "fieldname": "custom_po_recon_on",
    "fieldtype": "Datetime",
-   "label": "PO Recon On",
+   "label": "PO Reconciled On",
    "permlevel": 1,
    "read_only": 1
   },
@@ -1080,7 +1077,6 @@
    "read_only": 1
   },
   {
-   "description": "INCOMPLETE OPTION LIST: live register truncated this list with '...' after 'Released'. Additional options were not visible and were NOT guessed here.",
    "fieldname": "custom_delivery_release_state",
    "fieldtype": "Select",
    "label": "Delivery Release State",
@@ -1203,13 +1199,54 @@
   {
    "fieldname": "column_break_fkii",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "tab_costing",
+   "fieldtype": "Tab Break",
+   "label": "Costing"
+  },
+  {
+   "fieldname": "tab_solution_scope",
+   "fieldtype": "Tab Break",
+   "label": "Solution & Scope"
+  },
+  {
+   "fieldname": "tab_negotiation_approval",
+   "fieldtype": "Tab Break",
+   "label": "Negotiation & Approval"
+  },
+  {
+   "fieldname": "tab_award_handover",
+   "fieldtype": "Tab Break",
+   "label": "Award & Handover"
+  },
+  {
+   "fieldname": "tab_traceability",
+   "fieldtype": "Tab Break",
+   "label": "Traceability"
+  },
+  {
+   "fieldname": "column_break_ref",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "dcs_reference_html",
+   "fieldtype": "HTML",
+   "label": "DCS Reference"
+  },
+  {
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.__islocal || (doc.docstatus === 0 && !(doc.opportunity && doc.party_type && doc.party))",
+   "fieldname": "section_deal_details",
+   "fieldtype": "Section Break",
+   "label": "Deal Details"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-09-25 07:16:11.162102",
+ "modified": "2026-09-28 22:00:00.000000",
  "modified_by": "Administrator",
  "module": "BS Group",
  "name": "Deal Cost Sheet",

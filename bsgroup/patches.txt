@@ -16,3 +16,4 @@ bsgroup.patches.v0_1.drop_orphan_governance_change
 bsgroup.patches.v0_1.lock_pcb_until_g_pcb
 bsgroup.patches.v0_1.backfill_party_fields
 bsgroup.patches.v0_1.normalize_po_scope_match
+bsgroup.patches.v0_1.dcs_form_layout_property_setters

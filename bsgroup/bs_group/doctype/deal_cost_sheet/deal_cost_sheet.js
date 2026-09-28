@@ -14,51 +14,10 @@ frappe.ui.form.on("Deal Cost Sheet", {
 		render_summary_with_currency(frm);
 		reduce_subject_height(frm);
 		render_site_visit_evidence(frm);
+		render_dcs_reference(frm);
 
-		if (frm.doc.docstatus == 1) {
-			frm.add_custom_button("Create Quotation", () => {
-				create_quotation(frm);
-			}, "Create");
-		}
+		add_create_quotation_button(frm);
 
-		if (frm.doc.version_no) {
-			frm.set_intro(
-				'<b>Version ' + frm.doc.version_no + '</b>' +
-				(frm.doc.last_revised_by ? ' &nbsp;|&nbsp; Last revised by: <b>' + frm.doc.last_revised_by + '</b>' : '') +
-				(frm.doc.last_revised_on ? ' on <b>' + frappe.datetime.str_to_user(frm.doc.last_revised_on) + '</b>' : ''),
-				'blue'
-			);
-		}
-
-		if (frm.doc.version_history) {
-			try {
-				var history = JSON.parse(frm.doc.version_history);
-				if (history && history.length > 0) {
-					var rows = history.map(function(v) {
-						return '<tr>' +
-							'<td style="padding:4px 8px;border:1px solid #e0e0e0;"><b>v' + v.version + '</b></td>' +
-							'<td style="padding:4px 8px;border:1px solid #e0e0e0;">' + (v.revised_by || '-') + '</td>' +
-							'<td style="padding:4px 8px;border:1px solid #e0e0e0;">' + (v.revised_on ? v.revised_on.substring(0,16) : '-') + '</td>' +
-							'<td style="padding:4px 8px;border:1px solid #e0e0e0;text-align:right;">AED ' + parseFloat(v.total_cost || 0).toLocaleString() + '</td>' +
-							'<td style="padding:4px 8px;border:1px solid #e0e0e0;text-align:right;">AED ' + parseFloat(v.total_selling || 0).toLocaleString() + '</td>' +
-						'</tr>';
-					}).join('');
-
-					var html = '<div style="margin:10px 0;">' +
-						'<b>Version History</b>' +
-						'<table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:12px;">' +
-						'<thead><tr style="background:#f5f5f5;">' +
-						'<th style="padding:4px 8px;border:1px solid #e0e0e0;text-align:left;">Ver</th>' +
-						'<th style="padding:4px 8px;border:1px solid #e0e0e0;text-align:left;">Revised By</th>' +
-						'<th style="padding:4px 8px;border:1px solid #e0e0e0;text-align:left;">Date</th>' +
-						'<th style="padding:4px 8px;border:1px solid #e0e0e0;text-align:right;">Cost</th>' +
-						'<th style="padding:4px 8px;border:1px solid #e0e0e0;text-align:right;">Selling</th>' +
-						'</tr></thead><tbody>' + rows + '</tbody></table></div>';
-
-					frm.set_df_property('version_history', 'description', html);
-				}
-			} catch(e) {}
-		}
 	},
 	apply_exclude_to_all_items(frm){
 		exclude_all_items(frm)
@@ -90,6 +49,21 @@ frappe.ui.form.on("Deal Cost Sheet", {
         load_responsibilities(frm);
     }
 });
+
+function render_dcs_reference(frm) {
+	// First line of the Costing tab, beside Organisation Name: the sheet's own reference.
+	const field = frm.fields_dict.dcs_reference_html;
+	if (!field || !field.$wrapper) return;
+	const esc = frappe.utils.escape_html;
+	if (frm.is_new()) {
+		field.$wrapper.html(`<div class="dcs-ref"><div class="dcs-ref-label">${__("DCS Reference")}</div><div class="dcs-ref-empty">${__("Assigned when the sheet is saved")}</div></div>`);
+		return;
+	}
+	const revision = frm.doc.custom_revision_reference
+		? `<div class="dcs-ref-sub">${__("Revision reference")} ${esc(frm.doc.custom_revision_reference)}</div>`
+		: "";
+	field.$wrapper.html(`<div class="dcs-ref"><div class="dcs-ref-label">${__("DCS Reference")}</div><div class="dcs-ref-value">${esc(frm.doc.name)}</div>${revision}</div>`);
+}
 
 function reduce_subject_height(frm){
     setTimeout(() => {
@@ -194,136 +168,143 @@ frappe.ui.form.on("Deal Cost Resource", {
 // ── Summary Tables ────────────────────────────────────────────────────────────
 
 function render_summary_with_currency(frm) {
-	if (frm.doc.company) {
-		frappe.db.get_value("Company", frm.doc.company, "default_currency").then(r => {
-			const currency = (r.message && r.message.default_currency) || "AED";
+	if (!frm.doc.company) {
+		render_summary(frm, frm.doc.currency || "AED");
+		return;
+	}
+	frappe.db.get_value("Company", frm.doc.company, "default_currency").then((r) => {
+		const currency = (r.message && r.message.default_currency) || frm.doc.currency || "AED";
+		if (frm.doc.docstatus === 0 && currency !== frm.doc.currency) {
 			frm.doc.currency = currency;
 			propagate_currency(frm, currency);
-			render_summary(frm, currency);
-		});
-	} else {
-		render_summary(frm, frm.doc.currency || "AED");
-	}
+		}
+		render_summary(frm, currency);
+	});
 }
 
 function propagate_currency(frm, currency) {
-	(frm.doc.items || []).forEach(row => {
-		frappe.model.set_value(row.doctype, row.name, "currency", currency);
+	// Only touch rows whose currency actually differs - an unconditional set_value on
+	// every refresh used to mark each opened sheet dirty before the user changed anything.
+	let changed = false;
+	["items", "resources"].forEach((table) => {
+		(frm.doc[table] || []).forEach((row) => {
+			if (row.currency !== currency) {
+				frappe.model.set_value(row.doctype, row.name, "currency", currency);
+				changed = true;
+			}
+		});
 	});
-	(frm.doc.resources || []).forEach(row => {
-		frappe.model.set_value(row.doctype, row.name, "currency", currency);
-	});
-	frm.refresh_field("items");
-	frm.refresh_field("resources");
+	if (changed) {
+		frm.refresh_field("items");
+		frm.refresh_field("resources");
+	}
 }
 
 function render_summary(frm, currency) {
+	// The single commercial summary on the sheet. Styles live in public/css/deal_cost_sheet.css.
 	currency = currency || "AED";
 	const doc = frm.doc;
-	const $wrapper = $(frm.fields_dict["commercial_summary_html"].wrapper);
+	const field = frm.fields_dict["commercial_summary_html"];
+	if (!field) return;
+	const $wrapper = $(field.wrapper);
 
 	const fmt = (val) => format_currency(flt(val), currency);
 	const pct = (val) => flt(val, 2).toFixed(2) + "%";
-
 	const can_see_selling = frappe.user.has_role(["Sales Manager", "Sales User", "System Manager"]);
 
-	const prod_cost       = flt(doc.products_cost_total);
-	const prod_sell       = flt(doc.products_selling_total);
-	const prod_margin     = prod_sell - prod_cost;
+	const prod_cost = flt(doc.products_cost_total);
+	const prod_sell = flt(doc.products_selling_total);
+	const prod_margin = prod_sell - prod_cost;
 	const prod_margin_pct = prod_sell ? (prod_margin / prod_sell) * 100 : 0;
 
-	const svc_cost        = flt(doc.services_cost_total);
-	const svc_sell        = flt(doc.services_selling_total);
-	const svc_margin      = svc_sell - svc_cost;
-	const svc_margin_pct  = svc_sell ? (svc_margin / svc_sell) * 100 : 0;
+	const svc_cost = flt(doc.services_cost_total);
+	const svc_sell = flt(doc.services_selling_total);
+	const svc_margin = svc_sell - svc_cost;
+	const svc_margin_pct = svc_sell ? (svc_margin / svc_sell) * 100 : 0;
 
 	let charges_total = 0;
-	(doc.addtional_charges || []).forEach(row => {
+	(doc.addtional_charges || []).forEach((row) => {
 		charges_total += flt(row.amount);
 	});
 
 	let resource_cost_total = 0;
-	(doc.resources || []).forEach(row => {
+	(doc.resources || []).forEach((row) => {
 		resource_cost_total += flt(row.cost_amount);
 	});
 
-	const total_cost_calc    = flt(doc.total_cost);
-	const total_selling_calc = flt(doc.total_selling);
-	const total_margin_calc  = flt(doc.margin_value);
-        const total_margin_pct   = flt(doc.margin_percent);
+	const th = (label, num = true) => `<th class="${num ? "dcs-num" : ""}">${label}</th>`;
+	const td = (val, bold = false) => `<td class="dcs-num${bold ? " dcs-bold" : ""}">${val}</td>`;
+	const td_label = (val, bold = false) => `<td class="${bold ? "dcs-bold" : ""}">${val}</td>`;
+	const sell = (html) => (can_see_selling ? html : "");
 
-	const th = (label, align = "right") =>
-		`<th style="text-align:${align}; padding:8px 12px; background:#f0f4f8; font-weight:600; font-size:12px; color:#4a5568;">${label}</th>`;
+	// Once a negotiation revision exists, the negotiated position is the commercial truth and
+	// the table below is only the item cost build-up. Same source as the Living DCS headline.
+	const revision_no = cint(doc.custom_dcs_revision_no);
+	const living_html = revision_no > 0
+		? `<div class="dcs-living">
+				<div class="dcs-living-label">${__("Living commercial position")} &middot; ${__("Revision")} ${revision_no}</div>
+				<div class="dcs-living-figures">
+					${sell(`<span>${__("Selling")} <b>${fmt(doc.custom_working_total_selling)}</b></span>`)}
+					<span>${__("Cost")} <b>${fmt(doc.custom_working_total_cost)}</b></span>
+					${sell(`<span>${__("Margin")} <b>${pct(doc.custom_working_margin_percent)}</b></span>`)}
+				</div>
+				<div class="dcs-living-note">${__("Figures below are the item cost build-up and may differ from the negotiated position.")}</div>
+			</div>`
+		: "";
 
-	const td = (val, bold = false) =>
-		`<td style="text-align:right; padding:7px 12px; ${bold ? "font-weight:700;" : ""}">${val}</td>`;
+	const total_label = revision_no > 0 ? __("Total (item build-up)") : __("Total");
 
-	const td_label = (val, bold = false) =>
-		`<td style="padding:7px 12px; ${bold ? "font-weight:700;" : ""}">${val}</td>`;
-
-	// ── Commercial Summary ──
 	const commercial_html = `
-		<div style="margin-bottom:24px;">
-			<div style="font-size:14px; font-weight:700; color:#2d3748; margin-bottom:10px; padding-bottom:6px; border-bottom:2px solid #5b7fdb;">
-				Commercial Summary
-			</div>
-			<table style="width:100%; border-collapse:collapse; font-size:13px; border:1px solid #e2e8f0;">
+		<div class="dcs-summary-title">${__("Commercial Summary")}</div>
+		${living_html}
+		<div class="table-responsive">
+			<table class="dcs-table">
 				<thead>
 					<tr>
-						${th("Category", "left")}
-						${th(`Cost (${currency})`)}
-						${can_see_selling ? th(`Selling (${currency})`) : ""}
-						${can_see_selling ? th(`Margin (${currency})`) : ""}
-						${can_see_selling ? th("Margin %") : ""}
+						${th(__("Category"), false)}
+						${th(`${__("Cost")} (${currency})`)}
+						${sell(th(`${__("Selling")} (${currency})`))}
+						${sell(th(`${__("Margin")} (${currency})`))}
+						${sell(th(__("Margin %")))}
 					</tr>
 				</thead>
 				<tbody>
-					<tr style="border-bottom:1px solid #e2e8f0;">
-						${td_label("Products")}
+					<tr>
+						${td_label(__("Products"))}
 						${td(fmt(prod_cost))}
-						${can_see_selling ? td(fmt(prod_sell)) : ""}
-						${can_see_selling ? td(fmt(prod_margin)) : ""}
-						${can_see_selling ? td(pct(prod_margin_pct)) : ""}
+						${sell(td(fmt(prod_sell)) + td(fmt(prod_margin)) + td(pct(prod_margin_pct)))}
 					</tr>
-					<tr style="border-bottom:1px solid #e2e8f0;">
-						${td_label("Services")}
+					<tr>
+						${td_label(__("Services"))}
 						${td(fmt(svc_cost))}
-						${can_see_selling ? td(fmt(svc_sell)) : ""}
-						${can_see_selling ? td(fmt(svc_margin)) : ""}
-						${can_see_selling ? td(pct(svc_margin_pct)) : ""}
+						${sell(td(fmt(svc_sell)) + td(fmt(svc_margin)) + td(pct(svc_margin_pct)))}
 					</tr>
-					<tr style="border-bottom:1px solid #e2e8f0;">
-						${td_label("Additional Charges")}
+					<tr>
+						${td_label(__("Additional Charges"))}
 						${td(fmt(charges_total))}
-						${can_see_selling ? td("-") : ""}
-						${can_see_selling ? td("-") : ""}
-						${can_see_selling ? td("-") : ""}
+						${sell(td("-") + td("-") + td("-"))}
 					</tr>
-					<tr style="border-bottom:1px solid #e2e8f0;">
-						${td_label("Resources")}
+					<tr>
+						${td_label(__("Resources"))}
 						${td(fmt(resource_cost_total))}
-						${can_see_selling ? td("-") : ""}
-						${can_see_selling ? td("-") : ""}
-						${can_see_selling ? td("-") : ""}
+						${sell(td("-") + td("-") + td("-"))}
 					</tr>
-					<tr style="background:#f7f9fc; border-top:2px solid #cbd5e0;">
-						${td_label("Total", true)}
-						${td(fmt(total_cost_calc), true)}
-						${can_see_selling ? td(fmt(total_selling_calc), true) : ""}
-						${can_see_selling ? td(fmt(total_margin_calc), true) : ""}
-						${can_see_selling ? td(pct(total_margin_pct), true) : ""}
+					<tr class="dcs-total">
+						${td_label(total_label, true)}
+						${td(fmt(doc.total_cost), true)}
+						${sell(td(fmt(doc.total_selling), true) + td(fmt(doc.margin_value), true) + td(pct(doc.margin_percent), true))}
 					</tr>
 				</tbody>
 			</table>
 		</div>
 	`;
 
-	// ── Resource Summary ──
 	let resource_rows = "";
-	(doc.resources || []).forEach(r => {
+	(doc.resources || []).forEach((r) => {
 		resource_rows += `
-			<tr style="border-bottom:1px solid #e2e8f0;">
-				${td_label(r.resource_type || "")}
+			<tr>
+				${td_label(frappe.utils.escape_html(r.resource_type || ""))}
+				${td_label(frappe.utils.escape_html(r.role || ""))}
 				${td(flt(r.no_of_persons))}
 				${td(flt(r.no_of_days))}
 				${td(fmt(r.cost_rate))}
@@ -333,42 +314,37 @@ function render_summary(frm, currency) {
 	});
 
 	if (!resource_rows) {
-		resource_rows = `<tr><td colspan="5" style="text-align:center; padding:10px; color:#a0aec0; font-size:12px;">No resources added</td></tr>`;
+		resource_rows = `<tr><td colspan="6" class="dcs-empty">${__("No resources added")}</td></tr>`;
 	} else {
 		resource_rows += `
-			<tr style="background:#f7f9fc; border-top:2px solid #cbd5e0;">
-				${td_label("Total", true)}
-				${td("")}
-				${td("")}
-				${td("")}
+			<tr class="dcs-total">
+				${td_label(__("Total"), true)}
+				${td_label("")}${td("")}${td("")}${td("")}
 				${td(fmt(resource_cost_total), true)}
 			</tr>
 		`;
 	}
 
 	const resource_html = `
-		<div style="margin-bottom:24px;">
-			<div style="font-size:14px; font-weight:700; color:#2d3748; margin-bottom:10px; padding-bottom:6px; border-bottom:2px solid #5b7fdb;">
-				Resource Summary
-			</div>
-			<table style="width:100%; border-collapse:collapse; font-size:13px; border:1px solid #e2e8f0;">
+		<div class="dcs-summary-title">${__("Resource Summary")}</div>
+		<div class="table-responsive">
+			<table class="dcs-table">
 				<thead>
 					<tr>
-						${th("Resource Type", "left")}
-						${th("No. of Persons")}
-						${th("No. of Days")}
-						${th(`Cost Rate (${currency})`)}
-						${th(`Cost Amount (${currency})`)}
+						${th(__("Resource Type"), false)}
+						${th(__("Role"), false)}
+						${th(__("Persons"))}
+						${th(__("Days"))}
+						${th(`${__("Cost Rate")} (${currency})`)}
+						${th(`${__("Cost Amount")} (${currency})`)}
 					</tr>
 				</thead>
-				<tbody>
-					${resource_rows}
-				</tbody>
+				<tbody>${resource_rows}</tbody>
 			</table>
 		</div>
 	`;
 
-	$wrapper.html(resource_html + commercial_html);
+	$wrapper.html(`<div class="dcs-summary">${commercial_html}${resource_html}</div>`);
 }
 
 // ── Calculations ──────────────────────────────────────────────────────────────
@@ -477,6 +453,22 @@ function recalc_parent(frm) {
 	]);
 
 	render_summary_with_currency(frm);
+}
+
+function add_create_quotation_button(frm) {
+	// Offered on a submitted sheet unless a live Quotation is already linked through the
+	// link-back service. A cancelled linked Quotation (docstatus 2) does not block: the
+	// sheet may legitimately need a fresh one.
+	if (frm.doc.docstatus !== 1) return;
+	const add = () => frm.add_custom_button(__("Create Quotation"), () => create_quotation(frm), __("Create"));
+	if (!frm.doc.custom_quotation) {
+		add();
+		return;
+	}
+	frappe.db.get_value("Quotation", frm.doc.custom_quotation, "docstatus").then((r) => {
+		const linked = r && r.message && r.message.docstatus !== undefined ? cint(r.message.docstatus) : null;
+		if (linked === null || linked === 2) add();
+	});
 }
 
 function create_quotation(frm) {
@@ -633,6 +625,10 @@ function fetch_presales(frm) {
 
 
 function fetch_document_data(frm){
+	if (!frm.doc.document_upload) {
+		frappe.show_alert({ message: __("Attach a PDF document first, then click Get Data"), indicator: "orange" }, 5);
+		return;
+	}
 	frappe.call({
 		method: "bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet.read_deal_cost_sheet",
 		args: {
@@ -795,21 +791,18 @@ frappe.ui.form.on('Deal Cost Sheet', {
         // Cancelled sheets are commercially dead - suppress all mutating actions
         if (frm.doc.docstatus === 2) { return; }
 
-        // Add AI Assistant button group
-        frm.add_custom_button(__('🔍 Run Full AI Check'), () => {
-            dcs_ai_run_full_check(frm);
-        }, __('<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiB3aWR0aD0iMTYiIGhlaWdodD0iMTYiPjxkZWZzPjxyYWRpYWxHcmFkaWVudCBpZD0iYWlyYWciIGN4PSI1MCUiIGN5PSI2MCUiIHI9IjU1JSIgZng9IjUwJSIgZnk9IjcwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzAwZTVjYyIvPjxzdG9wIG9mZnNldD0iNTAlIiBzdG9wLWNvbG9yPSIjM2I2ZWY4Ii8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjN2IzZmU0Ii8+PC9yYWRpYWxHcmFkaWVudD48L2RlZnM+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDgiIGZpbGw9InVybCgjYWlyYWcpIi8+PHBhdGggZD0iTTI1IDc1IEw1MCAyNSBMNzUgNzUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZmlsbD0ibm9uZSIvPjxwb2x5Z29uIHBvaW50cz0iNTAsNTIgNTMsNTggNTksNTggNTQsNjIgNTYsNjggNTAsNjQgNDQsNjggNDYsNjIgNDEsNTggNDcsNTgiIGZpbGw9IndoaXRlIiBvcGFjaXR5PSIwLjkiLz48L3N2Zz4=" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;border-radius:50%"> AIRA'));
-
-        frm.add_custom_button(__('💰 Price Suggestions'), () => {
-            dcs_ai_price_suggestions(frm);
-        }, __('<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiB3aWR0aD0iMTYiIGhlaWdodD0iMTYiPjxkZWZzPjxyYWRpYWxHcmFkaWVudCBpZD0iYWlyYWciIGN4PSI1MCUiIGN5PSI2MCUiIHI9IjU1JSIgZng9IjUwJSIgZnk9IjcwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzAwZTVjYyIvPjxzdG9wIG9mZnNldD0iNTAlIiBzdG9wLWNvbG9yPSIjM2I2ZWY4Ii8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjN2IzZmU0Ii8+PC9yYWRpYWxHcmFkaWVudD48L2RlZnM+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDgiIGZpbGw9InVybCgjYWlyYWcpIi8+PHBhdGggZD0iTTI1IDc1IEw1MCAyNSBMNzUgNzUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZmlsbD0ibm9uZSIvPjxwb2x5Z29uIHBvaW50cz0iNTAsNTIgNTMsNTggNTksNTggNTQsNjIgNTYsNjggNTAsNjQgNDQsNjggNDYsNjIgNDEsNTggNDcsNTgiIGZpbGw9IndoaXRlIiBvcGFjaXR5PSIwLjkiLz48L3N2Zz4=" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;border-radius:50%"> AIRA'));
-
-        frm.add_custom_button(__('📊 Compare Proposals'), () => {
-            dcs_ai_compare_proposals(frm);
-        }, __('<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiB3aWR0aD0iMTYiIGhlaWdodD0iMTYiPjxkZWZzPjxyYWRpYWxHcmFkaWVudCBpZD0iYWlyYWciIGN4PSI1MCUiIGN5PSI2MCUiIHI9IjU1JSIgZng9IjUwJSIgZnk9IjcwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzAwZTVjYyIvPjxzdG9wIG9mZnNldD0iNTAlIiBzdG9wLWNvbG9yPSIjM2I2ZWY4Ii8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjN2IzZmU0Ii8+PC9yYWRpYWxHcmFkaWVudD48L2RlZnM+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDgiIGZpbGw9InVybCgjYWlyYWcpIi8+PHBhdGggZD0iTTI1IDc1IEw1MCAyNSBMNzUgNzUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZmlsbD0ibm9uZSIvPjxwb2x5Z29uIHBvaW50cz0iNTAsNTIgNTMsNTggNTksNTggNTQsNjIgNTYsNjggNTAsNjQgNDQsNjggNDYsNjIgNDEsNTggNDcsNTgiIGZpbGw9IndoaXRlIiBvcGFjaXR5PSIwLjkiLz48L3N2Zz4=" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;border-radius:50%"> AIRA'));
-
-        frm.add_custom_button(__('➕ Quick Add Item'), () => { dcs_quick_add_item(frm); }, __('<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiB3aWR0aD0iMTYiIGhlaWdodD0iMTYiPjxkZWZzPjxyYWRpYWxHcmFkaWVudCBpZD0iYWlyYWciIGN4PSI1MCUiIGN5PSI2MCUiIHI9IjU1JSIgZng9IjUwJSIgZnk9IjcwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzAwZTVjYyIvPjxzdG9wIG9mZnNldD0iNTAlIiBzdG9wLWNvbG9yPSIjM2I2ZWY4Ii8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjN2IzZmU0Ii8+PC9yYWRpYWxHcmFkaWVudD48L2RlZnM+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDgiIGZpbGw9InVybCgjYWlyYWcpIi8+PHBhdGggZD0iTTI1IDc1IEw1MCAyNSBMNzUgNzUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZmlsbD0ibm9uZSIvPjxwb2x5Z29uIHBvaW50cz0iNTAsNTIgNTMsNTggNTksNTggNTQsNjIgNTYsNjggNTAsNjQgNDQsNjggNDYsNjIgNDEsNTggNDcsNTgiIGZpbGw9IndoaXRlIiBvcGFjaXR5PSIwLjkiLz48L3N2Zz4=" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;border-radius:50%"> AIRA'));
-
+        // AI Assistant button group
+        const AIRA = __('AIRA');
+        frm.add_custom_button(__('Run Full AI Check'), () => dcs_ai_run_full_check(frm), AIRA);
+        frm.add_custom_button(__('Price Suggestions'), () => dcs_ai_price_suggestions(frm), AIRA);
+        frm.add_custom_button(__('Compare Proposals'), () => dcs_ai_compare_proposals(frm), AIRA);
+        frm.add_custom_button(__('Quick Add Item'), () => dcs_quick_add_item(frm), AIRA);
+        if (frm.doc.docstatus !== 2) {
+            frm.add_custom_button(__('Import Items from File or Paste'), () => dcsOpenModal(), AIRA);
+        }
+        if (frappe.user.has_role('System Manager') || frappe.user.has_role('Administrator')) {
+            frm.add_custom_button(__('AI Provider Settings'), () => dcsOpenAISettings(), AIRA);
+        }
     },
 
     company(frm) {
@@ -1338,38 +1331,18 @@ frappe.ui.form.on("Deal Cost Sheet", {
 });
 
 
-// DCS_QA_VERSION: V19 2026-07-15 - Same as V18 plus: the 'Analysis: N new item(s) not in ERP...' banner text above the preview table now also refreshes live when 'Use Generic' is clicked, instead of staying stuck on the stale pre-click wording.
-// AUTO-EXPOSE: These functions must be global for onclick handlers
-(function() {
-    // This block runs immediately when the script loads
-    console.log("DCS_SCRIPT_LOADED: version check");
-})();
 frappe.ui.form.on('Deal Cost Sheet', {
-    refresh: function(frm) { dcsInit(frm); if (window.dcsLiveCalc) window.dcsLiveCalc(frm);
-        // Override app's strict presales_request filter — allow all PRs when no opportunity set
+    refresh: function(frm) {
+        dcsInit(frm);
+        // Presales Request filter: scoped to the Opportunity when one is set, otherwise open.
+        // Flagged for the party-model review (browser finding 8); behaviour unchanged here.
         frm.set_query('presales_request', function() {
             if (frm.doc.opportunity) {
                 return { filters: { opportunity: frm.doc.opportunity } };
             }
-            return {}; // No filter — show all Presales Requests
+            return {};
         });
-        // Guard: intercept frappe.call to block read_deal_cost_sheet when no attachment
-        if (!window._dcsCallIntercepted) {
-            window._dcsCallIntercepted = true;
-            var _origFrappeCall = frappe.call;
-            frappe.call = function(opts) {
-                if (opts && opts.method && opts.method.indexOf('read_deal_cost_sheet') >= 0) {
-                    if (!opts.args || !opts.args.file_url) {
-                        frappe.show_alert({ message: '📎 Please attach a PDF document first, then click Get Data', indicator: 'orange' }, 5);
-                        return;
-                    }
-                }
-                return _origFrappeCall.apply(frappe, arguments);
-            };
-        }
     },
-    onload_post_render: function(frm) { dcsInit(frm); if (window.dcsLiveCalc) window.dcsLiveCalc(frm); }
-,
     onload: function(frm) {
         // Default Deal Owner to current user on new DCS
         if (frm.is_new() && !frm.doc.deal_owner) {
@@ -1404,15 +1377,6 @@ frappe.ui.form.on('Deal Cost Sheet', {
     }
 });
 
-// =====================================================================
-// LIVE COMMERCIAL SUMMARY - Updates totals as items are edited
-// =====================================================================
-frappe.ui.form.on('Deal Cost Item', {
-    cost_rate: function(frm, cdt, cdn) { if (window.dcsLiveCalc) window.dcsLiveCalc(frm, true); },
-    selling_rate: function(frm, cdt, cdn) { if (window.dcsLiveCalc) window.dcsLiveCalc(frm, true); },
-    qty: function(frm, cdt, cdn) { if (window.dcsLiveCalc) window.dcsLiveCalc(frm, true); },
-    items_remove: function(frm) { if (window.dcsLiveCalc) window.dcsLiveCalc(frm, true); }
-});
 
 function dcsInit(frm) {
   ['dcs-quick-add-btn','dcs-bulk-modal','dcs-modal-overlay','dcs-ai-provider-btn','dcs-styles'].forEach(function(id) {
@@ -1438,8 +1402,6 @@ function dcsInit(frm) {
     var style = document.createElement('style');
     style.id = 'dcs-styles';
     style.textContent = [
-        '#dcs-quick-add-btn{background:linear-gradient(135deg,#6c63ff,#4ecdc4);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;margin:8px 4px;box-shadow:0 3px 10px rgba(108,99,255,.4);}',
-        '#dcs-ai-provider-btn{position:fixed;bottom:20px;right:20px;z-index:9000;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:25px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;}',
         '#dcs-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;display:flex;align-items:center;justify-content:center;}',
         '#dcs-bulk-modal{background:#fff;border-radius:14px;width:960px;max-width:96vw;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;}',
         '.dcs-mhdr{background:linear-gradient(135deg,#6c63ff,#4ecdc4);color:#fff;padding:18px 24px;border-radius:14px 14px 0 0;display:flex;justify-content:space-between;align-items:center;flex:0 0 auto;}',
@@ -1499,20 +1461,7 @@ function dcsInit(frm) {
     ].join('');
     document.head.appendChild(style);
 
-    // Quick Add Button (suppressed on cancelled sheets)
-    dcsQuickAddButton(frm);
 
-    // AI Provider Button - only for System Manager / Administrator
-    if (!document.getElementById('dcs-ai-provider-btn')) {
-        var isAdmin = frappe.user.has_role('System Manager') || frappe.user.has_role('Administrator');
-        if (isAdmin) {
-            var aiBtn = document.createElement('button');
-            aiBtn.id = 'dcs-ai-provider-btn';
-            aiBtn.innerHTML = '&#129302; AI Provider';
-            aiBtn.onclick = function() { dcsOpenAISettings(); };
-            document.body.appendChild(aiBtn);
-        }
-    }
 
     // Expose functions as globals for onclick attributes
     window.dcsToggleHelp = dcsToggleHelp;
@@ -1682,113 +1631,18 @@ function dcsInit(frm) {
         cell.textContent = margin;
     }
         // Global helpers for onclick/closure access
-    console.log("DCSINIT_RUNNING: dcsProcess_defined=" + (typeof dcsProcess));
     window.dcsParse = dcsParse;
     window.dcsGuess = dcsGuess;
     window.dcsSim = dcsSim;
     window.dcsCallAIWithFallback = dcsCallAIWithFallback;
     // Expose all global functions to window for onclick handlers
-    window.dcsLiveCalc = dcsLiveCalc;
-    window.dcsRunAnalysis = dcsRunAnalysis;
+        window.dcsRunAnalysis = dcsRunAnalysis;
     window.dcsOpenModal = dcsOpenModal;
     window.dcsHandleFile = dcsHandleFile;
     window.dcsShowAI = dcsShowAI;
     window.dcsSaveAI = dcsSaveAI;
     window.dcsTestAI = dcsTestAI;
     window._dcsRows = window._dcsRows || [];
-}
-function dcsLiveCalc(frm, applyToDoc) {
-    // Calculate commercial totals from current items (live, before save)
-    if (!frm || !frm.doc || !frm.doc.items) return;
-    
-    // Group items by item_group category
-    var cats = {};
-    (frm.doc.items || []).forEach(function(item) {
-        var qty = parseFloat(item.qty) || 1;
-        var cost = (parseFloat(item.cost_rate) || 0) * qty;
-        var sell = (parseFloat(item.selling_rate) || 0) * qty;
-        var grp = item.header || item.item_group || 'Products';
-        if (!cats[grp]) cats[grp] = { cost: 0, sell: 0 };
-        cats[grp].cost += cost;
-        cats[grp].sell += sell;
-    });
-    
-    var totalCost = 0, totalSell = 0;
-    var productsCost = 0, productsSell = 0, servicesCost = 0, servicesSell = 0;
-    
-    for (var grp in cats) {
-        var isService = (grp && (grp.toLowerCase().includes('service') || grp.toLowerCase().includes('professional')));
-        totalCost += cats[grp].cost;
-        totalSell += cats[grp].sell;
-        if (isService) { servicesCost += cats[grp].cost; servicesSell += cats[grp].sell; }
-        else { productsCost += cats[grp].cost; productsSell += cats[grp].sell; }
-    }
-    
-    var marginVal = totalSell - totalCost;
-    var marginPct = totalSell > 0 ? (marginVal / totalSell * 100) : 0;
-    
-    // Commercial totals derived from the current item rows.
-    // These are LOCAL display values. They are written back to the document ONLY on an
-    var _calcFields = {
-        products_cost_total: productsCost, products_selling_total: productsSell,
-        services_cost_total: servicesCost, services_selling_total: servicesSell,
-        total_cost: totalCost, total_selling: totalSell,
-        margin_value: marginVal, margin_percent: parseFloat(marginPct.toFixed(3))
-    };
-    // explicit user edit (applyToDoc). A refresh/display pass never mutates frm.doc.
-    if (applyToDoc) {
-        Object.keys(_calcFields).forEach(function(f) {
-            frm.doc[f] = _calcFields[f];
-        });
-    }
-    var wrapper = frm.fields_dict['commercial_summary_html'] && frm.fields_dict['commercial_summary_html'].wrapper;
-    if (wrapper) {
-        var rows = '';
-        for (var g in cats) {
-            var c = cats[g].cost, s = cats[g].sell;
-            var m = s - c, mp = s > 0 ? (m / s * 100) : 0;
-            rows += '<tr><td>' + g + '</td>' +
-                '<td style="text-align:right">' + frappe.format(c, {fieldtype:'Currency'}) + '</td>' +
-                '<td style="text-align:right">' + frappe.format(s, {fieldtype:'Currency'}) + '</td>' +
-                '<td style="text-align:right">' + frappe.format(m, {fieldtype:'Currency'}) + '</td>' +
-                '<td style="text-align:right">' + mp.toFixed(2) + '%</td></tr>';
-        }
-        // Living commercial position - same source as the Living DCS headline.
-        // The table below remains the item cost build-up and is labelled as such,
-        // so base-sheet totals are never presented as a competing commercial truth.
-        var _lvRev = cint(frm.doc.custom_dcs_revision_no);
-        var _lvSell = flt(frm.doc.custom_working_total_selling);
-        var _lvCost = flt(frm.doc.custom_working_total_cost);
-        var _lvMpc = flt(frm.doc.custom_working_margin_percent);
-        var _lvCur = frm.doc.currency || 'AED';
-        var _lvHead = '';
-        if (_lvRev > 0) {
-            _lvHead = '<div style="margin:0 0 10px;padding:8px 10px;background:#f0f6ff;border-left:3px solid #1f6fd0;border-radius:4px;font-size:12px">' +
-                '<div style="color:#555;margin-bottom:2px">Living commercial position &middot; revision ' + _lvRev + '</div>' +
-                '<div style="font-weight:600">Selling ' + format_currency(_lvSell, _lvCur) +
-                ' &nbsp;&middot;&nbsp; Cost ' + format_currency(_lvCost, _lvCur) +
-                ' &nbsp;&middot;&nbsp; Margin ' + _lvMpc.toFixed(3) + '%</div>' +
-                '<div style="color:#777;margin-top:3px">Figures below are the item cost build-up and may differ from the negotiated position.</div>' +
-                '</div>';
-        }
-        wrapper.innerHTML = '<div style="margin:8px 0">' +
-            '<h6 style="font-weight:600;margin-bottom:8px">Commercial Summary</h6>' +
-            _lvHead +
-            '<table class="table table-bordered table-sm" style="font-size:13px">' +
-            '<thead style="background:#f5f5f5"><tr>' +
-            '<th>Category</th><th style="text-align:right">Cost (AED)</th>' +
-            '<th style="text-align:right">Selling (AED)</th>' +
-            '<th style="text-align:right">Margin (AED)</th>' +
-            '<th style="text-align:right">Margin %</th></tr></thead>' +
-            '<tbody>' + rows +
-            '<tr style="font-weight:bold;background:#f5f5f5">' +
-            '<td>' + (_lvRev > 0 ? 'Total (item build-up)' : 'Total') + '</td>' +
-            '<td style="text-align:right">' + frappe.format(totalCost, {fieldtype:'Currency'}) + '</td>' +
-            '<td style="text-align:right">' + frappe.format(totalSell, {fieldtype:'Currency'}) + '</td>' +
-            '<td style="text-align:right">' + frappe.format(marginVal, {fieldtype:'Currency'}) + '</td>' +
-            '<td style="text-align:right">' + marginPct.toFixed(2) + '%</td>' +
-            '</tr></tbody></table></div>';
-    }
 }
 
 function dcsOpenModal() {
@@ -2442,8 +2296,6 @@ function dcsTestAI(d) {
 }
 
 
-console.log("SCRIPT_END_MARKER: dcsProcess=" + typeof window.dcsProcess);
-
 function dcsTestAI(dialog) {
     // AIRA Gateway v4.0 - connectivity is tested through the governed server proxy.
     frappe.show_alert({ message: '🔌 Testing AI connectivity via governed gateway...', indicator: 'blue' }, 4);
@@ -2573,7 +2425,7 @@ function dcsDoImport() {
     }
     function finishImport(addedCount) {
         frm.refresh_field('items');
-        if (window.dcsLiveCalc) setTimeout(function() { window.dcsLiveCalc(frm, true); }, 50);
+        setTimeout(function() { recalc_parent(frm); }, 50);
         var overlay = document.getElementById('dcs-modal-overlay');
         if (overlay) overlay.remove();
         var modal = document.getElementById('dcs-bulk-modal');
@@ -2642,142 +2494,8 @@ function dcsDoImport() {
 }
 
 
-function dcsQuickAddButton(frm) {
-    // Cancelled sheets are commercially dead - suppress all mutating actions
-    if (frm.doc.docstatus === 2) { return; }
-
-    var btn = document.createElement('button');
-    btn.id = 'dcs-quick-add-btn';
-    btn.innerHTML = '&#9889; Quick Add Items';
-    btn.onclick = function() { dcsOpenModal(); };
-    var placed = false;
-    frm.$wrapper.find('.frappe-control[data-fieldname="items"]').each(function() {
-        if (!placed) { $(this).before(btn); placed = true; }
-    });
-    if (!placed) {
-        frm.$wrapper.find('.form-section').each(function() {
-            if (!placed && $(this).text().indexOf('Item Code') >= 0) { $(this).prepend(btn); placed = true; }
-        });
-    }
-    if (!placed) frm.$wrapper.append(btn);
-}
 
 
-frappe.ui.form.on(cur_frm ? cur_frm.doctype : 'Deal Cost Sheet', {
-  refresh() { window.__installLiteTheme && window.__installLiteTheme(); }
-});
-
-(function () {
-  if (window.__liteThemeInstalled) { window.__installLiteTheme(); return; }
-  window.__liteThemeInstalled = true;
-
-  var CSS = `
-  html.lite-theme { --lt-primary:#1e66f5; --lt-primary-soft:#eaf1ff; --lt-accent:#7c3aed; --lt-green:#16a34a; --lt-green-soft:#dcfce7; --lt-red:#dc2626; }
-  html.lite-theme .navbar { background:linear-gradient(90deg,#1e66f5 0%,#7c3aed 100%)!important; border-bottom:none!important; }
-  html.lite-theme .navbar .navbar-brand, html.lite-theme .navbar a, html.lite-theme .navbar .nav-link { color:#fff!important; }
-  html.lite-theme .btn-primary, html.lite-theme .primary-action { background:var(--lt-primary)!important; border-color:var(--lt-primary)!important; color:#fff!important; }
-  html.lite-theme .btn-primary:hover, html.lite-theme .primary-action:hover { filter:brightness(.93); }
-  html.lite-theme .standard-sidebar-item.selected, html.lite-theme .sidebar-item-label.selected { background:var(--lt-primary-soft)!important; border-radius:6px; }
-  html.lite-theme .desk-sidebar .standard-sidebar-item.selected a { color:var(--lt-primary)!important; }
-  html.lite-theme .list-row:hover, html.lite-theme .list-row-container:hover { background:var(--lt-primary-soft)!important; box-shadow:inset 3px 0 0 var(--lt-primary); }
-  html.lite-theme .indicator-pill.green { background:var(--lt-green-soft)!important; color:#15803d!important; }
-  html.lite-theme .indicator-pill.red { background:#fee2e2!important; color:#b91c1c!important; }
-  html.lite-theme .indicator-pill.orange { background:#ffedd5!important; color:#c2410c!important; }
-  html.lite-theme .indicator-pill.blue { background:#dbeafe!important; color:#1d4ed8!important; }
-  html.lite-theme .section-head, html.lite-theme .form-section .section-head { color:var(--lt-primary)!important; font-weight:600; }
-  html.lite-theme .form-layout table thead th, html.lite-theme .form-layout table thead td { background:var(--lt-primary)!important; color:#fff!important; font-weight:600!important; border-color:var(--lt-primary)!important; }
-  html.lite-theme .form-layout table tbody tr:hover { background:var(--lt-primary-soft)!important; }
-  html.lite-theme .form-layout table tbody tr:last-child { background:var(--lt-primary-soft)!important; font-weight:700!important; }
-  html.lite-theme .form-layout table tbody tr:last-child td { border-top:2px solid var(--lt-primary)!important; color:#0b3d91!important; }
-  html.lite-theme .form-layout table { border-radius:8px; overflow:hidden; }
-  html.lite-theme .form-grid .grid-heading-row, html.lite-theme .form-grid .grid-heading-row .col, html.lite-theme .form-grid .grid-heading-row .grid-static-col, html.lite-theme .form-grid .grid-heading-row .row-index, html.lite-theme .form-grid .grid-heading-row .row-check { background-color:#1e66f5!important; background-image:none!important; border-color:#1e66f5!important; }
-  html.lite-theme .form-grid .grid-heading-row .col { border-right:1px solid rgba(255,255,255,.15)!important; border-bottom:none!important; }
-  html.lite-theme .form-grid .grid-heading-row .col:last-child { border-right:none!important; }
-  html.lite-theme .form-grid .grid-heading-row, html.lite-theme .form-grid .grid-heading-row .col, html.lite-theme .form-grid .grid-heading-row .static-area, html.lite-theme .form-grid .grid-heading-row .field-area, html.lite-theme .form-grid .grid-heading-row span, html.lite-theme .form-grid .grid-heading-row div, html.lite-theme .form-grid .grid-heading-row .reqd { color:#fff!important; -webkit-text-fill-color:#fff!important; opacity:1!important; font-weight:600!important; }
-  html.lite-theme .form-grid .grid-heading-row .grid-row-check input { filter:brightness(0) invert(1); }
-  html.lite-theme .form-grid .grid-body .grid-row:hover { background:var(--lt-primary-soft)!important; }
-  html.lite-theme .form-grid .grid-body .grid-row:nth-child(even) { background:#f8fafd; }
-  html.lite-theme .frappe-control[data-fieldname="customer"], html.lite-theme .frappe-control[data-fieldname="customer_name"], html.lite-theme .frappe-control[data-fieldname="party_name"], html.lite-theme .frappe-control[data-fieldname="status"], html.lite-theme .frappe-control[data-fieldname="workflow_state"], html.lite-theme .frappe-control[data-fieldname="custom_organization_name"], html.lite-theme .frappe-control[data-fieldname="organization_name"], html.lite-theme .frappe-control[data-fieldname="custom_contact_person_name"], html.lite-theme .frappe-control[data-fieldname="contact_person"], html.lite-theme .frappe-control[data-fieldname="contact_display"], html.lite-theme .frappe-control[data-fieldname="custom_sales_person"], html.lite-theme .frappe-control[data-fieldname="sales_person"] { background:var(--lt-primary-soft)!important; border-left:3px solid var(--lt-primary)!important; border-radius:8px!important; padding:8px 10px!important; margin-bottom:8px!important; box-shadow:0 1px 3px rgba(30,102,245,.10); }
-  html.lite-theme .frappe-control[data-fieldname="customer"] .control-label, html.lite-theme .frappe-control[data-fieldname="customer_name"] .control-label, html.lite-theme .frappe-control[data-fieldname="party_name"] .control-label, html.lite-theme .frappe-control[data-fieldname="status"] .control-label, html.lite-theme .frappe-control[data-fieldname="workflow_state"] .control-label, html.lite-theme .frappe-control[data-fieldname="custom_organization_name"] .control-label, html.lite-theme .frappe-control[data-fieldname="organization_name"] .control-label, html.lite-theme .frappe-control[data-fieldname="custom_contact_person_name"] .control-label, html.lite-theme .frappe-control[data-fieldname="contact_person"] .control-label, html.lite-theme .frappe-control[data-fieldname="contact_display"] .control-label, html.lite-theme .frappe-control[data-fieldname="custom_sales_person"] .control-label, html.lite-theme .frappe-control[data-fieldname="sales_person"] .control-label { color:var(--lt-primary)!important; font-weight:700!important; text-transform:uppercase; letter-spacing:.3px; font-size:11px; }
-  html.lite-theme .frappe-control[data-fieldname="customer"] .control-input input, html.lite-theme .frappe-control[data-fieldname="customer_name"] .control-input input, html.lite-theme .frappe-control[data-fieldname="party_name"] .control-input input { font-weight:700!important; color:#0b3d91!important; }
-  html.lite-theme .frappe-control[data-fieldname="grand_total"], html.lite-theme .frappe-control[data-fieldname="rounded_total"], html.lite-theme .frappe-control[data-fieldname="base_grand_total"] { background:var(--lt-green-soft)!important; border-left:3px solid var(--lt-green)!important; border-radius:8px!important; padding:8px 10px!important; margin-bottom:8px!important; box-shadow:0 1px 4px rgba(22,163,74,.15); }
-  html.lite-theme .frappe-control[data-fieldname="grand_total"] .control-label, html.lite-theme .frappe-control[data-fieldname="rounded_total"] .control-label, html.lite-theme .frappe-control[data-fieldname="base_grand_total"] .control-label { color:#15803d!important; font-weight:700!important; text-transform:uppercase; font-size:11px; }
-  html.lite-theme .frappe-control[data-fieldname="grand_total"] .control-input input, html.lite-theme .frappe-control[data-fieldname="rounded_total"] .control-input input, html.lite-theme .frappe-control[data-fieldname="base_grand_total"] .control-input input { font-weight:800!important; color:#15803d!important; font-size:15px!important; }
-  html.lite-theme .page-head .indicator-pill, html.lite-theme .title-area .indicator-pill { font-weight:700!important; padding:3px 12px!important; border-radius:14px!important; font-size:11px!important; text-transform:uppercase; letter-spacing:.4px; border:1.5px solid transparent!important; box-shadow:0 1px 4px rgba(0,0,0,.12); }
-  html.lite-theme .page-head .indicator-pill.blue, html.lite-theme .title-area .indicator-pill.blue { background:#dbeafe!important; color:#1d4ed8!important; border-color:#93c5fd!important; }
-  html.lite-theme .page-head .indicator-pill.green, html.lite-theme .title-area .indicator-pill.green { background:#dcfce7!important; color:#15803d!important; border-color:#86efac!important; }
-  html.lite-theme .page-head .indicator-pill.red, html.lite-theme .title-area .indicator-pill.red { background:#fee2e2!important; color:#b91c1c!important; border-color:#fca5a5!important; }
-  html.lite-theme .page-head .indicator-pill.orange, html.lite-theme .title-area .indicator-pill.orange { background:#ffedd5!important; color:#c2410c!important; border-color:#fdba74!important; }
-  html.lite-theme .page-head .indicator-pill.gray, html.lite-theme .page-head .indicator-pill.grey { background:#f1f5f9!important; color:#475569!important; border-color:#cbd5e1!important; }
-    .form-grid .grid-body .data-row .col[data-fieldname="item_code"] { height:auto !important; max-height:none !important; }
-      .form-grid .grid-body .data-row .col[data-fieldname="item_code"] .static-area,
-        .form-grid .grid-body .data-row .col[data-fieldname="item_code"] .ellipsis,
-          .form-grid .grid-body .data-row .col[data-fieldname="item_code"] .control-value,
-            .form-grid .grid-body .data-row .col[data-fieldname="item_code"] .grid-static-col { height:auto !important; max-height:none !important; overflow:visible !important; white-space:normal !important; -webkit-line-clamp:unset !important; display:block !important; }
-            `;
-
-  function colorize() {
-    if (!document.documentElement.classList.contains('lite-theme')) return;
-    document.querySelectorAll('.form-layout table').forEach(function (tbl) {
-      var heads = Array.from(tbl.querySelectorAll('thead th, thead td')).map(function (h) { return h.innerText.toLowerCase().trim(); });
-      var cols = []; heads.forEach(function (h, i) { if (h.indexOf('margin') > -1) cols.push(i); });
-      if (!cols.length) return;
-      tbl.querySelectorAll('tbody tr').forEach(function (tr) {
-        cols.forEach(function (ci) {
-          var c = tr.children[ci]; if (!c) return;
-          var n = parseFloat(c.innerText.replace(/[^\d.\-]/g, '')); if (isNaN(n)) return;
-          c.style.fontWeight = '700';
-          c.style.color = n > 0 ? '#15803d' : (n < 0 ? '#dc2626' : '#92400e');
-        });
-      });
-    });
-    var profit = ['gp_value', 'gp_percent', 'margin', 'margin_amount', 'margin_percent'];
-    document.querySelectorAll('.form-grid .grid-body .grid-row .col[data-fieldname]').forEach(function (cell) {
-      var df = cell.getAttribute('data-fieldname');
-      var t = cell.querySelector('.static-area') || cell;
-      if (profit.indexOf(df) > -1) {
-        var n = parseFloat((t.innerText || '').replace(/[^\d.\-]/g, ''));
-        if (isNaN(n)) { t.style.color = ''; t.style.fontWeight = ''; return; }
-        t.style.fontWeight = '700';
-        t.style.color = n > 0 ? '#15803d' : (n < 0 ? '#dc2626' : '#92400e');
-      } else if (df === 'amount' || df === 'cost_amount' || df === 'selling_amount') {
-        t.style.fontWeight = '600';
-      }
-    });
-  }
-
-  function buildToggle() {
-    if (document.getElementById('lite-theme-toggle')) return;
-    var w = document.createElement('div'); w.id = 'lite-theme-toggle';
-    w.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #e2e2e2;border-radius:20px;padding:6px 13px;box-shadow:0 3px 10px rgba(0,0,0,.15);font-size:12px;font-family:inherit;cursor:pointer;user-select:none;';
-    function render() {
-      var on = document.documentElement.classList.contains('lite-theme');
-      w.innerHTML = '<span style="font-weight:600;color:#444;">Color Theme</span>' +
-        '<span style="position:relative;width:34px;height:18px;border-radius:10px;transition:.2s;background:' + (on ? '#1e66f5' : '#ccc') + ';display:inline-block;">' +
-        '<span style="position:absolute;top:2px;left:' + (on ? '18px' : '2px') + ';width:14px;height:14px;border-radius:50%;background:#fff;transition:.2s;"></span></span>' +
-        '<span style="color:' + (on ? '#1e66f5' : '#999') + ';font-weight:600;">' + (on ? 'ON' : 'OFF') + '</span>';
-    }
-    w.onclick = function () {
-      var on = document.documentElement.classList.toggle('lite-theme');
-      localStorage.setItem('lite_theme_on', on ? '1' : '0'); render();
-    };
-    render(); document.body.appendChild(w);
-  }
-
-  window.__installLiteTheme = function () {
-    if (!document.getElementById('lite-theme-style')) {
-      var s = document.createElement('style'); s.id = 'lite-theme-style'; s.textContent = CSS; document.head.appendChild(s);
-    }
-    if (localStorage.getItem('lite_theme_on') !== '0') document.documentElement.classList.add('lite-theme');
-    buildToggle();
-  };
-
-  window.__installLiteTheme();
-  setInterval(function () {
-    window.__installLiteTheme();
-    if (document.documentElement.classList.contains('lite-theme')) colorize();
-  }, 1500);
-})();
 
 
 frappe.ui.form.on('Deal Cost Sheet', {
@@ -2856,10 +2574,15 @@ function render_summary_dashboard(frm) {
             '</div>';
     }
 
-    var state = d.workflow_state || 'Draft';
-    var color_map = {'Draft': 'gray', 'Pending': 'orange', 'Approved': 'green', 'Returned for Rework': 'red'};
-    var color = color_map[state] || 'gray';
-    var workflow_badge = '<span class="indicator-pill ' + color + '" style="font-weight:600; font-size:12.5px;">' + state + '</span>';
+    // No Workflow is configured for Deal Cost Sheet on the site, so show the real document
+    // status from docstatus and the Deal Status the outcome and link-back services maintain.
+    var doc_status = d.docstatus === 2 ? 'Cancelled' : (d.docstatus === 1 ? 'Submitted' : 'Draft');
+    var doc_color = d.docstatus === 2 ? 'red' : (d.docstatus === 1 ? 'blue' : 'gray');
+    var status_badge = '<span class="indicator-pill ' + doc_color + '" style="font-weight:600; font-size:12.5px;">' + doc_status + '</span>';
+    var deal_status_colors = {'Draft': 'gray', 'Costing in Progress': 'orange', 'Submitted to Sales': 'blue', 'Quoted': 'blue', 'Won': 'green', 'Lost': 'red'};
+    var deal_badge = d.custom_deal_status
+        ? '<span class="indicator-pill ' + (deal_status_colors[d.custom_deal_status] || 'gray') + '" style="font-weight:600; font-size:12.5px;">' + frappe.utils.escape_html(d.custom_deal_status) + '</span>'
+        : '-';
 
     var green = '#059669';
     var blue = '#2563eb';
@@ -2868,8 +2591,6 @@ function render_summary_dashboard(frm) {
     var indigo = '#4f46e5';
     var amber = '#b45309';
 
-    var margin_color = d.margin_value > 0 ? green : '#dc2626';
-    var margin_pct = d.margin_percent ? d.margin_percent.toFixed(2) + '%' : '0.00%';
 
     var opp_body = link_row('Opportunity', 'opportunity', d.opportunity) +
         link_row('Presales Request', 'presales-request', d.presales_request) +
@@ -2879,14 +2600,9 @@ function render_summary_dashboard(frm) {
         row('Deal Owner', d.deal_owner) +
         row('Prepared By', d.owner);
 
-    var comm_body = '<div style="display:flex; flex-wrap:wrap; gap:10px;">' +
-        stat_box('Total Cost', fmt(d.total_cost), blue, '&#128181;') +
-        stat_box('Total Selling', fmt(d.total_selling), indigo, '&#128181;') +
-        stat_box('Gross Profit', '&#128176; ' + fmt(d.margin_value), margin_color, '&#128200;') +
-        stat_box('Margin %', margin_pct, amber, '&#127919;') +
-        '</div>';
 
-    var status_body = row('Workflow', workflow_badge) +
+    var status_body = row('Document', status_badge) +
+        row('Deal Status', deal_badge) +
         row('Items', d.items ? d.items.length : 0) +
         row('Resources', d.resources ? d.resources.length : 0) +
         row('Responsibilities', d.responsibilities ? d.responsibilities.length : 0) +
@@ -2905,7 +2621,7 @@ function render_summary_dashboard(frm) {
         '<span style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:50%; background:linear-gradient(135deg,#7c3aed,#2563eb); color:#fff; font-size:14px;">&#128203;</span>' +
         '<span style="font-size:16px; font-weight:700; letter-spacing:.01em; color:var(--text-color);">Decision Board</span>' +
         '</div>' +
-        '<span style="font-size:11.5px; color:var(--text-muted); letter-spacing:.02em;">Deal snapshot &amp; key metrics</span>' +
+        '<span style="font-size:11.5px; color:var(--text-muted); letter-spacing:.02em;">Deal snapshot and links</span>' +
         '</div>';
 
     var html = '<div style="border:1px solid var(--border-color); border-radius:16px; padding:14px; ' +
@@ -2913,7 +2629,6 @@ function render_summary_dashboard(frm) {
         section_title +
         '<div style="display:flex; flex-wrap:wrap; margin:0 -6px;">' +
         col('&#127970;', 'Opportunity', blue, opp_body, 1) +
-        col('&#128176;', 'Commercial Summary', green, comm_body, 1.5) +
         col('&#128202;', 'Status', purple, status_body, 1) +
         col('&#128279;', 'Quick Links', teal, quick_body, 1) +
         '</div></div>';
@@ -2995,10 +2710,22 @@ function dcs_method(name) {
 }
 
 function dcs_call(method, args) {
+	// Resolves with the service projection, or with a marked failure object when the
+	// request itself fails (network, server exception). A service refusal (ok = 0 with an
+	// error string) is a normal projection and is rendered by the screen it belongs to.
 	return new Promise(function (resolve) {
-		frappe.call({ method: dcs_method(method), args: args, callback: function (r) { resolve((r && r.message) || {}); }, error: function () { resolve({}); } });
+		frappe.call({
+			method: dcs_method(method), args: args,
+			callback: function (r) { resolve((r && r.message) || {}); },
+			error: function (xhr) {
+				var msg = (xhr && xhr.responseJSON && (xhr.responseJSON.exception || xhr.responseJSON._error_message)) || (xhr && xhr.statusText) || __('request failed');
+				resolve({ __failed: 1, __error: String(msg) });
+			}
+		});
 	});
 }
+
+var DCS_RETRY_LABEL = 'Retry loading governance data';
 
 function dcs_load(frm) {
 	var n = frm.doc.name;
@@ -3007,6 +2734,17 @@ function dcs_load(frm) {
 		dcs_call('dcs_screen4', { dcs: n }),
 		dcs_call('dcs_screen5', { dcs: n })
 	]).then(function (res) {
+		var names = ['Negotiation', 'Approval', 'Award & Handover'];
+		var failed = res.map(function (r, i) { return r && r.__failed ? names[i] + ' (' + r.__error + ')' : null; }).filter(Boolean);
+		if (failed.length) {
+			// Actionable, not silent: say what failed, keep governed actions off until a clean load.
+			frm.dashboard.set_headline('<span class="text-danger">' + __('Governance data could not be loaded: {0}. Governed actions stay hidden until it loads.', [frappe.utils.escape_html(failed.join('; '))]) + '</span>');
+			frm.remove_custom_button(__(DCS_RETRY_LABEL));
+			frm.add_custom_button(__(DCS_RETRY_LABEL), function () { dcs_load(frm); });
+			frappe.show_alert({ message: __('Governance data could not be loaded. Use "{0}" in the toolbar.', [__(DCS_RETRY_LABEL)]), indicator: 'red' }, 8);
+			return;
+		}
+		frm.remove_custom_button(__(DCS_RETRY_LABEL));
 		var s3 = res[0] || {}, s4 = res[1] || {}, s5 = res[2] || {};
 		frm.__dcs = { s3: s3, s4: s4, s5: s5 };
 		dcs_headline(frm, s5);
@@ -3368,7 +3106,16 @@ function dcs_buttons(frm, s3, s4, s5) {
 	}
 	frm.add_custom_button(__('Technical / Operations Handover'), function () { dcs_doc_out('handover'); }, D);
 
-	frm.page.set_inner_btn_group_as_primary(H);
+	// Primary group follows the stage: Handover once awarded, Approval while a sign-off is
+	// pending, Negotiation on a submitted sheet the user may negotiate, otherwise none (Save
+	// or Submit stays primary on a draft). The groups themselves stay server-gated as before.
+	if (st.customer_award === 'Awarded') {
+		frm.page.set_inner_btn_group_as_primary(H);
+	} else if (frm.doc.docstatus === 1 && lv.approval_required && lv.approval_required !== 'None' && lv.approval_state !== 'Approved') {
+		frm.page.set_inner_btn_group_as_primary(A);
+	} else if (frm.doc.docstatus === 1 && cap.can_negotiate) {
+		frm.page.set_inner_btn_group_as_primary(N);
+	}
 }
 
 

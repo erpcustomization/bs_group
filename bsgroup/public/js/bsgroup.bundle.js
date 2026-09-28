@@ -97,3 +97,20 @@
         }
     });
 })();
+
+// Retired lite theme cleanup. The theme installer, its toggle and its 1.5s recolour timer were
+// removed from the Deal Cost Sheet and Quotation form scripts. A browser that still holds the
+// stored preference or, until its next reload, the injected elements gets cleaned here. After
+// the deploy, users must reload once so the old form scripts stop running in open tabs.
+(function () {
+    try { localStorage.removeItem("lite_theme_on"); } catch (e) {}
+    function clean() {
+        ["lite-theme-style", "lite-theme-toggle", "dcs-ai-provider-btn", "dcs-quick-add-btn"].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.remove();
+        });
+        document.documentElement.classList.remove("lite-theme");
+    }
+    clean();
+    $(document).on("page-change", clean);
+})();
