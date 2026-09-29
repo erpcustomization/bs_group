@@ -113,6 +113,7 @@ case "$PHASE" in
 1|restore)
 	require_prev 0
 	[ -n "$BACKUP_DB" ] && [ -n "$BACKUP_PUB" ] && [ -n "$BACKUP_PRIV" ] || fail "set BACKUP_DB / BACKUP_PUB / BACKUP_PRIV to the exact approved erp-om backup filenames"
+	[ -n "${STAGING_ADMIN_PW:-}" ] || fail "set STAGING_ADMIN_PW (a new staging-only Administrator password)"
 	cd "$BACKUPS"
 	for f in "$BACKUP_DB" "$BACKUP_PUB" "$BACKUP_PRIV"; do [ -f "$f" ] || fail "missing $f"; done
 	gzip -t "$BACKUP_DB" || fail "db dump is not valid gzip"
@@ -127,7 +128,8 @@ case "$PHASE" in
 	bench --site "$SITE" set-config allow_tests 1
 	sql "update \`tabEmail Account\` set enable_outgoing=0, enable_incoming=0;"
 	sql "update \`tabWebhook\` set enabled=0;" || true
-	bench --site "$SITE" set-admin-password "$(openssl rand -hex 16)" >/dev/null
+	# staging-only Administrator password (never a production password); supplied by the operator
+	bench --site "$SITE" set-admin-password "$STAGING_ADMIN_PW" >/dev/null
 	echo "installed apps on the restored site:"; bench --site "$SITE" list-apps | tee "$EVID/site-apps.txt"
 	grep -qiE "zoho_migration|print_designer" "$EVID/site-apps.txt" && echo "WARN: restored site lists zoho_migration/print_designer - erp-om is not expected to"
 	pass "erp-om backup restored into $SITE and isolated (scheduler paused, mail muted, webhooks off)"
@@ -207,6 +209,11 @@ r = frappe.call('bsgroup.api.dcs.negotiation.dcs_screen3', dcs='$TARGET_DCS')
 print(json.dumps(r.get('capability'), indent=1, default=str))
 " | tee "$EVID/screen3-capability.json"
 		grep -qE '"can_vendor_side": (1|true)' "$EVID/screen3-capability.json" || fail "$DESK_USER has no vendor-side authority - Vendor Revision will not render"
+		if [ -n "${DESK_USER_PW:-}" ]; then
+			(cd "$BENCH" && bench --site "$SITE" set-password "$DESK_USER" "$DESK_USER_PW" >/dev/null) \
+				&& echo "staging-only password set for $DESK_USER" \
+				|| echo "NOTE: set-password unavailable; as Administrator open User $DESK_USER on $SITE and set a staging password"
+		fi
 		cat <<MSG
 NOW, IN THE BROWSER on $SITE as $DESK_USER (screenshots into $EVID):
   1. Open $TARGET_DCS. Confirm the 'Negotiation' button group shows 'Vendor Revision'.     [screenshot 1]
