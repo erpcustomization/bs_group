@@ -42,11 +42,18 @@ def validate_employee_location(latitude, longitude, log_type="Check-in"):
     if not ho or not ho.latitude or not ho.longitude:
         return {"status": "Success"}
 
-    distance_m = _haversine_distance_meters(
-        float(latitude), float(longitude),
-        float(ho.latitude), float(ho.longitude),
-    )
-    allowed_m = float(ho.allowd_distance_meters or 0)
+    from bsgroup.utils.employee_checkin import _to_float
+
+    coords = [_to_float(v) for v in (latitude, longitude, ho.latitude, ho.longitude)]
+    if any(c is None for c in coords):
+        frappe.log_error(
+            title="validate_employee_location: invalid coordinates",
+            message=f"Input: ({latitude}, {longitude}) Head Office: ({ho.latitude}, {ho.longitude})",
+        )
+        return {"status": "Success"}
+
+    distance_m = _haversine_distance_meters(*coords)
+    allowed_m = _to_float(ho.allowd_distance_meters) or 0
 
     if distance_m <= allowed_m:
         return {"status": "Success"}
@@ -197,4 +204,4 @@ class HolidayListEnglishDescriptionMixin:
    self.append(
     "holidays", {"description": holiday_name, "holiday_date": holiday_date, "weekly_off": 0}
    )
- 
+ 
