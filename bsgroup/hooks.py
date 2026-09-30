@@ -294,6 +294,7 @@ override_doctype_dashboards = {
 ignore_links_on_delete = ["Deal Cost Sheet", "Quotation"]
 
 doctype_js = {
+    "Deal Cost Sheet": "public/js/deal_cost_sheet_ai.js",
     "Item": "public/js/item.js",
     "Employee": "public/js/employee.js",
     "Lead": 'public/js/Lead.js',
