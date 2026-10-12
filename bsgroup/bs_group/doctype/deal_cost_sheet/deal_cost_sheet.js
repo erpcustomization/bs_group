@@ -3076,7 +3076,7 @@ function dcs_render_negotiation(frm, s3) {
 	var pol = s3.policy || {};
 	var body;
 	if (!revs.length) {
-		body = dcs_empty('No revisions yet. The first revision initialises the living commercial position from the sheet totals.');
+		body = dcs_empty('No baseline recorded yet. Valid submitted totals are initialised automatically on submission or the first authorised award.');
 	} else {
 		var rows = revs.map(function (r) {
 			var gp = r.gp_movement || 0;

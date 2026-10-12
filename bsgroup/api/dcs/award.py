@@ -78,6 +78,10 @@ def dcs_record_award(args):
 	else:
 		s = frappe.get_doc("Deal Cost Sheet", dcs_name)
 		s.check_permission("write")
+		# Existing submitted sheets initialise atomically with their first award.
+		from bsgroup.dcs.baseline import ensure_baseline
+		ensure_baseline(dcs_name, "dcs_record_award")
+		s = frappe.get_doc("Deal Cost Sheet", dcs_name, for_update=True)
 		req = s.custom_approval_required
 		appr = s.custom_approval_state
 		authorised = 1 if (req == "None" or appr == "Approved") else 0

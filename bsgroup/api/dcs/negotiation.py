@@ -144,7 +144,7 @@ def dcs_apply_revision(args):
 	elif not dcs_exists_and_open(dcs_name, result):
 		pass
 	else:
-		sheet = frappe.get_doc("Deal Cost Sheet", dcs_name)
+		sheet = frappe.get_doc("Deal Cost Sheet", dcs_name, for_update=True)
 		sheet.check_permission("write")
 
 		my_roles = get_user_roles()
@@ -155,21 +155,12 @@ def dcs_apply_revision(args):
 		baseline = sheet.custom_baseline_selling or 0
 		init_done = 0
 
-		# The baseline initialisation writes a governed DCS Revision under service
-		# authority. It never runs before the commercial authority gate.
-		if rev_no < 1 and (can_customer == 1 or can_vendor == 1):
-			base_cost = sheet.total_cost or 0
-			base_sell = sheet.total_selling or 0
-			baseline = base_sell
-			base_margin = pct((base_sell - base_cost), base_sell)
-			write_revision(
-				dcs_name, 1, "Internal",
-				"Commercial baseline established from the existing submitted Deal Cost Sheet totals. No commercial change was made by this entry.",
-				base_cost, base_sell, base_margin, 0.0, base_cost, base_sell, base_margin, 0.0, "", "None", "Not Required", gate_for(base_margin),
-			)
-			rev_no = 1
-			init_done = 1
-			prev_cost, prev_sell, prev_margin, prev_con = base_cost, base_sell, base_margin, 0.0
+		# Read the submitted baseline before validating the requested movement.
+		# No revision is inserted until authority and values have passed.
+		if rev_no < 1:
+			baseline = sheet.total_selling or 0
+			prev_cost, prev_sell = sheet.total_cost or 0, sheet.total_selling or 0
+			prev_margin, prev_con = pct(prev_sell - prev_cost, prev_sell), 0.0
 		else:
 			prev_cost = sheet.custom_working_total_cost or 0
 			prev_sell = sheet.custom_working_total_selling or 0
@@ -191,7 +182,19 @@ def dcs_apply_revision(args):
 		elif new_sell <= 0:
 			result["error"] = "Proposed selling value must be greater than zero."
 		else:
+			from bsgroup.dcs.baseline import ensure_baseline
+			initialisation = ensure_baseline(dcs_name, "dcs_apply_revision")
+			init_done = initialisation["initialised"]
+			sheet.reload()
+			rev_no = sheet.custom_dcs_revision_no
 			only_init = 1 if (new_cost == prev_cost and new_sell == prev_sell and init_done == 1) else 0
+
+			if not init_done and new_cost == prev_cost and new_sell == prev_sell:
+				return {"ok": 1, "error": "", "no_change": 1, "initialised": 0,
+					"revision": sheet.custom_revision_reference,
+					"state": {"revision_no": rev_no, "working_total_cost": prev_cost,
+						"working_total_selling": prev_sell, "working_margin_percent": prev_margin},
+					"note": "The proposed totals already match the living position. No revision was recorded."}
 
 			new_margin = pct((new_sell - new_cost), new_sell)
 			new_con = pct((baseline - new_sell), baseline)
@@ -204,7 +207,7 @@ def dcs_apply_revision(args):
 				next_no = 1
 				rev_name = str(dcs_name) + "-R1"
 				st = "Not Started"
-				appr_text = "Living position initialised. No negotiation applied yet."
+				appr_text = "Submitted commercial baseline initialised. No negotiation or approval decision recorded."
 			else:
 				next_no = rev_no + 1
 				st = state_for(req)
@@ -231,7 +234,7 @@ def dcs_apply_revision(args):
 				)
 				after = snapshot("Deal Cost Sheet", dcs_name, D2A_FIELDS)
 				moved = diff_changes(D2A_FIELDS, before, after, "Deal Cost Sheet", dcs_name)
-				result["governance_event"] = audit_event(
+				result["governance_event"] = initialisation.get("governance_event") if only_init else audit_event(
 					dcs_name, "DCS_REVISION_APPLIED", "Apply a negotiated revision to the living commercial position",
 					"dcs_apply_revision", reason, next_no, rev_name, rev_name, moved,
 				)
