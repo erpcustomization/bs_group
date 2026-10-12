@@ -1723,6 +1723,14 @@ function dcsLiveCalc(frm, applyToDoc) {
         if (isService) { servicesCost += cats[grp].cost; servicesSell += cats[grp].sell; }
         else { productsCost += cats[grp].cost; productsSell += cats[grp].sell; }
     }
+    var resourceCost = (frm.doc.resources || []).reduce(function (sum, row) {
+        var units = flt(row.no_of_persons) && flt(row.no_of_days) ? flt(row.no_of_persons) * flt(row.no_of_days) : flt(row.hours);
+        return sum + units * flt(row.cost_rate);
+    }, 0);
+    var chargeCost = (frm.doc.addtional_charges || []).reduce(function (sum, row) { return sum + flt(row.amount); }, 0);
+    totalCost += resourceCost + chargeCost;
+    if (resourceCost) { cats['Labour / Resources'] = {cost:resourceCost, sell:0}; }
+    if (chargeCost) { cats['Additional Charges'] = {cost:chargeCost, sell:0}; }
     
     var marginVal = totalSell - totalCost;
     var marginPct = totalSell > 0 ? (marginVal / totalSell * 100) : 0;
@@ -1732,6 +1740,7 @@ function dcsLiveCalc(frm, applyToDoc) {
     var _calcFields = {
         products_cost_total: productsCost, products_selling_total: productsSell,
         services_cost_total: servicesCost, services_selling_total: servicesSell,
+        total_resource_cost: resourceCost,
         total_cost: totalCost, total_selling: totalSell,
         margin_value: marginVal, margin_percent: parseFloat(marginPct.toFixed(3))
     };
@@ -1768,7 +1777,7 @@ function dcsLiveCalc(frm, applyToDoc) {
                 '<div style="font-weight:600">Selling ' + format_currency(_lvSell, _lvCur) +
                 ' &nbsp;&middot;&nbsp; Cost ' + format_currency(_lvCost, _lvCur) +
                 ' &nbsp;&middot;&nbsp; Margin ' + _lvMpc.toFixed(3) + '%</div>' +
-                '<div style="color:#777;margin-top:3px">Figures below are the item cost build-up and may differ from the negotiated position.</div>' +
+                '<div style="color:#777;margin-top:3px">Figures below include items, labour and additional charges. Earlier totals-only adjustments may differ until reconciled to a BOQ revision.</div>' +
                 '</div>';
         }
         wrapper.innerHTML = '<div style="margin:8px 0">' +
@@ -1782,7 +1791,7 @@ function dcsLiveCalc(frm, applyToDoc) {
             '<th style="text-align:right">Margin %</th></tr></thead>' +
             '<tbody>' + rows +
             '<tr style="font-weight:bold;background:#f5f5f5">' +
-            '<td>' + (_lvRev > 0 ? 'Total (item build-up)' : 'Total') + '</td>' +
+            '<td>' + (_lvRev > 0 ? 'Total (cost build-up)' : 'Total') + '</td>' +
             '<td style="text-align:right">' + frappe.format(totalCost, {fieldtype:'Currency'}) + '</td>' +
             '<td style="text-align:right">' + frappe.format(totalSell, {fieldtype:'Currency'}) + '</td>' +
             '<td style="text-align:right">' + frappe.format(marginVal, {fieldtype:'Currency'}) + '</td>' +
@@ -2979,6 +2988,7 @@ var DCS_METHODS = {
 	dcs_approval_decision: 'bsgroup.api.dcs.approval.dcs_approval_decision',
 	dcs_screen4: 'bsgroup.api.dcs.approval.dcs_screen4',
 	dcs_record_award: 'bsgroup.api.dcs.award.dcs_record_award',
+	dcs_apply_boq_revision: 'bsgroup.api.dcs.boq_revision.dcs_apply_boq_revision',
 	dcs_award_reversal: 'bsgroup.api.dcs.award.dcs_award_reversal',
 	dcs_po_reconcile: 'bsgroup.api.dcs.award.dcs_po_reconcile',
 	dcs_set_delivery_owner: 'bsgroup.api.dcs.handover.dcs_set_delivery_owner',
@@ -3213,6 +3223,7 @@ function dcs_run(frm, method, args, dlg) {
 				frappe.show_alert({ message: __('Recorded'), indicator: 'green' });
 			}
 			frm.reload_doc();
+			if (m.quotation_note) { frappe.msgprint({title:__('Quotation review'),message:dcs_esc(m.quotation_note),indicator:'blue'}); }
 		}
 	});
 }
@@ -3246,8 +3257,11 @@ function dcs_buttons(frm, s3, s4, s5) {
 			dcs_run(frm, 'dcs_apply_revision', args, d);
 		});
 	};
-	if (cap.can_customer_side) { frm.add_custom_button(__('Customer Revision'), function () { revision('Customer'); }, N); }
-	if (cap.can_vendor_side) { frm.add_custom_button(__('Vendor Revision'), function () { revision('Vendor'); }, N); }
+	if (cap.can_customer_side && !s3.boq_managed) { frm.add_custom_button(__('Customer Revision'), function () { revision('Customer'); }, N); }
+	if (cap.can_vendor_side && !s3.boq_managed) { frm.add_custom_button(__('Vendor Revision'), function () { revision('Vendor'); }, N); }
+	if (frm.doc.docstatus === 1 && cap.can_negotiate && st.customer_award !== 'Awarded' && st.delivery_release !== 'Released' && st.delivery_release !== 'Released with MD Override') {
+		frm.add_custom_button(__('BOQ Revision'), function () { dcs_boq_revision_dialog(frm, cap); }, N);
+	}
 	if (!cap.can_negotiate && cap.denial_reason) {
 		frm.add_custom_button(__('Why can I not negotiate?'), function () {
 			frappe.msgprint({ title: __('Negotiation authority'), message: dcs_esc(cap.denial_reason), indicator: 'orange' });
@@ -3392,3 +3406,85 @@ frappe.ui.form.on('Deal Cost Sheet', {
 });
 
 
+
+// Governed submitted BOQ editor. The ordinary form remains locked.
+function dcs_boq_revision_dialog(frm, cap) {
+    var both = cap.can_customer_side && cap.can_vendor_side;
+    var d;
+    var preview = function () {
+        if (!d) return;
+        var items = d.get_value('boq_items') || [], labour = d.get_value('boq_resources') || [];
+        var cost = 0, sell = 0;
+        items.forEach(function (r) { cost += flt(r.qty) * flt(r.cost_rate); sell += flt(r.qty) * flt(r.selling_rate); });
+        labour.forEach(function (r) { cost += (flt(r.no_of_persons) && flt(r.no_of_days) ? flt(r.no_of_persons) * flt(r.no_of_days) : flt(r.hours)) * flt(r.cost_rate); });
+        (frm.doc.addtional_charges || []).forEach(function (r) { cost += flt(r.amount); });
+        if (!cap.can_customer_side) {
+            d.fields_dict.preview.$wrapper.html('<div class="alert alert-info">Derived cost: <b>' + format_currency(cost, frm.doc.currency) + '</b>. Selling is preserved and margin is re-evaluated on the server.</div>');
+            return;
+        }
+        d.fields_dict.preview.$wrapper.html('<div class="alert alert-info">Derived cost: <b>' + format_currency(cost, frm.doc.currency) + '</b> · Selling: <b>' + format_currency(sell, frm.doc.currency) + '</b> · GP: <b>' + format_currency(sell-cost, frm.doc.currency) + '</b> · Margin: ' + (sell ? 100*(sell-cost)/sell : 0).toFixed(2) + '%</div>');
+    };
+    var f = function (type, name, label, options, readonly) {
+        return {fieldtype:type, fieldname:name, label:__(label), options:options, in_list_view:1, read_only:readonly ? 1 : 0, onchange:preview};
+    };
+    var itemFields = [
+        {fieldtype:'Data',fieldname:'row_name',hidden:1},
+        f('Link','item_code','Item','Item',!both), f('Small Text','description','Description',null,!both),
+        f('Float','qty','Qty',null,!both), f('Currency','cost_rate','Cost Rate',null,!cap.can_vendor_side),
+        f('Currency','selling_rate','Selling Rate',null,!cap.can_customer_side)
+    ];
+    var resourceFields = [
+        {fieldtype:'Data',fieldname:'row_name',hidden:1},
+        f('Select','resource_type','Type','Internal\nOutsourced',!cap.can_vendor_side),
+        f('Data','role','Role',null,!cap.can_vendor_side),
+        f('Float','no_of_persons','Persons',null,!cap.can_vendor_side),
+        f('Float','no_of_days','Days',null,!cap.can_vendor_side),
+        f('Float','hours','Hours',null,!cap.can_vendor_side),
+        f('Currency','cost_rate','Cost Rate',null,!cap.can_vendor_side),
+        f('Small Text','remarks','Remarks',null,!cap.can_vendor_side)
+    ];
+    itemFields.filter(function (field) { return field.fieldname === 'selling_rate'; }).forEach(function (field) { field.hidden = !cap.can_customer_side; });
+    var fields = function (rows, names) {
+        return (rows || []).map(function (r) {
+            var v={row_name:r.name}; names.forEach(function (key) { v[key]=r[key]; }); return v;
+        });
+    };
+    var itemKeys=['item_code','description','qty','cost_rate','selling_rate'];
+    var resourceKeys=['resource_type','role','no_of_persons','no_of_days','hours','cost_rate','remarks'];
+    var gapCost = flt(frm.doc.custom_working_total_cost)-flt(frm.doc.total_cost);
+    var gapSell = flt(frm.doc.custom_working_total_selling)-flt(frm.doc.total_selling);
+    var gap = cint(frm.doc.custom_dcs_revision_no)>0 && (Math.abs(gapCost)>0.005 || Math.abs(gapSell)>0.005);
+    d = new frappe.ui.Dialog({
+        title:__('BOQ Revision'), size:'extra-large',
+        fields:[
+            {fieldtype:'HTML',fieldname:'notice',options:'<p>Revise items and labour on this submitted sheet. Totals are derived from the rows. Approval and margin gates are re-evaluated; this does not award or release delivery. Additional charges remain unchanged.</p>' + (gap ? '<div class="alert alert-warning">Earlier totals-only adjustments differ from these rows: cost ' + format_currency(gapCost,frm.doc.currency) + ', selling ' + format_currency(gapSell,frm.doc.currency) + '. MD reconciliation is required.</div>' : '')},
+            {fieldtype:'Select',fieldname:'source',label:__('Source'),options:'Vendor\nCustomer\nTechnical\nInternal',reqd:1},
+            {fieldtype:'Small Text',fieldname:'reason',label:__('Reason'),reqd:1},
+            {fieldtype:'Small Text',fieldname:'technical_impact',label:__('Technical Impact')},
+            {fieldtype:'Table',fieldname:'boq_items',label:__('Items'),fields:itemFields,data:fields(frm.doc.items,itemKeys),cannot_add_rows:!both,cannot_delete_rows:!both,onchange:preview},
+            {fieldtype:'Table',fieldname:'boq_resources',label:__('Labour / Resources'),fields:resourceFields,data:fields(frm.doc.resources,resourceKeys),cannot_add_rows:!cap.can_vendor_side,cannot_delete_rows:!cap.can_vendor_side,onchange:preview},
+            {fieldtype:'HTML',fieldname:'preview'},
+            {fieldtype:'Check',fieldname:'reconcile_header_adjustments',label:__('Replace earlier totals-only adjustments with this complete BOQ'),hidden:!gap || !frappe.user.has_role('Managing Director'),description:__('No hidden adjustment is carried forward. Ensure every intended cost and selling change is represented above.')},
+            {fieldtype:'Check',fieldname:'update_quotation',label:__('Update the linked Draft Quotation from this BOQ'),description:__('Requires Quotation write permission. Only this sheet’s verified Draft Quotation may be updated; otherwise the entire revision is refused.')},
+            {fieldtype:'Check',fieldname:'acknowledge_quote_review',label:__('Keep the existing quotation for separate review'),description:__('Required if quoted scope/selling changes and you are not updating the Draft Quotation. The sheet will return from Quoted to Submitted to Sales; Won/Lost outcomes are preserved.'),hidden:!frm.doc.custom_quotation}
+        ],
+        primary_action_label:__('Record BOQ Revision'),
+        primary_action:function (v) {
+            var clean=function(rows,keys,isItem){return rows.map(function(r){
+                var out={row_name:r.row_name || ''}; keys.forEach(function(k){
+                    if (isItem && ((k==='cost_rate' && !cap.can_vendor_side) || (k==='selling_rate' && !cap.can_customer_side))) return;
+                    if (!isItem && k==='cost_rate' && !cap.can_vendor_side) return;
+                    out[k]=r[k];
+                }); return out;
+            });};
+            dcs_run(frm,'dcs_apply_boq_revision',{
+                dcs:frm.doc.name,expected_modified:frm.doc.modified,source:v.source,reason:v.reason,
+                technical_impact:v.technical_impact,items:clean(v.boq_items || [],itemKeys,true),
+                resources:clean(v.boq_resources || [],resourceKeys,false),
+                reconcile_header_adjustments:v.reconcile_header_adjustments || 0,update_quotation:v.update_quotation || 0,
+                acknowledge_quote_review:v.acknowledge_quote_review || 0
+            },d);
+        }
+    });
+    d.show(); preview();
+}

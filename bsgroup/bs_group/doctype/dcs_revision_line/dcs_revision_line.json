@@ -1,0 +1,108 @@
+{
+ "doctype": "DocType",
+ "name": "DCS Revision Line",
+ "module": "BS Group",
+ "istable": 1,
+ "engine": "InnoDB",
+ "editable_grid": 1,
+ "field_order": [
+  "line_type",
+  "row_key",
+  "operation",
+  "label",
+  "before_values",
+  "after_values",
+  "previous_cost",
+  "new_cost",
+  "cost_delta",
+  "previous_selling",
+  "new_selling",
+  "selling_delta"
+ ],
+ "fields": [
+  {
+   "fieldname": "line_type",
+   "fieldtype": "Select",
+   "label": "Line Type",
+   "read_only": 1,
+   "options": "Item\nResource",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "row_key",
+   "fieldtype": "Data",
+   "label": "Row Key",
+   "read_only": 1
+  },
+  {
+   "fieldname": "operation",
+   "fieldtype": "Select",
+   "label": "Operation",
+   "read_only": 1,
+   "options": "Baseline\nAdd\nUpdate\nRemove",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "label",
+   "fieldtype": "Small Text",
+   "label": "Description / Role",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "before_values",
+   "fieldtype": "Long Text",
+   "label": "Previous Values (JSON)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "after_values",
+   "fieldtype": "Long Text",
+   "label": "New Values (JSON)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "previous_cost",
+   "fieldtype": "Currency",
+   "label": "Previous Cost",
+   "read_only": 1
+  },
+  {
+   "fieldname": "new_cost",
+   "fieldtype": "Currency",
+   "label": "New Cost",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cost_delta",
+   "fieldtype": "Currency",
+   "label": "Cost Change",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "previous_selling",
+   "fieldtype": "Currency",
+   "label": "Previous Selling",
+   "read_only": 1
+  },
+  {
+   "fieldname": "new_selling",
+   "fieldtype": "Currency",
+   "label": "New Selling",
+   "read_only": 1
+  },
+  {
+   "fieldname": "selling_delta",
+   "fieldtype": "Currency",
+   "label": "Selling Change",
+   "read_only": 1,
+   "in_list_view": 1
+  }
+ ],
+ "permissions": [],
+ "modified": "2026-10-12 17:50:00.000000",
+ "creation": "2026-10-12 17:50:00.000000",
+ "modified_by": "Administrator",
+ "owner": "Administrator"
+}

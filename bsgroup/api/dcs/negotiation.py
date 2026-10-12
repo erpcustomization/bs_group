@@ -79,7 +79,7 @@ def rev_state_for(req):
 	return "Not Required"
 
 
-def write_revision(sheet_name, no, src, rsn, pc, ps, pm, pcon, nc, ns, nm, ncon, ti, req, st, mg):
+def write_revision(sheet_name, no, src, rsn, pc, ps, pm, pcon, nc, ns, nm, ncon, ti, req, st, mg, boq_lines=None):
 	rev = frappe.new_doc("DCS Revision")
 	rev.dcs = sheet_name
 	rev.revision_no = no
@@ -101,6 +101,8 @@ def write_revision(sheet_name, no, src, rsn, pc, ps, pm, pcon, nc, ns, nm, ncon,
 	rev.approval_requirement = req
 	rev.approval_state = st
 	rev.margin_gate = mg
+	for line in boq_lines or []:
+		rev.append("boq_lines", line)
 	rev.flags.dcs_api_write = 1
 	try:
 		# No role holds `create` on DCS Revision: negotiation history is written
@@ -146,6 +148,9 @@ def dcs_apply_revision(args):
 	else:
 		sheet = frappe.get_doc("Deal Cost Sheet", dcs_name, for_update=True)
 		sheet.check_permission("write")
+		from bsgroup.api.dcs.boq_revision import boq_managed
+		if boq_managed(sheet.name, locking=True):
+			return {"ok": 0, "error": "This sheet uses governed BOQ revisions. Use BOQ Revision to change item or labour rates and keep totals aligned with its rows.", "state": {}}
 
 		my_roles = get_user_roles()
 		can_customer = has_any(my_roles, CUSTOMER_SIDE)
@@ -326,6 +331,8 @@ def dcs_screen3(args):
 	else:
 		s = frappe.get_doc("Deal Cost Sheet", dcs_name)
 		s.check_permission("read")
+		from bsgroup.api.dcs.boq_revision import boq_managed
+		result["boq_managed"] = boq_managed(s.name)
 
 		initialised = 1
 		wc = s.custom_working_total_cost or 0
