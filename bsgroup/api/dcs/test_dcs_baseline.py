@@ -140,3 +140,13 @@ class IntegrationTestDCSBaseline(IntegrationTestCase):
         self.assertEqual(second.get("no_change"), 1)
         self.assertEqual(frappe.db.count("DCS Revision", {"dcs": doc.name}), 1)
         self.assertEqual(frappe.db.count("DCS Governance Event", {"dcs": doc.name}), 1)
+
+    def test_competing_award_rolls_back_and_returns_structured_refusal(self):
+        doc = self.sheet(legacy=True)
+        with patch("bsgroup.dcs.baseline.ensure_baseline", side_effect=frappe.QueryDeadlockError("competing write")), patch.object(frappe.db, "rollback") as rollback:
+            result = self.award(doc)
+        self.assertEqual(result["ok"], 0)
+        self.assertEqual(result["retry_required"], 1)
+        rollback.assert_called_once()
+        self.assertEqual(frappe.db.count("DCS Revision", {"dcs": doc.name}), 0)
+        self.assertEqual(frappe.db.count("DCS Governance Event", {"dcs": doc.name}), 0)

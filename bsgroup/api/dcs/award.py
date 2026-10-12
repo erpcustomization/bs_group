@@ -80,7 +80,16 @@ def dcs_record_award(args):
 		s.check_permission("write")
 		# Existing submitted sheets initialise atomically with their first award.
 		from bsgroup.dcs.baseline import ensure_baseline
-		ensure_baseline(dcs_name, "dcs_record_award")
+		try:
+			ensure_baseline(dcs_name, "dcs_record_award")
+		except frappe.QueryDeadlockError:
+			# A competing request may have changed this row after the permission
+			# read. Discard this transaction rather than returning HTTP 500 or
+			# retrying a commercial action implicitly.
+			frappe.db.rollback()
+			result["error"] = "The commercial position changed while this request was waiting. Refresh the Deal Cost Sheet and retry. Nothing from this request was recorded."
+			result["retry_required"] = 1
+			return result
 		s = frappe.get_doc("Deal Cost Sheet", dcs_name, for_update=True)
 		req = s.custom_approval_required
 		appr = s.custom_approval_state
