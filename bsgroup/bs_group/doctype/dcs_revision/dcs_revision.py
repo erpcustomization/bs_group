@@ -15,6 +15,7 @@ LOCKED_FIELDS = [
 	"prev_total_cost", "prev_total_selling", "prev_margin_percent", "prev_concession_percent",
 	"new_total_cost", "new_total_selling", "new_margin_percent", "new_concession_percent",
 	"gp_movement", "margin_movement", "technical_impact", "approval_requirement", "margin_gate",
+	"settled_by", "settled_on",
 ]
 DECISION_FIELDS = ["approval_state", "decided_by", "decided_on", "decision_reason"]
 FINAL_STATES = ["Approved", "Rejected"]
@@ -42,6 +43,9 @@ class DCSRevision(Document):
 					"DCS Revision " + str(self.name) + " is immutable. The field '" + str(f)
 					+ "' cannot be changed after the revision is recorded."
 				)
+		fields = [f.fieldname for f in frappe.get_meta("DCS Revision Line").fields]
+		if [[r.get(f) for f in fields] for r in prev.boq_lines] != [[r.get(f) for f in fields] for r in self.boq_lines]:
+			frappe.throw("Recorded BOQ revision lines are immutable. Record a corrective revision instead.")
 		for f in DECISION_FIELDS:
 			if str(prev.get(f) or "") != str(self.get(f) or ""):
 				frappe.throw(

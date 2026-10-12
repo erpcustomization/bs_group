@@ -63,6 +63,9 @@ def ensure_baseline(dcs_name, source_endpoint):
         "approval_state": "Not Required", "margin_gate": gate_for(margin),
     })
     rev.flags.dcs_api_write = 1
+    from bsgroup.api.dcs.boq_revision import line_history
+    for row in line_history(sheet, sheet, baseline=True):
+        rev.append("boq_lines", row)
     rev.insert(ignore_permissions=True)
     values = {
         "custom_dcs_revision_no": 1, "custom_revision_reference": rev.name,

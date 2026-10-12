@@ -59,6 +59,29 @@ class DealCostSheet(Document):
 			ensure_baseline(self.name, "deal_cost_sheet.on_submit")
 			self.reload()
 		dcs_amend_quotation_linkback(self)
+		from bsgroup.api.dcs.boq_revision import settle_predecessor
+		settle_predecessor(self)
+
+	def before_update_after_submit(self):
+		from bsgroup.api.dcs.boq_revision import authorised_save, row_values
+		if not authorised_save(self):
+			previous = self.get_doc_before_save()
+			for table, kind in [("items", "Item"), ("resources", "Resource")]:
+				before = [(r.name, row_values(r, kind)) for r in previous.get(table) or []]
+				after = [(r.name, row_values(r, kind)) for r in self.get(table) or []]
+				if before != after:
+					frappe.throw("Submitted BOQ rows may only be changed through Negotiation → BOQ Revision.")
+			# A serialisable flag on an incoming document cannot disable the
+			# framework's protections for other submitted fields either.
+			self.flags.ignore_validate_update_after_submit = False
+		else:
+			previous = self.get_doc_before_save()
+			for field in ["party_type", "party", "organisation_name", "customer", "opportunity", "company", "project", "presales_request", "subject", "site_visit", "amended_from", "custom_quotation", "custom_deal_status"]:
+				if str(previous.get(field) or "") != str(self.get(field) or ""):
+					frappe.throw("BOQ Revision cannot change deal identity or links. Resolve the record's identity separately before revising its BOQ.")
+			calculate_deal_financials(self)
+			self.margin_percent = frappe.utils.flt((self.total_selling-self.total_cost)/self.total_selling*100, 3) if self.total_selling else 0
+		dcs_governed_field_guard(self)
 
 	def validate(self):
 		apply_party_model(self)
