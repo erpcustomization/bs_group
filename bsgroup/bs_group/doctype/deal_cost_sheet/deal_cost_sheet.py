@@ -18,6 +18,12 @@ class DealCostSheet(Document):
 			self.name = frappe.model.naming.make_autoname(f"DCS-{base}-.###")
 
 	def before_insert(self):
+		if self.amended_from:
+			# An amendment is a new submitted baseline, not a copy of the old
+			# negotiation, approval, award or delivery decisions.
+			for field in GOVERNED_TEXT + GOVERNED_NUM:
+				df = self.meta.get_field(field)
+				self.set(field, df.default if df and df.default is not None else (0 if field in GOVERNED_NUM else None))
 		dcs_company_default_insert(self)
 		dcs_one_active_guard_insert(self)
 
@@ -47,6 +53,11 @@ class DealCostSheet(Document):
 		dcs_margin_canonicalisation(self)
 
 	def on_submit(self):
+		# Zero-selling costing sheets remain submittable, but cannot be awarded.
+		if frappe.utils.flt(self.total_selling) > 0:
+			from bsgroup.dcs.baseline import ensure_baseline
+			ensure_baseline(self.name, "deal_cost_sheet.on_submit")
+			self.reload()
 		dcs_amend_quotation_linkback(self)
 
 	def validate(self):
