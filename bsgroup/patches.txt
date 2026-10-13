@@ -20,3 +20,4 @@ bsgroup.patches.v0_1.dcs_audit_controls
 bsgroup.patches.v0_1.dcs_ui
 
 bsgroup.patches.v0_1.dcs_quotation_account_select
+bsgroup.patches.v0_1.dcs_workspace_counts

@@ -2853,8 +2853,8 @@ function render_summary_dashboard(frm) {
             '<a href="/app/' + route + '/' + encodeURIComponent(name) + '" target="_blank" style="color:' + color + '; font-weight:600;">View ' + label + '</a></div>';
     }
 
-    function col(icon, title, accent, body, flex) {
-        return '<div style="flex:' + (flex || 1) + '; min-width:230px; border-radius:12px; padding:16px 18px; margin:6px; ' +
+    function col(icon, title, accent, body, flex, wide) {
+        return '<div style="flex:' + (wide ? '1 1 100%' : (flex || 1)) + '; min-width:' + (wide ? '0' : '230px') + '; overflow-wrap:anywhere; border-radius:12px; padding:16px 18px; margin:6px; ' +
             'background:var(--card-bg, #fff); border:1px solid var(--border-color); border-top:3px solid ' + accent + '; ' +
             'box-shadow:0 2px 10px rgba(0,0,0,0.06);">' +
             '<div style="font-weight:600; font-size:13.5px; color:var(--text-color); letter-spacing:.01em; margin-bottom:14px; display:flex; align-items:center; gap:10px;">' +
@@ -2935,8 +2935,8 @@ function render_summary_dashboard(frm) {
         'background:linear-gradient(180deg, rgba(124,58,237,0.03), rgba(37,99,235,0.02)); box-shadow:0 3px 14px rgba(0,0,0,0.05);">' +
         section_title +
         '<div style="display:flex; flex-wrap:wrap; margin:0 -6px;">' +
+        col('&#128176;', 'Commercial position', green, comm_body, 1, true) +
         col('&#127970;', 'Opportunity', blue, opp_body, 1) +
-        col('&#128176;', 'Commercial Summary', green, comm_body, 1.5) +
         col('&#128202;', 'Status', purple, status_body, 1) +
         col('&#128279;', 'Quick Links', teal, quick_body, 1) +
         '</div></div>';
