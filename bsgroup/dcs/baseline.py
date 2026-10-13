@@ -20,7 +20,7 @@ FIELDS = [
 
 def ensure_baseline(dcs_name, source_endpoint):
     """Internal lifecycle service; callers enforce submission/commercial authority."""
-    from bsgroup.api.dcs.negotiation import gate_for, pct, why_gate
+    from bsgroup.api.dcs.negotiation import gate_for, pct, why_gate, requirement, why_approval, state_for, rev_state_for
 
     sheet = frappe.get_doc("Deal Cost Sheet", dcs_name, for_update=True)
     if sheet.docstatus != 1:
@@ -52,6 +52,7 @@ def ensure_baseline(dcs_name, source_endpoint):
 
     margin = pct(selling - cost, selling)
     before = snapshot("Deal Cost Sheet", dcs_name, FIELDS)
+    req = requirement(0, margin)
     rev = frappe.get_doc({
         "doctype": "DCS Revision", "dcs": dcs_name, "revision_no": 1,
         "changed_by": frappe.session.user, "changed_on": now_datetime(), "source": "Internal",
@@ -59,8 +60,8 @@ def ensure_baseline(dcs_name, source_endpoint):
         "prev_total_cost": cost, "prev_total_selling": selling, "prev_margin_percent": margin,
         "prev_concession_percent": 0, "new_total_cost": cost, "new_total_selling": selling,
         "new_margin_percent": margin, "new_concession_percent": 0,
-        "gp_movement": 0, "margin_movement": 0, "approval_requirement": "None",
-        "approval_state": "Not Required", "margin_gate": gate_for(margin),
+        "gp_movement": 0, "margin_movement": 0, "approval_requirement": req,
+        "approval_state": rev_state_for(req), "margin_gate": gate_for(margin),
     })
     rev.flags.dcs_api_write = 1
     from bsgroup.api.dcs.boq_revision import line_history
@@ -71,9 +72,9 @@ def ensure_baseline(dcs_name, source_endpoint):
         "custom_dcs_revision_no": 1, "custom_revision_reference": rev.name,
         "custom_working_total_cost": cost, "custom_working_total_selling": selling,
         "custom_working_margin_percent": margin, "custom_baseline_selling": selling,
-        "custom_concession_percent_from_baseline": 0, "custom_approval_state": "Not Started",
-        "custom_approval_required": "None",
-        "custom_approval_reason": "Submitted commercial baseline initialised. No negotiation or approval decision recorded.",
+        "custom_concession_percent_from_baseline": 0, "custom_approval_state": state_for(req) if req != "None" else "Not Started",
+        "custom_approval_required": req,
+        "custom_approval_reason": why_approval(0, margin),
         "custom_margin_gate": gate_for(margin), "custom_margin_gate_reason": why_gate(margin),
     }
     frappe.db.set_value("Deal Cost Sheet", dcs_name, values, update_modified=True)

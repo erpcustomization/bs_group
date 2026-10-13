@@ -124,3 +124,23 @@ def make_user(email, roles):
 
 def today():
 	return nowdate()
+
+
+def make_reporting_line(user, manager):
+    """Staging test employee hierarchy; grants no commercial approval role."""
+    for account in (user, manager):
+        frappe.db.set_value("User", account, "enabled", 1)
+    company = frappe.db.get_value("Company", {}, "name")
+    ensure("Gender", "Male", {"gender":"Male"}, insert=False)
+    def employee(account, reports_to=None):
+        name=frappe.db.get_value("Employee", {"user_id":account}, "name")
+        if name:
+            frappe.db.set_value("Employee", name, {"status":"Active", "reports_to":reports_to})
+            return name
+        doc=frappe.get_doc({"doctype":"Employee","first_name":"ZZTEST "+account.split("@")[0],
+            "gender":"Male","date_of_birth":"1990-01-01","date_of_joining":"2020-01-01",
+            "company":company,"status":"Active","user_id":account,"reports_to":reports_to})
+        doc.insert(ignore_permissions=True)
+        return doc.name
+    manager_employee=employee(manager)
+    return employee(user, manager_employee)

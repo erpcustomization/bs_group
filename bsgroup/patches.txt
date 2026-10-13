@@ -16,3 +16,10 @@ bsgroup.patches.v0_1.drop_orphan_governance_change
 bsgroup.patches.v0_1.lock_pcb_until_g_pcb
 bsgroup.patches.v0_1.backfill_party_fields
 bsgroup.patches.v0_1.normalize_po_scope_match
+bsgroup.patches.v0_1.dcs_audit_controls
+bsgroup.patches.v0_1.dcs_ui
+
+bsgroup.patches.v0_1.dcs_quotation_account_select
+bsgroup.patches.v0_1.dcs_workspace_counts
+
+bsgroup.patches.v0_1.dcs_manager_approval

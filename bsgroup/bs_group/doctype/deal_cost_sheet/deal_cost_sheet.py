@@ -123,6 +123,7 @@ def make_quotation(source_name):
 	frappe.has_permission("Deal Cost Sheet", "read", source_name, throw=True)
 	frappe.has_permission("Quotation", "create", throw=True)
 	source = frappe.get_doc("Deal Cost Sheet", source_name)
+	refuse_stale_quotation_source(source)
 
 	opp = frappe.db.get_value(
 		"Opportunity",
@@ -203,7 +204,7 @@ def make_quotation(source_name):
 				"amount": qty * selling_rate,
 			})
 
-	additional_charges_total = sum(frappe.utils.flt(c.amount) for c in source.addtional_charges or [])
+	additional_charges_total = sum(frappe.utils.flt(c.get("selling_amount")) for c in source.addtional_charges or [])
 	if additional_charges_total:
 		dcs_addtional_item = frappe.db.get_single_value("BS Group Settings", "dcs_addtional_item")
 		if not dcs_addtional_item:
@@ -229,9 +230,30 @@ def make_quotation(source_name):
 			"amount": additional_charges_total,
 		})
 
+	quotation.custom_deal_cost_sheet = source.name
+	quotation.custom_dcs_revision_reference = source.custom_revision_reference
 	quotation.insert(ignore_permissions=True, ignore_mandatory=True)
-	frappe.db.commit()
 	return quotation.name
+
+
+def refuse_stale_quotation_source(source):
+	"""A Quotation is built from the BOQ rows. Refuse when the living commercial position has moved
+	away from those rows (totals-only negotiation), so a stale price can never be quoted."""
+	if source.docstatus == 2:
+		frappe.throw("This Deal Cost Sheet is cancelled. A Quotation cannot be created from it.")
+	if not frappe.utils.cint(source.custom_dcs_revision_no):
+		return
+	gap_cost = abs(frappe.utils.flt(source.custom_working_total_cost) - frappe.utils.flt(source.total_cost))
+	gap_sell = abs(frappe.utils.flt(source.custom_working_total_selling) - frappe.utils.flt(source.total_selling))
+	if gap_cost > 0.005 or gap_sell > 0.005:
+		frappe.throw(
+			"The living commercial position (revision {0}: cost {1}, selling {2}) differs from the BOQ rows "
+			"(cost {3}, selling {4}). A Quotation built from the rows would quote a superseded price. Record the "
+			"movement as a BOQ Revision (Managing Director reconciliation) before creating the Quotation.".format(
+				source.custom_revision_reference, source.custom_working_total_cost, source.custom_working_total_selling,
+				source.total_cost, source.total_selling),
+			title="Quotation would be stale",
+		)
 
 
 def dcs_company_default_insert(doc):
@@ -878,9 +900,9 @@ def calculate_deal_financials(doc):
 	doc.total_resource_cost = total_resource_cost
 
 	doc.total_cost = products_cost_total + services_cost_total + additional_charges_total + total_resource_cost
-	doc.total_selling = products_selling_total + services_selling_total
+	doc.total_selling = products_selling_total + services_selling_total + sum(frappe.utils.flt(c.get("selling_amount")) for c in doc.addtional_charges or [])
 	doc.margin_value = doc.total_selling - doc.total_cost
-	doc.margin_percent = ((doc.total_selling / doc.total_cost) - 1) * 100 if doc.total_cost else 0
+	doc.margin_percent = (doc.margin_value / doc.total_selling) * 100 if doc.total_selling else 0
 
 
 @frappe.whitelist()

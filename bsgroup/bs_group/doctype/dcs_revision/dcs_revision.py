@@ -11,6 +11,7 @@ from frappe.model.document import Document
 # "DCS Revision - Immutability Guard" and "DCS Revision - Deletion Guard".
 
 LOCKED_FIELDS = [
+	"approval_policy", "submitter_employee", "manager_employee", "approval_manager", "approval_routing_error", "manager_dcs_share",
 	"dcs", "revision_no", "changed_by", "changed_on", "source", "reason",
 	"prev_total_cost", "prev_total_selling", "prev_margin_percent", "prev_concession_percent",
 	"new_total_cost", "new_total_selling", "new_margin_percent", "new_concession_percent",
@@ -35,6 +36,8 @@ class DCSRevision(Document):
 					"Direct creation of a revision is not permitted, because it would be forged "
 					"negotiation history."
 				)
+			from bsgroup.dcs.manager_approval import prepare_revision
+			prepare_revision(self)
 			return
 
 		for f in LOCKED_FIELDS:
@@ -58,6 +61,10 @@ class DCSRevision(Document):
 				"DCS Revision " + str(self.name) + " already carries a final decision ("
 				+ str(prev.get("approval_state")) + "). A recorded approval decision cannot be altered."
 			)
+
+	def after_insert(self):
+		from bsgroup.dcs.manager_approval import queue_review
+		queue_review(self)
 
 	def on_trash(self):
 		# Revision history is an audit trail. Entries are never removed.

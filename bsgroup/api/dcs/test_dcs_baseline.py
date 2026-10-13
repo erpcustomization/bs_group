@@ -5,7 +5,7 @@ import frappe
 from frappe.tests import IntegrationTestCase
 
 from bsgroup.dcs.baseline import ensure_baseline
-from bsgroup.tests.dcs_fixtures import ensure, make_dcs, make_user
+from bsgroup.tests.dcs_fixtures import ensure, make_dcs, make_user, make_reporting_line
 
 AWARD = "bsgroup.api.dcs.award.dcs_record_award"
 REVISE = "bsgroup.api.dcs.negotiation.dcs_apply_revision"
@@ -21,9 +21,12 @@ class IntegrationTestDCSBaseline(IntegrationTestCase):
         cls.md = make_user("zztest-baseline-md@example.com", ["System Manager", "Managing Director", "Sales Manager"])
         cls.tech = make_user("zztest-baseline-tech@example.com", ["Technical Engineer"])
 
+        cls.manager = make_user("zztest-baseline-manager@example.com", ["Employee"])
+
     def setUp(self):
         super().setUp()
         frappe.set_user("Administrator")
+        make_reporting_line(self.md, self.manager)
 
     def tearDown(self):
         frappe.set_user("Administrator")
@@ -95,8 +98,15 @@ class IntegrationTestDCSBaseline(IntegrationTestCase):
         self.assertEqual(frappe.db.count("DCS Revision", {"dcs": doc.name}), 0)
 
     def test_low_margin_remains_delivery_blocker(self):
+        frappe.set_user(self.md)
         doc = self.sheet(items=[{"item_code": frappe.db.get_value("Item", {"disabled": 0}, "name"), "qty": 1, "cost_rate": 2093, "selling_rate": 2500}])
         self.assertEqual(doc.custom_margin_gate, "Blocked")
+        self.assertEqual(doc.custom_approval_required, "Manager")
+        self.assertEqual(self.award(doc)["ok"], 0)
+        frappe.set_user(self.manager)
+        approval = frappe.call("bsgroup.api.dcs.approval.dcs_approval_decision",
+                              dcs=doc.name, action="Approve", reason="ZZTEST MD margin exception")
+        self.assertEqual(approval["ok"], 1, approval)
         result = self.award(doc)
         self.assertEqual(result["ok"], 1, result)
         self.assertEqual(result["state"]["delivery_release_state"], "Blocked")

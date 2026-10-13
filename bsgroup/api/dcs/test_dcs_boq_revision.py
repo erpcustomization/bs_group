@@ -242,7 +242,7 @@ class IntegrationTestDCSBOQRevision(IntegrationTestCase):
         doc = self.sheet()
         p = payload(doc)
         p["items"][0]["selling_rate"] = 1250
-        self.assertEqual(self.apply(doc, p)["state"]["approval_required"], "Managing Director")
+        self.assertEqual(self.apply(doc, p)["state"]["approval_required"], "Manager")
         doc.reload()
         p = payload(doc)
         p["items"][0]["selling_rate"] = 1000

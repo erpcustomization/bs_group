@@ -155,6 +155,9 @@ frappe.ui.form.on("Deal Cost Item", {
 });
 
 frappe.ui.form.on("Additional Charges Item", {
+	selling_amount(frm) {
+		recalc_parent(frm);
+	},
 	amount(frm, cdt, cdn) {
 		recalc_parent(frm);
 	},
@@ -225,7 +228,7 @@ function render_summary(frm, currency) {
 	const fmt = (val) => format_currency(flt(val), currency);
 	const pct = (val) => flt(val, 2).toFixed(2) + "%";
 
-	const can_see_selling = frappe.user.has_role(["Sales Manager", "Sales User", "System Manager"]);
+	const can_see_selling=frappe.user.has_role(["Sales Manager","Sales User","Presales","Commercial Controller","Managing Director","System Manager"]);
 
 	const prod_cost       = flt(doc.products_cost_total);
 	const prod_sell       = flt(doc.products_selling_total);
@@ -237,9 +240,10 @@ function render_summary(frm, currency) {
 	const svc_margin      = svc_sell - svc_cost;
 	const svc_margin_pct  = svc_sell ? (svc_margin / svc_sell) * 100 : 0;
 
-	let charges_total = 0;
+	let charges_total=0, charges_selling=0;
 	(doc.addtional_charges || []).forEach(row => {
 		charges_total += flt(row.amount);
+        charges_selling += flt(row.selling_amount);
 	});
 
 	let resource_cost_total = 0;
@@ -265,8 +269,9 @@ function render_summary(frm, currency) {
 	const commercial_html = `
 		<div style="margin-bottom:24px;">
 			<div style="font-size:14px; font-weight:700; color:#2d3748; margin-bottom:10px; padding-bottom:6px; border-bottom:2px solid #5b7fdb;">
-				Commercial Summary
+				BOQ breakdown — saved rows
 			</div>
+            <div class="text-muted small" style="margin-bottom:8px">These figures describe the saved BOQ. The Overview shows the current negotiated and awarded positions.</div>
 			<table style="width:100%; border-collapse:collapse; font-size:13px; border:1px solid #e2e8f0;">
 				<thead>
 					<tr>
@@ -283,21 +288,21 @@ function render_summary(frm, currency) {
 						${td(fmt(prod_cost))}
 						${can_see_selling ? td(fmt(prod_sell)) : ""}
 						${can_see_selling ? td(fmt(prod_margin)) : ""}
-						${can_see_selling ? td(pct(prod_margin_pct)) : ""}
+						${can_see_selling ? td(prod_sell > 0 ? pct(prod_margin_pct) : "Not priced") : ""}
 					</tr>
 					<tr style="border-bottom:1px solid #e2e8f0;">
 						${td_label("Services")}
 						${td(fmt(svc_cost))}
 						${can_see_selling ? td(fmt(svc_sell)) : ""}
 						${can_see_selling ? td(fmt(svc_margin)) : ""}
-						${can_see_selling ? td(pct(svc_margin_pct)) : ""}
+						${can_see_selling ? td(svc_sell > 0 ? pct(svc_margin_pct) : "Not priced") : ""}
 					</tr>
 					<tr style="border-bottom:1px solid #e2e8f0;">
 						${td_label("Additional Charges")}
 						${td(fmt(charges_total))}
-						${can_see_selling ? td("-") : ""}
-						${can_see_selling ? td("-") : ""}
-						${can_see_selling ? td("-") : ""}
+						${can_see_selling ? td(fmt(charges_selling)) : ""}
+						${can_see_selling ? td(fmt(charges_selling-charges_total)) : ""}
+						${can_see_selling ? td(charges_selling > 0 ? pct(100*(charges_selling-charges_total)/charges_selling) : "Not priced") : ""}
 					</tr>
 					<tr style="border-bottom:1px solid #e2e8f0;">
 						${td_label("Resources")}
@@ -311,7 +316,7 @@ function render_summary(frm, currency) {
 						${td(fmt(total_cost_calc), true)}
 						${can_see_selling ? td(fmt(total_selling_calc), true) : ""}
 						${can_see_selling ? td(fmt(total_margin_calc), true) : ""}
-						${can_see_selling ? td(pct(total_margin_pct), true) : ""}
+						${can_see_selling ? td(total_selling_calc > 0 ? pct(total_margin_pct) : "Not priced", true) : ""}
 					</tr>
 				</tbody>
 			</table>
@@ -456,7 +461,8 @@ function recalc_parent(frm) {
 	});
 
 	const total_cost = products_cost_total + services_cost_total + additional_charges_total + total_resource_cost;
-	const total_selling = products_selling_total + services_selling_total;
+	const total_selling = products_selling_total + services_selling_total +
+		(frm.doc.addtional_charges || []).reduce((sum, row) => sum + flt(row.selling_amount), 0);
 	const margin_value = total_selling - total_cost;
 	const margin_percent = total_selling ? (margin_value / total_selling) * 100 : 0;
 
@@ -2814,122 +2820,233 @@ frappe.ui.form.on('Deal Cost Sheet', {
 });
 
 function render_summary_dashboard(frm) {
-    if (!frm.fields_dict.custom_deal_summary_dashboard) return;
-    var d = frm.doc;
-
-    function fmt(v) {
-        var n = format_number(v || 0, null, 2);
-        return (d.currency || '') + ' ' + n;
+    var field=frm.fields_dict.custom_deal_summary_dashboard;
+    if (!field) return;
+    dcs_visual_styles(frm);
+    var state=frm.__dcs || {}, s2=state.s2 || {}, s5=state.s5 || {};
+    if (s2.ok !== 1 || s2.projection !== 'commercial') {
+        field.$wrapper.html('<div class="dcs-panel dcs-quiet">' + dcs_esc(s2.error || 'Commercial evaluation is not available in this view.') + '</div>');
+        return;
     }
-
-    function badge(icon, color) {
-        return '<span style="display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; background:' + color + '1f; color:' + color + '; font-size:13px; flex:none;">' + icon + '</span>';
+    var d=frm.doc, bridge=s2.margin_bridge, p=dcs_effective_position(frm,s5);
+    var approval=dcs_approval_presentation(frm,s5), st=s5.states || {}, cond=s5.conditions || {};
+    var next=dcs_next_step(frm,state.s3,state.s4,s5), esc=dcs_esc;
+    var number=function(v){return format_number(Number(v)||0,null,2);};
+    var money=function(v){return esc(d.currency || '') + ' ' + number(v);};
+    var margin=function(v){
+        return '<span class="' + dcs_margin_tone(v.selling > 0 ? Number(v.margin_percent)||0 : null) + '">'
+            + (v.selling > 0 ? (Number(v.margin_percent)||0).toFixed(2)+'%' : 'Not priced') + '</span>';
+    };
+    var positions=bridge ? [['Original',bridge.original],['Current',bridge.current]] :
+        [['Submitted BOQ',{cost:d.total_cost,selling:d.total_selling,gp:d.margin_value,margin_percent:d.margin_percent}]];
+    if (bridge && bridge.awarded) positions.push(['Awarded',bridge.awarded]);
+    var table='<div class="table-responsive"><table class="dcs-ledger"><thead><tr><th>Position</th><th>Buying</th><th>Selling</th><th>Gross profit</th><th>Margin</th></tr></thead><tbody>'
+        + positions.map(function(x){var v=x[1] || {}; return '<tr class="'+(x[0]==='Current'?'dcs-current':(x[0]==='Awarded'?'dcs-awarded':''))+'"><th>'+esc(x[0])+'</th><td>'+number(v.cost)+'</td><td>'+number(v.selling)+'</td><td>'+number(v.gp)+'</td><td>'+margin(v)+'</td></tr>';}).join('')
+        + '</tbody></table></div>';
+    var movement='';
+    if(bridge) {
+        movement='<div class="dcs-movement">' + [['GP movement',bridge.gp_movement],['Customer impact',(bridge.gp_impacts || {}).customer],['Vendor impact',(bridge.gp_impacts || {}).vendor]].map(function(x){
+            return '<div><span>'+x[0]+'</span><strong class="'+(x[1]<0?'dcs-tone-danger':'')+'">'+money(x[1])+'</strong></div>';
+        }).join('')+'</div>';
     }
-
-    function row(label, value, color) {
-        var style = color ? ('color:' + color + '; font-weight:700;') : 'color:var(--text-color);';
-        return '<div style="display:flex; justify-content:space-between; align-items:center; gap:12px; padding:6px 0; font-size:13px; border-bottom:1px dashed rgba(140,140,140,0.18);">' +
-            '<span style="color:var(--text-muted);">' + label + '</span>' +
-            '<span style="text-align:right; ' + style + '">' + (value !== undefined && value !== null && value !== '' ? value : '-') + '</span>' +
-            '</div>';
-    }
-
-    function link_row(label, route, name) {
-        if (!name) return row(label, '-');
-        var value = '<a href="/app/' + route + '/' + encodeURIComponent(name) + '" target="_blank" style="font-weight:600;">' + name + '</a>';
-        return row(label, value);
-    }
-
-    function quick_link(label, route, name, color) {
-        if (!name) return '';
-        return '<div style="padding:7px 0; font-size:13px; display:flex; align-items:center; gap:8px;">' +
-            badge('&#8594;', color) +
-            '<a href="/app/' + route + '/' + encodeURIComponent(name) + '" target="_blank" style="color:' + color + '; font-weight:600;">View ' + label + '</a></div>';
-    }
-
-    function col(icon, title, accent, body, flex) {
-        return '<div style="flex:' + (flex || 1) + '; min-width:230px; border-radius:12px; padding:16px 18px; margin:6px; ' +
-            'background:var(--card-bg, #fff); border:1px solid var(--border-color); border-top:3px solid ' + accent + '; ' +
-            'box-shadow:0 2px 10px rgba(0,0,0,0.06);">' +
-            '<div style="font-weight:600; font-size:13.5px; color:var(--text-color); letter-spacing:.01em; margin-bottom:14px; display:flex; align-items:center; gap:10px;">' +
-            badge(icon, accent) + '<span>' + title + '</span></div>' +
-            body + '</div>';
-    }
-
-    function stat_box(label, value, color, icon) {
-        return '<div style="flex:1; min-width:47%; border-radius:10px; padding:10px 12px 10px 14px; background:var(--card-bg, #fff); ' +
-            'border-left:4px solid ' + color + '; box-shadow:0 1px 4px rgba(0,0,0,0.06);">' +
-            '<div style="display:flex; align-items:center; gap:6px; font-size:10.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; font-weight:700; margin-bottom:4px;">' +
-            '<span>' + icon + '</span><span>' + label + '</span></div>' +
-            '<div style="font-size:18px; font-weight:700; color:' + color + '; line-height:1.2;">' + value + '</div>' +
-            '</div>';
-    }
-
-    var state = d.workflow_state || 'Draft';
-    var color_map = {'Draft': 'gray', 'Pending': 'orange', 'Approved': 'green', 'Returned for Rework': 'red'};
-    var color = color_map[state] || 'gray';
-    var workflow_badge = '<span class="indicator-pill ' + color + '" style="font-weight:600; font-size:12.5px;">' + state + '</span>';
-
-    var green = '#059669';
-    var blue = '#2563eb';
-    var purple = '#7c3aed';
-    var teal = '#0891b2';
-    var indigo = '#4f46e5';
-    var amber = '#b45309';
-
-    var margin_color = d.margin_value > 0 ? green : '#dc2626';
-    var margin_pct = d.margin_percent ? d.margin_percent.toFixed(2) + '%' : '0.00%';
-
-    var opp_body = link_row('Opportunity', 'opportunity', d.opportunity) +
-        link_row('Presales Request', 'presales-request', d.presales_request) +
-        link_row('Project', 'project', d.project) +
-        row('Territory', d.territory) +
-        row('Currency', d.currency) +
-        row('Deal Owner', d.deal_owner) +
-        row('Prepared By', d.owner);
-
-    var comm_body = '<div style="display:flex; flex-wrap:wrap; gap:10px;">' +
-        stat_box('Total Cost', fmt(d.total_cost), blue, '&#128181;') +
-        stat_box('Total Selling', fmt(d.total_selling), indigo, '&#128181;') +
-        stat_box('Gross Profit', '&#128176; ' + fmt(d.margin_value), margin_color, '&#128200;') +
-        stat_box('Margin %', margin_pct, amber, '&#127919;') +
-        '</div>';
-
-    var status_body = row('Workflow', workflow_badge) +
-        row('Items', d.items ? d.items.length : 0) +
-        row('Resources', d.resources ? d.resources.length : 0) +
-        row('Responsibilities', d.responsibilities ? d.responsibilities.length : 0) +
-        row('Last Updated', frappe.datetime.comment_when(d.modified));
-
-    var quick_body = quick_link('Opportunity', 'opportunity', d.opportunity, teal) +
-        quick_link('Presales Request', 'presales-request', d.presales_request, teal) +
-        quick_link('Project', 'project', d.project, teal);
-
-    if (!quick_body) {
-        quick_body = '<div style="font-size:13px; color:var(--text-muted);">No linked records yet</div>';
-    }
-
-    var section_title = '<div style="display:flex; align-items:center; justify-content:space-between; margin:2px 8px 12px 8px;">' +
-        '<div style="display:flex; align-items:center; gap:10px;">' +
-        '<span style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:50%; background:linear-gradient(135deg,#7c3aed,#2563eb); color:#fff; font-size:14px;">&#128203;</span>' +
-        '<span style="font-size:16px; font-weight:700; letter-spacing:.01em; color:var(--text-color);">Decision Board</span>' +
-        '</div>' +
-        '<span style="font-size:11.5px; color:var(--text-muted); letter-spacing:.02em;">Deal snapshot &amp; key metrics</span>' +
-        '</div>';
-
-    var html = '<div style="border:1px solid var(--border-color); border-radius:16px; padding:14px; ' +
-        'background:linear-gradient(180deg, rgba(124,58,237,0.03), rgba(37,99,235,0.02)); box-shadow:0 3px 14px rgba(0,0,0,0.05);">' +
-        section_title +
-        '<div style="display:flex; flex-wrap:wrap; margin:0 -6px;">' +
-        col('&#127970;', 'Opportunity', blue, opp_body, 1) +
-        col('&#128176;', 'Commercial Summary', green, comm_body, 1.5) +
-        col('&#128202;', 'Status', purple, status_body, 1) +
-        col('&#128279;', 'Quick Links', teal, quick_body, 1) +
-        '</div></div>';
-
-    frm.fields_dict.custom_deal_summary_dashboard.$wrapper.html(html);
+    var links=[['Opportunity','opportunity',d.opportunity],['Presales request','presales-request',d.presales_request],['Project','project',d.project]].filter(function(x){return !!x[2];}).map(function(x){
+        return '<div class="dcs-detail"><span>'+x[0]+'</span><a href="/desk/'+x[1]+'/'+encodeURIComponent(x[2])+'">'+esc(x[2])+'</a></div>';
+    }).join('');
+    var evaluated=s5.ok===1 && st.customer_award==='Awarded' && Number(p.revision_no)>0;
+    var blockers=evaluated && Number.isFinite(Number(cond.open_blockers)) ? Number(cond.open_blockers) : null;
+    var delivery=st.delivery_release || 'Not evaluated';
+    var html='<div class="dcs-panel dcs-overview">'
+        + '<div class="dcs-overview-heading"><div><div class="dcs-eyebrow">COMMERCIAL OVERVIEW</div><h2>'+esc(d.customer || d.title || d.name)+'</h2></div><span class="dcs-revision">R'+p.revision_no+' · '+esc(d.currency || '')+'</span></div>'
+        + '<div class="dcs-metrics">'
+        + '<div><span>Current selling</span><strong>'+money(p.selling)+'</strong><small>Buying '+money(p.cost)+'</small></div>'
+        + '<div><span>Gross profit</span><strong class="'+(p.gp<0?'dcs-tone-danger':'')+'">'+money(p.gp)+'</strong><small>Current commercial position</small></div>'
+        + '<div><span>Gross margin</span><strong class="'+dcs_margin_tone(p.margin)+'">'+(p.margin===null?'Not priced':p.margin.toFixed(2)+'%')+'</strong><small>'+ (p.margin===null?'Selling price required':(p.margin<20?'Below the 20% floor':'Meets the 20% floor'))+'</small></div></div>'
+        + '<div class="dcs-overview-grid"><section><div class="dcs-section-heading"><h3>Commercial position</h3><span>Amounts in ' + esc(d.currency || '') + ' · baseline → award</span></div>'+table+movement
+        + '<details class="dcs-linked"><summary>Deal details &amp; linked records</summary>'+links
+        + '<div class="dcs-detail"><span>Deal owner</span><strong>'+esc(d.deal_owner || 'Not assigned')+'</strong></div>'
+        + '<div class="dcs-detail"><span>Prepared by</span><strong>'+esc(d.owner)+'</strong></div></details></section>'
+        + '<aside><div class="dcs-decision"><div class="dcs-eyebrow">COMMERCIAL DECISION</div><h3>'+esc(approval.label)+'</h3><p>'+esc(approval.note)+'</p></div>'
+        + (p.approval_required === 'Manager' && state.s2.manager_route ? '<p class="dcs-quiet">' + esc(state.s2.manager_route.approval_routing_error || ('Manager: ' + (state.s2.manager_route.approval_manager_name || state.s2.manager_route.approval_manager_name || route.approval_manager || 'Not configured'))) + '</p>' : '')
+        + '<div class="dcs-release"><div class="dcs-eyebrow">AWARD &amp; DELIVERY</div><div class="dcs-detail"><span>Award</span><strong>'+esc(st.customer_award || 'Not Awarded')+'</strong></div>'
+        + '<div class="dcs-detail"><span>Delivery</span><strong class="'+(delivery==='Blocked'?'dcs-tone-danger':'')+'">'+esc(delivery)+'</strong></div>'
+        + '<div class="dcs-detail"><span>Open blockers</span><strong class="'+(blockers>0?'dcs-tone-danger':'')+'">'+(blockers===null?'Not evaluated':blockers)+'</strong></div>'
+        + '<p class="dcs-quiet">Commercial approval and delivery release are separate decisions.</p></div></aside></div>'
+        + '<div class="dcs-next"><span class="dcs-eyebrow">NEXT ACTION</span><div><strong>'+esc(next.label)+'</strong><p>'+esc(next.note)+'</p></div></div></div>';
+    field.$wrapper.html(html);
 }
 
+// Presentation only; server services remain the authority for every mutation.
+function dcs_margin_tone(margin) {
+    return margin === null || !Number.isFinite(Number(margin)) ? 'dcs-tone-neutral' :
+        (Number(margin) < 20 ? 'dcs-tone-danger' : 'dcs-tone-success');
+}
+
+function dcs_visual_styles(frm) {
+    if (typeof document === 'undefined') return;
+    if (frm.wrapper) $(frm.wrapper).addClass('dcs-workbench-v2');
+    if (document.getElementById('dcs-workbench-v2-styles')) return;
+    var style=document.createElement('style');
+    style.id='dcs-workbench-v2-styles';
+    style.textContent = `
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel {color:var(--text-color,#243247);font-size:13px;line-height:1.5}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview {border:1px solid var(--border-color,#e3e7ee);border-radius:12px;background:var(--card-bg,#fff);padding:26px;box-shadow:none}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview-heading {display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:18px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-eyebrow {font-size:10px;letter-spacing:1.1px;font-weight:650;color:var(--text-muted,#68758a)}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview h2 {font-size:21px;font-weight:650;line-height:1.3;margin:6px 0 0;overflow-wrap:anywhere;color:var(--text-color)}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-revision {font-size:12px;color:var(--text-muted);white-space:nowrap;padding-top:4px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:20px;border-bottom:1px solid var(--border-color);padding-bottom:18px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics>div {padding:0 24px;border-left:1px solid var(--border-color)}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics>div:first-child {padding-left:0;border:0}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics span,.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics small {display:block;color:var(--text-muted);font-size:12px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics strong {display:block;font-size:27px;letter-spacing:-.5px;font-weight:650;margin:6px 0;line-height:1.3;font-variant-numeric:tabular-nums}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview-grid {display:grid;grid-template-columns:minmax(0,2fr) minmax(240px,1fr);gap:28px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-section-heading {display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel h3 {font-size:14px;font-weight:650;margin:0;color:var(--text-color)}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-section-heading>span {font-size:11px;color:var(--text-muted)}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table {width:100%;border-collapse:collapse;font-size:12px;min-width:530px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel .dcs-ledger {table-layout:fixed;min-width:0;box-sizing:border-box}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table thead,.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table thead tr,.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table th {background:var(--subtle-fg,#f6f8fa)!important;color:var(--text-muted,#667489)!important;box-shadow:none!important;border:0!important}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table th,.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table td {padding:11px 10px!important;white-space:nowrap;border-bottom:1px solid var(--border-color)!important;text-align:right;background:transparent!important;color:var(--text-color)!important;font-variant-numeric:tabular-nums;box-shadow:none!important}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table th:first-child,.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table td:first-child {text-align:left}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table thead th {font-weight:500!important;font-size:11px;color:var(--text-muted)!important;background:var(--subtle-fg,#f6f8fa)!important}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table .dcs-current td,.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table .dcs-current th {font-weight:650!important}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table .dcs-awarded td,.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table .dcs-awarded th {background:var(--subtle-fg,#f6f8fa)!important}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-movement {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:18px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-movement span,.dcs-workbench-v2.dcs-workbench-v2 .dcs-movement strong {display:block;font-size:11px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-movement span {color:var(--text-muted);margin-bottom:4px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-movement strong {font-size:13px;font-weight:600}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-decision {padding:18px;border:1px solid var(--border-color);border-radius:8px;background:var(--subtle-fg,#f6f8fa)}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-decision h3 {font-size:18px;margin-top:8px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel p {font-size:12px;color:var(--text-muted);margin:8px 0 0}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-release {padding:18px 0 0}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-detail {display:flex;justify-content:space-between;gap:16px;padding:8px 0;font-size:12px;border-bottom:1px solid var(--border-color)}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-detail>span {color:var(--text-muted);flex:none}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-detail>strong,.dcs-workbench-v2.dcs-workbench-v2 .dcs-detail>a {font-weight:550;text-align:right;overflow-wrap:anywhere}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-linked {margin-top:24px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-linked summary {cursor:pointer;font-size:12px;color:var(--text-muted);padding:8px 0}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-next {display:flex;align-items:flex-start;gap:20px;margin-top:26px;padding-top:20px;border-top:1px solid var(--border-color)}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-next>.dcs-eyebrow {white-space:nowrap;padding-top:3px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-next strong {font-size:14px;font-weight:650}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-next p {margin:3px 0 0}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel .dcs-tone-danger,.dcs-workbench-v2.dcs-workbench-v2 .dcs-compact .dcs-tone-danger {color:#b54735!important}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel .dcs-tone-success,.dcs-workbench-v2.dcs-workbench-v2 .dcs-compact .dcs-tone-success {color:#25755a!important}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel .dcs-tone-neutral {color:var(--text-muted)!important}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-compact {display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:12px;color:var(--text-color);padding-right:24px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-compact small {font-size:11px;color:var(--text-muted);margin-left:12px}
+.dcs-workbench-v2.dcs-workbench-v2 .form-message {background:var(--card-bg,#fff)!important;border-bottom:1px solid var(--border-color);padding:10px 16px!important;box-shadow:none!important}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel-title {font-size:14px;font-weight:650;margin:4px 0 18px}
+@media(max-width:1000px) {.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview-grid {grid-template-columns:1fr}.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview-grid aside {display:grid;grid-template-columns:1fr 1fr;gap:20px}.dcs-workbench-v2.dcs-workbench-v2 .dcs-release {padding-top:0}.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics strong {font-size:23px}}
+@media(max-width:600px) {.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview {padding:16px}.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics {grid-template-columns:1fr;gap:16px}.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics>div {padding:0;border:0}.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview-grid aside {grid-template-columns:1fr}.dcs-workbench-v2.dcs-workbench-v2 .dcs-section-heading {display:block}.dcs-workbench-v2.dcs-workbench-v2 .dcs-compact {display:block}.dcs-workbench-v2.dcs-workbench-v2 .dcs-movement {grid-template-columns:1fr}.dcs-workbench-v2.dcs-workbench-v2 .dcs-next {display:block}}
+`;
+    document.head.appendChild(style);
+}
+
+function dcs_read_view(s2,s5) {
+    if (s5.ok === 1 || s2.ok !== 1 || s2.projection !== 'commercial') return s5;
+    var guard=s2.negotiation_guard || {}, position=(s2.margin_bridge || {}).current || {}, award=s2.award || {};
+    return {ok:1,projection:'commercial',authority:{},conditions:{},limited_read:1,
+        living:{revision_no:guard.revision_no,total_cost:position.cost,total_selling:position.selling,
+            margin_percent:position.margin_percent,approval_required:guard.approval_required,
+            approval_state:guard.approval_state,margin_gate:guard.margin_gate,authorised_position:guard.authorised_position},
+        states:{customer_award:award.state || 'Not Awarded',delivery_release:award.delivery_release_state || 'Not Applicable'},
+        frozen_baseline:{frozen:award.frozen,revision_no:award.frozen_revision_no,total_cost:award.frozen_total_cost,
+            total_selling:award.frozen_total_selling,margin_percent:award.frozen_margin_percent},
+        release_readiness:{pre_award_note:'Commercial read view. Award and delivery actions are available only to authorised commercial owners.'}};
+}
+
+function dcs_effective_position(frm, s5) {
+    var doc = frm.doc, lv = (s5 || {}).living || {};
+    var rev = Number(lv.revision_no !== undefined ? lv.revision_no : doc.custom_dcs_revision_no) || 0;
+    var value = function (key, field, fallback) {
+        var raw = lv[key] !== undefined && lv[key] !== null ? lv[key] : doc[field];
+        return Number(raw !== undefined && raw !== null ? raw : fallback) || 0;
+    };
+    var cost = rev > 0 ? value('total_cost', 'custom_working_total_cost', doc.total_cost) : Number(doc.total_cost) || 0;
+    var selling = rev > 0 ? value('total_selling', 'custom_working_total_selling', doc.total_selling) : Number(doc.total_selling) || 0;
+    return {revision_no: rev, cost: cost, selling: selling, gp: selling-cost,
+        margin: selling > 0 ? 100*(selling-cost)/selling : null,
+        approval_required: lv.approval_required, approval_state: lv.approval_state,
+        margin_gate: lv.margin_gate, authorised: lv.authorised_position === 1};
+}
+
+function dcs_approval_presentation(frm, s5) {
+    var p = dcs_effective_position(frm, s5);
+    if (!s5 || s5.ok !== 1 || !s5.living) {
+        return {label:'Not available', note:'Commercial evaluation is unavailable for this view.', color:'gray'};
+    }
+    if (!p.revision_no || p.selling <= 0) {
+        return {label:'Not evaluated', note:p.selling <= 0 ? 'Add selling prices, then record a BOQ revision.' : 'Record a revision to evaluate this legacy baseline.', color:'gray'};
+    }
+    if (p.approval_state === 'Rejected' || p.approval_state === 'Returned for Rework') {
+        return {label:p.approval_state, note:'Revise this sheet. The new position is evaluated independently; this decision stays in history.', color:'red'};
+    }
+    if (p.approval_required === 'Blocked') {
+        return {label:'Rework required', note:'Concession exceeds the ceiling. Revise the commercial position.', color:'red'};
+    }
+    if (p.margin < 20 || ['Manager','Managing Director'].indexOf(p.approval_required) !== -1) {
+        return {label:p.authorised ? (p.approval_required === 'Manager' ? 'Manager approved' : 'Approved') : 'Manager approval required',
+            note:p.margin < 20 ? 'Below the 20% margin floor. Delivery conditions remain separate.' : 'Another commercial approval trigger applies.',
+            color:p.authorised ? 'green' : 'orange'};
+    }
+    if (p.approval_required === 'None') {
+        return {label:'Not required', note:'Margin is at least 20% and no other approval trigger applies.', color:'blue'};
+    }
+    return {label:'Not evaluated', note:'Refresh or revise to evaluate the current position.', color:'gray'};
+}
+
+function dcs_boq_totals(items, resources, charges) {
+    var n = function (v) { return Number(v) || 0; }, cost = 0, selling = 0;
+    (items || []).forEach(function (r) { cost += n(r.qty)*n(r.cost_rate); selling += n(r.qty)*n(r.selling_rate); });
+    (resources || []).forEach(function (r) {
+        cost += (n(r.no_of_persons) && n(r.no_of_days) ? n(r.no_of_persons)*n(r.no_of_days) : n(r.hours))*n(r.cost_rate);
+    });
+    (charges || []).forEach(function (r) { cost += n(r.amount); selling += n(r.selling_amount); });
+    return {cost:cost, selling:selling, gp:selling-cost, margin:selling > 0 ? 100*(selling-cost)/selling : null};
+}
+
+function dcs_next_step(frm, s3, s4, s5) {
+    if (frm.doc.docstatus === 2) return {label:'Cancelled record', note:'Historical record; no commercial action is available.'};
+    if (frm.doc.docstatus !== 1) return {label:'Complete costing', note:'Prepare the BOQ and submit the sheet for commercial evaluation.'};
+    var route=((frm.__dcs || {}).s2 || {}).manager_route || ((frm.__dcs || {}).s4 || {}).manager_route || {};
+    if (route.approval_routing_error && route.changed_by === ((frappe.session || {}).user)) {
+        return {key:'Refresh Manager Routing',group:'Approval',label:'Route to my manager',note:route.approval_routing_error + ' Correct the Employee reporting line, then retry routing.'};
+    }
+
+    var cap = (s3 || {}).capability || {}, st = (s5 || {}).states || {}, auth = (s5 || {}).authority || {};
+    var p = dcs_effective_position(frm, s5), actions = (s4 || {}).actions || [];
+    if (cap.can_negotiate && st.customer_award !== 'Awarded' && !p.revision_no && p.selling > 0) {
+        return {key:'Evaluate submitted BOQ',group:'Negotiation',label:'Evaluate submitted BOQ',note:'Record the submitted baseline and calculate approval requirements without changing its totals.'};
+    }
+    if (cap.can_negotiate && st.customer_award !== 'Awarded' &&
+        (!p.revision_no || p.selling <= 0 || ['Rejected','Returned for Rework','Blocked'].indexOf(p.approval_state) >= 0)) {
+        return {key:'BOQ Revision', group:'Negotiation', label:'Revise BOQ', note:'Revise this sheet; approval is recalculated for the new position.'};
+    }
+    if (actions.length && p.approval_required && p.approval_required !== 'None' && p.approval_state !== 'Approved') {
+        var preferred = actions.filter(function (a) { return ['Approve','Endorse','Return for Rework'].indexOf(a.key) >= 0; })[0] || actions[0];
+        return {key:preferred.key, group:'Approval', label:preferred.label, note:preferred.note};
+    }
+    var required=p.approval_required || ((s4 || {}).deal || {}).approval_required;
+    if (required === 'Manager' && !p.authorised && ['Rejected','Returned for Rework'].indexOf(p.approval_state) < 0) {
+        return {label:'Await manager decision',note:route.approval_routing_error || ('Routed to ' + (route.approval_manager_name || route.approval_manager || 'the immediate manager') + '.')};
+    }
+    if (auth.can_record_award && p.authorised && st.customer_award !== 'Awarded') {
+        return {key:'Record Award', group:'Award', label:'Record Award', note:'Record customer evidence and freeze the current commercial position.'};
+    }
+    if (st.customer_award === 'Awarded') {
+        if (((s5 || {}).po || {}).reconciliation_state !== 'Reconciled' && auth.can_reconcile_po) {
+            return {key:'Reconcile Customer PO', group:'Handover', label:'Reconcile Customer PO', note:'Check PO value, scope and payment terms against the awarded position.'};
+        }
+        if (!st.delivery_owner && auth.can_set_delivery_owner) {
+            return {key:'Set Delivery Owner', group:'Handover', label:'Set Delivery Owner', note:'Name the person accountable for delivery.'};
+        }
+        if (auth.can_release && s5.release_readiness && s5.release_readiness.commercially_aligned &&
+            Number((s5.conditions || {}).open_blockers) === 0 && (st.delivery_release || '').indexOf('Released') !== 0) {
+            return {key:'Release to Delivery', group:'Handover', label:'Release to Delivery', note:'Confirm release of the awarded and reconciled position.'};
+        }
+        return {label:'Review handover conditions', group:'Handover', note:'Award, PO reconciliation and delivery release are separate decisions.'};
+    }
+    return {label:'Review commercial position', note:'Resolve pricing or approval requirements using the permitted actions.'};
+}
 
 // Deal Cost Sheet - Living DCS Experience
 // Brings Negotiation, Approval, Award, Award Reversal, PO Reconciliation and Handover onto the
@@ -2966,7 +3083,7 @@ function dcs_when(v) { return v ? frappe.datetime.str_to_user(v) : '&mdash;'; }
 
 function dcs_panel(title, body, note) {
 	var n = note ? '<div class="text-muted small" style="margin-top:6px">' + dcs_esc(note) + '</div>' : '';
-	return '<div style="margin-top:4px"><div class="text-muted" style="font-weight:600;letter-spacing:.4px;text-transform:uppercase;font-size:11px;margin-bottom:8px">'
+	return '<div class="dcs-panel"><div class="dcs-panel-title">'
 		+ dcs_esc(title) + '</div>' + body + n + '</div>';
 }
 
@@ -2983,7 +3100,9 @@ function dcs_set_html(frm, field, html) {
 // workspace call resolves through this map to the dotted app method; the bare
 // Server Script names are no longer called from the client.
 var DCS_METHODS = {
+	dcs_refresh_manager_route: 'bsgroup.dcs.manager_approval.dcs_refresh_manager_route',
 	dcs_apply_revision: 'bsgroup.api.dcs.negotiation.dcs_apply_revision',
+	dcs_screen2: 'bsgroup.api.dcs.living.dcs_screen2',
 	dcs_screen3: 'bsgroup.api.dcs.negotiation.dcs_screen3',
 	dcs_approval_decision: 'bsgroup.api.dcs.approval.dcs_approval_decision',
 	dcs_screen4: 'bsgroup.api.dcs.approval.dcs_screen4',
@@ -3006,19 +3125,23 @@ function dcs_method(name) {
 
 function dcs_call(method, args) {
 	return new Promise(function (resolve) {
-		frappe.call({ method: dcs_method(method), args: args, callback: function (r) { resolve((r && r.message) || {}); }, error: function () { resolve({}); } });
+		frappe.call({ method: dcs_method(method), args: args, callback: function (r) { resolve((r && r.message) || {}); }, error: function () { resolve({ok:0, load_failed:1, error:"Commercial evaluation could not be loaded. Refresh to retry."}); } });
 	});
 }
 
 function dcs_load(frm) {
 	var n = frm.doc.name;
+    var loadId = frm.__dcs_load_id = (frm.__dcs_load_id || 0) + 1;
 	Promise.all([
 		dcs_call('dcs_screen3', { dcs: n }),
 		dcs_call('dcs_screen4', { dcs: n }),
-		dcs_call('dcs_screen5', { dcs: n })
+		dcs_call('dcs_screen5', { dcs: n }),
+		dcs_call('dcs_screen2', { dcs: n })
 	]).then(function (res) {
-		var s3 = res[0] || {}, s4 = res[1] || {}, s5 = res[2] || {};
-		frm.__dcs = { s3: s3, s4: s4, s5: s5 };
+		if (frm.doc.name !== n || frm.__dcs_load_id !== loadId) return;
+        var s3 = res[0] || {}, s4 = res[1] || {}, s5 = dcs_read_view(res[3] || {},res[2] || {});
+		frm.__dcs = { s3: s3, s4: s4, s5: s5, s2: res[3] || {} };
+		render_summary_dashboard(frm);
 		dcs_headline(frm, s5);
 		dcs_indicators(frm, s5);
 		dcs_render_negotiation(frm, s3);
@@ -3030,39 +3153,20 @@ function dcs_load(frm) {
 }
 
 function dcs_headline(frm, s5) {
-	if (!s5.living) { return; }
-	var lv = s5.living, fz = s5.frozen_baseline || {};
-	var dcs_hasrev = (lv && lv.revision_no) ? 1 : 0;
-	if (!dcs_hasrev) {
-		lv = {
-			revision_no: 0,
-			total_cost: (frm.doc.total_cost || 0),
-			total_selling: (frm.doc.total_selling || 0),
-			margin_percent: (frm.doc.margin_percent || 0),
-			approval_state: lv ? lv.approval_state : null,
-			approval_required: lv ? lv.approval_required : null,
-			margin_gate: lv ? lv.margin_gate : null
-		};
-	}
-	var cell = function (label, value, sub) {
-		return '<div style="display:inline-block;min-width:150px;margin-right:26px;vertical-align:top">'
-			+ '<div class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.4px">' + dcs_esc(label) + '</div>'
-			+ '<div style="font-size:15px;font-weight:600">' + value + '</div>'
-			+ (sub ? '<div class="text-muted" style="font-size:11px">' + sub + '</div>' : '') + '</div>';
-	};
-	var h = cell((dcs_hasrev ? 'Living position' : 'Baseline position'), dcs_money(frm, lv.total_selling), 'Cost ' + (dcs_money(frm, lv.total_cost) + (dcs_hasrev ? '' : ' · GP ' + dcs_money(frm, (frm.doc.margin_value || 0)))))
-		+ cell((dcs_hasrev ? 'Living margin' : 'Baseline margin'), dcs_pct(lv.margin_percent), (dcs_hasrev ? 'Revision ' : 'No negotiation revisions yet') + (dcs_hasrev ? dcs_esc(lv.revision_no) : ''))
-		+ (fz.frozen ? cell('Frozen baseline', dcs_money(frm, fz.total_selling), 'Awarded at revision ' + dcs_esc(fz.revision_no))
-			: cell('Frozen baseline', '<span class="text-muted">Not frozen</span>', 'Set when the award is recorded'))
-		+ cell('Approval', dcs_esc(lv.approval_state || 'Not started'), lv.approval_required && lv.approval_required !== 'None' ? 'Requires ' + dcs_esc(lv.approval_required) : 'No sign-off required');
-	var rr = s5.release_readiness || {};
-	if (rr.note) {
-		h += '<div class="text-muted" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border-color)">' + dcs_esc(rr.note) + '</div>';
-	} else if (rr.pre_award_note) {
-		// Informational only: no award recorded, no frozen baseline - never an instruction to reverse an award.
-		h += '<div class="text-muted" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border-color)">' + dcs_esc(rr.pre_award_note) + '</div>';
-	}
-	frm.dashboard.set_headline(h);
+    dcs_visual_styles(frm);
+    if (!s5.living || s5.ok !== 1) {
+        var routing=((frm.__dcs || {}).s4 || {});
+        if (routing.projection === 'approval-routing') {
+            var route=routing.manager_route || {}, deal=routing.deal || {};
+            frm.dashboard.set_headline('<div class="dcs-compact"><b>' + dcs_esc(deal.approval_state || 'Manager approval') + '</b><span>' + dcs_esc(route.approval_routing_error || ('Manager: ' + (route.approval_manager_name || route.approval_manager || 'Not configured'))) + '</span></div>');
+            return;
+        }
+        frm.dashboard.set_headline('<div class="dcs-compact">Commercial evaluation is not available in this view. ' + dcs_esc(s5.error || 'Refresh to retry.') + '</div>');
+        return;
+    }
+    var p=dcs_effective_position(frm,s5), approval=dcs_approval_presentation(frm,s5);
+    var next=dcs_next_step(frm,(frm.__dcs || {}).s3,(frm.__dcs || {}).s4,s5);
+    frm.dashboard.set_headline('<div class="dcs-compact"><div><b>'+dcs_esc(approval.label)+'</b><small>Margin <span class="'+dcs_margin_tone(p.margin)+'">'+(p.margin===null?'Not priced':p.margin.toFixed(2)+'%')+'</span> · R'+p.revision_no+'</small></div><span>Next: <b>'+dcs_esc(next.label)+'</b></span></div>');
 }
 
 function dcs_indicators(frm, s5) {
@@ -3076,9 +3180,12 @@ function dcs_indicators(frm, s5) {
 	add('Award: ' + (st.customer_award || 'Not Awarded'), st.customer_award === 'Awarded' ? 'green' : 'gray');
 	if (st.award_reversal_state) { add('Reversal: ' + st.award_reversal_state, 'red'); }
 	if (po.reconciliation_state) { add('PO ' + po.reconciliation_state, po.reconciliation_state === 'Reconciled' ? 'green' : 'orange'); }
-	var ob = cond.open_blockers || 0;
-	add(ob === 0 ? 'No open blockers' : ob + ' open blocker(s)', ob === 0 ? 'green' : 'red');
+	var ob = Number(cond.open_blockers);
+    var evaluated = s5.ok === 1 && st.customer_award === 'Awarded' && Number(lv.revision_no) > 0;
+    add(!evaluated || !Number.isFinite(ob) ? 'Handover not evaluated' : (ob === 0 ? 'No open handover blockers' : ob + ' open handover blocker(s)'),
+        !evaluated || !Number.isFinite(ob) ? 'gray' : (ob === 0 ? 'green' : 'red'));
 	add('Delivery: ' + (st.delivery_release || 'Not Applicable'), (st.delivery_release || '').indexOf('Released') === 0 ? 'blue' : 'gray');
+    if (s5.ok === 1 && s5.projection === 'commercial' && frm.dashboard.stats_area) frm.dashboard.stats_area.hide();
 }
 
 function dcs_render_negotiation(frm, s3) {
@@ -3121,6 +3228,9 @@ function dcs_render_negotiation(frm, s3) {
 function dcs_render_approval(frm, s4) {
 	var hist = s4.approval_history || [], why = s4.why || {}, prev = s4.previous_approved || {}, cur = s4.current || {}, d = s4.delta || {};
 	var body = '';
+    if (s4.manager_route && s4.manager_route.approval_policy === 'Immediate Manager') {
+        body += '<div class="dcs-decision"><div class="dcs-eyebrow">MANAGER APPROVAL</div><h3>' + dcs_esc(s4.manager_route.approval_manager_name || s4.manager_route.approval_manager || 'Manager not configured') + '</h3><p>' + dcs_esc(s4.manager_route.approval_routing_error || 'Routed from the current revision submitter’s Employee reporting line.') + '</p></div>';
+    }
 	if (why.approval_reason || why.margin_gate_reason) {
 		body += '<div class="text-muted small" style="margin-bottom:10px">' + dcs_esc(why.approval_reason || '')
 			+ (why.margin_gate_reason ? '<br>' + dcs_esc(why.margin_gate_reason) : '') + '</div>';
@@ -3151,7 +3261,7 @@ function dcs_render_award(frm, s5) {
 	var aw = s5.award || {}, fz = s5.frozen_baseline || {}, st = s5.states || {};
 	var body = '<div class="table-responsive"><table class="table table-sm" style="font-size:12px"><tbody>'
 		+ '<tr><td class="text-muted" style="width:36%">Award state</td><td>' + dcs_esc(aw.state || 'Not Awarded') + ' &middot; sequence ' + dcs_esc(st.award_sequence_no || 0) + '</td></tr>'
-		+ '<tr><td class="text-muted">Evidence</td><td>' + dcs_esc(aw.evidence_type || '&mdash;') + ' ' + dcs_esc(aw.reference || '') + '</td></tr>'
+		+ '<tr><td class="text-muted">Evidence</td><td>' + dcs_esc(aw.evidence_type || '—') + ' ' + dcs_esc(aw.reference || '') + '</td></tr>'
 		+ '<tr><td class="text-muted">Recorded</td><td>' + (aw.recorded_by ? dcs_esc(aw.recorded_by) + ' &middot; ' + dcs_when(aw.recorded_on) : '&mdash;') + '</td></tr>'
 		+ '<tr><td class="text-muted">Frozen baseline</td><td>' + (fz.frozen ? 'Cost ' + dcs_money(frm, fz.total_cost) + ' &middot; Selling ' + dcs_money(frm, fz.total_selling) + ' &middot; GP ' + dcs_money(frm, fz.gp) + ' &middot; ' + dcs_pct(fz.margin_percent) + ' at revision ' + dcs_esc(fz.revision_no) : 'Not frozen') + '</td></tr>'
 		+ '<tr><td class="text-muted">Reversals</td><td>' + dcs_esc(st.award_reversal_count || 0) + (st.award_reversal_state ? ' &middot; ' + dcs_esc(st.award_reversal_state) : '') + (st.award_reversal_ref ? ' &middot; <a href="' + frappe.utils.get_form_link('DCS Award Reversal', st.award_reversal_ref) + '">' + dcs_esc(st.award_reversal_ref) + '</a>' : '') + '</td></tr>'
@@ -3182,10 +3292,12 @@ function dcs_render_handover(frm, s5) {
 		var map = { 'Open': 'red', 'Cleared': 'green', 'Accepted Risk': 'orange' };
 		return '<span class="indicator-pill ' + (map[state] || 'gray') + '">' + dcs_esc(state) + '</span>';
 	};
-	var all = (c.blockers || []).concat(c.watch_items || []).concat(c.accepted_risks || []);
-	var body = '<div style="margin-bottom:10px">'
-		+ '<span class="indicator-pill ' + (rr.commercially_aligned ? 'green' : 'red') + '">' + (rr.commercially_aligned ? 'Commercially aligned' : 'Not commercially aligned') + '</span> '
-		+ '<span class="indicator-pill ' + ((c.open_blockers || 0) === 0 ? 'green' : 'red') + '">' + (c.open_blockers || 0) + ' open blocker(s)</span> '
+	var technical = s5.projection === 'technical';
+    var all = technical ? (s5.technical_conditions || []) : (c.blockers || []).concat(c.watch_items || []).concat(c.accepted_risks || []);
+    var evaluated = s5.ok === 1 && s5.projection === 'commercial' && rr.awarded_and_frozen;
+    var body = '<div style="margin-bottom:10px">'
+        + '<span class="indicator-pill ' + (!evaluated ? 'gray' : (rr.commercially_aligned ? 'green' : 'red')) + '">' + (!evaluated ? 'Handover not evaluated' : (rr.commercially_aligned ? 'Awarded position aligned' : 'Not commercially aligned')) + '</span> '
+        + (evaluated ? '<span class="indicator-pill ' + ((c.open_blockers || 0) === 0 ? 'green' : 'red') + '">' + (c.open_blockers || 0) + ' open handover blocker(s)</span> ' : '')
 		+ '<span class="indicator-pill gray">Delivery owner: ' + dcs_esc(st.delivery_owner || 'not named') + '</span>'
 		+ (rr.note ? '<div class="text-danger small" style="margin-top:8px">' + dcs_esc(rr.note) + '</div>' : '') + '</div>';
 	if (!all.length) {
@@ -3201,7 +3313,7 @@ function dcs_render_handover(frm, s5) {
 					+ '<td class="text-muted small">' + dcs_esc(note) + '</td></tr>';
 			}).join('') + '</tbody></table></div>';
 	}
-	dcs_set_html(frm, 'custom_handover_html', dcs_panel('Handover conditions and delivery readiness', body, rr.basis || ''));
+	dcs_set_html(frm, 'custom_handover_html', dcs_panel(technical ? 'Technical conditions' : 'Handover conditions and delivery readiness', body, technical ? 'Only technical conditions are shown in this view. Commercial clearance is evaluated separately.' : (rr.basis || '')));
 }
 
 function dcs_run(frm, method, args, dlg) {
@@ -3212,12 +3324,14 @@ function dcs_run(frm, method, args, dlg) {
 		freeze_message: __('Applying...'),
 		callback: function (r) {
 			var m = (r && r.message) || {};
-			if (m.error) {
-				frappe.msgprint({ title: __('Not permitted'), message: dcs_esc(m.error), indicator: 'red' });
+			if (m.ok !== 1 || m.error) {
+				frappe.msgprint({ title: __('Action not recorded'), message: dcs_esc(m.error || 'The action could not be verified. Refresh and retry.'), indicator: 'red' });
 				return;
 			}
 			if (dlg) { dlg.hide(); }
-			if (m.idempotent_replay) {
+			if (m.no_change) {
+                frappe.show_alert({message:__('No change — no revision recorded'),indicator:'blue'});
+            } else if (m.idempotent_replay) {
 				frappe.show_alert({ message: __('Already recorded - nothing changed again'), indicator: 'blue' });
 			} else {
 				frappe.show_alert({ message: __('Recorded'), indicator: 'green' });
@@ -3243,58 +3357,86 @@ function dcs_buttons(frm, s3, s4, s5) {
 	if (frm.doc.docstatus === 2) { return; }
 	var cap = s3.capability || {}, auth = s5.authority || {}, st = s5.states || {}, lv = s5.living || {};
 	var N = __('Negotiation'), A = __('Approval'), W = __('Award'), H = __('Handover');
+    var available = {};
+    var route=((frm.__dcs || {}).s2 || {}).manager_route || ((frm.__dcs || {}).s4 || {}).manager_route || {};
+    if (route.changed_by === ((frappe.session || {}).user) && route.approval_routing_error) {
+        available['Refresh Manager Routing']=function(){dcs_run(frm,'dcs_refresh_manager_route',{dcs:frm.doc.name});};
+        frm.add_custom_button(__('Route to my manager'),available['Refresh Manager Routing'],__('Approval'));
+    }
+    var add = function(label,handler,group) { available[label]=handler; return frm.add_custom_button(__(label),handler,group); };
 
-	var revision = function (side) {
-		var isCust = side === 'Customer';
-		dcs_dialog(frm, isCust ? 'Customer Revision' : 'Vendor Revision', [
-			{ fieldtype: 'Currency', fieldname: 'new_total_selling', label: __('New Total Selling'), default: lv.total_selling, hidden: isCust ? 0 : 1 },
-			{ fieldtype: 'Currency', fieldname: 'new_total_cost', label: __('New Total Cost'), default: lv.total_cost, hidden: isCust ? 1 : 0 },
-			{ fieldtype: 'Small Text', fieldname: 'reason', label: __('Reason'), reqd: 1 },
-			{ fieldtype: 'Small Text', fieldname: 'technical_impact', label: __('Technical Impact') }
-		], 'Apply Revision', function (v, d) {
-			var args = { dcs: frm.doc.name, source: side, reason: v.reason, technical_impact: v.technical_impact };
-			if (isCust) { args.new_total_selling = v.new_total_selling; } else { args.new_total_cost = v.new_total_cost; }
-			dcs_run(frm, 'dcs_apply_revision', args, d);
-		});
-	};
-	if (cap.can_customer_side && !s3.boq_managed) { frm.add_custom_button(__('Customer Revision'), function () { revision('Customer'); }, N); }
-	if (cap.can_vendor_side && !s3.boq_managed) { frm.add_custom_button(__('Vendor Revision'), function () { revision('Vendor'); }, N); }
+
+    var revision = function (side) {
+        var isCust=side === 'Customer', position=dcs_effective_position(frm,s5), dialog;
+        var preview=function() {
+            if(!dialog) return;
+            var cost=isCust ? position.cost : Number(dialog.get_value('new_total_cost'));
+            var sell=isCust ? Number(dialog.get_value('new_total_selling')) : position.selling;
+            var margin=sell > 0 ? 100*(sell-cost)/sell : null;
+            dialog.fields_dict.preview.$wrapper.html('<div class="alert alert-info">Current buying ' + dcs_money(frm,position.cost) + ' · Selling ' + dcs_money(frm,position.selling)
+                + '<br>Proposed buying <b>' + dcs_money(frm,cost) + '</b> · Selling <b>' + dcs_money(frm,sell) + '</b> · GP <b>' + dcs_money(frm,sell-cost)
+                + '</b> · Margin ' + (margin === null ? 'Not priced' : dcs_pct(margin)) + '<br>Approval is recalculated on the server. Rejected revisions stay in history.</div>');
+        };
+        dialog=new frappe.ui.Dialog({
+            title:__(isCust ? 'Customer Revision' : 'Vendor Revision'),
+            fields:[
+                {fieldtype:'Currency',fieldname:'new_total_selling',label:__('New Total Selling'),default:position.selling,hidden:!isCust,onchange:preview},
+                {fieldtype:'Currency',fieldname:'new_total_cost',label:__('New Total Cost'),default:position.cost,hidden:isCust,onchange:preview},
+                {fieldtype:'HTML',fieldname:'preview'},
+                {fieldtype:'Small Text',fieldname:'reason',label:__('Reason'),reqd:1},
+                {fieldtype:'Small Text',fieldname:'technical_impact',label:__('Technical Impact')}
+            ],
+            primary_action_label:__('Record Revision'),
+            primary_action:function(v) {
+                var args={dcs:frm.doc.name,source:side,reason:v.reason,technical_impact:v.technical_impact};
+                if(isCust) args.new_total_selling=v.new_total_selling; else args.new_total_cost=v.new_total_cost;
+                dcs_run(frm,'dcs_apply_revision',args,dialog);
+            }
+        });
+        dialog.show();preview();
+    };
+
+    if (cap.can_negotiate && !dcs_effective_position(frm,s5).revision_no && dcs_effective_position(frm,s5).selling > 0) {
+        add('Evaluate submitted BOQ',function(){dcs_run(frm,'dcs_apply_revision',{dcs:frm.doc.name,source:'Internal',reason:'Evaluate the submitted BOQ baseline without changing its totals.'});},N);
+    }
+	if (cap.can_customer_side && !s3.boq_managed) { add('Customer Revision', function () { revision('Customer'); }, N); }
+	if (cap.can_vendor_side && !s3.boq_managed) { add('Vendor Revision', function () { revision('Vendor'); }, N); }
 	if (frm.doc.docstatus === 1 && cap.can_negotiate && st.customer_award !== 'Awarded' && st.delivery_release !== 'Released' && st.delivery_release !== 'Released with MD Override') {
-		frm.add_custom_button(__('BOQ Revision'), function () { dcs_boq_revision_dialog(frm, cap); }, N);
+		add('BOQ Revision', function () { dcs_boq_revision_dialog(frm, cap); }, N);
 	}
 	if (!cap.can_negotiate && cap.denial_reason) {
-		frm.add_custom_button(__('Why can I not negotiate?'), function () {
+		add('Why can I not negotiate?', function () {
 			frappe.msgprint({ title: __('Negotiation authority'), message: dcs_esc(cap.denial_reason), indicator: 'orange' });
 		}, N);
 	}
 
-	var decide = function (action) {
-		dcs_dialog(frm, action, [
-			{ fieldtype: 'Small Text', fieldname: 'reason', label: __('Reason'), reqd: 1 },
-			{ fieldtype: 'HTML', fieldname: 'why', options: '<div class="text-muted small">' + dcs_esc(((s4.consequences || {})[action.toLowerCase().split(' ')[0] + 'ed'] || '')) + '</div>' }
-		], action, function (v, d) {
-			dcs_run(frm, 'dcs_approval_decision', { dcs: frm.doc.name, action: action, reason: v.reason }, d);
-		});
-	};
-	if (lv.approval_required && lv.approval_required !== 'None' && lv.approval_state !== 'Approved') {
-		['Endorse', 'Approve', 'Return for Rework', 'Reject'].forEach(function (a) {
-			frm.add_custom_button(__(a), function () { decide(a); }, A);
-		});
-	}
+
+    var decide=function(action) {
+        var item=(s4.actions || []).filter(function(x){return x.key === action;})[0];
+        if(!item) return;
+        var consequence={Approve:'approved',Endorse:'endorsed','Return for Rework':'returned',Reject:'rejected'};
+        dcs_dialog(frm,item.label || action,[
+            {fieldtype:'Small Text',fieldname:'reason',label:__('Reason'),reqd:item.needs_reason ? 1 : 0},
+            {fieldtype:'HTML',fieldname:'why',options:'<div class="text-muted small">' + dcs_esc((s4.consequences || {})[consequence[action]] || item.note || '') + '</div>'}
+        ],item.label || action,function(v,d){dcs_run(frm,'dcs_approval_decision',{dcs:frm.doc.name,action:action,reason:v.reason},d);});
+    };
+    (s4.ok === 1 ? s4.actions || [] : []).forEach(function(item) {
+        if(lv.approval_required && lv.approval_required !== 'None') add(item.key,function(){decide(item.key);},A);
+    });
 
 	var record_award = function (relabel) {
 		dcs_dialog(frm, relabel || 'Record Award', [
 			{ fieldtype: 'Data', fieldname: 'award_reference', label: __('Award Reference'), reqd: 1 },
-			{ fieldtype: 'Select', fieldname: 'evidence_type', label: __('Evidence Type'), options: 'Customer PO\nSigned Quotation\nEmail Confirmation\nLetter of Award', reqd: 1 },
+			{ fieldtype: 'Select', fieldname: 'evidence_type', label: __('Evidence Type'), options: 'Customer PO\nLetter of Award\nEmail Confirmation\nVerbal - Not Evidenced\nNot Provided', reqd: 1 },
 			{ fieldtype: 'Small Text', fieldname: 'notes', label: __('Notes') },
 			{ fieldtype: 'HTML', fieldname: 'note', options: '<div class="text-muted small">Recording an award freezes the commercial baseline at the current living position. It does not release delivery.</div>' }
 		], relabel || 'Record Award', function (v, d) {
 			dcs_run(frm, 'dcs_record_award', { dcs: frm.doc.name, award_reference: v.award_reference, evidence_type: v.evidence_type, notes: v.notes }, d);
 		});
 	};
-	if (st.customer_award !== 'Awarded') { frm.add_custom_button(__('Record Award'), function () { record_award(); }, W); }
-	if (st.customer_award === 'Awarded') {
-		frm.add_custom_button(__('Reverse Award'), function () {
+	if (auth.can_record_award && lv.authorised_position === 1 && st.customer_award !== 'Awarded') { add('Record Award', function () { record_award(); }, W); }
+	if (st.customer_award === 'Awarded' && auth.can_override) {
+		add('Reverse Award', function () {
 			dcs_dialog(frm, 'Reverse Award', [
 				{ fieldtype: 'Small Text', fieldname: 'reason', label: __('Reversal Reason'), reqd: 1 },
 				{ fieldtype: 'Data', fieldname: 'evidence_reference', label: __('Evidence Reference') },
@@ -3304,9 +3446,9 @@ function dcs_buttons(frm, s3, s4, s5) {
 			});
 		}, W);
 	}
-	if (st.award_reversal_state === 'Reversed') { frm.add_custom_button(__('Re-award'), function () { record_award('Re-award'); }, W); }
+	if (st.award_reversal_state === 'Reversed' && auth.can_record_award && lv.authorised_position === 1) { add('Re-award', function () { record_award('Re-award'); }, W); }
 
-	frm.add_custom_button(__('Reconcile Customer PO'), function () {
+	if (st.customer_award === 'Awarded' && auth.can_reconcile_po) add('Reconcile Customer PO', function () {
 		var po = s5.po || {};
 		dcs_dialog(frm, 'Reconcile Customer PO', [
 			{ fieldtype: 'Data', fieldname: 'po_reference', label: __('PO Reference'), default: po.reference, reqd: 1 },
@@ -3319,18 +3461,20 @@ function dcs_buttons(frm, s3, s4, s5) {
 		});
 	}, H);
 
-	frm.add_custom_button(__('Set Delivery Owner'), function () {
+	if (st.customer_award === 'Awarded' && auth.can_set_delivery_owner) add('Set Delivery Owner', function () {
 		dcs_dialog(frm, 'Set Delivery Owner', [
 			{ fieldtype: 'Link', fieldname: 'delivery_owner', label: __('Delivery Owner'), options: 'User', default: st.delivery_owner, reqd: 1 }
 		], 'Set', function (v, d) { dcs_run(frm, 'dcs_set_delivery_owner', { dcs: frm.doc.name, delivery_owner: v.delivery_owner }, d); });
 	}, H);
 
-	var open_conds = ((s5.conditions || {}).blockers || []).concat(((s5.conditions || {}).watch_items || [])).filter(function (x) { return x.state === 'Open'; });
+	var open_conds = (s5.projection === 'technical' ? s5.technical_conditions || [] : ((s5.conditions || {}).blockers || []).concat(((s5.conditions || {}).watch_items || []))).filter(function (x) {
+        return x.state === 'Open' && (x.domain === 'Technical' ? auth.can_clear_technical : auth.can_clear_commercial);
+    });
 	if (open_conds.length) {
-		frm.add_custom_button(__('Action a Condition'), function () {
+		add('Action a Condition', function () {
 			dcs_dialog(frm, 'Handover Condition', [
 				{ fieldtype: 'Select', fieldname: 'condition', label: __('Condition'), options: open_conds.map(function (x) { return x.name; }).join('\n'), reqd: 1 },
-				{ fieldtype: 'Select', fieldname: 'action', label: __('Action'), options: 'Clear\nAssign\nAccept Risk', reqd: 1 },
+				{ fieldtype: 'Select', fieldname: 'action', label: __('Action'), options: auth.can_override ? 'Clear\nAssign\nAccept Risk' : 'Clear\nAssign', reqd: 1 },
 				{ fieldtype: 'Small Text', fieldname: 'note', label: __('Note'), reqd: 1 },
 				{ fieldtype: 'Link', fieldname: 'assign_to', label: __('Assign To'), options: 'User' },
 				{ fieldtype: 'Check', fieldname: 'acknowledged', label: __('Acknowledged (required to accept a risk)') }
@@ -3340,10 +3484,10 @@ function dcs_buttons(frm, s3, s4, s5) {
 		}, H);
 	}
 
-	if (st.customer_award === 'Awarded' && (st.delivery_release || '').indexOf('Released') !== 0) {
-		frm.add_custom_button(__('Release to Delivery'), function () {
+	if (auth.can_release && st.customer_award === 'Awarded' && (st.delivery_release || '').indexOf('Released') !== 0) {
+		add('Release to Delivery', function () {
 			dcs_dialog(frm, 'Release to Delivery', [
-				{ fieldtype: 'Check', fieldname: 'override', label: __('Exceptional Managing Director override') },
+				{ fieldtype: 'Check', fieldname: 'override', label: __('Exceptional Managing Director override'), hidden: !auth.can_override },
 				{ fieldtype: 'Small Text', fieldname: 'reason', label: __('Override Reason'), depends_on: 'override' },
 				{ fieldtype: 'Check', fieldname: 'acknowledged', label: __('I acknowledge each overridden blocker remains unresolved and is carried as an accepted risk'), depends_on: 'override' },
 				{ fieldtype: 'Small Text', fieldname: 'note', label: __('Release Note') }
@@ -3360,11 +3504,11 @@ function dcs_buttons(frm, s3, s4, s5) {
 	// refuse them outright. No permission rule is reimplemented on the client.
 	var G = __('Governed Actions');
 	var dcs_portal = function (path) { window.open(path + '?dcs=' + encodeURIComponent(frm.doc.name), '_blank'); };
-	frm.add_custom_button(__('Working View'), function () { dcs_portal('/living-dcs'); }, G);
-	if (s3 && s3.ok) { frm.add_custom_button(__('Negotiation & Revision'), function () { dcs_portal('/negotiation-workspace'); }, G); }
-	if (s4 && s4.ok) { frm.add_custom_button(__('Approval'), function () { dcs_portal('/approval-workspace'); }, G); }
-	if (s5 && s5.ok) { frm.add_custom_button(__('Award & Handover (PO, Delivery, Reversal)'), function () { dcs_portal('/award-handover'); }, G); }
-	frm.add_custom_button(__('DCS Governance Workspace'), function () { frappe.set_route('dcs-governance'); }, G);
+	add('Working View', function () { dcs_portal('/living-dcs'); }, G);
+	if (s3 && s3.ok) { add('Negotiation & Revision', function () { dcs_portal('/negotiation-workspace'); }, G); }
+	if (s4 && s4.ok) { add('Approval', function () { dcs_portal('/approval-workspace'); }, G); }
+	if (s5 && s5.ok) { add('Award & Handover (PO, Delivery, Reversal)', function () { dcs_portal('/award-handover'); }, G); }
+	add('DCS Governance Workspace', function () { frappe.set_route('dcs-governance'); }, G);
 
 
 	// Governed Documents - NAVIGATION ONLY, exactly like the group above.
@@ -3377,12 +3521,16 @@ function dcs_buttons(frm, s3, s4, s5) {
 	};
 	var dproj = (s5 && s5.projection) || (s4 && s4.projection) || (s3 && s3.projection) || '';
 	if (dproj !== 'technical' && dproj !== 'reduced') {
-		frm.add_custom_button(__('Commercial Deal Cost Sheet'), function () { dcs_doc_out('commercial'); }, D);
-		frm.add_custom_button(__('Award & Reversal Evidence'), function () { dcs_doc_out('award'); }, D);
+		add('Commercial Deal Cost Sheet', function () { dcs_doc_out('commercial'); }, D);
+		add('Award & Reversal Evidence', function () { dcs_doc_out('award'); }, D);
 	}
-	frm.add_custom_button(__('Technical / Operations Handover'), function () { dcs_doc_out('handover'); }, D);
+	add('Technical / Operations Handover', function () { dcs_doc_out('handover'); }, D);
 
-	frm.page.set_inner_btn_group_as_primary(H);
+    var next=dcs_next_step(frm,s3,s4,s5);
+    if(next.group) frm.page.set_inner_btn_group_as_primary(__(next.group));
+    if(frm.doc.docstatus === 1 && !frm.is_dirty() && next.key && available[next.key]) {
+        frm.page.set_primary_action(__(next.label),available[next.key]);
+    }
 }
 
 
@@ -3414,15 +3562,13 @@ function dcs_boq_revision_dialog(frm, cap) {
     var preview = function () {
         if (!d) return;
         var items = d.get_value('boq_items') || [], labour = d.get_value('boq_resources') || [];
-        var cost = 0, sell = 0;
-        items.forEach(function (r) { cost += flt(r.qty) * flt(r.cost_rate); sell += flt(r.qty) * flt(r.selling_rate); });
-        labour.forEach(function (r) { cost += (flt(r.no_of_persons) && flt(r.no_of_days) ? flt(r.no_of_persons) * flt(r.no_of_days) : flt(r.hours)) * flt(r.cost_rate); });
-        (frm.doc.addtional_charges || []).forEach(function (r) { cost += flt(r.amount); });
+        var totals=dcs_boq_totals(items,labour,frm.doc.addtional_charges);
+        var cost=totals.cost, sell=totals.selling;
         if (!cap.can_customer_side) {
             d.fields_dict.preview.$wrapper.html('<div class="alert alert-info">Derived cost: <b>' + format_currency(cost, frm.doc.currency) + '</b>. Selling is preserved and margin is re-evaluated on the server.</div>');
             return;
         }
-        d.fields_dict.preview.$wrapper.html('<div class="alert alert-info">Derived cost: <b>' + format_currency(cost, frm.doc.currency) + '</b> · Selling: <b>' + format_currency(sell, frm.doc.currency) + '</b> · GP: <b>' + format_currency(sell-cost, frm.doc.currency) + '</b> · Margin: ' + (sell ? 100*(sell-cost)/sell : 0).toFixed(2) + '%</div>');
+        d.fields_dict.preview.$wrapper.html('<div class="alert alert-info">Derived cost: <b>' + format_currency(cost, frm.doc.currency) + '</b> · Selling: <b>' + format_currency(sell, frm.doc.currency) + '</b> · GP: <b>' + format_currency(sell-cost, frm.doc.currency) + '</b> · Margin: ' + (totals.margin === null ? 'Not priced' : totals.margin.toFixed(2) + '%') + '</div>');
     };
     var f = function (type, name, label, options, readonly) {
         return {fieldtype:type, fieldname:name, label:__(label), options:options, in_list_view:1, read_only:readonly ? 1 : 0, onchange:preview};
