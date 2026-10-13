@@ -262,7 +262,7 @@ def dcs_screen4(args):
 		result["why"] = {
 			"approval_reason": s.custom_approval_reason,
 			"threshold_crossed": "Concession from baseline " + str(s.custom_concession_percent_from_baseline or 0) + "% against a 16% manager approval threshold and a 26% ceiling.",
-			"policy_basis": "Immediate manager approval is required below 20% gross margin or when another approval trigger applies (including concession of at least 16%). Concession above 26% cannot be authorised. A rejected revision stays audited; revise this sheet and recalculate. At or above 20% with no other trigger, Manager reapproval is not required. The submitter\'s immediate manager is the final approver.",
+			"policy_basis": "Immediate manager approval is required below 20% gross margin or when another approval trigger applies (including concession of at least 16%). Concession above 26% cannot be authorised. A rejected revision stays audited; revise this sheet and recalculate. A revision following rejection requires fresh approval from its assigned immediate manager, regardless of recovered margin. The submitter\'s immediate manager is the final approver.",
 			"margin_gate": s.custom_margin_gate, "margin_gate_reason": s.custom_margin_gate_reason,
 			"margin_gate_note": "The 20% margin floor is an independent commercial gate. Approving this position does not clear it.",
 		}
@@ -337,10 +337,11 @@ def dcs_screen4(args):
 		result["consequences"] = {
 			"approved": approved_txt,
 			"returned": "The negotiation reopens at the current revision. No commercial position is authorised and the deal owner is expected to move the position again.",
-			"rejected": "This revision is rejected and retained in audit history. Revise the same sheet; approval is recalculated for the new position. At or above 20% margin with no other trigger, Manager reapproval is not required.",
+			"rejected": "This revision is rejected and retained in audit history. Revise the same sheet; approval is recalculated for the new position. Fresh assigned manager approval is required for the revised position, regardless of recovered margin.",
 			"endorsed": "Legacy endorsement is retained in history. New requests go directly to the assigned immediate manager.",
 		}
 		result["approvers"] = dict(route_for(s))
 		result["ok"] = 1
 
 	return result
+

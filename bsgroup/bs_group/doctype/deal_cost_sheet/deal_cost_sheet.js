@@ -2978,7 +2978,7 @@ function dcs_approval_presentation(frm, s5) {
         return {label:'Not evaluated', note:p.selling <= 0 ? 'Add selling prices, then record a BOQ revision.' : 'Record a revision to evaluate this legacy baseline.', color:'gray'};
     }
     if (p.approval_state === 'Rejected' || p.approval_state === 'Returned for Rework') {
-        return {label:p.approval_state, note:'Revise this sheet. The new position is evaluated independently; this decision stays in history.', color:'red'};
+        return {label:p.approval_state, note:'Revise this sheet. A revision after rejection requires fresh approval from its assigned manager, regardless of recovered margin; this decision stays in history.', color:'red'};
     }
     if (p.approval_required === 'Blocked') {
         return {label:'Rework required', note:'Concession exceeds the ceiling. Revise the commercial position.', color:'red'};

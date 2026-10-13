@@ -79,15 +79,50 @@ class IntegrationTestDCSManagerApproval(IntegrationTestCase):
         self.assertEqual(self.doc.custom_approved_by,self.manager)
         self.assertFalse(frappe.db.exists("ToDo",{"reference_type":"DCS Revision","reference_name":self.doc.custom_revision_reference,"status":"Open"}))
 
-    def test_reject_revise_recalculate_preserves_rejection_and_removes_reapproval(self):
+    def test_reject_revise_recalculate_requires_fresh_manager_approval(self):
         old=self.revise()
         frappe.set_user(self.manager)
         self.assertEqual(frappe.call(DECIDE,dcs=self.doc.name,action="Reject",reason="Recover margin")["ok"],1)
+        history=frappe.db.get_value("DCS Revision",old.name,
+            ["approval_state","decided_by","decided_on","decision_reason"],as_dict=True)
         new=self.revise(1200)
-        self.assertEqual(new.approval_requirement,"None")
-        self.assertEqual(frappe.db.get_value("DCS Revision",old.name,"approval_state"),"Rejected")
+        self.assertEqual(new.approval_requirement,"Manager")
+        self.assertEqual(new.approval_manager,self.manager)
+        self.assertEqual(self.doc.custom_approval_state,"Pending Manager")
+        self.assertFalse(authorised_position(self.doc))
+        self.assertTrue(frappe.db.exists("ToDo",{"reference_type":"DCS Revision","reference_name":new.name,"allocated_to":self.manager,"status":"Open"}))
+        for user in [self.submitter,self.other]:
+            frappe.set_user(user)
+            self.assertEqual(frappe.call(DECIDE,dcs=self.doc.name,action="Approve")["ok"],0)
+        frappe.set_user(self.manager)
+        self.assertEqual(frappe.call(DECIDE,dcs=self.doc.name,action="Approve")["ok"],1)
+        self.doc.reload()
         self.assertTrue(authorised_position(self.doc))
-        self.assertFalse(frappe.db.exists("ToDo",{"reference_type":"DCS Revision","reference_name":new.name,"status":"Open"}))
+        self.assertEqual(self.doc.custom_approved_revision_no,new.revision_no)
+        self.assertEqual(frappe.db.get_value("DCS Revision",old.name,list(history),as_dict=True),history)
+        self.assertEqual(frappe.db.count("DCS Governance Event",{"dcs":self.doc.name,"event_code":"DCS_APPROVAL_REJECTED"}),1)
+        self.assertEqual(frappe.db.count("DCS Governance Event",{"dcs":self.doc.name,"event_code":"DCS_APPROVAL_APPROVED"}),1)
+
+    def test_repeat_revision_cannot_wash_away_rejection(self):
+        old=self.revise()
+        frappe.set_user(self.manager)
+        self.assertEqual(frappe.call(DECIDE,dcs=self.doc.name,action="Reject",reason="Revise")["ok"],1)
+        self.revise(1200)
+        new=self.revise(1100)
+        self.assertEqual(new.approval_requirement,"Manager")
+        self.assertFalse(authorised_position(self.doc))
+        self.assertEqual(frappe.db.get_value("DCS Revision",old.name,"approval_state"),"Rejected")
+
+    def test_recovery_with_missing_manager_stays_unauthorised(self):
+        self.revise()
+        frappe.set_user(self.manager)
+        self.assertEqual(frappe.call(DECIDE,dcs=self.doc.name,action="Reject",reason="Revise")["ok"],1)
+        frappe.set_user("Administrator")
+        frappe.db.set_value("Employee",self.submitter_emp,"reports_to","")
+        new=self.revise(1100)
+        self.assertEqual(new.approval_requirement,"Manager")
+        self.assertTrue(new.approval_routing_error)
+        self.assertFalse(authorised_position(self.doc))
 
     def test_revised_below_floor_still_requires_manager_approval(self):
         old=self.revise()
@@ -242,3 +277,4 @@ class IntegrationTestDCSManagerApproval(IntegrationTestCase):
             route = resolve_manager(self.submitter)
             self.assertEqual(route["approval_manager"], self.manager)
             self.assertEqual(route["submitter_employee"], self.submitter_emp)
+

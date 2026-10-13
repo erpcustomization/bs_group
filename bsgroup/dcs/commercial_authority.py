@@ -9,7 +9,9 @@ def authorised_position(sheet):
         return False
     baseline = flt(sheet.custom_baseline_selling)
     concession = (baseline-selling)/baseline*100 if baseline else 0
-    required = requirement(concession, (selling-cost)/selling*100)
+    from bsgroup.dcs.rejection_review import requires_fresh_approval
+    fresh_approval = requires_fresh_approval(sheet, before_revision=sheet.custom_dcs_revision_no)
+    required = requirement(concession, (selling-cost)/selling*100, fresh_approval)
     if required == "Blocked" or sheet.custom_approval_required == "Blocked":
         return False
     if sheet.custom_approval_state in ("Rejected", "Returned for Rework"):
@@ -22,6 +24,8 @@ def authorised_position(sheet):
         ["dcs", "approval_state", "decided_by"], as_dict=True)
     from bsgroup.dcs.manager_approval import route_for
     route = route_for(sheet)
+    if fresh_approval and (route.get("approval_policy") != "Immediate Manager" or route.get("approval_routing_error") or not frappe.db.get_value("User", sheet.custom_approved_by, "enabled")):
+        return False
     if route.get("approval_policy") == "Immediate Manager" and (not route.get("approval_manager") or route.approval_manager != sheet.custom_approved_by or route.changed_by == sheet.custom_approved_by):
         return False
     return bool(revision and revision.dcs == sheet.name and revision.approval_state == "Approved"
@@ -29,3 +33,4 @@ def authorised_position(sheet):
                 and revision.decided_by
                 and abs(flt(sheet.custom_approved_total_cost)-cost) <= 0.005
                 and abs(flt(sheet.custom_approved_total_selling)-selling) <= 0.005)
+

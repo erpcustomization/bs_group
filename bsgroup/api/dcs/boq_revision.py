@@ -291,7 +291,9 @@ def _apply(args):
     nc, ns = flt(proposed.total_cost), flt(proposed.total_selling)
     baseline = ns if unpriced else flt(sheet.custom_baseline_selling)
     nm, ncon = pct(ns-nc, ns), pct(baseline-ns, baseline)
-    req, gate = requirement(ncon, nm), gate_for(nm)
+    from bsgroup.dcs.rejection_review import requires_fresh_approval
+    fresh_approval = requires_fresh_approval(sheet)
+    req, gate = requirement(ncon, nm, fresh_approval), gate_for(nm)
     no = (sheet.custom_dcs_revision_no or 0) + 1
     rev = write_revision(sheet.name, no, args["source"], args["reason"], pc, ps,
         pct(ps-pc, ps), flt(sheet.custom_concession_percent_from_baseline), nc, ns,
@@ -304,7 +306,7 @@ def _apply(args):
         "custom_working_margin_percent": nm, "custom_concession_percent_from_baseline": ncon,
         "custom_baseline_selling": baseline,
         "custom_approval_state": state_for(req), "custom_approval_required": req,
-        "custom_approval_reason": why_approval(ncon, nm), "custom_margin_gate": gate,
+        "custom_approval_reason": why_approval(ncon, nm, fresh_approval), "custom_margin_gate": gate,
         "custom_margin_gate_reason": why_gate(nm)}, update_modified=True)
     proposed.reload()
     from bsgroup.dcs.quotation_control import supersede_submitted
@@ -342,3 +344,4 @@ def settle_predecessor(amendment):
             action_label="Supersede predecessor BOQ history with the amendment's own baseline",
             source_endpoint="deal_cost_sheet.on_submit", reason=f"Amended from {amendment.amended_from}; prior movements are not applied again.",
             changes=changes, request_key=make_request_key("dcs_boq_settlement", {"amendment": amendment.name}))
+
