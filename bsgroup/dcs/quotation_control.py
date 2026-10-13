@@ -3,9 +3,12 @@ import frappe
 from frappe.utils import flt
 
 def validate_quotation(doc, method=None):
+    previous = doc.get_doc_before_save()
+    if previous and previous.get("custom_deal_cost_sheet") and previous.get("custom_deal_cost_sheet") != doc.get("custom_deal_cost_sheet"):
+        frappe.throw("Quotation DCS lineage cannot be removed or changed. Use a governed replacement quotation.")
     if doc.docstatus == 2 or not doc.get("custom_deal_cost_sheet"):
         return
-    sheet = frappe.get_doc("Deal Cost Sheet", doc.custom_deal_cost_sheet)
+    sheet = frappe.get_doc("Deal Cost Sheet", doc.custom_deal_cost_sheet, for_update=True)
     validate_position(sheet, doc)
     if doc.docstatus == 0:
         doc.custom_dcs_revision_reference = sheet.custom_revision_reference
@@ -14,6 +17,11 @@ def validate_position(sheet, quotation):
     from bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet import quotation_deal_identity
     if sheet.docstatus != 1 or sheet.custom_superseded_by:
         frappe.throw("This quotation refers to a cancelled, unsubmitted or superseded Deal Cost Sheet.")
+    if quotation.docstatus == 1:
+        from bsgroup.dcs.rejection_review import requires_fresh_approval
+        from bsgroup.dcs.commercial_authority import authorised_position
+        if (sheet.custom_approval_state == "Rejected" or requires_fresh_approval(sheet, before_revision=sheet.custom_dcs_revision_no)) and not authorised_position(sheet):
+            frappe.throw("This revised DCS position requires fresh assigned manager approval before quotation submission or use.")
     currency = sheet.currency or frappe.db.get_value("Company", sheet.company, "default_currency")
     if currency and quotation.currency != currency:
         frappe.throw("Quotation currency differs from the Deal Cost Sheet.")
@@ -41,6 +49,12 @@ def validate_sales_order(doc, method=None):
     if doc.docstatus == 2:
         return
     names = {r.get("prevdoc_docname") for r in doc.items if r.get("prevdoc_docname")}
+    previous = doc.get_doc_before_save()
+    if previous:
+        old_names = {r.get("prevdoc_docname") for r in previous.items if r.get("prevdoc_docname")}
+        for name in old_names - names:
+            if frappe.db.get_value("Quotation", name, "custom_deal_cost_sheet"):
+                frappe.throw("Sales Order DCS quotation lineage cannot be removed. Use a replacement order for a changed scope.")
     for name in sorted(names):
         quotation = frappe.get_doc("Quotation", name)
         if not quotation.get("custom_deal_cost_sheet"):
@@ -49,7 +63,7 @@ def validate_sales_order(doc, method=None):
         validate_position(sheet, quotation)
         from bsgroup.dcs.commercial_authority import authorised_position
         if not authorised_position(sheet):
-            frappe.throw("The current DCS position requires recorded Managing Director approval before a Sales Order can be created or submitted.")
+            frappe.throw("The current DCS position requires recorded assigned manager approval before a Sales Order can be created or submitted.")
 
 def supersede_submitted(sheet):
     changes = []
@@ -71,7 +85,7 @@ def make_sales_order(source_name, target_doc=None, args=None):
         validate_position(sheet, quotation)
         from bsgroup.dcs.commercial_authority import authorised_position
         if not authorised_position(sheet):
-            frappe.throw("The current DCS position requires recorded Managing Director approval before conversion to Sales Order.")
+            frappe.throw("The current DCS position requires recorded assigned manager approval before conversion to Sales Order.")
     from erpnext.selling.doctype.quotation.quotation import make_sales_order as core_make_sales_order
     return core_make_sales_order(source_name, target_doc, args)
 
@@ -80,6 +94,7 @@ def guard_lineage(doc, method=None):
     previous = doc.get_doc_before_save()
     if not previous:
         return
-    for field in ("custom_dcs_revision_reference", "custom_dcs_superseded_revision"):
+    for field in ("custom_deal_cost_sheet", "custom_dcs_revision_reference", "custom_dcs_superseded_revision"):
         if str(doc.get(field) or "") != str(previous.get(field) or ""):
             frappe.throw("Submitted quotation lineage is governed by the DCS service and cannot be edited.")
+

@@ -89,20 +89,24 @@ class IntegrationTestDCSAuditControls(IntegrationTestCase):
         self.assertFalse(authorised_position(self.doc))
         self.assertEqual(self.award()["ok"], 0)
 
-    def test_reject_revise_exact_floor_proceeds_and_retains_rejection(self):
+    def test_reject_revise_exact_floor_needs_approval_and_retains_rejection(self):
         self.revise(new_total_cost=1250)
         old = self.reject()
         self.revise(new_total_cost=1200)
         self.assertEqual(self.doc.custom_working_margin_percent, 20)
-        self.assertEqual(self.doc.custom_approval_required, "None")
-        self.assertTrue(authorised_position(self.doc))
+        self.assertEqual(self.doc.custom_approval_required, "Manager")
+        self.assertFalse(authorised_position(self.doc))
         rejected = frappe.get_doc("DCS Revision", old)
         self.assertEqual(rejected.approval_state, "Rejected")
         self.assertEqual(rejected.decided_by, self.manager)
         self.assertEqual(rejected.decision_reason, "ZZTEST rejected margin")
         self.assertEqual(self.doc.docstatus, 1)
-        self.assertEqual(self.award()["ok"], 1)
+        self.assertEqual(self.award()["ok"], 0)
         self.assertEqual(frappe.db.count("DCS Governance Event", {"dcs": self.doc.name, "event_code": "DCS_APPROVAL_APPROVED"}), 0)
+
+        self.assertEqual(self.decide(action="Approve")["ok"],1)
+        self.doc.reload()
+        self.assertEqual(self.award()["ok"],1)
 
     def test_reject_revise_below_floor_still_requires_manager(self):
         self.revise(new_total_cost=1300)
@@ -223,9 +227,9 @@ class IntegrationTestDCSAuditControls(IntegrationTestCase):
         self.assertEqual(bridge["current"]["gp"],300)
         self.assertEqual(bridge["gp_impacts"]["vendor"],-200)
         self.assertEqual(bridge["unreconciled_gp"],0)
-        self.assertEqual(bridge["approval_required"],"None")
+        self.assertEqual(bridge["approval_required"],"Manager")
 
-    def test_boq_below_floor_then_rejected_revision_recovers_without_manager(self):
+    def test_boq_recovery_blocks_quotation_order_and_award_until_manager_approval(self):
         from bsgroup.api.dcs.test_dcs_boq_revision import payload
         def apply(cost):
             self.doc.reload()
@@ -240,8 +244,31 @@ class IntegrationTestDCSAuditControls(IntegrationTestCase):
         self.assertEqual(self.doc.custom_approval_required,"Manager")
         old = self.reject()
         apply(1200)
-        self.assertEqual(self.doc.custom_approval_required,"None")
+        self.assertEqual(self.doc.custom_approval_required,"Manager")
         self.assertEqual(frappe.db.get_value("DCS Revision",old,"approval_state"),"Rejected")
+        self.assertEqual(self.award()["ok"],0)
+        q=make_quotation_for(self.doc)
+        # Draft preparation is permitted; submission and conversion are gated.
+        validate_position(self.doc,q)
+        q.docstatus=1
+        q.custom_dcs_revision_reference=self.doc.custom_revision_reference
+        with self.assertRaises(frappe.ValidationError):
+            validate_position(self.doc,q)
+        q.docstatus=0
+        from bsgroup.dcs.quotation_control import make_sales_order
+        with patch("frappe.get_doc",side_effect=[q,self.doc]):
+            with self.assertRaises(frappe.ValidationError):
+                make_sales_order(q.name)
+        order=frappe.get_doc({"doctype":"Sales Order","items":[{"prevdoc_docname":q.name}]})
+        with patch("frappe.get_doc",side_effect=[q,self.doc]):
+            with self.assertRaises(frappe.ValidationError):
+                validate_sales_order(order)
+        self.assertEqual(self.decide(action="Approve")["ok"],1)
+        self.doc.reload()
+        q.docstatus=1
+        validate_position(self.doc,q)
+        with patch("frappe.get_doc",side_effect=[q,self.doc]):
+            validate_sales_order(order)
         self.assertEqual(self.award()["ok"],1)
 
     def test_quotation_from_charges_matches_dcs_selling_total(self):
@@ -311,3 +338,4 @@ class IntegrationTestDCSAuditControls(IntegrationTestCase):
         self.doc = d
         self.assertEqual(self.award()["ok"],0)
         self.assertFalse(authorised_position(d))
+

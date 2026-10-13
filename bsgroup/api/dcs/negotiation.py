@@ -5,7 +5,7 @@ Ported from the production Server Scripts of the same names
 ``dcs_screen3.py``). Business rules are unchanged:
 
 * approval routing checks concession and margin independently
-  (>= 16 % concession or < 20 % margin: Managing Director; > 26 % concession: Blocked);
+  (>= 16 % concession, < 20 % margin or revision after rejection: immediate manager; > 26 % concession: Blocked);
 * the 20 % margin floor is an independent gate, never cleared by approval;
 * every movement is an immutable DCS Revision; the sheet is never cancelled
   or amended.
@@ -38,17 +38,19 @@ def num(v, fallback):
 	return float(v)
 
 
-def requirement(concession, margin=None):
+def requirement(concession, margin=None, fresh_approval=False):
 	if concession > CEILING:
 		return "Blocked"
-	if concession >= MD_THRESHOLD or (margin is not None and margin < MARGIN_FLOOR):
+	if fresh_approval or concession >= MD_THRESHOLD or (margin is not None and margin < MARGIN_FLOOR):
 		return "Manager"
 	return "None"
 
 
-def why_approval(concession, margin=None):
+def why_approval(concession, margin=None, fresh_approval=False):
 	if concession > CEILING:
 		return "Concession " + str(concession) + "% from baseline is above the 26% ceiling. No approver may authorise this position."
+	if fresh_approval:
+		return "An earlier commercial position was rejected. This revision requires fresh approval from its assigned immediate manager, regardless of recovered margin."
 	if margin is not None and margin < MARGIN_FLOOR:
 		return "Gross margin " + str(margin) + "% is below the 20% floor and requires immediate manager approval."
 	if concession >= MD_THRESHOLD:
@@ -206,9 +208,11 @@ def dcs_apply_revision(args):
 
 			new_margin = pct((new_sell - new_cost), new_sell)
 			new_con = pct((baseline - new_sell), baseline)
-			req = requirement(new_con, new_margin)
+			from bsgroup.dcs.rejection_review import requires_fresh_approval
+			fresh_approval = requires_fresh_approval(sheet)
+			req = requirement(new_con, new_margin, fresh_approval)
 			mg = gate_for(new_margin)
-			appr_text = why_approval(new_con, new_margin)
+			appr_text = why_approval(new_con, new_margin, fresh_approval)
 			gate_text = why_gate(new_margin)
 
 			if only_init == 1:
@@ -287,10 +291,10 @@ def advisory_win(c, m, req):
 	return p
 
 
-def scenario(key, label, cost, sell, baseline, rationale):
+def scenario(key, label, cost, sell, baseline, rationale, fresh_approval=False):
 	m = pct((sell - cost), sell)
 	c = pct((baseline - sell), baseline)
-	req = requirement(c, m)
+	req = requirement(c, m, fresh_approval)
 	g = gate_for(m)
 	blocker = ""
 	if req == "Blocked":
@@ -389,7 +393,7 @@ def dcs_screen3(args):
 
 		result["policy"] = {
 			"md_threshold_percent": MD_THRESHOLD, "concession_ceiling_percent": CEILING, "margin_floor_percent": MARGIN_FLOOR,
-			"basis": "Immediate manager approval is required below 20% gross margin or at least 16% concession. Concession above 26% cannot be authorised. Each new revision is evaluated independently; a rejected revision remains audited. Approval does not clear delivery conditions.",
+			"basis": "Immediate manager approval is required below 20% gross margin or at least 16% concession. Concession above 26% cannot be authorised. A revision following rejection requires fresh approval from its assigned manager, regardless of recovered margin; the rejected revision remains audited. Approval does not clear delivery conditions.",
 		}
 
 		result["revisions"] = revisions
@@ -419,14 +423,16 @@ def dcs_screen3(args):
 		target = None
 		if target_raw and target_raw != "":
 			target = float(target_raw)
-		scn = [scenario("hold", "Hold", wc, ws, baseline, "Do not move. Defend the current position on value.")]
+		from bsgroup.dcs.rejection_review import requires_fresh_approval
+		fresh_approval = requires_fresh_approval(s)
+		scn = [scenario("hold", "Hold", wc, ws, baseline, "Do not move. Defend the current position on value.", fresh_approval)]
 		if target is not None:
 			if target > 0:
 				mid = (ws + target) / 2.0
-				scn.append(scenario("counter", "Counter", wc, mid, baseline, "Meet the customer approximately half way between the current position and their target."))
-				scn.append(scenario("accept", "Accept customer target", wc, target, baseline, "Concede fully to the stated customer target."))
+				scn.append(scenario("counter", "Counter", wc, mid, baseline, "Meet the customer approximately half way between the current position and their target.", fresh_approval))
+				scn.append(scenario("accept", "Accept customer target", wc, target, baseline, "Concede fully to the stated customer target.", fresh_approval))
 		else:
-			scn.append(scenario("counter", "Counter (indicative 5% move)", wc, ws * 0.95, baseline, "Indicative only. Enter a customer target to model a real counter."))
+			scn.append(scenario("counter", "Counter (indicative 5% move)", wc, ws * 0.95, baseline, "Indicative only. Enter a customer target to model a real counter.", fresh_approval))
 		result["scenarios"] = scn
 		result["scenario_notice"] = "Scenarios are advisory modelling only. They are not decisions, are not recorded, and no revision exists until Apply and Continue is used."
 
@@ -436,7 +442,7 @@ def dcs_screen3(args):
 			pc = float(p_cost) if p_cost else wc
 			ps = float(p_sell) if p_sell else ws
 			if ps > 0:
-				result["preview"] = scenario("preview", "Proposed position", pc, ps, baseline, "Live impact of the values currently entered.")
+				result["preview"] = scenario("preview", "Proposed position", pc, ps, baseline, "Live impact of the values currently entered.", fresh_approval)
 
 		ci = {"customer": s.customer, "available": 0}
 		if s.customer:
@@ -475,3 +481,4 @@ def dcs_screen3(args):
 		result["ok"] = 1
 
 	return result
+
