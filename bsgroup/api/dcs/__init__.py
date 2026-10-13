@@ -15,6 +15,8 @@ implementation package for their retirement.
 """
 
 ENDPOINTS = {
+	"dcs_screen1": "bsgroup.api.dcs.command_center.dcs_screen1",
+	"dcs_screen2": "bsgroup.api.dcs.living.dcs_screen2",
 	"dcs_apply_revision": "bsgroup.api.dcs.negotiation.dcs_apply_revision",
 	"dcs_screen3": "bsgroup.api.dcs.negotiation.dcs_screen3",
 	"dcs_approval_decision": "bsgroup.api.dcs.approval.dcs_approval_decision",

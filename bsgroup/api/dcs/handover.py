@@ -111,6 +111,12 @@ SHEET_RELEASE_FIELDS = ["custom_delivery_release_state"]
 VALID_ACTIONS = ["Chase", "Assign", "Hold", "Return", "Clear", "Accept Risk"]
 
 
+def margin_still_below_floor(sheet_name):
+	s = frappe.db.get_value("Deal Cost Sheet", sheet_name, ["custom_dcs_revision_no", "custom_working_margin_percent", "margin_percent", "custom_margin_gate"], as_dict=True) or {}
+	margin = s.get("custom_working_margin_percent") if (s.get("custom_dcs_revision_no") or 0) > 0 else s.get("margin_percent")
+	return s.get("custom_margin_gate") == "Blocked" or float(margin or 0) < MARGIN_FLOOR
+
+
 @governed_endpoint("dcs_handover_action", perm_doctype="DCS Handover Condition", ptype="write")
 def dcs_handover_action(args):
 	result = {"ok": 0, "error": "", "action": "", "condition": {}}
@@ -203,6 +209,10 @@ def dcs_handover_action(args):
 		result["error"] = "A note is required to " + str(action) + " a condition."
 	elif action == "Clear" and not note:
 		result["error"] = "A clearance note is required. A condition is never cleared silently."
+	elif action == "Clear" and c.source_key == "margin_gate" and margin_still_below_floor(sheet_of):
+		result["error"] = ("The margin floor blocker cannot be cleared while the living margin is still below the "
+			+ str(MARGIN_FLOOR) + "% floor. Correct the commercial position, or the Managing Director must accept it as a risk "
+			"(or override at release) with a written reason.")
 	elif nrc_chk["block"] != "":
 		result["error"] = nrc_chk["block"]
 		result["narrative_guard"] = "blocked"

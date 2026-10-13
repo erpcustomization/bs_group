@@ -184,7 +184,7 @@ def _sync_quotation(sheet, requested):
     expected_currency = sheet.currency or frappe.db.get_value("Company", sheet.company, "default_currency")
     if q.currency != expected_currency:
         frappe.throw("The linked Quotation currency differs from the BOQ; review it separately.")
-    if any(flt(r.amount) for r in sheet.addtional_charges or []):
+    if any(flt(r.get("selling_amount")) for r in sheet.addtional_charges or []):
         frappe.throw("Quotation sync with separate additional charges requires a commercial review. Represent quoted charges as selling item rows first, or leave the Quotation unchanged.")
     # Do not call make_quotation: that legacy endpoint inserts and commits a
     # new document. This action updates only the already locked draft and must
@@ -201,6 +201,10 @@ def _sync_quotation(sheet, requested):
             "custom_selling_rate": row.selling_rate, "price_list_rate": row.selling_rate,
             "discount_percentage": 0, "rate": row.selling_rate})
     q.set("items", items)
+    # The draft was created by make_quotation with ignore_mandatory; quotation
+    # mandatory fields (e.g. payment terms) are enforced when it is submitted,
+    # not when the governed BOQ sync refreshes its lines.
+    q.flags.ignore_mandatory = True
     q.save()
     if abs(flt(q.total)-flt(sheet.total_selling)) > 0.005:
         frappe.throw("Quotation pricing rules or discounts changed the derived selling total. Review them before synchronising; this revision was not saved.")
@@ -276,13 +280,18 @@ def _apply(args):
     # client flag can grant it; payloads cannot change fields outside the BOQ.
     proposed.flags.bsg_boq_revision = _SAVE_TOKEN
     proposed.flags.ignore_validate_update_after_submit = True
+    # Authority was decided above (governed endpoint write check, per-line buying/selling
+    # authority, MD-only reconciliation). DocType 'submit' permission is not the control here:
+    # Commercial Controller and Managing Director hold no submit right, which made every
+    # CC/MD BOQ revision - including the MD-only header reconciliation - fail with 403.
+    proposed.flags.ignore_permissions = True
     proposed.save()
     proposed.reload()
     history = line_history(sheet, proposed)
     nc, ns = flt(proposed.total_cost), flt(proposed.total_selling)
     baseline = ns if unpriced else flt(sheet.custom_baseline_selling)
     nm, ncon = pct(ns-nc, ns), pct(baseline-ns, baseline)
-    req, gate = requirement(ncon), gate_for(nm)
+    req, gate = requirement(ncon, nm), gate_for(nm)
     no = (sheet.custom_dcs_revision_no or 0) + 1
     rev = write_revision(sheet.name, no, args["source"], args["reason"], pc, ps,
         pct(ps-pc, ps), flt(sheet.custom_concession_percent_from_baseline), nc, ns,
@@ -295,11 +304,14 @@ def _apply(args):
         "custom_working_margin_percent": nm, "custom_concession_percent_from_baseline": ncon,
         "custom_baseline_selling": baseline,
         "custom_approval_state": state_for(req), "custom_approval_required": req,
-        "custom_approval_reason": why_approval(ncon), "custom_margin_gate": gate,
+        "custom_approval_reason": why_approval(ncon, nm), "custom_margin_gate": gate,
         "custom_margin_gate_reason": why_gate(nm)}, update_modified=True)
     proposed.reload()
+    from bsgroup.dcs.quotation_control import supersede_submitted
+    supersession_changes = supersede_submitted(proposed)
     quotation_note = _sync_quotation(proposed, truthy_flag(args.get("update_quotation")))
     changes = diff_changes(D2A_FIELDS, before, snapshot("Deal Cost Sheet", sheet.name, D2A_FIELDS), "Deal Cost Sheet", sheet.name)
+    changes += supersession_changes
     if quote_changed and sheet.custom_quotation and not truthy_flag(args.get("update_quotation")):
         if sheet.custom_deal_status == "Quoted":
             frappe.db.set_value("Deal Cost Sheet", sheet.name, "custom_deal_status", "Submitted to Sales", update_modified=True)

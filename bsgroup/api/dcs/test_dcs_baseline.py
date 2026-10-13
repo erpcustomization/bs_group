@@ -97,6 +97,11 @@ class IntegrationTestDCSBaseline(IntegrationTestCase):
     def test_low_margin_remains_delivery_blocker(self):
         doc = self.sheet(items=[{"item_code": frappe.db.get_value("Item", {"disabled": 0}, "name"), "qty": 1, "cost_rate": 2093, "selling_rate": 2500}])
         self.assertEqual(doc.custom_margin_gate, "Blocked")
+        self.assertEqual(doc.custom_approval_required, "Managing Director")
+        self.assertEqual(self.award(doc)["ok"], 0)
+        approval = frappe.call("bsgroup.api.dcs.approval.dcs_approval_decision",
+                              dcs=doc.name, action="Approve", reason="ZZTEST MD margin exception")
+        self.assertEqual(approval["ok"], 1, approval)
         result = self.award(doc)
         self.assertEqual(result["ok"], 1, result)
         self.assertEqual(result["state"]["delivery_release_state"], "Blocked")

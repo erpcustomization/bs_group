@@ -25,7 +25,7 @@ AWARD_FIELDS = [
 	"custom_awarded_by", "custom_awarded_on", "custom_baseline_frozen", "custom_frozen_revision_no",
 	"custom_frozen_total_cost", "custom_frozen_total_selling", "custom_frozen_margin_percent", "custom_frozen_by",
 	"custom_frozen_on", "custom_delivery_release_state", "custom_po_recon_state", "custom_award_sequence_no",
-	"custom_award_reversal_state",
+	"custom_award_reversal_state", "custom_deal_status", "custom_outcome_date", "custom_opportunity_status",
 ]
 VALID_EVIDENCE = ["Customer PO", "Letter of Award", "Email Confirmation", "Verbal - Not Evidenced", "Not Provided"]
 
@@ -93,7 +93,8 @@ def dcs_record_award(args):
 		s = frappe.get_doc("Deal Cost Sheet", dcs_name, for_update=True)
 		req = s.custom_approval_required
 		appr = s.custom_approval_state
-		authorised = 1 if (req == "None" or appr == "Approved") else 0
+		from bsgroup.dcs.commercial_authority import authorised_position
+		authorised = int(authorised_position(s))
 
 		if s.custom_award_state == "Awarded":
 			result["error"] = "An award is already recorded on this Deal Cost Sheet on " + str(s.custom_awarded_on) + ". The commercial baseline is frozen and an award event cannot be recorded twice."
@@ -142,8 +143,23 @@ def dcs_record_award(args):
 				},
 				update_modified=True,
 			)
+			frappe.db.set_value("Deal Cost Sheet", dcs_name, {
+				"custom_deal_status": "Won", "custom_outcome_date": frappe.utils.nowdate(),
+				"custom_opportunity_status": "Converted"})
+			linked_changes = []
+			if s.opportunity:
+				old = snapshot("Opportunity", s.opportunity, ["status", "custom_quotation_outcome", "custom_quotation_outcome_date"])
+				frappe.db.set_value("Opportunity", s.opportunity, {"status": "Converted",
+					"custom_quotation_outcome": "Won", "custom_quotation_outcome_date": frappe.utils.nowdate()})
+				linked_changes = diff_changes(list(old), old, snapshot("Opportunity", s.opportunity, list(old)), "Opportunity", s.opportunity)
+			if s.presales_request:
+				old = snapshot("Presales Request", s.presales_request, ["status", "custom_deal_status"])
+				frappe.db.set_value("Presales Request", s.presales_request, {"status": "Won", "custom_deal_status": "Won"})
+				linked_changes += diff_changes(list(old), old, snapshot("Presales Request", s.presales_request, list(old)), "Presales Request", s.presales_request)
+				from bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet import dcs_presales_sync
+				dcs_presales_sync(s.presales_request)
 			after = snapshot("Deal Cost Sheet", dcs_name, AWARD_FIELDS)
-			moved = diff_changes(AWARD_FIELDS, before, after, "Deal Cost Sheet", dcs_name)
+			moved = diff_changes(AWARD_FIELDS, before, after, "Deal Cost Sheet", dcs_name) + linked_changes
 			anchor = frappe.db.get_value("Deal Cost Sheet", dcs_name, ["custom_dcs_revision_no", "custom_revision_reference"], as_dict=True) or {}
 			result["governance_event"] = audit_event(
 				dcs_name, "DCS_AWARD_RECORDED", "Record a customer award against the frozen commercial baseline", "dcs_record_award",
@@ -172,6 +188,7 @@ REVERSAL_FIELDS = [
 	"custom_award_state", "custom_award_reversal_state", "custom_award_reversal_ref", "custom_award_reversal_count",
 	"custom_award_reversed_by", "custom_award_reversed_on", "custom_award_reversal_reason",
 	"custom_operational_review_state", "custom_delivery_release_state", "custom_approval_state",
+	"custom_deal_status", "custom_outcome_date", "custom_opportunity_status",
 ]
 
 
@@ -310,8 +327,29 @@ def dcs_award_reversal(args):
 					},
 					update_modified=True,
 				)
+				reopened = "Quoted" if s.custom_quotation else "Submitted to Sales"
+				opportunity_state = "Quotation" if s.custom_quotation else "Open"
+				frappe.db.set_value("Deal Cost Sheet", dcs_name, {
+					"custom_deal_status": reopened, "custom_outcome_date": None,
+					"custom_opportunity_status": opportunity_state})
+				linked_changes = []
+				if s.opportunity and not frappe.db.exists("Deal Cost Sheet", {
+					"opportunity": s.opportunity, "name": ["!=", dcs_name], "docstatus": 1, "custom_award_state": "Awarded"}):
+					fields = ["status", "custom_quotation_outcome", "custom_quotation_outcome_date"]
+					old = snapshot("Opportunity", s.opportunity, fields)
+					frappe.db.set_value("Opportunity", s.opportunity, {"status": opportunity_state,
+						"custom_quotation_outcome": "", "custom_quotation_outcome_date": None})
+					linked_changes += diff_changes(fields, old, snapshot("Opportunity", s.opportunity, fields), "Opportunity", s.opportunity)
+				if s.presales_request and not frappe.db.exists("Deal Cost Sheet", {
+					"presales_request": s.presales_request, "name": ["!=", dcs_name], "docstatus": 1, "custom_award_state": "Awarded"}):
+					fields = ["status", "custom_deal_status"]
+					old = snapshot("Presales Request", s.presales_request, fields)
+					frappe.db.set_value("Presales Request", s.presales_request, {"status": "Submitted to Sales", "custom_deal_status": reopened})
+					linked_changes += diff_changes(fields, old, snapshot("Presales Request", s.presales_request, fields), "Presales Request", s.presales_request)
+					from bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet import dcs_presales_sync
+					dcs_presales_sync(s.presales_request)
 				after = snapshot("Deal Cost Sheet", dcs_name, REVERSAL_FIELDS)
-				moved = diff_changes(REVERSAL_FIELDS, before, after, "Deal Cost Sheet", dcs_name)
+				moved = diff_changes(REVERSAL_FIELDS, before, after, "Deal Cost Sheet", dcs_name) + linked_changes
 				anchor = frappe.db.get_value("Deal Cost Sheet", dcs_name, ["custom_dcs_revision_no", "custom_revision_reference"], as_dict=True) or {}
 				result["governance_event"] = audit_event(
 					dcs_name, "DCS_AWARD_REVERSED", "Reverse a recorded customer award under Managing Director authority", "dcs_award_reversal",

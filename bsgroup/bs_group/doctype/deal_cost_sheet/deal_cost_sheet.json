@@ -728,7 +728,7 @@
    "fieldname": "custom_approval_state",
    "fieldtype": "Select",
    "label": "Approval State",
-   "options": "\nNot Started\nIn Negotiation\nPending Endorsement",
+   "options": "\nNot Started\nIn Negotiation\nPending Endorsement\nEndorsed - Pending MD\nApproved\nReturned for Rework\nRejected\nBlocked",
    "permlevel": 1,
    "read_only": 1
   },
@@ -846,7 +846,7 @@
    "fieldname": "custom_award_evidence_type",
    "fieldtype": "Select",
    "label": "Award Evidence Type",
-   "options": "\nCustomer PO\nLetter of Award\nEmail Confirmation",
+   "options": "\nCustomer PO\nLetter of Award\nEmail Confirmation\nVerbal - Not Evidenced\nNot Provided",
    "permlevel": 1,
    "read_only": 1
   },
@@ -980,7 +980,7 @@
    "fieldname": "custom_operational_review_state",
    "fieldtype": "Select",
    "label": "Operational Review State",
-   "options": "\nNot Required\nRequired \u2013 Delivery Already",
+   "options": "\nNot Required\nRequired - Delivery Already Released",
    "permlevel": 1,
    "read_only": 1
   },
@@ -1084,7 +1084,7 @@
    "fieldname": "custom_delivery_release_state",
    "fieldtype": "Select",
    "label": "Delivery Release State",
-   "options": "\nNot Applicable\nPending\nBlocked\nOn Hold\nReleased",
+   "options": "\nNot Applicable\nPending\nBlocked\nOn Hold\nReleased\nReleased with MD Override",
    "permlevel": 1,
    "read_only": 1
   },
@@ -1270,6 +1270,12 @@
    "read": 1,
    "report": 1,
    "role": "Project Manager"
+  },
+  {
+   "role": "Presales",
+   "permlevel": 1,
+   "read": 1,
+   "write": 1
   }
  ],
  "row_format": "Dynamic",

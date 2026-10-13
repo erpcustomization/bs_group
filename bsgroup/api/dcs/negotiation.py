@@ -4,8 +4,8 @@ Ported from the production Server Scripts of the same names
 (``bsgroup/dcs/server_script_export/dcs_apply_revision.py`` and
 ``dcs_screen3.py``). Business rules are unchanged:
 
-* approval routing is driven by concession from baseline only
-  (>= 16 % Managing Director, > 26 % Blocked);
+* approval routing checks concession and margin independently
+  (>= 16 % concession or < 20 % margin: Managing Director; > 26 % concession: Blocked);
 * the 20 % margin floor is an independent gate, never cleared by approval;
 * every movement is an immutable DCS Revision; the sheet is never cancelled
   or amended.
@@ -24,7 +24,8 @@ from bsgroup.api.dcs._common import (
 def pct(numer, denom):
 	if not denom:
 		return 0.0
-	return int((((numer * 1.0) / denom) * 100000.0) + 0.5) / 1000.0
+	# Evaluate gates before display rounding: 19.999999% remains below the floor.
+	return (numer * 100.0) / denom
 
 
 def r2(v):
@@ -37,17 +38,19 @@ def num(v, fallback):
 	return float(v)
 
 
-def requirement(concession):
+def requirement(concession, margin=None):
 	if concession > CEILING:
 		return "Blocked"
-	if concession >= MD_THRESHOLD:
+	if concession >= MD_THRESHOLD or (margin is not None and margin < MARGIN_FLOOR):
 		return "Managing Director"
 	return "None"
 
 
-def why_approval(concession):
+def why_approval(concession, margin=None):
 	if concession > CEILING:
 		return "Concession " + str(concession) + "% from baseline is above the 26% ceiling. No approver may authorise this position."
+	if margin is not None and margin < MARGIN_FLOOR:
+		return "Gross margin " + str(margin) + "% is below the 20% floor and requires Managing Director approval."
 	if concession >= MD_THRESHOLD:
 		return "Concession " + str(concession) + "% from baseline is at or above 16%, which requires Managing Director approval."
 	return "Concession " + str(concession) + "% from baseline is below 16%. No discount sign-off is required."
@@ -203,16 +206,15 @@ def dcs_apply_revision(args):
 
 			new_margin = pct((new_sell - new_cost), new_sell)
 			new_con = pct((baseline - new_sell), baseline)
-			req = requirement(new_con)
+			req = requirement(new_con, new_margin)
 			mg = gate_for(new_margin)
-			appr_text = why_approval(new_con)
+			appr_text = why_approval(new_con, new_margin)
 			gate_text = why_gate(new_margin)
 
 			if only_init == 1:
 				next_no = 1
 				rev_name = str(dcs_name) + "-R1"
-				st = "Not Started"
-				appr_text = "Submitted commercial baseline initialised. No negotiation or approval decision recorded."
+				st = state_for(req) if req != "None" else "Not Started"
 			else:
 				next_no = rev_no + 1
 				st = state_for(req)
@@ -239,6 +241,10 @@ def dcs_apply_revision(args):
 				)
 				after = snapshot("Deal Cost Sheet", dcs_name, D2A_FIELDS)
 				moved = diff_changes(D2A_FIELDS, before, after, "Deal Cost Sheet", dcs_name)
+				if not only_init:
+					from bsgroup.dcs.quotation_control import supersede_submitted
+					sheet.reload()
+					moved += supersede_submitted(sheet)
 				result["governance_event"] = initialisation.get("governance_event") if only_init else audit_event(
 					dcs_name, "DCS_REVISION_APPLIED", "Apply a negotiated revision to the living commercial position",
 					"dcs_apply_revision", reason, next_no, rev_name, rev_name, moved,
@@ -284,7 +290,7 @@ def advisory_win(c, m, req):
 def scenario(key, label, cost, sell, baseline, rationale):
 	m = pct((sell - cost), sell)
 	c = pct((baseline - sell), baseline)
-	req = requirement(c)
+	req = requirement(c, m)
 	g = gate_for(m)
 	blocker = ""
 	if req == "Blocked":

@@ -155,6 +155,9 @@ frappe.ui.form.on("Deal Cost Item", {
 });
 
 frappe.ui.form.on("Additional Charges Item", {
+	selling_amount(frm) {
+		recalc_parent(frm);
+	},
 	amount(frm, cdt, cdn) {
 		recalc_parent(frm);
 	},
@@ -456,7 +459,8 @@ function recalc_parent(frm) {
 	});
 
 	const total_cost = products_cost_total + services_cost_total + additional_charges_total + total_resource_cost;
-	const total_selling = products_selling_total + services_selling_total;
+	const total_selling = products_selling_total + services_selling_total +
+		(frm.doc.addtional_charges || []).reduce((sum, row) => sum + flt(row.selling_amount), 0);
 	const margin_value = total_selling - total_cost;
 	const margin_percent = total_selling ? (margin_value / total_selling) * 100 : 0;
 
@@ -2877,8 +2881,10 @@ function render_summary_dashboard(frm) {
     var indigo = '#4f46e5';
     var amber = '#b45309';
 
-    var margin_color = d.margin_value > 0 ? green : '#dc2626';
-    var margin_pct = d.margin_percent ? d.margin_percent.toFixed(2) + '%' : '0.00%';
+    var bridge = frm.__dcs && frm.__dcs.s2 && frm.__dcs.s2.margin_bridge;
+    var current = bridge ? bridge.current : {cost: d.total_cost, selling: d.total_selling, gp: d.margin_value, margin_percent: d.margin_percent};
+    var margin_color = current.gp > 0 ? green : '#dc2626';
+    var margin_pct = (current.margin_percent || 0).toFixed(2) + '%';
 
     var opp_body = link_row('Opportunity', 'opportunity', d.opportunity) +
         link_row('Presales Request', 'presales-request', d.presales_request) +
@@ -2889,11 +2895,13 @@ function render_summary_dashboard(frm) {
         row('Prepared By', d.owner);
 
     var comm_body = '<div style="display:flex; flex-wrap:wrap; gap:10px;">' +
-        stat_box('Total Cost', fmt(d.total_cost), blue, '&#128181;') +
-        stat_box('Total Selling', fmt(d.total_selling), indigo, '&#128181;') +
-        stat_box('Gross Profit', '&#128176; ' + fmt(d.margin_value), margin_color, '&#128200;') +
+        stat_box('Current Cost', fmt(current.cost), blue, '&#128181;') +
+        stat_box('Current Selling', fmt(current.selling), indigo, '&#128181;') +
+        stat_box('Gross Profit', '&#128176; ' + fmt(current.gp), margin_color, '&#128200;') +
         stat_box('Margin %', margin_pct, amber, '&#127919;') +
         '</div>';
+
+    if (bridge) comm_body += row('Original GP', fmt(bridge.original.gp)) + row('GP Movement', fmt(bridge.gp_movement)) + row('Customer Impact', fmt(bridge.gp_impacts.customer)) + row('Vendor Impact', fmt(bridge.gp_impacts.vendor)) + row('Approval', frappe.utils.escape_html(bridge.approval_required + ' · ' + bridge.approval_state));
 
     var status_body = row('Workflow', workflow_badge) +
         row('Items', d.items ? d.items.length : 0) +
@@ -2984,6 +2992,7 @@ function dcs_set_html(frm, field, html) {
 // Server Script names are no longer called from the client.
 var DCS_METHODS = {
 	dcs_apply_revision: 'bsgroup.api.dcs.negotiation.dcs_apply_revision',
+	dcs_screen2: 'bsgroup.api.dcs.living.dcs_screen2',
 	dcs_screen3: 'bsgroup.api.dcs.negotiation.dcs_screen3',
 	dcs_approval_decision: 'bsgroup.api.dcs.approval.dcs_approval_decision',
 	dcs_screen4: 'bsgroup.api.dcs.approval.dcs_screen4',
@@ -3015,10 +3024,12 @@ function dcs_load(frm) {
 	Promise.all([
 		dcs_call('dcs_screen3', { dcs: n }),
 		dcs_call('dcs_screen4', { dcs: n }),
-		dcs_call('dcs_screen5', { dcs: n })
+		dcs_call('dcs_screen5', { dcs: n }),
+		dcs_call('dcs_screen2', { dcs: n })
 	]).then(function (res) {
 		var s3 = res[0] || {}, s4 = res[1] || {}, s5 = res[2] || {};
-		frm.__dcs = { s3: s3, s4: s4, s5: s5 };
+		frm.__dcs = { s3: s3, s4: s4, s5: s5, s2: res[3] || {} };
+		render_summary_dashboard(frm);
 		dcs_headline(frm, s5);
 		dcs_indicators(frm, s5);
 		dcs_render_negotiation(frm, s3);
@@ -3285,7 +3296,7 @@ function dcs_buttons(frm, s3, s4, s5) {
 	var record_award = function (relabel) {
 		dcs_dialog(frm, relabel || 'Record Award', [
 			{ fieldtype: 'Data', fieldname: 'award_reference', label: __('Award Reference'), reqd: 1 },
-			{ fieldtype: 'Select', fieldname: 'evidence_type', label: __('Evidence Type'), options: 'Customer PO\nSigned Quotation\nEmail Confirmation\nLetter of Award', reqd: 1 },
+			{ fieldtype: 'Select', fieldname: 'evidence_type', label: __('Evidence Type'), options: 'Customer PO\nLetter of Award\nEmail Confirmation\nVerbal - Not Evidenced\nNot Provided', reqd: 1 },
 			{ fieldtype: 'Small Text', fieldname: 'notes', label: __('Notes') },
 			{ fieldtype: 'HTML', fieldname: 'note', options: '<div class="text-muted small">Recording an award freezes the commercial baseline at the current living position. It does not release delivery.</div>' }
 		], relabel || 'Record Award', function (v, d) {

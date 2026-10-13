@@ -53,7 +53,7 @@ def dcs_approval_decision(args):
 	elif action == "Endorse" and is_cc == 0:
 		result["error"] = "Endorsement is a Commercial Controller action."
 	else:
-		s = frappe.get_doc("Deal Cost Sheet", dcs_name)
+		s = frappe.get_doc("Deal Cost Sheet", dcs_name, for_update=True)
 		s.check_permission("write")
 		req = s.custom_approval_required
 		state = s.custom_approval_state
@@ -318,7 +318,7 @@ def dcs_screen4(args):
 		result["consequences"] = {
 			"approved": approved_txt,
 			"returned": "The negotiation reopens at the current revision. No commercial position is authorised and the deal owner is expected to move the position again.",
-			"rejected": "This commercial position is closed. Nothing is authorised. A new negotiation would have to start from the current living position.",
+			"rejected": "This revision is rejected and retained in audit history. Revise the same sheet; approval is recalculated for the new position. At or above 20% margin with no other trigger, MD reapproval is not required.",
 			"endorsed": "The position is recorded as reviewed and endorsed and passes to the Managing Director, who remains the final approver. Endorsement authorises nothing on its own.",
 		}
 		result["approvers"] = {"managing_director": holders(MD), "commercial_controller": holders(CC), "basis": "Read from real Has Role assignments. No approver name is hard coded."}

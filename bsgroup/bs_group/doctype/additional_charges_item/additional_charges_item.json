@@ -8,7 +8,8 @@
  "field_order": [
   "charges_type",
   "description",
-  "amount"
+  "amount",
+  "selling_amount"
  ],
  "fields": [
   {
@@ -28,7 +29,14 @@
    "fieldname": "amount",
    "fieldtype": "Currency",
    "in_list_view": 1,
-   "label": "Amount"
+   "label": "Buying Amount"
+  },
+  {
+   "fieldname": "selling_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Selling Amount",
+   "default": "0"
   }
  ],
  "grid_page_length": 50,
