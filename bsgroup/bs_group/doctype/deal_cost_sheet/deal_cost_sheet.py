@@ -9,6 +9,19 @@ from bsgroup.utils.party import apply_party_model, require_customer, slug
 
 
 class DealCostSheet(Document):
+	def _cancel(self):
+		self.flags.ignore_links = False
+		from bsgroup.dcs.presales_lineage import atomic_lifecycle
+		return atomic_lifecycle(super()._cancel)
+
+	def _submit(self):
+		from bsgroup.dcs.presales_lineage import atomic_lifecycle
+		return atomic_lifecycle(super()._submit)
+
+	def before_cancel(self):
+		from bsgroup.dcs.presales_lineage import before_cancel
+		before_cancel(self)
+
 	def autoname(self):
 		# Named after the organisation (D2) with the same slug rule the customer
 		# text used, so DCS-<slug>-### names are unchanged for existing parties.
@@ -45,6 +58,8 @@ class DealCostSheet(Document):
 		dcs_record_authority_guard(self)
 
 	def before_submit(self):
+		from bsgroup.dcs.presales_lineage import amendment_request
+		amendment_request(self)
 		validate_deal_cost(self)
 		dcs_one_active_guard_submit(self)
 		dcs_submit_advance_presales_status(self)
@@ -58,6 +73,8 @@ class DealCostSheet(Document):
 			from bsgroup.dcs.baseline import ensure_baseline
 			ensure_baseline(self.name, "deal_cost_sheet.on_submit")
 			self.reload()
+		from bsgroup.dcs.presales_lineage import on_submit
+		on_submit(self)
 		dcs_amend_quotation_linkback(self)
 		from bsgroup.api.dcs.boq_revision import settle_predecessor
 		settle_predecessor(self)
