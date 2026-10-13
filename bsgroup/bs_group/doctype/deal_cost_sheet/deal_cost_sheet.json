@@ -745,11 +745,11 @@
    "collapsible_depends_on": ""
   },
   {
-   "description": "INCOMPLETE OPTION LIST: live register truncated this list with '...' after 'Pending Endorsement'. Additional options exist on the live site but were not visible in the register and were NOT guessed here. Verify against live site before relying on this Select for validation.",
+   "description": "Current approval state. Final decisions remain recorded in immutable revision history.",
    "fieldname": "custom_approval_state",
    "fieldtype": "Select",
    "label": "Approval State",
-   "options": "\nNot Started\nIn Negotiation\nPending Endorsement\nEndorsed - Pending MD\nApproved\nReturned for Rework\nRejected\nBlocked",
+   "options": "\nNot Started\nIn Negotiation\nPending Endorsement\nEndorsed - Pending MD\nApproved\nReturned for Rework\nRejected\nBlocked\nPending Manager",
    "permlevel": 1,
    "read_only": 1
   },
@@ -757,7 +757,7 @@
    "fieldname": "custom_approval_required",
    "fieldtype": "Select",
    "label": "Approval Required",
-   "options": "\nNone\nManaging Director\nBlocked",
+   "options": "\nNone\nManaging Director\nBlocked\nManager",
    "permlevel": 1,
    "read_only": 1
   },

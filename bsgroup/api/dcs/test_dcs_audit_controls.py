@@ -3,7 +3,7 @@ from unittest.mock import patch
 import json
 import frappe
 from frappe.tests import IntegrationTestCase
-from bsgroup.tests.dcs_fixtures import ensure, make_dcs, make_user
+from bsgroup.tests.dcs_fixtures import ensure, make_dcs, make_user, make_reporting_line
 from bsgroup.api.dcs.test_dcs_vendor_revision import make_quotation_for
 from bsgroup.dcs.quotation_control import validate_sales_order, validate_position
 from bsgroup.dcs.commercial_authority import authorised_position
@@ -24,10 +24,22 @@ class IntegrationTestDCSAuditControls(IntegrationTestCase):
         cls.sales = make_user("zztest-audit-sales@example.com", ["Sales User"])
         cls.tech = make_user("zztest-audit-tech@example.com", ["Technical Engineer"])
 
+        cls.manager = make_user("zztest-audit-manager@example.com", ["Employee"])
+
     def setUp(self):
         super().setUp()
         frappe.set_user("Administrator")
+        make_reporting_line(self.md, self.manager)
+        make_reporting_line(self.presales, self.manager)
         self.doc = make_dcs(suffix=frappe.generate_hash(length=8), submit=True)
+
+    def decide(self, **args):
+        actor = frappe.session.user
+        frappe.set_user(self.manager)
+        try:
+            return frappe.call("bsgroup.api.dcs.approval.dcs_approval_decision", dcs=self.doc.name, **args)
+        finally:
+            frappe.set_user(actor)
 
     def tearDown(self):
         frappe.set_user("Administrator")
@@ -46,29 +58,30 @@ class IntegrationTestDCSAuditControls(IntegrationTestCase):
 
     def reject(self):
         frappe.set_user(self.md)
-        result = frappe.call(DECIDE, dcs=self.doc.name, action="Reject", reason="ZZTEST rejected margin")
+        result = self.decide( action="Reject", reason="ZZTEST rejected margin")
         self.assertEqual(result["ok"], 1, result)
         self.doc.reload()
         return self.doc.custom_revision_reference
 
-    def test_initial_below_floor_requires_md_even_without_concession(self):
+    def test_initial_below_floor_requires_manager_even_without_concession(self):
+        frappe.set_user(self.md)
         d = make_dcs(suffix=frappe.generate_hash(length=8), submit=False)
         d.items[0].cost_rate = 1250
         d.save(ignore_permissions=True)
         d.submit()
         d.reload()
-        self.assertEqual(d.custom_approval_required, "Managing Director")
+        self.assertEqual(d.custom_approval_required, "Manager")
         self.assertEqual(d.custom_concession_percent_from_baseline, 0)
-        self.assertEqual(d.custom_approval_state, "Pending Endorsement")
+        self.assertEqual(d.custom_approval_state, "Pending Manager")
         self.doc = d
         self.assertEqual(self.award()["ok"], 0)
         self.assertEqual(frappe.db.count("DCS Governance Event", {"dcs": d.name, "event_code": "DCS_AWARD_RECORDED"}), 0)
 
-    def test_revised_below_floor_requires_md_and_old_approval_cannot_authorise(self):
+    def test_revised_below_floor_requires_manager_and_old_approval_cannot_authorise(self):
         self.revise(new_total_cost=1250)
-        self.assertEqual(self.doc.custom_approval_required, "Managing Director")
+        self.assertEqual(self.doc.custom_approval_required, "Manager")
         self.assertEqual(self.award()["ok"], 0)
-        approved = frappe.call(DECIDE, dcs=self.doc.name, action="Approve", reason="ZZTEST margin exception")
+        approved = self.decide( action="Approve", reason="ZZTEST margin exception")
         self.assertEqual(approved["ok"], 1, approved)
         self.doc.reload()
         self.assertTrue(authorised_position(self.doc))
@@ -85,22 +98,22 @@ class IntegrationTestDCSAuditControls(IntegrationTestCase):
         self.assertTrue(authorised_position(self.doc))
         rejected = frappe.get_doc("DCS Revision", old)
         self.assertEqual(rejected.approval_state, "Rejected")
-        self.assertEqual(rejected.decided_by, self.md)
+        self.assertEqual(rejected.decided_by, self.manager)
         self.assertEqual(rejected.decision_reason, "ZZTEST rejected margin")
         self.assertEqual(self.doc.docstatus, 1)
         self.assertEqual(self.award()["ok"], 1)
         self.assertEqual(frappe.db.count("DCS Governance Event", {"dcs": self.doc.name, "event_code": "DCS_APPROVAL_APPROVED"}), 0)
 
-    def test_reject_revise_below_floor_still_requires_md(self):
+    def test_reject_revise_below_floor_still_requires_manager(self):
         self.revise(new_total_cost=1300)
         old = self.reject()
         self.revise(new_total_cost=1250)
-        self.assertEqual(self.doc.custom_approval_required, "Managing Director")
-        self.assertEqual(self.doc.custom_approval_state, "Pending Endorsement")
+        self.assertEqual(self.doc.custom_approval_required, "Manager")
+        self.assertEqual(self.doc.custom_approval_state, "Pending Manager")
         self.assertEqual(self.award()["ok"], 0)
         self.assertEqual(frappe.db.get_value("DCS Revision", old, "approval_state"), "Rejected")
 
-    def test_reject_revise_above_floor_with_concession_trigger_requires_md(self):
+    def test_reject_revise_above_floor_with_concession_trigger_requires_manager(self):
         self.revise(new_total_cost=1250)
         self.reject()
         frappe.set_user(self.md)
@@ -109,7 +122,7 @@ class IntegrationTestDCSAuditControls(IntegrationTestCase):
         self.assertEqual(r["ok"], 1, r)
         self.doc.reload()
         self.assertEqual(self.doc.custom_working_margin_percent, 25)
-        self.assertEqual(self.doc.custom_approval_required, "Managing Director")
+        self.assertEqual(self.doc.custom_approval_required, "Manager")
         self.assertEqual(self.award()["ok"], 0)
 
     def test_presales_actual_docperm_allows_buying_only(self):
@@ -154,7 +167,7 @@ class IntegrationTestDCSAuditControls(IntegrationTestCase):
         order = frappe.get_doc({"doctype":"Sales Order", "items":[{"prevdoc_docname":q.name}]})
         with self.assertRaises(frappe.ValidationError):
             validate_sales_order(order)
-        approved = frappe.call(DECIDE, dcs=self.doc.name, action="Approve", reason="ZZTEST exception")
+        approved = self.decide( action="Approve", reason="ZZTEST exception")
         self.assertEqual(approved["ok"], 1, approved)
         validate_sales_order(order)
 
@@ -212,7 +225,7 @@ class IntegrationTestDCSAuditControls(IntegrationTestCase):
         self.assertEqual(bridge["unreconciled_gp"],0)
         self.assertEqual(bridge["approval_required"],"None")
 
-    def test_boq_below_floor_then_rejected_revision_recovers_without_md(self):
+    def test_boq_below_floor_then_rejected_revision_recovers_without_manager(self):
         from bsgroup.api.dcs.test_dcs_boq_revision import payload
         def apply(cost):
             self.doc.reload()
@@ -224,7 +237,7 @@ class IntegrationTestDCSAuditControls(IntegrationTestCase):
             self.assertEqual(result["ok"],1,result)
             self.doc.reload()
         apply(1250)
-        self.assertEqual(self.doc.custom_approval_required,"Managing Director")
+        self.assertEqual(self.doc.custom_approval_required,"Manager")
         old = self.reject()
         apply(1200)
         self.assertEqual(self.doc.custom_approval_required,"None")
@@ -294,7 +307,7 @@ class IntegrationTestDCSAuditControls(IntegrationTestCase):
         d.save(ignore_permissions=True)
         d.submit()
         d.reload()
-        self.assertEqual(d.custom_approval_required,"Managing Director")
+        self.assertEqual(d.custom_approval_required,"Manager")
         self.doc = d
         self.assertEqual(self.award()["ok"],0)
         self.assertFalse(authorised_position(d))

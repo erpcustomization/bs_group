@@ -103,7 +103,7 @@ def dcs_record_award(args):
 		elif req == "Blocked":
 			result["error"] = "The current commercial position is above the 26% concession ceiling and was never authorised. An award cannot be recorded against an unauthorised position."
 		elif authorised == 0:
-			result["error"] = "The current position requires Managing Director approval and is in state '" + str(appr) + "'. Record the award only against an authorised commercial position."
+			result["error"] = "The current position requires manager approval and is in state '" + str(appr) + "'. Record the award only against an authorised commercial position."
 		else:
 			now = now_datetime()
 			me = frappe.session.user

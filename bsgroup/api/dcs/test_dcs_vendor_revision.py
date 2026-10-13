@@ -367,11 +367,11 @@ class IntegrationTestDCSVendorRevisionBinding(IntegrationTestCase):
 		self.assertEqual(initialise_living_position(self.dcs.name, new_total_selling=1500).get("ok"), 1)
 		r = frappe.call(APPLY_REVISION, dcs=self.dcs.name, source="Customer", reason="ZZTEST concession 20%", new_total_selling=1200)
 		self.assertEqual(r.get("ok"), 1, r.get("error"))
-		self.assertEqual(r["state"]["approval_required"], "Managing Director")
-		self.assertEqual(r["state"]["approval_state"], "Pending Endorsement")
+		self.assertEqual(r["state"]["approval_required"], "Manager")
+		self.assertEqual(r["state"]["approval_state"], "Pending Manager")
 		a = frappe.call(RECORD_AWARD, dcs=self.dcs.name, award_reference="PO-ZZ-2", evidence_type="Customer PO", notes="ZZTEST")
 		self.assertEqual(a.get("ok"), 0)  # unapproved concession cannot be awarded - control intact
-		self.assertIn("Managing Director approval", a.get("error"))
+		self.assertIn("manager approval", a.get("error"))
 
 	def test_award_cannot_be_recorded_twice(self):
 		frappe.set_user(self.md)

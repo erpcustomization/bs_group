@@ -7,6 +7,7 @@ the frozen award baseline and last approved position are added so management see
 """
 
 import frappe
+from bsgroup.dcs.manager_approval import is_assigned_manager, route_for
 from bsgroup.dcs.commercial_authority import authorised_position
 
 from bsgroup.api.dcs._common import TECHNICAL_ROLES, get_user_roles, governed_endpoint, has_any
@@ -24,7 +25,7 @@ def dcs_screen2(args):
 	result = {"ok": 0, "error": "", "projection": "denied", "user": frappe.session.user}
 	dcs_name = args.get("dcs")
 	roles = get_user_roles()
-	is_comm = has_any(roles, SCREEN2_COMMERCIAL)
+	is_comm = has_any(roles, SCREEN2_COMMERCIAL) or bool(dcs_name and frappe.db.exists("Deal Cost Sheet",dcs_name) and is_assigned_manager(dcs_name))
 	is_tech = has_any(roles, TECHNICAL_ROLES)
 
 	if not dcs_name:
@@ -70,11 +71,11 @@ def dcs_screen2(args):
 	decision = "Review and progress the current negotiated commercial position."
 	if s.custom_approval_required == "Blocked":
 		decision = "This position cannot be authorised by anyone. Recover it or stop."
-	elif s.custom_approval_required == "Managing Director":
-		decision = "Decide whether to send this position to the Managing Director."
+	elif s.custom_approval_required == "Manager":
+		decision = "Decide whether to send this position to the submitter\'s immediate manager."
 	doing_nothing = "The position stays where it is and no approval is sought."
 	if s.custom_margin_gate == "Blocked":
-		doing_nothing = "The margin remains below the floor. A recorded MD approval is required before award; delivery conditions remain separate."
+		doing_nothing = "The margin remains below the floor. A recorded manager approval is required before award; delivery conditions remain separate."
 	result["header"] = {"decision": decision, "money": {"working_total_selling": ws, "working_total_cost": wc,
 		"working_gp": ws - wc, "working_margin_percent": wm, "currency": s.currency}, "if_nothing": doing_nothing, "resolvable_here": 1}
 
@@ -109,6 +110,7 @@ def dcs_screen2(args):
 		"margin_gate": s.custom_margin_gate, "margin_gate_reason": s.custom_margin_gate_reason, "cancel_amend_required": 0,
         "authorised_position": int(authorised_position(s)),
 		"boq_matches_living": int(abs((s.total_selling or 0) - ws) <= 0.005 and abs((s.total_cost or 0) - wc) <= 0.005)}
+	result["manager_route"] = dict(route_for(s))
 	result["approved_position"] = {"revision_no": s.custom_approved_revision_no or 0, "total_cost": s.custom_approved_total_cost,
 		"total_selling": s.custom_approved_total_selling, "margin_percent": s.custom_approved_margin_percent,
 		"approved_by": s.custom_approved_by, "approved_on": s.custom_approved_on}

@@ -2866,6 +2866,7 @@ function render_summary_dashboard(frm) {
         + '<div class="dcs-detail"><span>Deal owner</span><strong>'+esc(d.deal_owner || 'Not assigned')+'</strong></div>'
         + '<div class="dcs-detail"><span>Prepared by</span><strong>'+esc(d.owner)+'</strong></div></details></section>'
         + '<aside><div class="dcs-decision"><div class="dcs-eyebrow">COMMERCIAL DECISION</div><h3>'+esc(approval.label)+'</h3><p>'+esc(approval.note)+'</p></div>'
+        + (p.approval_required === 'Manager' && state.s2.manager_route ? '<p class="dcs-quiet">' + esc(state.s2.manager_route.approval_routing_error || ('Manager: ' + (state.s2.manager_route.approval_manager_name || state.s2.manager_route.approval_manager_name || route.approval_manager || 'Not configured'))) + '</p>' : '')
         + '<div class="dcs-release"><div class="dcs-eyebrow">AWARD &amp; DELIVERY</div><div class="dcs-detail"><span>Award</span><strong>'+esc(st.customer_award || 'Not Awarded')+'</strong></div>'
         + '<div class="dcs-detail"><span>Delivery</span><strong class="'+(delivery==='Blocked'?'dcs-tone-danger':'')+'">'+esc(delivery)+'</strong></div>'
         + '<div class="dcs-detail"><span>Open blockers</span><strong class="'+(blockers>0?'dcs-tone-danger':'')+'">'+(blockers===null?'Not evaluated':blockers)+'</strong></div>'
@@ -2982,8 +2983,8 @@ function dcs_approval_presentation(frm, s5) {
     if (p.approval_required === 'Blocked') {
         return {label:'Rework required', note:'Concession exceeds the ceiling. Revise the commercial position.', color:'red'};
     }
-    if (p.margin < 20 || p.approval_required === 'Managing Director') {
-        return {label:p.authorised ? 'MD approved' : 'MD approval required',
+    if (p.margin < 20 || ['Manager','Managing Director'].indexOf(p.approval_required) !== -1) {
+        return {label:p.authorised ? (p.approval_required === 'Manager' ? 'Manager approved' : 'Approved') : 'Manager approval required',
             note:p.margin < 20 ? 'Below the 20% margin floor. Delivery conditions remain separate.' : 'Another commercial approval trigger applies.',
             color:p.authorised ? 'green' : 'orange'};
     }
@@ -3006,6 +3007,11 @@ function dcs_boq_totals(items, resources, charges) {
 function dcs_next_step(frm, s3, s4, s5) {
     if (frm.doc.docstatus === 2) return {label:'Cancelled record', note:'Historical record; no commercial action is available.'};
     if (frm.doc.docstatus !== 1) return {label:'Complete costing', note:'Prepare the BOQ and submit the sheet for commercial evaluation.'};
+    var route=((frm.__dcs || {}).s2 || {}).manager_route || ((frm.__dcs || {}).s4 || {}).manager_route || {};
+    if (route.approval_routing_error && route.changed_by === ((frappe.session || {}).user)) {
+        return {key:'Refresh Manager Routing',group:'Approval',label:'Route to my manager',note:route.approval_routing_error + ' Correct the Employee reporting line, then retry routing.'};
+    }
+
     var cap = (s3 || {}).capability || {}, st = (s5 || {}).states || {}, auth = (s5 || {}).authority || {};
     var p = dcs_effective_position(frm, s5), actions = (s4 || {}).actions || [];
     if (cap.can_negotiate && st.customer_award !== 'Awarded' && !p.revision_no && p.selling > 0) {
@@ -3018,6 +3024,10 @@ function dcs_next_step(frm, s3, s4, s5) {
     if (actions.length && p.approval_required && p.approval_required !== 'None' && p.approval_state !== 'Approved') {
         var preferred = actions.filter(function (a) { return ['Approve','Endorse','Return for Rework'].indexOf(a.key) >= 0; })[0] || actions[0];
         return {key:preferred.key, group:'Approval', label:preferred.label, note:preferred.note};
+    }
+    var required=p.approval_required || ((s4 || {}).deal || {}).approval_required;
+    if (required === 'Manager' && !p.authorised && ['Rejected','Returned for Rework'].indexOf(p.approval_state) < 0) {
+        return {label:'Await manager decision',note:route.approval_routing_error || ('Routed to ' + (route.approval_manager_name || route.approval_manager || 'the immediate manager') + '.')};
     }
     if (auth.can_record_award && p.authorised && st.customer_award !== 'Awarded') {
         return {key:'Record Award', group:'Award', label:'Record Award', note:'Record customer evidence and freeze the current commercial position.'};
@@ -3090,6 +3100,7 @@ function dcs_set_html(frm, field, html) {
 // workspace call resolves through this map to the dotted app method; the bare
 // Server Script names are no longer called from the client.
 var DCS_METHODS = {
+	dcs_refresh_manager_route: 'bsgroup.dcs.manager_approval.dcs_refresh_manager_route',
 	dcs_apply_revision: 'bsgroup.api.dcs.negotiation.dcs_apply_revision',
 	dcs_screen2: 'bsgroup.api.dcs.living.dcs_screen2',
 	dcs_screen3: 'bsgroup.api.dcs.negotiation.dcs_screen3',
@@ -3144,6 +3155,12 @@ function dcs_load(frm) {
 function dcs_headline(frm, s5) {
     dcs_visual_styles(frm);
     if (!s5.living || s5.ok !== 1) {
+        var routing=((frm.__dcs || {}).s4 || {});
+        if (routing.projection === 'approval-routing') {
+            var route=routing.manager_route || {}, deal=routing.deal || {};
+            frm.dashboard.set_headline('<div class="dcs-compact"><b>' + dcs_esc(deal.approval_state || 'Manager approval') + '</b><span>' + dcs_esc(route.approval_routing_error || ('Manager: ' + (route.approval_manager_name || route.approval_manager || 'Not configured'))) + '</span></div>');
+            return;
+        }
         frm.dashboard.set_headline('<div class="dcs-compact">Commercial evaluation is not available in this view. ' + dcs_esc(s5.error || 'Refresh to retry.') + '</div>');
         return;
     }
@@ -3211,6 +3228,9 @@ function dcs_render_negotiation(frm, s3) {
 function dcs_render_approval(frm, s4) {
 	var hist = s4.approval_history || [], why = s4.why || {}, prev = s4.previous_approved || {}, cur = s4.current || {}, d = s4.delta || {};
 	var body = '';
+    if (s4.manager_route && s4.manager_route.approval_policy === 'Immediate Manager') {
+        body += '<div class="dcs-decision"><div class="dcs-eyebrow">MANAGER APPROVAL</div><h3>' + dcs_esc(s4.manager_route.approval_manager_name || s4.manager_route.approval_manager || 'Manager not configured') + '</h3><p>' + dcs_esc(s4.manager_route.approval_routing_error || 'Routed from the current revision submitter’s Employee reporting line.') + '</p></div>';
+    }
 	if (why.approval_reason || why.margin_gate_reason) {
 		body += '<div class="text-muted small" style="margin-bottom:10px">' + dcs_esc(why.approval_reason || '')
 			+ (why.margin_gate_reason ? '<br>' + dcs_esc(why.margin_gate_reason) : '') + '</div>';
@@ -3338,6 +3358,11 @@ function dcs_buttons(frm, s3, s4, s5) {
 	var cap = s3.capability || {}, auth = s5.authority || {}, st = s5.states || {}, lv = s5.living || {};
 	var N = __('Negotiation'), A = __('Approval'), W = __('Award'), H = __('Handover');
     var available = {};
+    var route=((frm.__dcs || {}).s2 || {}).manager_route || ((frm.__dcs || {}).s4 || {}).manager_route || {};
+    if (route.changed_by === ((frappe.session || {}).user) && route.approval_routing_error) {
+        available['Refresh Manager Routing']=function(){dcs_run(frm,'dcs_refresh_manager_route',{dcs:frm.doc.name});};
+        frm.add_custom_button(__('Route to my manager'),available['Refresh Manager Routing'],__('Approval'));
+    }
     var add = function(label,handler,group) { available[label]=handler; return frm.add_custom_button(__(label),handler,group); };
 
 

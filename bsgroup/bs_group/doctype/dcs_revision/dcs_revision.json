@@ -34,6 +34,12 @@
   "approval_requirement",
   "margin_gate",
   "approval_state",
+  "approval_policy",
+  "submitter_employee",
+  "manager_employee",
+  "approval_manager",
+  "approval_routing_error",
+  "manager_dcs_share",
   "cb_appr",
   "decided_by",
   "decided_on",
@@ -181,7 +187,7 @@
    "fieldname": "approval_requirement",
    "fieldtype": "Select",
    "label": "Approval Requirement",
-   "options": "None\nManaging Director\nBlocked"
+   "options": "None\nManaging Director\nBlocked\nManager"
   },
   {
    "description": "Independent commercial floor gate. Not an approver-routing rule.",
@@ -195,7 +201,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Approval State",
-   "options": "Not Required\nPending Endorsement\nEndorsed - Pending MD\nApproved\nReturned for Rework\nRejected\nBlocked"
+   "options": "Not Required\nPending Endorsement\nEndorsed - Pending MD\nApproved\nReturned for Rework\nRejected\nBlocked\nPending Manager"
   },
   {
    "fieldname": "cb_appr",
@@ -236,6 +242,46 @@
    "fieldtype": "Datetime",
    "label": "Superseded On",
    "read_only": 1
+  },
+  {
+   "fieldname": "approval_policy",
+   "fieldtype": "Data",
+   "label": "Approval Routing Policy",
+   "read_only": 1
+  },
+  {
+   "fieldname": "submitter_employee",
+   "fieldtype": "Link",
+   "label": "Submitter Employee",
+   "read_only": 1,
+   "options": "Employee"
+  },
+  {
+   "fieldname": "manager_employee",
+   "fieldtype": "Link",
+   "label": "Immediate Manager Employee",
+   "read_only": 1,
+   "options": "Employee"
+  },
+  {
+   "fieldname": "approval_manager",
+   "fieldtype": "Link",
+   "label": "Approval Manager",
+   "read_only": 1,
+   "options": "User"
+  },
+  {
+   "fieldname": "approval_routing_error",
+   "fieldtype": "Small Text",
+   "label": "Approval Routing Issue",
+   "read_only": 1
+  },
+  {
+   "fieldname": "manager_dcs_share",
+   "fieldtype": "Data",
+   "label": "Service-owned Manager Access",
+   "read_only": 1,
+   "hidden": 1
   }
  ],
  "grid_page_length": 50,

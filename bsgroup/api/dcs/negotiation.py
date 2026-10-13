@@ -42,7 +42,7 @@ def requirement(concession, margin=None):
 	if concession > CEILING:
 		return "Blocked"
 	if concession >= MD_THRESHOLD or (margin is not None and margin < MARGIN_FLOOR):
-		return "Managing Director"
+		return "Manager"
 	return "None"
 
 
@@ -50,9 +50,9 @@ def why_approval(concession, margin=None):
 	if concession > CEILING:
 		return "Concession " + str(concession) + "% from baseline is above the 26% ceiling. No approver may authorise this position."
 	if margin is not None and margin < MARGIN_FLOOR:
-		return "Gross margin " + str(margin) + "% is below the 20% floor and requires Managing Director approval."
+		return "Gross margin " + str(margin) + "% is below the 20% floor and requires immediate manager approval."
 	if concession >= MD_THRESHOLD:
-		return "Concession " + str(concession) + "% from baseline is at or above 16%, which requires Managing Director approval."
+		return "Concession " + str(concession) + "% from baseline is at or above 16%, which requires immediate manager approval."
 	return "Concession " + str(concession) + "% from baseline is below 16%. No discount sign-off is required."
 
 
@@ -69,16 +69,16 @@ def why_gate(margin):
 def state_for(req):
 	if req == "Blocked":
 		return "Blocked"
-	if req == "Managing Director":
-		return "Pending Endorsement"
+	if req == "Manager":
+		return "Pending Manager"
 	return "In Negotiation"
 
 
 def rev_state_for(req):
 	if req == "Blocked":
 		return "Blocked"
-	if req == "Managing Director":
-		return "Pending Endorsement"
+	if req == "Manager":
+		return "Pending Manager"
 	return "Not Required"
 
 
@@ -274,7 +274,7 @@ def dcs_apply_revision(args):
 # ---------------------------------------------------------------------------
 def advisory_win(c, m, req):
 	p = 55 + int(c * 1.6)
-	if req == "Managing Director":
+	if req == "Manager":
 		p = p - 8
 	if req == "Blocked":
 		return 0
@@ -363,11 +363,11 @@ def dcs_screen3(args):
 		decision = "Decide the next negotiation movement on the living commercial position."
 		if s.custom_approval_required == "Blocked":
 			decision = "Recover this position. It is above the concession ceiling and cannot be authorised by anyone."
-		elif s.custom_approval_required == "Managing Director":
-			decision = "Decide whether to hold, counter, or send the current position to the Managing Director."
+		elif s.custom_approval_required == "Manager":
+			decision = "Decide whether to hold, counter, or send the current position to the submitter\'s immediate manager."
 		if_nothing = "The customer receives no response and the position stays where it is. No revision is recorded."
 		if s.custom_margin_gate == "Blocked":
-			if_nothing = "The margin remains below the floor. A recorded MD approval is required before award; delivery conditions remain separate."
+			if_nothing = "The margin remains below the floor. A recorded manager approval is required before award; delivery conditions remain separate."
 		result["header"] = {
 			"decision": decision,
 			"money": {"total_cost": r2(wc), "total_selling": r2(ws), "gp": r2(ws - wc), "margin_percent": wm, "currency": s.currency},
@@ -389,7 +389,7 @@ def dcs_screen3(args):
 
 		result["policy"] = {
 			"md_threshold_percent": MD_THRESHOLD, "concession_ceiling_percent": CEILING, "margin_floor_percent": MARGIN_FLOOR,
-			"basis": "Managing Director approval is required below 20% gross margin or at least 16% concession. Concession above 26% cannot be authorised. Each new revision is evaluated independently; a rejected revision remains audited. Approval does not clear delivery conditions.",
+			"basis": "Immediate manager approval is required below 20% gross margin or at least 16% concession. Concession above 26% cannot be authorised. Each new revision is evaluated independently; a rejected revision remains audited. Approval does not clear delivery conditions.",
 		}
 
 		result["revisions"] = revisions

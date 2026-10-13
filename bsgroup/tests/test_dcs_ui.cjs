@@ -115,7 +115,7 @@ test('fully authorised current position selects Record Award as primary action',
 });
 test('MD-approved below-floor position stays explicit about the margin exception',()=>{
   const p=context.dcs_approval_presentation(fixture(),sheet({living:{revision_no:2,total_cost:1250,total_selling:1500,approval_required:'Managing Director',approval_state:'Approved',authorised_position:1}}));
-  assert.equal(p.label,'MD approved');assert.match(p.note,/Below the 20%/);
+  assert.equal(p.label,'Approved');assert.match(p.note,/Below the 20%/);
 });
 test('charges contribute buying, selling and GP to BOQ preview',()=>{
   const totals=context.dcs_boq_totals([{qty:1,cost_rate:1000,selling_rate:1500}],[],[{amount:100,selling_amount:150}]);
@@ -196,7 +196,7 @@ test('below-floor margin remains an exception color after MD approval',()=>{
   frm.__dcs={s2:{ok:1,projection:'commercial',margin_bridge:{original:current,current,gp_impacts:{},gp_movement:0}},
     s3:negotiator,s4:{},s5:sheet({living:{revision_no:2,total_cost:1250,total_selling:1500,approval_required:'Managing Director',approval_state:'Approved',authorised_position:1}})};
   context.render_summary_dashboard(frm);
-  assert.match(html,/MD approved/);
+  assert.match(html,/Approved/);
   assert.match(html,/dcs-tone-danger">16.67%/);
   assert.doesNotMatch(html,/dcs-tone-success">16.67%/);
   assert.match(html,/Below the 20% floor/);
@@ -214,4 +214,30 @@ test('margin floor color handles exact 20%, negative and unpriced positions',()=
   assert.equal(context.dcs_margin_tone(19.999),'dcs-tone-danger');
   assert.equal(context.dcs_margin_tone(-2),'dcs-tone-danger');
   assert.equal(context.dcs_margin_tone(null),'dcs-tone-neutral');
+});
+
+test('current manager approval uses manager wording and keeps below-floor warning',()=>{
+  const frm=fixture(),view=sheet({living:{revision_no:2,total_cost:1250,total_selling:1500,approval_required:'Manager',approval_state:'Approved',authorised_position:1}});
+  const result=context.dcs_approval_presentation(frm,view);
+  assert.equal(result.label,'Manager approved');assert.match(result.note,/Below the 20%/);
+});
+test('reportee routing headline contains manager identity and no commercial figures',()=>{
+  const frm=fixture();frm.__dcs={s4:{projection:'approval-routing',deal:{approval_state:'Pending Manager'},manager_route:{approval_manager:'manager@example.com',approval_manager_name:'Immediate Manager'}}};
+  context.dcs_headline(frm,{ok:0});
+  assert.match(frm.headline,/Immediate Manager/);assert.doesNotMatch(frm.headline,/14800|16900|Gross profit/);
+});
+test('a reduced reportee projection offers only repair of its own missing route',()=>{
+  const frm=fixture();context.frappe.session={user:'reportee@example.com'};
+  frm.__dcs={s4:{manager_route:{changed_by:'reportee@example.com',approval_routing_error:'Set Reports To'}}};
+  const next=context.dcs_next_step(frm,{}, {}, {ok:0});
+  assert.equal(next.key,'Refresh Manager Routing');
+  context.frappe.session={user:'someoneelse@example.com'};
+  assert.notEqual(context.dcs_next_step(frm,{}, {}, {ok:0}).key,'Refresh Manager Routing');
+  delete context.frappe.session;
+});
+
+test('reportee with a routed exception waits for the named manager',()=>{
+  const frm=fixture();frm.__dcs={s4:{manager_route:{approval_manager_name:'Direct Manager'}}};
+  const next=context.dcs_next_step(frm,{}, {deal:{approval_required:'Manager'}},sheet());
+  assert.equal(next.label,'Await manager decision');assert.match(next.note,/Direct Manager/);assert.equal(next.key,undefined);
 });

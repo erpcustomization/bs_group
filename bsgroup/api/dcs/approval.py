@@ -2,11 +2,12 @@
 
 Ported from the production Server Scripts of the same names. Authority is
 enforced server side: Commercial Controller may Endorse or Return for
-Rework; only the Managing Director may Approve or Reject. A recorded final
+Rework; only the assigned immediate manager may Approve or Reject. A recorded final
 decision is never altered.
 """
 
 import frappe
+from bsgroup.dcs.manager_approval import is_assigned_manager, route_for, close_review
 from frappe.utils import now_datetime
 
 from bsgroup.api.dcs._common import (
@@ -22,7 +23,7 @@ def holders(role):
 	return [r.get("parent") for r in rows]
 
 
-@governed_endpoint("dcs_approval_decision", ptype="write")
+@governed_endpoint("dcs_approval_decision", ptype="read")
 def dcs_approval_decision(args):
 	result = {"ok": 0, "error": "", "action": "", "state": {}}
 
@@ -33,7 +34,7 @@ def dcs_approval_decision(args):
 	needs_reason = ["Return for Rework", "Reject"]
 
 	roles = get_user_roles()
-	is_md = 1 if MD in roles else 0
+	is_approver = int(bool(dcs_name and frappe.db.exists("Deal Cost Sheet", dcs_name) and is_assigned_manager(dcs_name)))
 	is_cc = 1 if CC in roles else 0
 
 	if not dcs_name:
@@ -42,19 +43,25 @@ def dcs_approval_decision(args):
 		result["error"] = "action must be one of Endorse, Approve, Return for Rework, Reject."
 	elif not dcs_exists_and_open(dcs_name, result):
 		pass
-	elif is_md == 0 and is_cc == 0:
-		result["error"] = "You do not hold an approval authority. Only the Commercial Controller and the Managing Director may act on this screen."
+	elif is_approver == 0 and is_cc == 0:
+		result["error"] = "You do not hold an approval authority. Only the assigned immediate manager may approve or reject; the Commercial Controller may return for rework."
 	elif action in needs_reason and not reason:
 		result["error"] = "A reason is required to " + str(action) + ". A decision that sends work back or closes a position is never recorded silently."
-	elif action == "Approve" and is_md == 0:
-		result["error"] = "The Commercial Controller may review and endorse but is never the final approver on an escalated case. Only the Managing Director may approve."
-	elif action == "Reject" and is_md == 0:
-		result["error"] = "The Commercial Controller may not reject an escalated case. Only the Managing Director may reject."
-	elif action == "Endorse" and is_cc == 0:
+	elif action == "Approve" and is_approver == 0:
+		result["error"] = "The Commercial Controller may review and endorse but is never the final approver on an escalated case. Only the assigned immediate manager may approve."
+	elif action == "Reject" and is_approver == 0:
+		result["error"] = "The Commercial Controller may not reject an escalated case. Only the assigned immediate manager may reject."
+	elif action == "Endorse" and (is_cc == 0 or frappe.db.get_value("Deal Cost Sheet", dcs_name, "custom_approval_required") == "Manager"):
 		result["error"] = "Endorsement is a Commercial Controller action."
 	else:
 		s = frappe.get_doc("Deal Cost Sheet", dcs_name, for_update=True)
-		s.check_permission("write")
+		# Recheck the current revision after acquiring the sheet lock; an old manager
+		# must not decide a revision submitted concurrently to a different manager.
+		is_approver = int(is_assigned_manager(s))
+		if not is_approver and (not is_cc or action in ("Approve", "Reject")):
+			result["error"] = "The current revision is assigned to a different manager. Refresh before deciding."
+			return result
+		s.check_permission("read" if is_approver else "write")
 		req = s.custom_approval_required
 		state = s.custom_approval_state
 		rev_ref = s.custom_revision_reference
@@ -82,7 +89,7 @@ def dcs_approval_decision(args):
 						 "custom_approved_total_cost": s.custom_working_total_cost,
 						 "custom_approved_total_selling": s.custom_working_total_selling,
 						 "custom_approved_margin_percent": s.custom_working_margin_percent, "custom_approved_by": me,
-						 "custom_approved_on": now, "custom_last_decision_reason": reason or "Approved by the Managing Director."}
+						 "custom_approved_on": now, "custom_last_decision_reason": reason or "Approved by the assigned immediate manager."}
 			elif action == "Return for Rework":
 				new_state = "Returned for Rework"
 				patch = {"custom_approval_state": new_state, "custom_last_decision_reason": reason}
@@ -109,8 +116,8 @@ def dcs_approval_decision(args):
 
 			codes = {"Endorse": "DCS_APPROVAL_ENDORSED", "Approve": "DCS_APPROVAL_APPROVED",
 					 "Return for Rework": "DCS_APPROVAL_RETURNED_FOR_REWORK", "Reject": "DCS_APPROVAL_REJECTED"}
-			labels = {"Endorse": "Endorse - Commercial Controller", "Approve": "Approve - Managing Director",
-					  "Return for Rework": "Return for Rework", "Reject": "Reject - Managing Director"}
+			labels = {"Endorse": "Endorse - Commercial Controller", "Approve": "Approve - Immediate Manager",
+					  "Return for Rework": "Return for Rework", "Reject": "Reject - Immediate Manager"}
 			changes = []
 			for pk in dcs_keys:
 				if pk in patch:
@@ -138,6 +145,7 @@ def dcs_approval_decision(args):
 			}
 
 	if result.get("ok"):
+		close_review(result["state"]["revision"])
 		st_ = result.get("state") or {}
 		tlas = st_.get("approval_state")
 		text = ""
@@ -160,14 +168,21 @@ def dcs_screen4(args):
 
 	dcs_name = args.get("dcs")
 	roles = get_user_roles()
-	is_md = 1 if MD in roles else 0
+	is_approver = int(bool(dcs_name and frappe.db.exists("Deal Cost Sheet", dcs_name) and is_assigned_manager(dcs_name)))
 	is_cc = 1 if CC in roles else 0
-	can_view = has_any(roles, VIEW_ROLES)
+	can_view = has_any(roles, VIEW_ROLES) or is_approver
 
 	if not dcs_name:
 		result["error"] = "dcs is required."
 	elif not frappe.db.exists("Deal Cost Sheet", dcs_name):
 		result["error"] = "Deal Cost Sheet " + str(dcs_name) + " does not exist."
+	elif can_view == 0 and route_for(dcs_name).get("changed_by") == frappe.session.user:
+		s=frappe.get_doc("Deal Cost Sheet",dcs_name)
+		s.check_permission("read")
+		result.update(ok=1,projection="approval-routing",manager_route=dict(route_for(s)),
+			deal={"name":s.name,"revision_no":s.custom_dcs_revision_no,"approval_required":s.custom_approval_required,"approval_state":s.custom_approval_state},
+			why={"approval_reason":route_for(s).get("approval_routing_error") or "Approval is routed to your immediate manager."})
+		return result
 	elif can_view == 0:
 		if has_any(roles, TECHNICAL_ROLES) == 1:
 			result["error"] = "The Approval Workspace is a commercial approval screen. Technical roles have no access to it."
@@ -177,7 +192,7 @@ def dcs_screen4(args):
 		s = frappe.get_doc("Deal Cost Sheet", dcs_name)
 		s.check_permission("read")
 
-		result["authority"] = "Managing Director" if is_md == 1 else ("Commercial Controller" if is_cc == 1 else "Viewer")
+		result["authority"] = "Immediate Manager" if is_approver == 1 else ("Commercial Controller" if is_cc == 1 else "Viewer")
 
 		req = s.custom_approval_required
 		state = s.custom_approval_state
@@ -185,8 +200,8 @@ def dcs_screen4(args):
 
 		acts = []
 		if final == 0:
-			if is_md == 1:
-				if req == "Managing Director":
+			if is_approver == 1:
+				if req == "Manager":
 					acts.append({"key": "Approve", "label": "Approve", "needs_reason": 0, "note": "Authorises the negotiated commercial position."})
 				acts.append({"key": "Return for Rework", "label": "Return for Rework", "needs_reason": 1, "note": "Sends the position back to negotiation."})
 				acts.append({"key": "Reject", "label": "Reject", "needs_reason": 1, "note": "Closes this commercial position."})
@@ -197,6 +212,9 @@ def dcs_screen4(args):
 		result["actions"] = acts
 
 		blockers = []
+		route = route_for(s)
+		if req in ("Manager", "Blocked") and (route.get("approval_routing_error") or not route.get("approval_manager")):
+			blockers.append(route.get("approval_routing_error") or "Immediate manager routing has not been configured.")
 		if req == "None":
 			blockers.append("No approval is required: gross margin is at least 20% and no other approval trigger applies.")
 		if req == "Blocked":
@@ -205,6 +223,7 @@ def dcs_screen4(args):
 			blockers.append("A final decision (" + str(state) + ") is already recorded. It cannot be altered.")
 		result["blockers"] = blockers
 
+		result["manager_route"] = dict(route_for(s))
 		result["deal"] = {
 			"name": s.name, "customer": s.customer, "subject": s.subject, "deal_owner": s.deal_owner, "opportunity": s.opportunity,
 			"currency": s.currency, "docstatus": s.docstatus, "revision_no": s.custom_dcs_revision_no,
@@ -242,8 +261,8 @@ def dcs_screen4(args):
 
 		result["why"] = {
 			"approval_reason": s.custom_approval_reason,
-			"threshold_crossed": "Concession from baseline " + str(s.custom_concession_percent_from_baseline or 0) + "% against a 16% Managing Director threshold and a 26% ceiling.",
-			"policy_basis": "Managing Director approval is required below 20% gross margin or when another approval trigger applies (including concession of at least 16%). Concession above 26% cannot be authorised. A rejected revision stays audited; revise this sheet and recalculate. At or above 20% with no other trigger, MD reapproval is not required. The Commercial Controller may endorse; the Managing Director remains the final approver.",
+			"threshold_crossed": "Concession from baseline " + str(s.custom_concession_percent_from_baseline or 0) + "% against a 16% manager approval threshold and a 26% ceiling.",
+			"policy_basis": "Immediate manager approval is required below 20% gross margin or when another approval trigger applies (including concession of at least 16%). Concession above 26% cannot be authorised. A rejected revision stays audited; revise this sheet and recalculate. At or above 20% with no other trigger, Manager reapproval is not required. The submitter\'s immediate manager is the final approver.",
 			"margin_gate": s.custom_margin_gate, "margin_gate_reason": s.custom_margin_gate_reason,
 			"margin_gate_note": "The 20% margin floor is an independent commercial gate. Approving this position does not clear it.",
 		}
@@ -318,10 +337,10 @@ def dcs_screen4(args):
 		result["consequences"] = {
 			"approved": approved_txt,
 			"returned": "The negotiation reopens at the current revision. No commercial position is authorised and the deal owner is expected to move the position again.",
-			"rejected": "This revision is rejected and retained in audit history. Revise the same sheet; approval is recalculated for the new position. At or above 20% margin with no other trigger, MD reapproval is not required.",
-			"endorsed": "The position is recorded as reviewed and endorsed and passes to the Managing Director, who remains the final approver. Endorsement authorises nothing on its own.",
+			"rejected": "This revision is rejected and retained in audit history. Revise the same sheet; approval is recalculated for the new position. At or above 20% margin with no other trigger, Manager reapproval is not required.",
+			"endorsed": "Legacy endorsement is retained in history. New requests go directly to the assigned immediate manager.",
 		}
-		result["approvers"] = {"managing_director": holders(MD), "commercial_controller": holders(CC), "basis": "Read from real Has Role assignments. No approver name is hard coded."}
+		result["approvers"] = dict(route_for(s))
 		result["ok"] = 1
 
 	return result

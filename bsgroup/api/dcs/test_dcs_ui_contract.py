@@ -2,7 +2,7 @@
 from unittest.mock import patch
 import frappe
 from frappe.tests import IntegrationTestCase
-from bsgroup.tests.dcs_fixtures import ensure, make_dcs, make_user
+from bsgroup.tests.dcs_fixtures import ensure, make_dcs, make_user, make_reporting_line
 from bsgroup.dcs.commercial_authority import authorised_position
 
 S4="bsgroup.api.dcs.approval.dcs_screen4"
@@ -22,10 +22,22 @@ class IntegrationTestDCSUIContract(IntegrationTestCase):
         cls.tech=make_user("zztest-ui-tech@example.com",["Technical Engineer"])
         cls.presales=make_user("zztest-ui-presales@example.com",["Presales"])
 
+        cls.manager = make_user("zztest-ui-manager@example.com", ["Employee"])
+
     def setUp(self):
         super().setUp()
         frappe.set_user("Administrator")
+        make_reporting_line(self.md, self.manager)
+        make_reporting_line(self.presales, self.manager)
         self.doc=make_dcs(suffix="UI"+frappe.generate_hash(length=6),submit=True)
+
+    def decide(self, **args):
+        actor = frappe.session.user
+        frappe.set_user(self.manager)
+        try:
+            return frappe.call("bsgroup.api.dcs.approval.dcs_approval_decision", dcs=self.doc.name, **args)
+        finally:
+            frappe.set_user(actor)
 
     def tearDown(self):
         frappe.set_user("Administrator")
@@ -48,25 +60,25 @@ class IntegrationTestDCSUIContract(IntegrationTestCase):
         self.below_floor()
         screen=frappe.call(S5,dcs=self.doc.name)
         self.assertEqual(screen["living"]["authorised_position"],0)
-        self.assertEqual(screen["living"]["approval_required"],"Managing Director")
+        self.assertEqual(screen["living"]["approval_required"],"Manager")
         self.assertEqual(screen["authority"]["can_set_delivery_owner"],1)
-        result=frappe.call(DECIDE,dcs=self.doc.name,action="Approve",reason="ZZTEST UI MD exception")
+        result=self.decide(action="Approve",reason="ZZTEST UI MD exception")
         self.assertEqual(result["ok"],1,result)
         screen=frappe.call(S5,dcs=self.doc.name)
         self.assertEqual(screen["living"]["authorised_position"],1)
         self.assertEqual(screen["living"]["margin_gate"],"Blocked")
         self.assertEqual(screen["states"]["customer_award"],"Not Awarded")
 
-    def test_cc_receives_endorse_and_return_without_final_md_actions(self):
+    def test_cc_receives_return_without_final_manager_actions(self):
         self.below_floor()
         frappe.set_user(self.cc)
         screen=frappe.call(S4,dcs=self.doc.name)
         self.assertEqual(screen["ok"],1,screen)
-        self.assertEqual([a["key"] for a in screen["actions"]],["Endorse","Return for Rework"])
+        self.assertEqual([a["key"] for a in screen["actions"]],["Return for Rework"])
 
     def test_rejected_revision_has_no_final_decision_buttons_and_recovery_recalculates(self):
         self.below_floor()
-        result=frappe.call(DECIDE,dcs=self.doc.name,action="Reject",reason="ZZTEST UI rejection")
+        result=self.decide(action="Reject",reason="ZZTEST UI rejection")
         self.assertEqual(result["ok"],1,result)
         self.doc.reload()
         rejected=self.doc.custom_revision_reference
@@ -81,9 +93,9 @@ class IntegrationTestDCSUIContract(IntegrationTestCase):
     def test_policy_explains_margin_trigger_and_simple_rejection_process(self):
         self.below_floor()
         screen=frappe.call(S4,dcs=self.doc.name)
-        self.assertEqual(screen["deal"]["approval_required"],"Managing Director")
+        self.assertEqual(screen["deal"]["approval_required"],"Manager")
         self.assertIn("below 20%",screen["why"]["policy_basis"])
-        self.assertIn("MD reapproval is not required",screen["why"]["policy_basis"])
+        self.assertIn("Manager reapproval is not required",screen["why"]["policy_basis"])
         self.assertNotIn("concession from baseline only",screen["why"]["policy_basis"])
 
     def test_technical_projection_contains_no_commercial_authority_or_position(self):
@@ -122,6 +134,6 @@ class IntegrationTestDCSUIContract(IntegrationTestCase):
         read=frappe.call("bsgroup.api.dcs.living.dcs_screen2",dcs=self.doc.name)
         self.assertEqual(read["ok"],1,read)
         self.assertEqual(read["negotiation_guard"]["authorised_position"],0)
-        self.assertEqual(read["negotiation_guard"]["approval_required"],"Managing Director")
+        self.assertEqual(read["negotiation_guard"]["approval_required"],"Manager")
         award=frappe.call(S5,dcs=self.doc.name)
         self.assertEqual(award["ok"],0,award)

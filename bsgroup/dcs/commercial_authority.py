@@ -1,4 +1,4 @@
-"""Only a decision on the current revision authorises an MD exception."""
+"""Only a decision on the current revision authorises a commercial exception."""
 import frappe
 from frappe.utils import flt
 
@@ -20,6 +20,10 @@ def authorised_position(sheet):
         return False
     revision = frappe.db.get_value("DCS Revision", sheet.custom_revision_reference,
         ["dcs", "approval_state", "decided_by"], as_dict=True)
+    from bsgroup.dcs.manager_approval import route_for
+    route = route_for(sheet)
+    if route.get("approval_policy") == "Immediate Manager" and (not route.get("approval_manager") or route.approval_manager != sheet.custom_approved_by or route.changed_by == sheet.custom_approved_by):
+        return False
     return bool(revision and revision.dcs == sheet.name and revision.approval_state == "Approved"
                 and revision.decided_by == sheet.custom_approved_by
                 and revision.decided_by
