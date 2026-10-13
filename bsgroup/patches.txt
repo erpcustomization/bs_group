@@ -23,3 +23,4 @@ bsgroup.patches.v0_1.dcs_quotation_account_select
 bsgroup.patches.v0_1.dcs_workspace_counts
 
 bsgroup.patches.v0_1.dcs_manager_approval
+bsgroup.patches.v0_1.dcs_draft_entry_ui

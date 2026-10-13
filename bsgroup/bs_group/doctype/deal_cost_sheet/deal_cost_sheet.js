@@ -2823,6 +2823,15 @@ function render_summary_dashboard(frm) {
     var field=frm.fields_dict.custom_deal_summary_dashboard;
     if (!field) return;
     dcs_visual_styles(frm);
+    if (dcs_is_draft(frm)) {
+        frm.__dcs={};
+        frm.__dcs_docname=frm.doc.name;
+        ['custom_negotiation_html','custom_approval_html','custom_award_history_html','custom_handover_html'].forEach(function(name) {
+            dcs_set_html(frm,name,'<div class="dcs-quiet">Available after the sheet is submitted.</div>');
+        });
+        dcs_render_draft_summary(frm, field); return;
+    }
+    if (frm.__dcs_docname && frm.__dcs_docname !== frm.doc.name) frm.__dcs = {};
     var state=frm.__dcs || {}, s2=state.s2 || {}, s5=state.s5 || {};
     if (s2.ok !== 1 || s2.projection !== 'commercial') {
         field.$wrapper.html('<div class="dcs-panel dcs-quiet">' + dcs_esc(s2.error || 'Commercial evaluation is not available in this view.') + '</div>');
@@ -2866,7 +2875,7 @@ function render_summary_dashboard(frm) {
         + '<div class="dcs-detail"><span>Deal owner</span><strong>'+esc(d.deal_owner || 'Not assigned')+'</strong></div>'
         + '<div class="dcs-detail"><span>Prepared by</span><strong>'+esc(d.owner)+'</strong></div></details></section>'
         + '<aside><div class="dcs-decision"><div class="dcs-eyebrow">COMMERCIAL DECISION</div><h3>'+esc(approval.label)+'</h3><p>'+esc(approval.note)+'</p></div>'
-        + (p.approval_required === 'Manager' && state.s2.manager_route ? '<p class="dcs-quiet">' + esc(state.s2.manager_route.approval_routing_error || ('Manager: ' + (state.s2.manager_route.approval_manager_name || state.s2.manager_route.approval_manager_name || route.approval_manager || 'Not configured'))) + '</p>' : '')
+        + (p.approval_required === 'Manager' && state.s2.manager_route ? '<p class="dcs-quiet">' + esc(state.s2.manager_route.approval_routing_error || ('Manager: ' + (state.s2.manager_route.approval_manager_name || state.s2.manager_route.approval_manager || 'Not configured'))) + '</p>' : '')
         + '<div class="dcs-release"><div class="dcs-eyebrow">AWARD &amp; DELIVERY</div><div class="dcs-detail"><span>Award</span><strong>'+esc(st.customer_award || 'Not Awarded')+'</strong></div>'
         + '<div class="dcs-detail"><span>Delivery</span><strong class="'+(delivery==='Blocked'?'dcs-tone-danger':'')+'">'+esc(delivery)+'</strong></div>'
         + '<div class="dcs-detail"><span>Open blockers</span><strong class="'+(blockers>0?'dcs-tone-danger':'')+'">'+(blockers===null?'Not evaluated':blockers)+'</strong></div>'
@@ -2876,6 +2885,40 @@ function render_summary_dashboard(frm) {
 }
 
 // Presentation only; server services remain the authority for every mutation.
+function dcs_is_draft(frm) {
+    return Number(frm.doc.docstatus || 0) === 0 || !!frm.doc.__islocal;
+}
+
+function dcs_draft_position(frm) {
+    var doc=frm.doc, rows=(doc.items || []).length+(doc.resources || []).length+(doc.addtional_charges || []).length;
+    var totals=rows ? dcs_boq_totals(doc.items,doc.resources,doc.addtional_charges) :
+        {cost:Number(doc.total_cost)||0,selling:Number(doc.total_selling)||0};
+    totals.gp=totals.selling-totals.cost;
+    totals.margin=totals.selling>0 ? 100*totals.gp/totals.selling : null;
+    totals.revision_no=0;
+    return totals;
+}
+
+function dcs_render_draft_summary(frm, field) {
+    var p=dcs_draft_position(frm), esc=dcs_esc;
+    var full=frappe.session && frappe.session.user==='Administrator' ||
+        ['Managing Director','Commercial Controller','Sales Manager','Presales'].some(function(role){return frappe.user.has_role(role);});
+    var entered=full ? p.cost!==0 || p.selling!==0 : p.selling!==0;
+    if (!entered) {
+        field.$wrapper.html('<div class="dcs-panel dcs-quiet"><b>Prepare the draft costing</b><p>Enter customer and scope details first, then add BOQ lines in Costing. Your draft figures will appear here as you enter them.</p></div>');
+        return;
+    }
+    var money=function(v){return esc(frm.doc.currency || 'AED')+' '+format_number(v,null,2);};
+    var html='<div class="dcs-panel dcs-overview"><div class="dcs-eyebrow">DRAFT ESTIMATE</div>'
+        +'<h2>'+esc(frm.doc.organisation_name || frm.doc.customer || frm.doc.subject || 'New deal')+'</h2>'
+        +'<div class="dcs-metrics"><div><span>Draft selling</span><strong>'+money(p.selling)+'</strong>'
+        +(full ? '<small>Buying '+money(p.cost)+'</small>' : '')+'</div>';
+    if (full) html+='<div><span>Gross profit</span><strong>'+money(p.gp)+'</strong><small>Draft BOQ estimate</small></div>'
+        +'<div><span>Gross margin</span><strong class="'+dcs_margin_tone(p.margin)+'">'+(p.margin===null?'Selling price required':p.margin.toFixed(2)+'%')+'</strong></div>';
+    html+='</div><p>Recalculates as you edit the BOQ. Approval is evaluated when the sheet is submitted.</p></div>';
+    field.$wrapper.html(html);
+}
+
 function dcs_margin_tone(margin) {
     return margin === null || !Number.isFinite(Number(margin)) ? 'dcs-tone-neutral' :
         (Number(margin) < 20 ? 'dcs-tone-danger' : 'dcs-tone-success');
@@ -2955,6 +2998,7 @@ function dcs_read_view(s2,s5) {
 }
 
 function dcs_effective_position(frm, s5) {
+    if (dcs_is_draft(frm)) return dcs_draft_position(frm);
     var doc = frm.doc, lv = (s5 || {}).living || {};
     var rev = Number(lv.revision_no !== undefined ? lv.revision_no : doc.custom_dcs_revision_no) || 0;
     var value = function (key, field, fallback) {
@@ -2970,6 +3014,7 @@ function dcs_effective_position(frm, s5) {
 }
 
 function dcs_approval_presentation(frm, s5) {
+    if (dcs_is_draft(frm)) return {label:'Draft estimate',note:'Approval is evaluated when the sheet is submitted.',color:'gray'};
     var p = dcs_effective_position(frm, s5);
     if (!s5 || s5.ok !== 1 || !s5.living) {
         return {label:'Not available', note:'Commercial evaluation is unavailable for this view.', color:'gray'};
@@ -3130,7 +3175,15 @@ function dcs_call(method, args) {
 }
 
 function dcs_load(frm) {
-	var n = frm.doc.name;
+    var n=frm.doc.name;
+    frm.__dcs={};
+    frm.__dcs_docname=n;
+    if (dcs_is_draft(frm)) {
+        frm.__dcs_load_id=(frm.__dcs_load_id || 0)+1;
+        render_summary_dashboard(frm);
+        frm.dashboard.set_headline('<div class="dcs-compact"><b>Draft</b><span>Enter customer and scope details, then complete costing.</span></div>');
+        return;
+    }
     var loadId = frm.__dcs_load_id = (frm.__dcs_load_id || 0) + 1;
 	Promise.all([
 		dcs_call('dcs_screen3', { dcs: n }),
@@ -3634,3 +3687,21 @@ function dcs_boq_revision_dialog(frm, cap) {
     });
     d.show(); preview();
 }
+function dcs_refresh_draft(frm) {
+    if (dcs_is_draft(frm)) render_summary_dashboard(frm);
+}
+frappe.ui.form.on('Deal Cost Sheet', {
+    organisation_name: dcs_refresh_draft, customer: dcs_refresh_draft,
+    subject: dcs_refresh_draft, items_remove: dcs_refresh_draft,
+    resources_remove: dcs_refresh_draft, addtional_charges_remove: dcs_refresh_draft
+});
+frappe.ui.form.on('Deal Cost Item', {
+    qty: dcs_refresh_draft, cost_rate: dcs_refresh_draft, selling_rate: dcs_refresh_draft
+});
+frappe.ui.form.on('Deal Cost Resource', {
+    no_of_persons: dcs_refresh_draft, no_of_days: dcs_refresh_draft,
+    hours: dcs_refresh_draft, cost_rate: dcs_refresh_draft
+});
+frappe.ui.form.on('Additional Charges Item', {
+    amount: dcs_refresh_draft, selling_amount: dcs_refresh_draft
+});
