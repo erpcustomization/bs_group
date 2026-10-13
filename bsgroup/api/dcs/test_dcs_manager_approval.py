@@ -218,3 +218,27 @@ class IntegrationTestDCSManagerApproval(IntegrationTestCase):
         history=frappe.db.get_value("DCS Revision",rev.name,["approval_state","decided_by","decided_on","decision_reason"],as_dict=True)
         execute()
         self.assertEqual(frappe.db.get_value("DCS Revision",rev.name,list(history),as_dict=True),history)
+    def test_shared_account_exception_routes_only_to_configured_manager(self):
+        with patch("bsgroup.dcs.manager_approval.SHARED_ACCOUNT_MANAGERS", {self.submitter: self.manager}):
+            frappe.db.set_value("Employee", self.submitter_emp, "reports_to", "")
+            rev = self.revise()
+            self.assertEqual(rev.approval_manager, self.manager)
+            self.assertFalse(rev.submitter_employee)
+            self.assertEqual(rev.manager_employee, self.manager_emp)
+            frappe.set_user(self.manager)
+            self.assertEqual(frappe.call(DECIDE, dcs=self.doc.name, action="Approve")["ok"], 1)
+
+    def test_shared_account_exception_refuses_self_and_disabled_manager(self):
+        with patch("bsgroup.dcs.manager_approval.SHARED_ACCOUNT_MANAGERS", {self.submitter: self.submitter}):
+            self.assertTrue(resolve_manager(self.submitter)["approval_routing_error"])
+        frappe.db.set_value("User", self.manager, "enabled", 0)
+        with patch("bsgroup.dcs.manager_approval.SHARED_ACCOUNT_MANAGERS", {self.submitter: self.manager}):
+            route = resolve_manager(self.submitter)
+            self.assertIn("disabled", route["approval_routing_error"])
+            self.assertFalse(route["approval_manager"])
+
+    def test_shared_account_exception_does_not_change_other_reporting_lines(self):
+        with patch("bsgroup.dcs.manager_approval.SHARED_ACCOUNT_MANAGERS", {"zztest-shared@example.com": self.other}):
+            route = resolve_manager(self.submitter)
+            self.assertEqual(route["approval_manager"], self.manager)
+            self.assertEqual(route["submitter_employee"], self.submitter_emp)

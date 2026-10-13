@@ -5,11 +5,25 @@ from urllib.parse import quote
 
 ROUTE_FIELDS = ["approval_policy", "submitter_employee", "manager_employee",
                 "approval_manager", "approval_routing_error", "manager_dcs_share"]
+# Owner-approved shared-account exception; ordinary employees still use Reports To.
+SHARED_ACCOUNT_MANAGERS = {"helpdesk@bitssecureit.com": "mohan@bitssecureit.com"}
+
 FINAL_STATES = ("Approved", "Rejected", "Returned for Rework", "Not Required")
 
 def resolve_manager(user):
     out = {"approval_policy": "Immediate Manager", "approval_manager": "",
            "submitter_employee": "", "manager_employee": "", "approval_routing_error": ""}
+    if user in SHARED_ACCOUNT_MANAGERS:
+        manager_user = SHARED_ACCOUNT_MANAGERS[user]
+        managers = frappe.get_all("Employee", filters={"user_id": manager_user, "status": "Active"},
+                                  fields=["name"], limit_page_length=2)
+        if manager_user == user or manager_user in ("Administrator", "Guest") or len(managers) != 1:
+            out["approval_routing_error"] = "The configured shared-account manager must be a distinct active Employee."
+        elif not frappe.db.get_value("User", manager_user, "enabled"):
+            out["approval_routing_error"] = "The configured shared-account manager's user is disabled."
+        else:
+            out.update(manager_employee=managers[0].name, approval_manager=manager_user)
+        return out
     employees = frappe.get_all("Employee", filters={"user_id": user, "status": "Active"},
                                fields=["name", "reports_to"], limit_page_length=2)
     if len(employees) != 1:
