@@ -187,3 +187,31 @@ test('a no-op response is labelled No change, never Recorded',()=>{
   context.dcs_run(frm,'dcs_apply_revision',{});
   assert.equal(alert.message,'No change — no revision recorded');assert.equal(alert.indicator,'blue');
 });
+
+vm.runInContext(source.slice(source.indexOf('function render_summary_dashboard(frm) {'),source.indexOf('// Presentation only; server services')),context);
+test('below-floor margin remains an exception color after MD approval',()=>{
+  const frm=fixture(); let html;
+  const current={cost:1250,selling:1500,gp:250,margin_percent:100/6};
+  frm.fields_dict.custom_deal_summary_dashboard={$wrapper:{html:value=>{html=value;}}};
+  frm.__dcs={s2:{ok:1,projection:'commercial',margin_bridge:{original:current,current,gp_impacts:{},gp_movement:0}},
+    s3:negotiator,s4:{},s5:sheet({living:{revision_no:2,total_cost:1250,total_selling:1500,approval_required:'Managing Director',approval_state:'Approved',authorised_position:1}})};
+  context.render_summary_dashboard(frm);
+  assert.match(html,/MD approved/);
+  assert.match(html,/dcs-tone-danger">16.67%/);
+  assert.doesNotMatch(html,/dcs-tone-success">16.67%/);
+  assert.match(html,/Below the 20% floor/);
+});
+test('the redesigned overview never exposes figures in a reduced commercial projection',()=>{
+  const frm=fixture();let html;
+  frm.fields_dict.custom_deal_summary_dashboard={$wrapper:{html:value=>{html=value;}}};
+  frm.__dcs={s2:{ok:1,projection:'reduced'},s5:{ok:0}};
+  context.render_summary_dashboard(frm);
+  assert.doesNotMatch(html,/14800|16900|Current selling|Gross profit/);
+  assert.match(html,/not available/);
+});
+test('margin floor color handles exact 20%, negative and unpriced positions',()=>{
+  assert.equal(context.dcs_margin_tone(20),'dcs-tone-success');
+  assert.equal(context.dcs_margin_tone(19.999),'dcs-tone-danger');
+  assert.equal(context.dcs_margin_tone(-2),'dcs-tone-danger');
+  assert.equal(context.dcs_margin_tone(null),'dcs-tone-neutral');
+});

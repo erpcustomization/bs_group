@@ -2820,132 +2820,126 @@ frappe.ui.form.on('Deal Cost Sheet', {
 });
 
 function render_summary_dashboard(frm) {
-    if (!frm.fields_dict.custom_deal_summary_dashboard) return;
-    var d = frm.doc;
-
-    function fmt(v) {
-        var n = format_number(v || 0, null, 2);
-        return (d.currency || '') + ' ' + n;
+    var field=frm.fields_dict.custom_deal_summary_dashboard;
+    if (!field) return;
+    dcs_visual_styles(frm);
+    var state=frm.__dcs || {}, s2=state.s2 || {}, s5=state.s5 || {};
+    if (s2.ok !== 1 || s2.projection !== 'commercial') {
+        field.$wrapper.html('<div class="dcs-panel dcs-quiet">' + dcs_esc(s2.error || 'Commercial evaluation is not available in this view.') + '</div>');
+        return;
     }
-
-    function badge(icon, color) {
-        return '<span style="display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; background:' + color + '1f; color:' + color + '; font-size:13px; flex:none;">' + icon + '</span>';
-    }
-
-    function row(label, value, color) {
-        var style = color ? ('color:' + color + '; font-weight:700;') : 'color:var(--text-color);';
-        return '<div style="display:flex; justify-content:space-between; align-items:center; gap:12px; padding:6px 0; font-size:13px; border-bottom:1px dashed rgba(140,140,140,0.18);">' +
-            '<span style="color:var(--text-muted);">' + label + '</span>' +
-            '<span style="text-align:right; ' + style + '">' + (value !== undefined && value !== null && value !== '' ? value : '-') + '</span>' +
-            '</div>';
-    }
-
-    function link_row(label, route, name) {
-        if (!name) return row(label, '-');
-        var value = '<a href="/app/' + route + '/' + encodeURIComponent(name) + '" target="_blank" style="font-weight:600;">' + name + '</a>';
-        return row(label, value);
-    }
-
-    function quick_link(label, route, name, color) {
-        if (!name) return '';
-        return '<div style="padding:7px 0; font-size:13px; display:flex; align-items:center; gap:8px;">' +
-            badge('&#8594;', color) +
-            '<a href="/app/' + route + '/' + encodeURIComponent(name) + '" target="_blank" style="color:' + color + '; font-weight:600;">View ' + label + '</a></div>';
-    }
-
-    function col(icon, title, accent, body, flex, wide) {
-        return '<div style="flex:' + (wide ? '1 1 100%' : (flex || 1)) + '; min-width:' + (wide ? '0' : '230px') + '; overflow-wrap:anywhere; border-radius:12px; padding:16px 18px; margin:6px; ' +
-            'background:var(--card-bg, #fff); border:1px solid var(--border-color); border-top:3px solid ' + accent + '; ' +
-            'box-shadow:0 2px 10px rgba(0,0,0,0.06);">' +
-            '<div style="font-weight:600; font-size:13.5px; color:var(--text-color); letter-spacing:.01em; margin-bottom:14px; display:flex; align-items:center; gap:10px;">' +
-            badge(icon, accent) + '<span>' + title + '</span></div>' +
-            body + '</div>';
-    }
-
-    function stat_box(label, value, color, icon) {
-        return '<div style="flex:1; min-width:47%; border-radius:10px; padding:10px 12px 10px 14px; background:var(--card-bg, #fff); ' +
-            'border-left:4px solid ' + color + '; box-shadow:0 1px 4px rgba(0,0,0,0.06);">' +
-            '<div style="display:flex; align-items:center; gap:6px; font-size:10.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; font-weight:700; margin-bottom:4px;">' +
-            '<span>' + icon + '</span><span>' + label + '</span></div>' +
-            '<div style="font-size:18px; font-weight:700; color:' + color + '; line-height:1.2;">' + value + '</div>' +
-            '</div>';
-    }
-
-
-    var green = '#059669';
-    var blue = '#2563eb';
-    var purple = '#7c3aed';
-    var teal = '#0891b2';
-    var indigo = '#4f46e5';
-    var amber = '#b45309';
-
-    var bridge = frm.__dcs && frm.__dcs.s2 && frm.__dcs.s2.margin_bridge;
-    var current = bridge ? bridge.current : {cost: d.total_cost, selling: d.total_selling, gp: d.margin_value, margin_percent: d.margin_percent};
-    var margin_color = current.gp > 0 ? green : '#dc2626';
-    var margin_pct=current.selling > 0 ? (current.margin_percent || 0).toFixed(2) + '%' : 'Not priced';
-
-    var opp_body = link_row('Opportunity', 'opportunity', d.opportunity) +
-        link_row('Presales Request', 'presales-request', d.presales_request) +
-        link_row('Project', 'project', d.project) +
-        row('Territory', d.territory) +
-        row('Currency', d.currency) +
-        row('Deal Owner', d.deal_owner) +
-        row('Prepared By', d.owner);
-
-
-    var positions=[['Submitted BOQ',{cost:d.total_cost,selling:d.total_selling,gp:d.margin_value,margin_percent:d.margin_percent}]];
-    if(bridge) positions=[['Original',bridge.original],['Current',bridge.current]].concat(bridge.awarded ? [['Awarded',bridge.awarded]] : []);
-    var comm_body='<div class="table-responsive"><table class="table table-sm"><thead><tr><th>Position</th><th>Buying</th><th>Selling</th><th>GP</th><th>Margin</th></tr></thead><tbody>'
-        + positions.map(function(x){var v=x[1];return '<tr><th>' + x[0] + '</th><td>' + fmt(v.cost) + '</td><td>' + fmt(v.selling) + '</td><td>' + fmt(v.gp) + '</td><td>' + (v.selling > 0 ? (v.margin_percent || 0).toFixed(2) + '%' : 'Not priced') + '</td></tr>';}).join('')
+    var d=frm.doc, bridge=s2.margin_bridge, p=dcs_effective_position(frm,s5);
+    var approval=dcs_approval_presentation(frm,s5), st=s5.states || {}, cond=s5.conditions || {};
+    var next=dcs_next_step(frm,state.s3,state.s4,s5), esc=dcs_esc;
+    var number=function(v){return format_number(Number(v)||0,null,2);};
+    var money=function(v){return esc(d.currency || '') + ' ' + number(v);};
+    var margin=function(v){
+        return '<span class="' + dcs_margin_tone(v.selling > 0 ? Number(v.margin_percent)||0 : null) + '">'
+            + (v.selling > 0 ? (Number(v.margin_percent)||0).toFixed(2)+'%' : 'Not priced') + '</span>';
+    };
+    var positions=bridge ? [['Original',bridge.original],['Current',bridge.current]] :
+        [['Submitted BOQ',{cost:d.total_cost,selling:d.total_selling,gp:d.margin_value,margin_percent:d.margin_percent}]];
+    if (bridge && bridge.awarded) positions.push(['Awarded',bridge.awarded]);
+    var table='<div class="table-responsive"><table class="dcs-ledger"><thead><tr><th>Position</th><th>Buying</th><th>Selling</th><th>Gross profit</th><th>Margin</th></tr></thead><tbody>'
+        + positions.map(function(x){var v=x[1] || {}; return '<tr class="'+(x[0]==='Current'?'dcs-current':(x[0]==='Awarded'?'dcs-awarded':''))+'"><th>'+esc(x[0])+'</th><td>'+number(v.cost)+'</td><td>'+number(v.selling)+'</td><td>'+number(v.gp)+'</td><td>'+margin(v)+'</td></tr>';}).join('')
         + '</tbody></table></div>';
-    if(bridge) comm_body += row('GP movement',fmt(bridge.gp_movement)) + row('Customer impact',fmt(bridge.gp_impacts.customer)) + row('Vendor impact',fmt(bridge.gp_impacts.vendor));
-    var nextStep=dcs_next_step(frm,(frm.__dcs || {}).s3,(frm.__dcs || {}).s4,(frm.__dcs || {}).s5);
-    comm_body += '<div class="text-muted small"><b>Next step: ' + frappe.utils.escape_html(nextStep.label) + '</b><br>' + frappe.utils.escape_html(nextStep.note) + '</div>';
-
-    if (frm.__dcs && frm.__dcs.s2 && frm.__dcs.s2.ok !== 1) {
-        comm_body = '<div class="text-muted">' + frappe.utils.escape_html(frm.__dcs.s2.error || 'Commercial figures are not available in this view.') + '</div>';
+    var movement='';
+    if(bridge) {
+        movement='<div class="dcs-movement">' + [['GP movement',bridge.gp_movement],['Customer impact',(bridge.gp_impacts || {}).customer],['Vendor impact',(bridge.gp_impacts || {}).vendor]].map(function(x){
+            return '<div><span>'+x[0]+'</span><strong class="'+(x[1]<0?'dcs-tone-danger':'')+'">'+money(x[1])+'</strong></div>';
+        }).join('')+'</div>';
     }
-    var evaluation=dcs_approval_presentation(frm,(frm.__dcs || {}).s5);
-    var status_body=row('Document',d.docstatus === 2 ? 'Cancelled' : (d.docstatus === 1 ? 'Submitted' : 'Draft')) +
-        row('Commercial approval',frappe.utils.escape_html(evaluation.label)) +
-        row('Award',frappe.utils.escape_html(d.custom_award_state || 'Not recorded')) +
-        row('Delivery',frappe.utils.escape_html(d.custom_delivery_release_state || 'Not evaluated')) +
-        row('Items', d.items ? d.items.length : 0) +
-        row('Resources', d.resources ? d.resources.length : 0) +
-        row('Responsibilities', d.responsibilities ? d.responsibilities.length : 0) +
-        row('Last Updated', frappe.datetime.comment_when(d.modified));
-
-    var quick_body = quick_link('Opportunity', 'opportunity', d.opportunity, teal) +
-        quick_link('Presales Request', 'presales-request', d.presales_request, teal) +
-        quick_link('Project', 'project', d.project, teal);
-
-    if (!quick_body) {
-        quick_body = '<div style="font-size:13px; color:var(--text-muted);">No linked records yet</div>';
-    }
-
-    var section_title = '<div style="display:flex; align-items:center; justify-content:space-between; margin:2px 8px 12px 8px;">' +
-        '<div style="display:flex; align-items:center; gap:10px;">' +
-        '<span style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:50%; background:linear-gradient(135deg,#7c3aed,#2563eb); color:#fff; font-size:14px;">&#128203;</span>' +
-        '<span style="font-size:16px; font-weight:700; letter-spacing:.01em; color:var(--text-color);">Deal overview</span>' +
-        '</div>' +
-        '<span style="font-size:11.5px; color:var(--text-muted); letter-spacing:.02em;">Deal snapshot &amp; key metrics</span>' +
-        '</div>';
-
-    var html = '<div style="border:1px solid var(--border-color); border-radius:16px; padding:14px; ' +
-        'background:linear-gradient(180deg, rgba(124,58,237,0.03), rgba(37,99,235,0.02)); box-shadow:0 3px 14px rgba(0,0,0,0.05);">' +
-        section_title +
-        '<div style="display:flex; flex-wrap:wrap; margin:0 -6px;">' +
-        col('&#128176;', 'Commercial position', green, comm_body, 1, true) +
-        col('&#127970;', 'Opportunity', blue, opp_body, 1) +
-        col('&#128202;', 'Status', purple, status_body, 1) +
-        col('&#128279;', 'Quick Links', teal, quick_body, 1) +
-        '</div></div>';
-
-    frm.fields_dict.custom_deal_summary_dashboard.$wrapper.html(html);
+    var links=[['Opportunity','opportunity',d.opportunity],['Presales request','presales-request',d.presales_request],['Project','project',d.project]].filter(function(x){return !!x[2];}).map(function(x){
+        return '<div class="dcs-detail"><span>'+x[0]+'</span><a href="/desk/'+x[1]+'/'+encodeURIComponent(x[2])+'">'+esc(x[2])+'</a></div>';
+    }).join('');
+    var evaluated=s5.ok===1 && st.customer_award==='Awarded' && Number(p.revision_no)>0;
+    var blockers=evaluated && Number.isFinite(Number(cond.open_blockers)) ? Number(cond.open_blockers) : null;
+    var delivery=st.delivery_release || 'Not evaluated';
+    var html='<div class="dcs-panel dcs-overview">'
+        + '<div class="dcs-overview-heading"><div><div class="dcs-eyebrow">COMMERCIAL OVERVIEW</div><h2>'+esc(d.customer || d.title || d.name)+'</h2></div><span class="dcs-revision">R'+p.revision_no+' · '+esc(d.currency || '')+'</span></div>'
+        + '<div class="dcs-metrics">'
+        + '<div><span>Current selling</span><strong>'+money(p.selling)+'</strong><small>Buying '+money(p.cost)+'</small></div>'
+        + '<div><span>Gross profit</span><strong class="'+(p.gp<0?'dcs-tone-danger':'')+'">'+money(p.gp)+'</strong><small>Current commercial position</small></div>'
+        + '<div><span>Gross margin</span><strong class="'+dcs_margin_tone(p.margin)+'">'+(p.margin===null?'Not priced':p.margin.toFixed(2)+'%')+'</strong><small>'+ (p.margin===null?'Selling price required':(p.margin<20?'Below the 20% floor':'Meets the 20% floor'))+'</small></div></div>'
+        + '<div class="dcs-overview-grid"><section><div class="dcs-section-heading"><h3>Commercial position</h3><span>Amounts in ' + esc(d.currency || '') + ' · baseline → award</span></div>'+table+movement
+        + '<details class="dcs-linked"><summary>Deal details &amp; linked records</summary>'+links
+        + '<div class="dcs-detail"><span>Deal owner</span><strong>'+esc(d.deal_owner || 'Not assigned')+'</strong></div>'
+        + '<div class="dcs-detail"><span>Prepared by</span><strong>'+esc(d.owner)+'</strong></div></details></section>'
+        + '<aside><div class="dcs-decision"><div class="dcs-eyebrow">COMMERCIAL DECISION</div><h3>'+esc(approval.label)+'</h3><p>'+esc(approval.note)+'</p></div>'
+        + '<div class="dcs-release"><div class="dcs-eyebrow">AWARD &amp; DELIVERY</div><div class="dcs-detail"><span>Award</span><strong>'+esc(st.customer_award || 'Not Awarded')+'</strong></div>'
+        + '<div class="dcs-detail"><span>Delivery</span><strong class="'+(delivery==='Blocked'?'dcs-tone-danger':'')+'">'+esc(delivery)+'</strong></div>'
+        + '<div class="dcs-detail"><span>Open blockers</span><strong class="'+(blockers>0?'dcs-tone-danger':'')+'">'+(blockers===null?'Not evaluated':blockers)+'</strong></div>'
+        + '<p class="dcs-quiet">Commercial approval and delivery release are separate decisions.</p></div></aside></div>'
+        + '<div class="dcs-next"><span class="dcs-eyebrow">NEXT ACTION</span><div><strong>'+esc(next.label)+'</strong><p>'+esc(next.note)+'</p></div></div></div>';
+    field.$wrapper.html(html);
 }
 
-
 // Presentation only; server services remain the authority for every mutation.
+function dcs_margin_tone(margin) {
+    return margin === null || !Number.isFinite(Number(margin)) ? 'dcs-tone-neutral' :
+        (Number(margin) < 20 ? 'dcs-tone-danger' : 'dcs-tone-success');
+}
+
+function dcs_visual_styles(frm) {
+    if (typeof document === 'undefined') return;
+    if (frm.wrapper) $(frm.wrapper).addClass('dcs-workbench-v2');
+    if (document.getElementById('dcs-workbench-v2-styles')) return;
+    var style=document.createElement('style');
+    style.id='dcs-workbench-v2-styles';
+    style.textContent = `
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel {color:var(--text-color,#243247);font-size:13px;line-height:1.5}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview {border:1px solid var(--border-color,#e3e7ee);border-radius:12px;background:var(--card-bg,#fff);padding:26px;box-shadow:none}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview-heading {display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:18px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-eyebrow {font-size:10px;letter-spacing:1.1px;font-weight:650;color:var(--text-muted,#68758a)}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview h2 {font-size:21px;font-weight:650;line-height:1.3;margin:6px 0 0;overflow-wrap:anywhere;color:var(--text-color)}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-revision {font-size:12px;color:var(--text-muted);white-space:nowrap;padding-top:4px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:20px;border-bottom:1px solid var(--border-color);padding-bottom:18px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics>div {padding:0 24px;border-left:1px solid var(--border-color)}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics>div:first-child {padding-left:0;border:0}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics span,.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics small {display:block;color:var(--text-muted);font-size:12px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics strong {display:block;font-size:27px;letter-spacing:-.5px;font-weight:650;margin:6px 0;line-height:1.3;font-variant-numeric:tabular-nums}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview-grid {display:grid;grid-template-columns:minmax(0,2fr) minmax(240px,1fr);gap:28px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-section-heading {display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel h3 {font-size:14px;font-weight:650;margin:0;color:var(--text-color)}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-section-heading>span {font-size:11px;color:var(--text-muted)}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table {width:100%;border-collapse:collapse;font-size:12px;min-width:530px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel .dcs-ledger {table-layout:fixed;min-width:0;box-sizing:border-box}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table thead,.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table thead tr,.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table th {background:var(--subtle-fg,#f6f8fa)!important;color:var(--text-muted,#667489)!important;box-shadow:none!important;border:0!important}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table th,.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table td {padding:11px 10px!important;white-space:nowrap;border-bottom:1px solid var(--border-color)!important;text-align:right;background:transparent!important;color:var(--text-color)!important;font-variant-numeric:tabular-nums;box-shadow:none!important}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table th:first-child,.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table td:first-child {text-align:left}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table thead th {font-weight:500!important;font-size:11px;color:var(--text-muted)!important;background:var(--subtle-fg,#f6f8fa)!important}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table .dcs-current td,.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table .dcs-current th {font-weight:650!important}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table .dcs-awarded td,.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel table .dcs-awarded th {background:var(--subtle-fg,#f6f8fa)!important}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-movement {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:18px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-movement span,.dcs-workbench-v2.dcs-workbench-v2 .dcs-movement strong {display:block;font-size:11px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-movement span {color:var(--text-muted);margin-bottom:4px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-movement strong {font-size:13px;font-weight:600}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-decision {padding:18px;border:1px solid var(--border-color);border-radius:8px;background:var(--subtle-fg,#f6f8fa)}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-decision h3 {font-size:18px;margin-top:8px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel p {font-size:12px;color:var(--text-muted);margin:8px 0 0}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-release {padding:18px 0 0}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-detail {display:flex;justify-content:space-between;gap:16px;padding:8px 0;font-size:12px;border-bottom:1px solid var(--border-color)}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-detail>span {color:var(--text-muted);flex:none}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-detail>strong,.dcs-workbench-v2.dcs-workbench-v2 .dcs-detail>a {font-weight:550;text-align:right;overflow-wrap:anywhere}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-linked {margin-top:24px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-linked summary {cursor:pointer;font-size:12px;color:var(--text-muted);padding:8px 0}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-next {display:flex;align-items:flex-start;gap:20px;margin-top:26px;padding-top:20px;border-top:1px solid var(--border-color)}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-next>.dcs-eyebrow {white-space:nowrap;padding-top:3px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-next strong {font-size:14px;font-weight:650}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-next p {margin:3px 0 0}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel .dcs-tone-danger,.dcs-workbench-v2.dcs-workbench-v2 .dcs-compact .dcs-tone-danger {color:#b54735!important}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel .dcs-tone-success,.dcs-workbench-v2.dcs-workbench-v2 .dcs-compact .dcs-tone-success {color:#25755a!important}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel .dcs-tone-neutral {color:var(--text-muted)!important}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-compact {display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:12px;color:var(--text-color);padding-right:24px}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-compact small {font-size:11px;color:var(--text-muted);margin-left:12px}
+.dcs-workbench-v2.dcs-workbench-v2 .form-message {background:var(--card-bg,#fff)!important;border-bottom:1px solid var(--border-color);padding:10px 16px!important;box-shadow:none!important}
+.dcs-workbench-v2.dcs-workbench-v2 .dcs-panel-title {font-size:14px;font-weight:650;margin:4px 0 18px}
+@media(max-width:1000px) {.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview-grid {grid-template-columns:1fr}.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview-grid aside {display:grid;grid-template-columns:1fr 1fr;gap:20px}.dcs-workbench-v2.dcs-workbench-v2 .dcs-release {padding-top:0}.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics strong {font-size:23px}}
+@media(max-width:600px) {.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview {padding:16px}.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics {grid-template-columns:1fr;gap:16px}.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics>div {padding:0;border:0}.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview-grid aside {grid-template-columns:1fr}.dcs-workbench-v2.dcs-workbench-v2 .dcs-section-heading {display:block}.dcs-workbench-v2.dcs-workbench-v2 .dcs-compact {display:block}.dcs-workbench-v2.dcs-workbench-v2 .dcs-movement {grid-template-columns:1fr}.dcs-workbench-v2.dcs-workbench-v2 .dcs-next {display:block}}
+`;
+    document.head.appendChild(style);
+}
+
 function dcs_read_view(s2,s5) {
     if (s5.ok === 1 || s2.ok !== 1 || s2.projection !== 'commercial') return s5;
     var guard=s2.negotiation_guard || {}, position=(s2.margin_bridge || {}).current || {}, award=s2.award || {};
@@ -3079,7 +3073,7 @@ function dcs_when(v) { return v ? frappe.datetime.str_to_user(v) : '&mdash;'; }
 
 function dcs_panel(title, body, note) {
 	var n = note ? '<div class="text-muted small" style="margin-top:6px">' + dcs_esc(note) + '</div>' : '';
-	return '<div style="margin-top:4px"><div class="text-muted" style="font-weight:600;letter-spacing:.4px;text-transform:uppercase;font-size:11px;margin-bottom:8px">'
+	return '<div class="dcs-panel"><div class="dcs-panel-title">'
 		+ dcs_esc(title) + '</div>' + body + n + '</div>';
 }
 
@@ -3148,46 +3142,14 @@ function dcs_load(frm) {
 }
 
 function dcs_headline(frm, s5) {
-	if (!s5.living || s5.ok !== 1) {
-        frm.dashboard.set_headline('<span class="text-muted">Commercial evaluation is not available in this view. ' + dcs_esc(s5.error || 'Refresh to retry.') + '</span>');
+    dcs_visual_styles(frm);
+    if (!s5.living || s5.ok !== 1) {
+        frm.dashboard.set_headline('<div class="dcs-compact">Commercial evaluation is not available in this view. ' + dcs_esc(s5.error || 'Refresh to retry.') + '</div>');
         return;
     }
-	var lv = s5.living, fz = s5.frozen_baseline || {};
-	var dcs_hasrev = (lv && lv.revision_no) ? 1 : 0;
-	if (!dcs_hasrev) {
-		lv = {
-			revision_no: 0,
-			total_cost: (frm.doc.total_cost || 0),
-			total_selling: (frm.doc.total_selling || 0),
-			margin_percent: (frm.doc.margin_percent || 0),
-			approval_state: lv ? lv.approval_state : null,
-			approval_required: lv ? lv.approval_required : null,
-			margin_gate: lv ? lv.margin_gate : null
-		};
-	}
-	var cell = function (label, value, sub) {
-		return '<div style="display:inline-block;min-width:150px;margin-right:26px;vertical-align:top">'
-			+ '<div class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.4px">' + dcs_esc(label) + '</div>'
-			+ '<div style="font-size:15px;font-weight:600">' + value + '</div>'
-			+ (sub ? '<div class="text-muted" style="font-size:11px">' + sub + '</div>' : '') + '</div>';
-	};
-
-    var p = dcs_effective_position(frm,s5), approval = dcs_approval_presentation(frm,s5);
-    var h = cell(dcs_hasrev ? 'Current selling' : 'Submitted BOQ selling',dcs_money(frm,p.selling),'Buying ' + dcs_money(frm,p.cost) + ' · GP ' + dcs_money(frm,p.gp))
-        + cell('Gross margin',p.margin === null ? 'Not priced' : dcs_pct(p.margin),dcs_hasrev ? 'Revision ' + dcs_esc(p.revision_no) : 'Commercial evaluation pending')
-        + (fz.frozen ? cell('Awarded selling',dcs_money(frm,fz.total_selling),'Frozen at revision ' + dcs_esc(fz.revision_no)) : cell('Award','Not recorded','Delivery has not been released'))
-        + cell('Commercial approval',dcs_esc(approval.label),dcs_esc(approval.note));
-    var next = dcs_next_step(frm,(frm.__dcs || {}).s3,(frm.__dcs || {}).s4,s5);
-    h += '<div class="text-muted" style="margin-top:8px"><b>Next step: ' + dcs_esc(next.label) + '</b> · ' + dcs_esc(next.note) + '</div>';
-
-	var rr = s5.release_readiness || {};
-	if (rr.note) {
-		h += '<div class="text-muted" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border-color)">' + dcs_esc(rr.note) + '</div>';
-	} else if (rr.pre_award_note) {
-		// Informational only: no award recorded, no frozen baseline - never an instruction to reverse an award.
-		h += '<div class="text-muted" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border-color)">' + dcs_esc(rr.pre_award_note) + '</div>';
-	}
-	frm.dashboard.set_headline(h);
+    var p=dcs_effective_position(frm,s5), approval=dcs_approval_presentation(frm,s5);
+    var next=dcs_next_step(frm,(frm.__dcs || {}).s3,(frm.__dcs || {}).s4,s5);
+    frm.dashboard.set_headline('<div class="dcs-compact"><div><b>'+dcs_esc(approval.label)+'</b><small>Margin <span class="'+dcs_margin_tone(p.margin)+'">'+(p.margin===null?'Not priced':p.margin.toFixed(2)+'%')+'</span> · R'+p.revision_no+'</small></div><span>Next: <b>'+dcs_esc(next.label)+'</b></span></div>');
 }
 
 function dcs_indicators(frm, s5) {
@@ -3206,6 +3168,7 @@ function dcs_indicators(frm, s5) {
     add(!evaluated || !Number.isFinite(ob) ? 'Handover not evaluated' : (ob === 0 ? 'No open handover blockers' : ob + ' open handover blocker(s)'),
         !evaluated || !Number.isFinite(ob) ? 'gray' : (ob === 0 ? 'green' : 'red'));
 	add('Delivery: ' + (st.delivery_release || 'Not Applicable'), (st.delivery_release || '').indexOf('Released') === 0 ? 'blue' : 'gray');
+    if (s5.ok === 1 && s5.projection === 'commercial' && frm.dashboard.stats_area) frm.dashboard.stats_area.hide();
 }
 
 function dcs_render_negotiation(frm, s3) {
