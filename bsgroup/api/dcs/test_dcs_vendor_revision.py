@@ -124,11 +124,17 @@ def make_quotation_for(dcs, total=None):
 	return q
 
 
-def amend(dcs):
-	"""FIXTURE SHORTCUT: cancel and amend with ignore_links (the strict class uses amend_strict)."""
+def amend(dcs, historical_cancelled=False):
+	"""Fixture inserts may bypass mandatory fields; normal cancellation keeps link checks.
+
+	One binding test models a historical cancelled source with a submitted
+	quotation. New cancellation correctly refuses that dependency.
+	"""
+	if historical_cancelled:
+		frappe.db.set_value("Deal Cost Sheet", dcs.name, "docstatus", 2, update_modified=False)
 	dcs.reload()
-	dcs.flags.ignore_links = True
-	dcs.cancel()
+	if not historical_cancelled:
+		dcs.cancel()
 	new = frappe.copy_doc(dcs)
 	new.amended_from = dcs.name
 	new.docstatus = 0
@@ -256,7 +262,7 @@ class IntegrationTestDCSVendorRevisionBinding(IntegrationTestCase):
 	def test_submitted_quotation_is_reported_not_repointed(self):
 		q = make_quotation_for(self.dcs)
 		frappe.db.set_value("Quotation", q.name, "docstatus", 1, update_modified=False)  # fixture shortcut
-		new = amend(self.dcs)
+		new = amend(self.dcs, historical_cancelled=True)
 		submit(new)
 		self.assertEqual(frappe.db.get_value("Quotation", q.name, "custom_deal_cost_sheet"), self.dcs.name)  # unchanged
 		self.assertEqual(events(new.name, LINKBACK), 0)
