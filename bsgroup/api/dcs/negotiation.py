@@ -367,7 +367,7 @@ def dcs_screen3(args):
 			decision = "Decide whether to hold, counter, or send the current position to the Managing Director."
 		if_nothing = "The customer receives no response and the position stays where it is. No revision is recorded."
 		if s.custom_margin_gate == "Blocked":
-			if_nothing = "The margin gate stays blocked. The deal cannot proceed to award on this position."
+			if_nothing = "The margin remains below the floor. A recorded MD approval is required before award; delivery conditions remain separate."
 		result["header"] = {
 			"decision": decision,
 			"money": {"total_cost": r2(wc), "total_selling": r2(ws), "gp": r2(ws - wc), "margin_percent": wm, "currency": s.currency},
@@ -389,7 +389,7 @@ def dcs_screen3(args):
 
 		result["policy"] = {
 			"md_threshold_percent": MD_THRESHOLD, "concession_ceiling_percent": CEILING, "margin_floor_percent": MARGIN_FLOOR,
-			"basis": "Approval routing is driven by concession from baseline only. The 20% margin floor is an independent commercial gate and is never cleared by an approval decision.",
+			"basis": "Managing Director approval is required below 20% gross margin or at least 16% concession. Concession above 26% cannot be authorised. Each new revision is evaluated independently; a rejected revision remains audited. Approval does not clear delivery conditions.",
 		}
 
 		result["revisions"] = revisions

@@ -17,6 +17,8 @@ result shapes are unchanged; authority is derived from the session only.
 import frappe
 from frappe.utils import now_datetime
 
+from bsgroup.dcs.commercial_authority import authorised_position
+
 from bsgroup.api.dcs._common import (
 	CC, COMMERCIAL_ROLES, MARGIN_FLOOR, MD, NRC_UNAVAILABLE, TECHNICAL_ROLES, absf, audit_event,
 	dcs_exists_and_open, emit_timeline, find_condition, get_user_roles, governed_endpoint, has_any,
@@ -638,7 +640,7 @@ def dcs_screen5(args):
 	if is_comm == 1:
 		result["projection"] = "commercial"
 		result["authority"] = {
-			"can_record_award": 1, "can_reconcile_po": 1, "can_release": is_cc + is_md, "can_override": is_md,
+			"can_record_award": 1, "can_reconcile_po": 1, "can_set_delivery_owner": 1, "can_release": is_cc + is_md, "can_override": is_md,
 			"can_clear_technical": 0, "can_clear_commercial": 1,
 			"role_label": "Managing Director" if is_md == 1 else ("Commercial Controller" if is_cc == 1 else "Commercial"),
 			"note": "Commercial users cannot close technical gates.",
@@ -660,7 +662,7 @@ def dcs_screen5(args):
 			"revision_no": s.custom_dcs_revision_no or 0, "total_cost": r2(s.custom_working_total_cost),
 			"total_selling": r2(s.custom_working_total_selling), "margin_percent": s.custom_working_margin_percent or 0,
 			"approval_state": s.custom_approval_state, "approval_required": s.custom_approval_required,
-			"margin_gate": s.custom_margin_gate,
+			"margin_gate": s.custom_margin_gate, "authorised_position": int(authorised_position(s)),
 		}
 		result["po"] = {
 			"reference": s.custom_po_reference, "value": r2(s.custom_po_value), "scope_revision": s.custom_po_scope_revision,
@@ -682,7 +684,7 @@ def dcs_screen5(args):
 	# ---- technical projection: explicit safe field list, NRC-1 governed narrative ----
 	result["projection"] = "technical"
 	result["authority"] = {
-		"can_record_award": 0, "can_reconcile_po": 0, "can_release": 0, "can_override": 0,
+		"can_record_award": 0, "can_reconcile_po": 0, "can_set_delivery_owner": 0, "can_release": 0, "can_override": 0,
 		"can_clear_technical": 1, "can_clear_commercial": 0, "role_label": "Technical",
 		"note": "Technical users cannot close commercial or finance gates. No commercial value is returned to this projection.",
 	}

@@ -64,7 +64,7 @@ def dcs_approval_decision(args):
 		elif (s.custom_dcs_revision_no or 0) < 1:
 			result["error"] = "The living position has not been initialised. There is nothing to approve."
 		elif req == "None" and action in ["Approve", "Endorse"]:
-			result["error"] = "No approval is required for the current position. The concession is below the 16% Managing Director threshold."
+			result["error"] = "No approval is required for the current position: gross margin is at least 20% and no other approval trigger applies."
 		elif req == "Blocked" and action in ["Approve", "Endorse"]:
 			result["error"] = "This position is above the 26% concession ceiling. No approver may authorise it. It can only be returned for rework or rejected."
 		elif not frappe.db.exists("DCS Revision", rev_ref):
@@ -198,7 +198,7 @@ def dcs_screen4(args):
 
 		blockers = []
 		if req == "None":
-			blockers.append("No approval is required. The current concession is below the 16% Managing Director threshold, so there is nothing to decide here.")
+			blockers.append("No approval is required: gross margin is at least 20% and no other approval trigger applies.")
 		if req == "Blocked":
 			blockers.append("Concession is above the 26% ceiling. No approver may authorise this position. It can only be returned for rework or rejected.")
 		if final == 1:
@@ -243,7 +243,7 @@ def dcs_screen4(args):
 		result["why"] = {
 			"approval_reason": s.custom_approval_reason,
 			"threshold_crossed": "Concession from baseline " + str(s.custom_concession_percent_from_baseline or 0) + "% against a 16% Managing Director threshold and a 26% ceiling.",
-			"policy_basis": "Approval routing is driven by concession from baseline only. The Commercial Controller may review and endorse but is never the final approver on an escalated case.",
+			"policy_basis": "Managing Director approval is required below 20% gross margin or when another approval trigger applies (including concession of at least 16%). Concession above 26% cannot be authorised. A rejected revision stays audited; revise this sheet and recalculate. At or above 20% with no other trigger, MD reapproval is not required. The Commercial Controller may endorse; the Managing Director remains the final approver.",
 			"margin_gate": s.custom_margin_gate, "margin_gate_reason": s.custom_margin_gate_reason,
 			"margin_gate_note": "The 20% margin floor is an independent commercial gate. Approving this position does not clear it.",
 		}
