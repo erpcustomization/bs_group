@@ -7,8 +7,7 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "dcs_overview_tab",
-  "custom_deal_summary_dashboard",
+  "dcs_details_tab",
   "section_break_giph",
   "currency",
   "opportunity",
@@ -23,6 +22,10 @@
   "company",
   "territory",
   "deal_owner",
+  "dcs_scope_section",
+  "subject",
+  "scope_overview",
+  "customer_notes",
   "custom_lifecycle_section",
   "custom_deal_stage",
   "custom_deal_status_section",
@@ -44,9 +47,6 @@
   "document_upload",
   "get_data",
   "section_break_jbpa",
-  "subject",
-  "customer_notes",
-  "scope_overview",
   "apply_exclude_to_all_items",
   "items",
   "addtional_charges",
@@ -170,7 +170,9 @@
   "column_break_rvjn",
   "custom_delivery_override",
   "custom_delivery_override_reason",
-  "custom_delivery_release_note"
+  "custom_delivery_release_note",
+  "dcs_overview_tab",
+  "custom_deal_summary_dashboard"
  ],
  "fields": [
   {
@@ -1001,7 +1003,7 @@
    "read_only": 1
   },
   {
-   "description": "INCOMPLETE OPTION LIST: live register truncated this list twice ('Required \u2013 Delivery Already...' and again with '...' after that). Real remaining option text was not visible and was NOT guessed here.",
+   "description": "INCOMPLETE OPTION LIST: live register truncated this list twice ('Required – Delivery Already...' and again with '...' after that). Real remaining option text was not visible and was NOT guessed here.",
    "fieldname": "custom_operational_review_state",
    "fieldtype": "Select",
    "label": "Operational Review State",
@@ -1047,11 +1049,11 @@
    "read_only": 1
   },
   {
-   "description": "INCOMPLETE OPTION LIST: live register truncated this list with '...' after 'Mismatch \u2013 Superseded'. Additional options were not visible and were NOT guessed here.",
+   "description": "INCOMPLETE OPTION LIST: live register truncated this list with '...' after 'Mismatch – Superseded'. Additional options were not visible and were NOT guessed here.",
    "fieldname": "custom_po_scope_match",
    "fieldtype": "Select",
    "label": "PO Scope Match",
-   "options": "\nNot Checked\nMatch\nMismatch \u2013 Superseded\nMismatch \u2013 Different Scope",
+   "options": "\nNot Checked\nMatch\nMismatch – Superseded\nMismatch – Different Scope",
    "permlevel": 1,
    "read_only": 1
   },
@@ -1257,6 +1259,16 @@
    "fieldname": "dcs_award_handover_tab",
    "fieldtype": "Tab Break",
    "label": "Award & Handover"
+  },
+  {
+   "fieldname": "dcs_scope_section",
+   "fieldtype": "Section Break",
+   "label": "Scope & customer requirements"
+  },
+  {
+   "fieldname": "dcs_details_tab",
+   "fieldtype": "Tab Break",
+   "label": "Deal & Scope"
   }
  ],
  "grid_page_length": 50,

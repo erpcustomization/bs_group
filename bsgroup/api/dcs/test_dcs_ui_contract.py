@@ -51,7 +51,7 @@ class IntegrationTestDCSUIContract(IntegrationTestCase):
     def test_effective_five_tab_layout_and_field_retention(self):
         meta=frappe.get_meta("Deal Cost Sheet")
         self.assertEqual([f.label for f in meta.fields if f.fieldtype=="Tab Break"],
-            ["Overview","Costing","Revisions","Approval","Award & Handover"])
+            ["Deal & Scope","Costing","Revisions","Approval","Award & Handover","Overview"])
         self.assertTrue(meta.has_field("custom_approved_revision_no"))
         self.assertTrue(meta.has_field("custom_superseded_by"))
         self.assertEqual(meta.get_field("addtional_charges").label,"Additional Charges")

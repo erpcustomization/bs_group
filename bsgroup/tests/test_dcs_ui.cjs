@@ -144,9 +144,9 @@ test('unsaved edits keep the framework Save action intact',()=>{
   context.dcs_buttons(frm,negotiator,{},sheet());
   assert.equal(frm.primary,undefined);
 });
-test('five tabs retain every existing standard field without duplication',()=>{
+test('all tabs retain every existing standard field without duplication',()=>{
   const definition=JSON.parse(fs.readFileSync(path.join(__dirname,'../bs_group/doctype/deal_cost_sheet/deal_cost_sheet.json'),'utf8'));
-  assert.deepEqual(definition.fields.filter(f=>f.fieldtype==='Tab Break').map(f=>f.label),['Overview','Costing','Revisions','Approval','Award & Handover']);
+  assert.deepEqual(definition.fields.filter(f=>f.fieldtype==='Tab Break').map(f=>f.label),['Overview','Costing','Revisions','Approval','Award & Handover','Deal & Scope']);
   assert.equal(new Set(definition.field_order).size,definition.field_order.length);
   assert.equal(definition.field_order.length,definition.fields.length);
 });
@@ -240,4 +240,56 @@ test('reportee with a routed exception waits for the named manager',()=>{
   const frm=fixture();frm.__dcs={s4:{manager_route:{approval_manager_name:'Direct Manager'}}};
   const next=context.dcs_next_step(frm,{}, {deal:{approval_required:'Manager'}},sheet());
   assert.equal(next.label,'Await manager decision');assert.match(next.note,/Direct Manager/);assert.equal(next.key,undefined);
+});
+test('empty new draft never renders zero metrics or previous deal figures',()=>{
+  const frm=fixture({docstatus:0,__islocal:1,total_cost:0,total_selling:0,items:[],resources:[],addtional_charges:[]});let html;
+  frm.fields_dict.custom_deal_summary_dashboard={$wrapper:{html:v=>{html=v;}}};
+  frm.__dcs={s2:{ok:1,projection:'commercial',margin_bridge:{original:{cost:3787.5,selling:7182.5},current:{cost:3787.5,selling:7182.5}}},s5:sheet()};
+  context.render_summary_dashboard(frm);
+  assert.match(html,/Enter customer and scope details first/);
+  assert.doesNotMatch(html,/3787|7182|AED 0.00|Original|Current selling|AWARD|Not evaluated/);
+  assert.equal(Object.keys(frm.__dcs).length,0);
+});
+test('draft headline figures use entered BOQ rows despite delayed document totals',()=>{
+  const frm=fixture({docstatus:0,total_cost:0,total_selling:0,items:[{qty:1,cost_rate:3787.5,selling_rate:7182.5}],resources:[],addtional_charges:[]});let html;
+  frm.fields_dict.custom_deal_summary_dashboard={$wrapper:{html:v=>{html=v;}}};
+  frm.__dcs={s2:{ok:1,projection:'commercial',margin_bridge:{current:{cost:999,selling:999}}},s5:sheet()};
+  context.render_summary_dashboard(frm);
+  assert.match(html,/AED 7182.50/);assert.match(html,/AED 3787.50/);assert.match(html,/AED 3395.00/);assert.match(html,/47.27%/);
+  assert.doesNotMatch(html,/Original|999.00|R0|new-deal/);
+  frm.doc.items[0].selling_rate=8000;context.render_summary_dashboard(frm);
+  assert.match(html,/AED 8000.00/);assert.match(html,/AED 4212.50/);assert.doesNotMatch(html,/7182.50/);
+});
+test('draft ignores inherited living revisions and shows estimate instead of approval clearance',()=>{
+  const frm=fixture({docstatus:0,custom_dcs_revision_no:3,total_cost:0,total_selling:0,items:[{qty:2,cost_rate:100,selling_rate:150}]});
+  const old=sheet({living:{revision_no:3,total_cost:9999,total_selling:19999,approval_required:'None',authorised_position:1}});
+  const p=context.dcs_effective_position(frm,old);
+  assert.equal(p.revision_no,0);assert.equal(p.cost,200);assert.equal(p.selling,300);
+  assert.equal(context.dcs_approval_presentation(frm,old).label,'Draft estimate');
+});
+test('reduced draft view exposes selling only and never buying, GP or margin',()=>{
+  const original=context.frappe.user.has_role;context.frappe.user.has_role=()=>false;
+  try {
+    const frm=fixture({docstatus:0,items:[{qty:1,cost_rate:987,selling_rate:1500}]});let html;
+    frm.fields_dict.custom_deal_summary_dashboard={$wrapper:{html:v=>{html=v;}}};
+    context.render_summary_dashboard(frm);
+    assert.match(html,/AED 1500.00/);assert.doesNotMatch(html,/987|513|Buying|Gross profit|Gross margin/);
+  } finally {context.frappe.user.has_role=original;}
+});
+test('draft load clears the prior record and makes no persisted-deal RPC calls',()=>{
+  const frm=fixture({docstatus:0,__islocal:1,total_cost:0,total_selling:0});let calls=0;
+  frm.__dcs={s2:{ok:1,projection:'commercial'}};frm.__dcs_load_id=5;
+  const old=context.frappe.call;context.frappe.call=()=>{calls++;};
+  try {context.dcs_load(frm);assert.equal(calls,0);assert.equal(frm.__dcs_load_id,6);assert.equal(Object.keys(frm.__dcs).length,0);assert.match(frm.headline,/Enter customer and scope details/);}
+  finally {context.frappe.call=old;}
+});
+test('customer and scope entry precede draft summary and costing without losing fields',()=>{
+  const d=JSON.parse(fs.readFileSync(path.join(__dirname,'../bs_group/doctype/deal_cost_sheet/deal_cost_sheet.json'),'utf8'));
+  const order=d.field_order;
+  assert.ok(order.indexOf('party')<order.indexOf('scope_overview'));
+  assert.ok(order.indexOf('scope_overview')<order.indexOf('custom_deal_summary_dashboard'));
+  assert.ok(order.indexOf('dcs_costing_tab')<order.indexOf('dcs_overview_tab'));
+  assert.equal(order[0],'dcs_details_tab');
+  assert.deepEqual(order.filter(n=>d.fields.find(f=>f.fieldname===n).fieldtype==='Tab Break').map(n=>d.fields.find(f=>f.fieldname===n).label),['Deal & Scope','Costing','Revisions','Approval','Award & Handover','Overview']);
+  assert.equal(new Set(order).size,order.length);assert.equal(order.length,d.fields.length);
 });
