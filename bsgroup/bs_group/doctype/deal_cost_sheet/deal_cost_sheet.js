@@ -3429,7 +3429,7 @@ function dcs_boq_revision_dialog(frm, cap) {
     };
     var itemFields = [
         {fieldtype:'Data',fieldname:'row_name',hidden:1},
-        f('Link','item_code','Item','Item',!both), f('Small Text','description','Description',null,!both),
+        f('Link','item_code','Item','Item',!both), f('Text Editor','description','Description',null,!both),
         f('Float','qty','Qty',null,!both), f('Currency','cost_rate','Cost Rate',null,!cap.can_vendor_side),
         f('Currency','selling_rate','Selling Rate',null,!cap.can_customer_side)
     ];
