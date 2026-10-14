@@ -24,14 +24,18 @@ def ensure_baseline(dcs_name, source_endpoint):
 
     sheet = frappe.get_doc("Deal Cost Sheet", dcs_name, for_update=True)
     from bsgroup.dcs.input_validation import validate_position
-    validate_position(sheet)
     if sheet.docstatus != 1:
         frappe.throw("Commercial baseline initialisation requires a submitted Deal Cost Sheet.")
     if (sheet.custom_dcs_revision_no or 0) >= 1:
+        # A fully validated replacement BOQ may repair legacy invalid inputs.
+        # Other callers must refuse the invalid position before any decision.
+        if source_endpoint != "dcs_apply_boq_revision":
+            validate_position(sheet)
         if not frappe.db.get_value("DCS Revision", {"name": sheet.custom_revision_reference, "dcs": dcs_name,
                                                      "revision_no": sheet.custom_dcs_revision_no}, "name", for_update=True):
             frappe.throw("The commercial revision reference is inconsistent. No baseline was overwritten.")
         return {"initialised": 0, "revision": sheet.custom_revision_reference}
+    validate_position(sheet)
     if frappe.db.exists("DCS Revision", {"dcs": dcs_name}):
         frappe.throw("Revision history already exists on this revision-zero sheet. Reconcile it before initialising.")
     if sheet.custom_baseline_frozen or sheet.custom_award_state == "Awarded" or sheet.custom_approved_revision_no:

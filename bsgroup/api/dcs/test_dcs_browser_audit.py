@@ -168,3 +168,23 @@ class IntegrationTestDCSBrowserAudit(IntegrationTestCase):
         self.assertEqual(self.doc.items[0].item_category,"Products")
         self.assertEqual(self.doc.products_cost_total,1000)
         self.assertEqual(self.doc.services_cost_total,0)
+
+    def test_invalid_legacy_rows_can_be_repaired_by_audited_boq_revision(self):
+        from bsgroup.api.dcs.test_dcs_boq_revision import payload
+        self.doc.submit()
+        original=self.doc.custom_revision_reference
+        frappe.db.set_value("Deal Cost Item",self.doc.items[0].name,"cost_rate",-1000)
+        self.doc.reload()
+        values=payload(self.doc)
+        values["items"][0]["cost_rate"]=1250
+        frappe.set_user(self.actor)
+        result=frappe.call("bsgroup.api.dcs.boq_revision.dcs_apply_boq_revision",
+            dcs=self.doc.name,expected_modified=str(self.doc.modified),source="Vendor",
+            reason="ZZTEST repair invalid old row",**values)
+        self.assertEqual(result["ok"],1,result)
+        self.doc.reload()
+        self.assertEqual(self.doc.custom_approval_required,"Manager")
+        self.assertEqual(self.doc.custom_working_total_cost,1250)
+        self.assertTrue(frappe.db.exists("DCS Revision",original))
+        revision=frappe.get_doc("DCS Revision",result["revision"])
+        self.assertTrue(any(json.loads(row.before_values).get("cost_rate")==-1000 for row in revision.boq_lines))
