@@ -2946,6 +2946,7 @@ function dcs_margin_tone(margin) {
 function dcs_visual_styles(frm) {
     if (typeof document === 'undefined') return;
     if (frm.wrapper) $(frm.wrapper).addClass('dcs-workbench-v2');
+    if (frm.page && frm.page.wrapper) $(frm.page.wrapper).addClass('dcs-workbench-v2');
     if (document.getElementById('dcs-workbench-v2-styles')) return;
     var style=document.createElement('style');
     style.id='dcs-workbench-v2-styles';
@@ -2998,7 +2999,7 @@ function dcs_visual_styles(frm) {
 .dcs-workbench-v2.dcs-workbench-v2 .form-message {background:var(--card-bg,#fff)!important;border-bottom:1px solid var(--border-color);padding:10px 16px!important;box-shadow:none!important}
 .dcs-workbench-v2.dcs-workbench-v2 .dcs-panel-title {font-size:14px;font-weight:650;margin:4px 0 18px}
 .dcs-workbench-v2 .form-tabs {overflow-x:auto;flex-wrap:nowrap}.dcs-workbench-v2 .form-tabs .nav-item {flex-shrink:0}.dcs-workbench-v2 .table-responsive {overflow-x:auto}.dcs-workbench-v2 .table-responsive table {min-width:720px}.dcs-workbench-v2 .page-actions {flex-wrap:wrap;gap:4px}.dcs-workbench-v2 .dcs-overview {min-width:0;max-width:100%;overflow-wrap:anywhere}.dcs-workbench-v2 .dcs-overview-grid {min-width:0}.dcs-workbench-v2 .dcs-metrics {min-width:0}.dcs-workbench-v2 .form-grid [data-fieldname="cost_rate"] .static-area {direction:ltr;unicode-bidi:isolate;overflow:visible;white-space:nowrap}
-@media(max-width:1000px) {.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview-grid {grid-template-columns:1fr}.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview-grid aside {display:grid;grid-template-columns:1fr 1fr;gap:20px}.dcs-workbench-v2.dcs-workbench-v2 .dcs-release {padding-top:0}.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics strong {font-size:23px}}
+@media(max-width:1000px) {.dcs-workbench-v2 .page-head-content {flex-wrap:wrap;height:auto}.dcs-workbench-v2 .page-actions {max-width:100%;height:auto}.dcs-workbench-v2 .dcs-overview-grid main {min-width:0}.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview-grid {grid-template-columns:1fr}.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview-grid aside {display:grid;grid-template-columns:1fr 1fr;gap:20px}.dcs-workbench-v2.dcs-workbench-v2 .dcs-release {padding-top:0}.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics strong {font-size:23px}}
 @media(max-width:600px) {.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview {padding:16px}.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics {grid-template-columns:1fr;gap:16px}.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics>div {padding:0;border:0}.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview-grid aside {grid-template-columns:1fr}.dcs-workbench-v2.dcs-workbench-v2 .dcs-section-heading {display:block}.dcs-workbench-v2.dcs-workbench-v2 .dcs-compact {display:block}.dcs-workbench-v2.dcs-workbench-v2 .dcs-movement {grid-template-columns:1fr}.dcs-workbench-v2.dcs-workbench-v2 .dcs-next {display:block}}
 `;
     document.head.appendChild(style);
