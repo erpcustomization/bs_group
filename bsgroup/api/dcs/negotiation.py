@@ -11,6 +11,7 @@ Ported from the production Server Scripts of the same names
   or amended.
 """
 
+import math
 import frappe
 from frappe.utils import now_datetime
 
@@ -46,14 +47,18 @@ def requirement(concession, margin=None):
 	return "None"
 
 
+def display_percent(value):
+	return f"{value:.4f}" if 19.99 < value < 20 else f"{value:.2f}"
+
+
 def why_approval(concession, margin=None):
 	if concession > CEILING:
-		return "Concession " + str(concession) + "% from baseline is above the 26% ceiling. No approver may authorise this position."
+		return "Concession " + display_percent(concession) + "% from baseline is above the 26% ceiling. No approver may authorise this position."
 	if margin is not None and margin < MARGIN_FLOOR:
-		return "Gross margin " + str(margin) + "% is below the 20% floor and requires immediate manager approval."
+		return "Gross margin " + display_percent(margin) + "% is below the 20% floor and requires immediate manager approval."
 	if concession >= MD_THRESHOLD:
-		return "Concession " + str(concession) + "% from baseline is at or above 16%, which requires immediate manager approval."
-	return "Concession " + str(concession) + "% from baseline is below 16%. No discount sign-off is required."
+		return "Concession " + display_percent(concession) + "% from baseline is at or above 16%, which requires immediate manager approval."
+	return "Concession " + display_percent(concession) + "% from baseline is below 16%. No discount sign-off is required."
 
 
 def gate_for(margin):
@@ -62,8 +67,8 @@ def gate_for(margin):
 
 def why_gate(margin):
 	if margin < MARGIN_FLOOR:
-		return "MARGIN GATE BLOCKED. Margin " + str(margin) + "% is below the 20% commercial floor. This gate is evaluated independently of approval routing and is not cleared by an approval decision."
-	return "Margin " + str(margin) + "% is at or above the 20% commercial floor."
+		return "MARGIN GATE BLOCKED. Margin " + display_percent(margin) + "% is below the 20% commercial floor. A recorded immediate-manager exception can authorise this commercial position; the below-floor warning remains visible. Delivery conditions are evaluated separately."
+	return "Margin " + display_percent(margin) + "% is at or above the 20% commercial floor."
 
 
 def state_for(req):
@@ -187,7 +192,9 @@ def dcs_apply_revision(args):
 			result["error"] = "Your role may not move the customer-side selling position. Presales may revise buying cost only."
 		elif cost_moved == 1 and can_vendor == 0:
 			result["error"] = "Your role may not move the vendor-side buying cost. Sales User may revise the customer-side selling position only."
-		elif new_sell <= 0:
+		elif not math.isfinite(new_cost) or new_cost < 0:
+			result["error"] = "Proposed buying cost must be finite and non-negative."
+		elif not math.isfinite(new_sell) or new_sell <= 0:
 			result["error"] = "Proposed selling value must be greater than zero."
 		else:
 			from bsgroup.dcs.baseline import ensure_baseline

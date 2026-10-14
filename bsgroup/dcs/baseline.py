@@ -23,6 +23,8 @@ def ensure_baseline(dcs_name, source_endpoint):
     from bsgroup.api.dcs.negotiation import gate_for, pct, why_gate, requirement, why_approval, state_for, rev_state_for
 
     sheet = frappe.get_doc("Deal Cost Sheet", dcs_name, for_update=True)
+    from bsgroup.dcs.input_validation import validate_position
+    validate_position(sheet)
     if sheet.docstatus != 1:
         frappe.throw("Commercial baseline initialisation requires a submitted Deal Cost Sheet.")
     if (sheet.custom_dcs_revision_no or 0) >= 1:

@@ -11,6 +11,7 @@ frappe.ui.form.on("Opportunity", {
             party_type: frm.doc.opportunity_from,
             party: frm.doc.party_name,
             organisation_name: frm.doc.custom_organization_name,
+            subject: frm.doc.custom_subject || frm.doc.title,
         };
         if(frm.doc.custom_presales_required == 1){
             frm.add_custom_button("Presales Request", ()=>{
@@ -30,7 +31,7 @@ frappe.ui.form.on("Opportunity", {
         set_opportunity_status(frm);
     },
     onload: function(frm) {
-        set_lead_name(frm);
+        if (frm.is_new()) set_lead_name(frm);
     },
     party_name: function(frm){
         set_lead_name(frm);
@@ -104,4 +105,3 @@ function reduce_subject_height(frm){
             });
     }, 300);
 }
-

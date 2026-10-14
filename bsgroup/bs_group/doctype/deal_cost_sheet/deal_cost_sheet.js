@@ -116,7 +116,7 @@ frappe.ui.form.on("Deal Cost Item", {
 		if (frm.doc.currency) {
 			frappe.model.set_value(cdt, cdn, "currency", frm.doc.currency);
 		}
-		set_item_category(frm, cdt, cdn).then(() => {
+		const categoryReady = set_item_category(frm, cdt, cdn).then(() => {
 			recalc_item(frm, cdt, cdn);
 		});
 		if (row.item_code) {
@@ -130,6 +130,7 @@ frappe.ui.form.on("Deal Cost Item", {
 				set_customer_item(frm, cdt, cdn);
 			});
 		}
+        return categoryReady;
 	},
 	brand: function(frm, cdt, cdn) {
         set_customer_item(frm, cdt, cdn);
@@ -381,11 +382,11 @@ function render_summary(frm, currency) {
 async function set_item_category(frm, cdt, cdn) {
 	const row = locals[cdt][cdn];
 	if (!row.item_code) return;
+    const selectedItem = row.item_code;
 
-	const r = await frappe.db.get_value("Item", row.item_code, "is_stock_item");
-	const is_stock_item = r.message && r.message.is_stock_item;
-
-	const category = is_stock_item ? "Products" : "Professional Services";
+	const r = await frappe.call({method:"bsgroup.dcs.item_category.get_item_category",args:{item_code:selectedItem}});
+    if (row.item_code !== selectedItem) return;
+	const category = r.message;
 	await frappe.model.set_value(cdt, cdn, "item_category", category);
 }
 
@@ -630,7 +631,7 @@ function fetch_presales(frm) {
                 "custom_organization_name"
             ).then(res => {
                 if (res.message && res.message.custom_organization_name) {
-                    frm.set_value("customer", res.message.custom_organization_name);
+                    dcs_fetch_party_details(frm);
                 }
             });
         }
@@ -1377,6 +1378,7 @@ frappe.ui.form.on('Deal Cost Sheet', {
     onload_post_render: function(frm) { dcsInit(frm); if (window.dcsLiveCalc) window.dcsLiveCalc(frm); }
 ,
     onload: function(frm) {
+        dcs_fetch_party_details(frm);
         // Default Deal Owner to current user on new DCS
         if (frm.is_new() && !frm.doc.deal_owner) {
             frm.set_value('deal_owner', frappe.session.user);
@@ -1398,14 +1400,15 @@ frappe.ui.form.on('Deal Cost Sheet', {
                 }
             });
         }
-        // Auto-fetch Customer & Deal Owner from selected Opportunity
         var opp = frm.doc.opportunity;
-        if (!opp) return;
-        frappe.db.get_value('Opportunity', opp, ['party_name', 'customer_name', 'opportunity_owner'], function(r) {
-            if (!r) return;
-            var cust = r.party_name || r.customer_name;
-            if (cust && !frm.doc.customer) frm.set_value('customer', cust);
+        if (!opp || frm.doc.docstatus !== 0) return;
+        frappe.db.get_value('Opportunity', opp, ['opportunity_from', 'party_name', 'opportunity_owner', 'custom_subject'], function(r) {
+            if (!r || frm.doc.opportunity !== opp) return;
+            frm.set_value({party_type:r.opportunity_from, party:r.party_name,
+                customer:r.opportunity_from === 'Customer' ? r.party_name : ''});
+            if (r.custom_subject && !frm.doc.subject) frm.set_value('subject', r.custom_subject);
             if (r.opportunity_owner && !frm.doc.deal_owner) frm.set_value('deal_owner', r.opportunity_owner);
+            dcs_fetch_party_details(frm);
         });
     }
 });
@@ -2869,7 +2872,7 @@ function render_summary_dashboard(frm) {
         + '<div class="dcs-metrics">'
         + '<div><span>Current selling</span><strong>'+money(p.selling)+'</strong><small>Buying '+money(p.cost)+'</small></div>'
         + '<div><span>Gross profit</span><strong class="'+(p.gp<0?'dcs-tone-danger':'')+'">'+money(p.gp)+'</strong><small>Current commercial position</small></div>'
-        + '<div><span>Gross margin</span><strong class="'+dcs_margin_tone(p.margin)+'">'+(p.margin===null?'Not priced':p.margin.toFixed(2)+'%')+'</strong><small>'+ (p.margin===null?'Selling price required':(p.margin<20?'Below the 20% floor':'Meets the 20% floor'))+'</small></div></div>'
+        + '<div><span>Gross margin</span><strong class="'+dcs_margin_tone(p.margin)+'">'+(p.margin===null?'Not priced':dcs_pct(p.margin))+'</strong><small>'+ (p.margin===null?'Selling price required':(p.margin<20?'Below the 20% floor':'Meets the 20% floor'))+'</small></div></div>'
         + '<div class="dcs-overview-grid"><section><div class="dcs-section-heading"><h3>Commercial position</h3><span>Amounts in ' + esc(d.currency || '') + ' · baseline → award</span></div>'+table+movement
         + '<details class="dcs-linked"><summary>Deal details &amp; linked records</summary>'+links
         + '<div class="dcs-detail"><span>Deal owner</span><strong>'+esc(d.deal_owner || 'Not assigned')+'</strong></div>'
@@ -2903,9 +2906,22 @@ function dcs_render_draft_summary(frm, field) {
     var p=dcs_draft_position(frm), esc=dcs_esc;
     var full=frappe.session && frappe.session.user==='Administrator' ||
         ['Managing Director','Commercial Controller','Sales Manager','Presales'].some(function(role){return frappe.user.has_role(role);});
+    var invalid=[];
+    [['items',['qty','cost_rate','selling_rate']],['resources',['no_of_persons','no_of_days','hours','cost_rate']],['addtional_charges',['amount','selling_amount']]].forEach(function(pair){
+        (frm.doc[pair[0]] || []).forEach(function(row,index){
+            pair[1].forEach(function(key){
+                var value=Number(row[key] || 0);
+                if (!Number.isFinite(value) || value<0) invalid.push(pair[0]+' row '+(index+1)+': '+key.replaceAll('_',' '));
+            });
+        });
+    });
+    if (invalid.length) {
+        field.$wrapper.html('<div class="dcs-panel alert alert-danger"><b>Correct invalid costing inputs</b><p>Negative or non-finite values cannot be saved or submitted.</p><p>'+esc(invalid.join('; '))+'</p></div>');
+        return;
+    }
     var entered=full ? p.cost!==0 || p.selling!==0 : p.selling!==0;
     if (!entered) {
-        field.$wrapper.html('<div class="dcs-panel dcs-quiet"><b>Prepare the draft costing</b><p>Enter customer and scope details first, then add BOQ lines in Costing. Your draft figures will appear here as you enter them.</p></div>');
+        field.$wrapper.html('<div class="dcs-panel dcs-quiet"><b>Prepare the draft costing</b><p>'+ (frm.doc.party && frm.doc.subject ? 'Add BOQ lines in Costing. Your draft figures will appear here as you enter them.' : 'Enter customer and scope details first, then add BOQ lines in Costing. Your draft figures will appear here as you enter them.') + '</p></div>');
         return;
     }
     var money=function(v){return esc(frm.doc.currency || 'AED')+' '+format_number(v,null,2);};
@@ -2914,8 +2930,11 @@ function dcs_render_draft_summary(frm, field) {
         +'<div class="dcs-metrics"><div><span>Draft selling</span><strong>'+money(p.selling)+'</strong>'
         +(full ? '<small>Buying '+money(p.cost)+'</small>' : '')+'</div>';
     if (full) html+='<div><span>Gross profit</span><strong>'+money(p.gp)+'</strong><small>Draft BOQ estimate</small></div>'
-        +'<div><span>Gross margin</span><strong class="'+dcs_margin_tone(p.margin)+'">'+(p.margin===null?'Selling price required':p.margin.toFixed(2)+'%')+'</strong></div>';
-    html+='</div><p>Recalculates as you edit the BOQ. Approval is evaluated when the sheet is submitted.</p></div>';
+        +'<div><span>Gross margin</span><strong class="'+dcs_margin_tone(p.margin)+'">'+(p.margin===null?'Selling price required':dcs_pct(p.margin))+'</strong></div>';
+    var unpriced=(frm.doc.items || []).filter(function(row){return Number(row.qty)>0 && !(Number(row.selling_rate)>0);}).length;
+    html+='</div>';
+    if (unpriced) html+='<p class="text-warning">'+unpriced+' BOQ line(s) have no selling price. This is an incomplete pricing estimate.</p>';
+    html+='<p>Recalculates as you edit the BOQ. Approval is evaluated when the sheet is submitted.</p></div>';
     field.$wrapper.html(html);
 }
 
@@ -2978,6 +2997,7 @@ function dcs_visual_styles(frm) {
 .dcs-workbench-v2.dcs-workbench-v2 .dcs-compact small {font-size:11px;color:var(--text-muted);margin-left:12px}
 .dcs-workbench-v2.dcs-workbench-v2 .form-message {background:var(--card-bg,#fff)!important;border-bottom:1px solid var(--border-color);padding:10px 16px!important;box-shadow:none!important}
 .dcs-workbench-v2.dcs-workbench-v2 .dcs-panel-title {font-size:14px;font-weight:650;margin:4px 0 18px}
+.dcs-workbench-v2 .form-tabs {overflow-x:auto;flex-wrap:nowrap}.dcs-workbench-v2 .form-tabs .nav-item {flex-shrink:0}.dcs-workbench-v2 .table-responsive {overflow-x:auto}.dcs-workbench-v2 .table-responsive table {min-width:720px}.dcs-workbench-v2 .page-actions {flex-wrap:wrap;gap:4px}.dcs-workbench-v2 .dcs-overview {min-width:0;max-width:100%;overflow-wrap:anywhere}.dcs-workbench-v2 .dcs-overview-grid {min-width:0}.dcs-workbench-v2 .dcs-metrics {min-width:0}.dcs-workbench-v2 .form-grid [data-fieldname="cost_rate"] .static-area {direction:ltr;unicode-bidi:isolate;overflow:visible;white-space:nowrap}
 @media(max-width:1000px) {.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview-grid {grid-template-columns:1fr}.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview-grid aside {display:grid;grid-template-columns:1fr 1fr;gap:20px}.dcs-workbench-v2.dcs-workbench-v2 .dcs-release {padding-top:0}.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics strong {font-size:23px}}
 @media(max-width:600px) {.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview {padding:16px}.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics {grid-template-columns:1fr;gap:16px}.dcs-workbench-v2.dcs-workbench-v2 .dcs-metrics>div {padding:0;border:0}.dcs-workbench-v2.dcs-workbench-v2 .dcs-overview-grid aside {grid-template-columns:1fr}.dcs-workbench-v2.dcs-workbench-v2 .dcs-section-heading {display:block}.dcs-workbench-v2.dcs-workbench-v2 .dcs-compact {display:block}.dcs-workbench-v2.dcs-workbench-v2 .dcs-movement {grid-template-columns:1fr}.dcs-workbench-v2.dcs-workbench-v2 .dcs-next {display:block}}
 `;
@@ -3078,6 +3098,7 @@ function dcs_next_step(frm, s3, s4, s5) {
         return {key:'Record Award', group:'Award', label:'Record Award', note:'Record customer evidence and freeze the current commercial position.'};
     }
     if (st.customer_award === 'Awarded') {
+        if (s5.release_readiness && s5.release_readiness.commercially_aligned === 0) return {label:'Review changed award',group:'Award',note:'The current position differs from the frozen award. Reverse and re-award before PO reconciliation or delivery.'};
         if (((s5 || {}).po || {}).reconciliation_state !== 'Reconciled' && auth.can_reconcile_po) {
             return {key:'Reconcile Customer PO', group:'Handover', label:'Reconcile Customer PO', note:'Check PO value, scope and payment terms against the awarded position.'};
         }
@@ -3121,7 +3142,7 @@ function dcs_money(frm, v) {
 
 function dcs_pct(v) {
 	if (v === null || v === undefined || v === '') { return '&mdash;'; }
-	return flt(v, 3) + '%';
+	return Number(v).toFixed(Number(v) < 20 && Number(v) > 19.99 ? 4 : 2) + '%';
 }
 
 function dcs_when(v) { return v ? frappe.datetime.str_to_user(v) : '&mdash;'; }
@@ -3181,7 +3202,7 @@ function dcs_load(frm) {
     if (dcs_is_draft(frm)) {
         frm.__dcs_load_id=(frm.__dcs_load_id || 0)+1;
         render_summary_dashboard(frm);
-        frm.dashboard.set_headline('<div class="dcs-compact"><b>Draft</b><span>Enter customer and scope details, then complete costing.</span></div>');
+        frm.dashboard.set_headline('<div class="dcs-compact"><span>' + (frm.doc.party && frm.doc.subject ? 'Complete the costing, then submit for commercial evaluation.' : 'Enter customer and scope details, then complete costing.') + '</span></div>');
         return;
     }
     var loadId = frm.__dcs_load_id = (frm.__dcs_load_id || 0) + 1;
@@ -3256,8 +3277,8 @@ function dcs_render_negotiation(frm, s3) {
 			return '<tr>'
 				+ '<td style="white-space:nowrap"><a href="' + frappe.utils.get_form_link('DCS Revision', r.name) + '">R' + dcs_esc(r.revision_no) + '</a></td>'
 				+ '<td>' + dcs_esc(r.source) + '</td>'
-				+ '<td class="text-right">' + dcs_money(frm, r.prev_total_cost) + ' &rarr; <b>' + dcs_money(frm, r.new_total_cost) + '</b></td>'
-				+ '<td class="text-right">' + dcs_money(frm, r.prev_total_selling) + ' &rarr; <b>' + dcs_money(frm, r.new_total_selling) + '</b></td>'
+				+ '<td class="text-right" dir="ltr" style="white-space:nowrap">' + dcs_money(frm, r.prev_total_cost) + ' &rarr; <b>' + dcs_money(frm, r.new_total_cost) + '</b></td>'
+				+ '<td class="text-right" dir="ltr" style="white-space:nowrap">' + dcs_money(frm, r.prev_total_selling) + ' &rarr; <b>' + dcs_money(frm, r.new_total_selling) + '</b></td>'
 				+ '<td class="text-right">' + dcs_pct(r.prev_margin_percent) + ' &rarr; <b>' + dcs_pct(r.new_margin_percent) + '</b></td>'
 				+ '<td class="text-right ' + gpCls + '">' + gpTxt + '</td>'
 				+ '<td>' + req + '</td>'
@@ -3267,7 +3288,7 @@ function dcs_render_negotiation(frm, s3) {
 				+ (r.technical_impact ? '<br><i>Technical impact:</i> ' + dcs_esc(r.technical_impact) : '') + '</td></tr>';
 		}).join('');
 		body = '<div class="table-responsive"><table class="table table-sm" style="font-size:12px">'
-			+ '<thead><tr><th>Rev</th><th>Side</th><th class="text-right">Cost</th><th class="text-right">Selling</th>'
+			+ '<thead><tr><th>Rev</th><th>Side</th><th class="text-right">Buying: before → after</th><th class="text-right">Selling: before → after</th>'
 			+ '<th class="text-right">Margin</th><th class="text-right">GP move</th><th>Sign-off</th><th>Recorded</th></tr></thead>'
 			+ '<tbody>' + rows + '</tbody></table></div>';
 	}
@@ -3638,7 +3659,7 @@ function dcs_boq_revision_dialog(frm, cap) {
         f('Data','role','Role',null,!cap.can_vendor_side),
         f('Float','no_of_persons','Persons',null,!cap.can_vendor_side),
         f('Float','no_of_days','Days',null,!cap.can_vendor_side),
-        f('Float','hours','Hours',null,!cap.can_vendor_side),
+        f('Float','hours','Total hours (if days not used)',null,!cap.can_vendor_side),
         f('Currency','cost_rate','Cost Rate',null,!cap.can_vendor_side),
         f('Small Text','remarks','Remarks',null,!cap.can_vendor_side)
     ];
@@ -3656,7 +3677,7 @@ function dcs_boq_revision_dialog(frm, cap) {
     d = new frappe.ui.Dialog({
         title:__('BOQ Revision'), size:'extra-large',
         fields:[
-            {fieldtype:'HTML',fieldname:'notice',options:'<p>Revise items and labour on this submitted sheet. Totals are derived from the rows. Approval and margin gates are re-evaluated; this does not award or release delivery. Additional charges remain unchanged.</p>' + (gap ? '<div class="alert alert-warning">Earlier totals-only adjustments differ from these rows: cost ' + format_currency(gapCost,frm.doc.currency) + ', selling ' + format_currency(gapSell,frm.doc.currency) + '. MD reconciliation is required.</div>' : '')},
+            {fieldtype:'HTML',fieldname:'notice',options:'<p>Revise items and labour on this submitted sheet. Totals are derived from the rows. Approval and margin gates are re-evaluated; this does not award or release delivery. Additional charges remain unchanged. Labour uses persons × days × rate; when persons/days are not supplied, it uses total hours × rate.</p>' + (gap ? '<div class="alert alert-warning">Earlier totals-only adjustments differ from these rows: cost ' + format_currency(gapCost,frm.doc.currency) + ', selling ' + format_currency(gapSell,frm.doc.currency) + '. MD reconciliation is required.</div>' : '')},
             {fieldtype:'Select',fieldname:'source',label:__('Source'),options:'Vendor\nCustomer\nTechnical\nInternal',reqd:1},
             {fieldtype:'Small Text',fieldname:'reason',label:__('Reason'),reqd:1},
             {fieldtype:'Small Text',fieldname:'technical_impact',label:__('Technical Impact')},
@@ -3704,4 +3725,27 @@ frappe.ui.form.on('Deal Cost Resource', {
 });
 frappe.ui.form.on('Additional Charges Item', {
     amount: dcs_refresh_draft, selling_amount: dcs_refresh_draft
+});
+
+function dcs_fetch_party_details(frm) {
+    if (frm.doc.docstatus !== 0 || !frm.doc.party || !['Lead','Customer'].includes(frm.doc.party_type)) return;
+    var type=frm.doc.party_type, party=frm.doc.party;
+    var fields=type === 'Customer' ? ['customer_name','territory'] : ['company_name','lead_name','territory'];
+    return frappe.db.get_value(type, party, fields).then(function(r) {
+        if (frm.doc.party_type !== type || frm.doc.party !== party || !r.message) return;
+        var data=r.message;
+        return frm.set_value({
+            organisation_name: type === 'Customer' ? (data.customer_name || party) : (data.company_name || data.lead_name || party),
+            customer:type === 'Customer' ? party : '',
+            territory:frm.doc.territory || data.territory || ''
+        });
+    });
+}
+frappe.ui.form.on('Deal Cost Sheet', {
+    party:dcs_fetch_party_details,
+    party_type:function(frm) {
+        if (frm.doc.docstatus !== 0) return;
+        frm.set_value({customer:'', organisation_name:''});
+        dcs_fetch_party_details(frm);
+    }
 });
