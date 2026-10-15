@@ -2,6 +2,8 @@
    Keep native Frappe controls, grid semantics, focus states and permissions. */
 .dcs-compact-crm.dcs-compact-crm {
     --dcs-accent: #2465d9;
+    --dcs-header-ink: #2457a7;
+    --dcs-header-tint: rgba(36, 101, 217, 0.08);
     --dcs-surface: var(--card-bg, #fff);
     --dcs-subtle: var(--subtle-fg, #f6f8fa);
     --dcs-border: var(--border-color, #e4e9ef);
@@ -18,7 +20,7 @@
 .dcs-compact-crm.dcs-compact-crm .form-section .section-head {
     font-size: 14px;
     font-weight: 600;
-    color: var(--dcs-ink);
+    color: var(--dcs-header-ink);
     margin-bottom: 14px;
 }
 .dcs-compact-crm.dcs-compact-crm .form-section .section-body { margin-top: 0; }
@@ -70,8 +72,8 @@
 .dcs-compact-crm.dcs-compact-crm .form-grid .grid-heading-row,
 .dcs-compact-crm.dcs-compact-crm .form-grid .grid-heading-row .col,
 .dcs-compact-crm.dcs-compact-crm .form-grid .grid-heading-row .static-area {
-    background: var(--dcs-subtle);
-    color: var(--text-muted);
+    background: var(--dcs-header-tint);
+    color: var(--dcs-ink);
     font-size: 12px;
     font-weight: 500;
     border-color: var(--dcs-border);
@@ -149,3 +151,10 @@
     gap: 5px;
 }
 .dcs-compact-crm.dcs-compact-crm .dcs-revision-movement bdi:last-child { font-weight: 600; }
+
+/* Theme-aware header accents; static CSS adds no scripts, fonts or requests. */
+[data-theme="dark"] .dcs-compact-crm.dcs-compact-crm,
+.dcs-compact-crm.dcs-compact-crm[data-theme="dark"] {
+    --dcs-header-ink: #adcaff;
+    --dcs-header-tint: rgba(105, 155, 255, 0.14);
+}
