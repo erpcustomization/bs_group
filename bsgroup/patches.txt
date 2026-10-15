@@ -24,3 +24,7 @@ bsgroup.patches.v0_1.dcs_workspace_counts
 
 bsgroup.patches.v0_1.dcs_manager_approval
 bsgroup.patches.v0_1.dcs_draft_entry_ui
+bsgroup.patches.v0_1.dcs_browser_audit
+bsgroup.patches.v0_1.dcs_compact_crm
+bsgroup.patches.v0_1.dcs_account_labels
+bsgroup.patches.v0_1.dcs_costing_subject

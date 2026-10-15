@@ -11,6 +11,8 @@ def validate_quotation(doc, method=None):
         doc.custom_dcs_revision_reference = sheet.custom_revision_reference
 
 def validate_position(sheet, quotation):
+    from bsgroup.dcs.input_validation import validate_position as validate_commercial_inputs
+    validate_commercial_inputs(sheet)
     from bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet import quotation_deal_identity
     if sheet.docstatus != 1 or sheet.custom_superseded_by:
         frappe.throw("This quotation refers to a cancelled, unsubmitted or superseded Deal Cost Sheet.")
@@ -49,7 +51,7 @@ def validate_sales_order(doc, method=None):
         validate_position(sheet, quotation)
         from bsgroup.dcs.commercial_authority import authorised_position
         if not authorised_position(sheet):
-            frappe.throw("The current DCS position requires recorded Managing Director approval before a Sales Order can be created or submitted.")
+            frappe.throw("The current DCS position requires recorded manager approval before a Sales Order can be created or submitted.")
 
 def supersede_submitted(sheet):
     changes = []
@@ -71,7 +73,7 @@ def make_sales_order(source_name, target_doc=None, args=None):
         validate_position(sheet, quotation)
         from bsgroup.dcs.commercial_authority import authorised_position
         if not authorised_position(sheet):
-            frappe.throw("The current DCS position requires recorded Managing Director approval before conversion to Sales Order.")
+            frappe.throw("The current DCS position requires recorded manager approval before conversion to Sales Order.")
     from erpnext.selling.doctype.quotation.quotation import make_sales_order as core_make_sales_order
     return core_make_sales_order(source_name, target_doc, args)
 
@@ -80,6 +82,26 @@ def guard_lineage(doc, method=None):
     previous = doc.get_doc_before_save()
     if not previous:
         return
+    if previous.get("custom_deal_cost_sheet"):
+        if doc.get("custom_deal_cost_sheet") != previous.custom_deal_cost_sheet:
+            frappe.throw("Submitted quotation DCS linkage cannot be changed.")
+        fields = ("item_code", "qty", "rate", "amount", "uom", "conversion_factor", "discount_percentage", "discount_amount")
+        before = [tuple(r.get(f) for f in fields) for r in previous.items]
+        after = [tuple(r.get(f) for f in fields) for r in doc.items]
+        if before != after or any(doc.get(f) != previous.get(f) for f in ("currency", "conversion_rate", "total", "grand_total", "discount_amount", "additional_discount_percentage")):
+            frappe.throw("Submitted DCS quotation prices and scope are frozen. Create a replacement quotation.")
     for field in ("custom_dcs_revision_reference", "custom_dcs_superseded_revision"):
         if str(doc.get(field) or "") != str(previous.get(field) or ""):
             frappe.throw("Submitted quotation lineage is governed by the DCS service and cannot be edited.")
+
+@frappe.whitelist()
+def update_child_qty_rate(parent_doctype, trans_items, parent_doctype_name, child_docname="items"):
+    # Core updates child rows directly before saving the parent; a document hook
+    # alone cannot compare the original prices or protect them atomically.
+    if parent_doctype == "Quotation":
+        quotation = frappe.get_doc("Quotation", parent_doctype_name, for_update=True)
+        quotation.check_permission("write")
+        if quotation.docstatus == 1 and quotation.get("custom_deal_cost_sheet"):
+            frappe.throw("Submitted DCS quotation prices and scope are frozen. Create a replacement quotation for the current revision.")
+    from erpnext.controllers.accounts_controller import update_child_qty_rate as core_update
+    return core_update(parent_doctype, trans_items, parent_doctype_name, child_docname)

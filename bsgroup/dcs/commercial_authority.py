@@ -3,6 +3,9 @@ import frappe
 from frappe.utils import flt
 
 def authorised_position(sheet):
+    from bsgroup.dcs.input_validation import position_is_valid
+    if not position_is_valid(sheet):
+        return False
     from bsgroup.api.dcs.negotiation import requirement
     selling, cost = flt(sheet.custom_working_total_selling), flt(sheet.custom_working_total_cost)
     if selling <= 0:

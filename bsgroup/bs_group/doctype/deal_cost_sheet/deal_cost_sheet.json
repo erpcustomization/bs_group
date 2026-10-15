@@ -10,20 +10,20 @@
   "dcs_details_tab",
   "section_break_giph",
   "currency",
-  "opportunity",
-  "presales_request",
+  "organisation_name",
   "party_type",
   "party",
-  "organisation_name",
-  "customer",
+  "dcs_details_links_column",
+  "opportunity",
+  "presales_request",
   "site_visit",
   "project",
   "column_break_wlnj",
   "company",
   "territory",
   "deal_owner",
+  "customer",
   "dcs_scope_section",
-  "subject",
   "scope_overview",
   "customer_notes",
   "custom_lifecycle_section",
@@ -31,24 +31,31 @@
   "custom_deal_status_section",
   "custom_deal_status",
   "custom_presales_status",
-  "custom_presales_owner",
   "custom_presales_completion_date",
-  "custom_opportunity_status",
+  "dcs_status_links_column",
   "custom_quotation",
   "custom_quotation_status",
+  "custom_sales_order",
+  "dcs_status_owner_column",
+  "custom_presales_owner",
+  "amended_from",
+  "custom_opportunity_status",
   "custom_lost_reason",
   "custom_outcome_date",
-  "custom_sales_order",
   "custom_closure_notes",
-  "amended_from",
   "workflow_state",
   "dcs_costing_tab",
+  "dcs_costing_subject_section",
+  "subject",
+  "section_break_jbpa",
+  "items",
   "section_break_dsjr",
   "document_upload",
   "get_data",
-  "section_break_jbpa",
+  "dcs_costing_tools_column",
+  "dcs_quick_add_html",
   "apply_exclude_to_all_items",
-  "items",
+  "dcs_supporting_costs_section",
   "addtional_charges",
   "resources",
   "site_visit_evidence_section",
@@ -204,16 +211,16 @@
   {
    "fieldname": "party_type",
    "fieldtype": "Select",
-   "label": "Party Type",
+   "label": "Account Type",
    "options": "Lead\nCustomer",
    "reqd": 1,
    "in_standard_filter": 1,
-   "description": "Costing can start for a Lead. A Customer record is required to link a Project."
+   "description": "A Lead can be costed before conversion to a Customer."
   },
   {
    "fieldname": "party",
    "fieldtype": "Dynamic Link",
-   "label": "Party",
+   "label": "Account",
    "options": "party_type",
    "reqd": 1,
    "in_list_view": 1
@@ -222,11 +229,12 @@
    "fieldname": "organisation_name",
    "fieldtype": "Data",
    "label": "Organisation Name",
-   "reqd": 1,
+   "reqd": 0,
    "read_only": 1,
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "description": "Uses the linked organisation name."
+   "description": "",
+   "depends_on": "eval:doc.organisation_name && doc.organisation_name !== doc.party"
   },
   {
    "fieldname": "customer",
@@ -234,7 +242,8 @@
    "label": "Customer",
    "options": "Customer",
    "read_only": 1,
-   "description": "Set automatically from Party when Party Type is Customer. A Project may be linked only when a Customer is set (D3)."
+   "description": "Derived from the selected Customer.",
+   "hidden": 1
   },
   {
    "fetch_from": "presales_request.site_visit",
@@ -264,7 +273,7 @@
   {
    "fieldname": "section_break_jbpa",
    "fieldtype": "Section Break",
-   "label": "BOQ"
+   "label": "Bill of quantities"
   },
   {
    "fieldname": "items",
@@ -382,12 +391,14 @@
    "default": "0",
    "fieldname": "apply_exclude_to_all_items",
    "fieldtype": "Check",
-   "label": "Apply Exclude to all Items"
+   "label": "Exclude item name & brand on quotation"
   },
   {
    "fieldname": "section_break_dsjr",
    "fieldtype": "Section Break",
-   "label": "Import costing"
+   "label": "Costing tools",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.docstatus === 0"
   },
   {
    "fieldname": "document_upload",
@@ -397,7 +408,7 @@
   {
    "fieldname": "get_data",
    "fieldtype": "Button",
-   "label": "Get Data"
+   "label": "Import costing"
   },
   {
    "fieldname": "company",
@@ -495,14 +506,15 @@
   {
    "fieldname": "custom_deal_status_section",
    "fieldtype": "Section Break",
-   "label": "Deal Status & Traceability"
+   "label": "Status & linked records"
   },
   {
-   "description": "Current sales outcome, synchronized with quotation and award events.",
+   "description": "Updated from quotation and award events.",
    "fieldname": "custom_deal_status",
    "fieldtype": "Select",
    "label": "Deal Status",
-   "options": "Draft\nCosting in Progress\nSubmitted to Sales\nQuoted\nWon\nLost"
+   "options": "Draft\nCosting in Progress\nSubmitted to Sales\nQuoted\nWon\nLost",
+   "no_copy": 1
   },
   {
    "fieldname": "custom_record_authority_section",
@@ -538,13 +550,15 @@
    "fieldtype": "Data",
    "label": "Opportunity Status",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_quotation",
    "fieldtype": "Link",
    "label": "Quotation",
-   "options": "Quotation"
+   "options": "Quotation",
+   "no_copy": 1
   },
   {
    "fieldname": "custom_quotation_status",
@@ -557,24 +571,28 @@
    "fieldname": "custom_sales_order",
    "fieldtype": "Link",
    "label": "Sales Order",
-   "options": "Sales Order"
+   "options": "Sales Order",
+   "no_copy": 1
   },
   {
    "fieldname": "custom_outcome_date",
    "fieldtype": "Date",
-   "label": "Outcome Date"
+   "label": "Outcome Date",
+   "no_copy": 1
   },
   {
    "fieldname": "custom_lost_reason",
    "fieldtype": "Link",
    "label": "Lost Reason",
-   "options": "Opportunity Lost Reason"
+   "options": "Opportunity Lost Reason",
+   "no_copy": 1
   },
   {
    "description": "Free narrative. Guarded by the NRC-1 protected-field-name channel on save.",
    "fieldname": "custom_closure_notes",
    "fieldtype": "Small Text",
-   "label": "Closure Notes"
+   "label": "Closure Notes",
+   "no_copy": 1
   },
   {
    "fieldname": "custom_record_authority",
@@ -586,7 +604,8 @@
    "fieldname": "custom_superseded_by",
    "fieldtype": "Link",
    "label": "Superseded By",
-   "options": "Deal Cost Sheet"
+   "options": "Deal Cost Sheet",
+   "no_copy": 1
   },
   {
    "fieldname": "custom_supersession_reason",
@@ -677,14 +696,16 @@
    "fieldtype": "Int",
    "label": "DCS Revision No",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_revision_reference",
    "fieldtype": "Data",
    "label": "Revision Reference",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_working_total_cost",
@@ -692,7 +713,8 @@
    "label": "Working Total Cost",
    "options": "currency",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_working_total_selling",
@@ -700,14 +722,16 @@
    "label": "Working Total Selling",
    "options": "currency",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_working_margin_percent",
    "fieldtype": "Percent",
    "label": "Working Margin Percent",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_baseline_selling",
@@ -715,14 +739,16 @@
    "label": "Baseline Selling",
    "options": "currency",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_concession_percent_from_baseline",
    "fieldtype": "Percent",
    "label": "Concession Percent From Baseline",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_margin_gate",
@@ -730,14 +756,16 @@
    "label": "Margin Gate",
    "options": "\nClear\nBlocked",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_margin_gate_reason",
    "fieldtype": "Small Text",
    "label": "Margin Gate Reason",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_approved_position_section",
@@ -753,7 +781,8 @@
    "label": "Approval State",
    "options": "\nNot Started\nIn Negotiation\nPending Endorsement\nEndorsed - Pending MD\nApproved\nReturned for Rework\nRejected\nBlocked\nPending Manager",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_approval_required",
@@ -761,21 +790,24 @@
    "label": "Approval Required",
    "options": "\nNone\nManaging Director\nBlocked\nManager",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_approval_reason",
    "fieldtype": "Small Text",
    "label": "Approval Reason",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_approved_revision_no",
    "fieldtype": "Int",
    "label": "Approved Revision No",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_approved_total_cost",
@@ -783,7 +815,8 @@
    "label": "Approved Total Cost",
    "options": "currency",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_approved_total_selling",
@@ -791,14 +824,16 @@
    "label": "Approved Total Selling",
    "options": "currency",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_approved_margin_percent",
    "fieldtype": "Percent",
    "label": "Approved Margin Percent",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_endorsed_by",
@@ -806,14 +841,16 @@
    "label": "Endorsed By",
    "options": "User",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_endorsed_on",
    "fieldtype": "Datetime",
    "label": "Endorsed On",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_approved_by",
@@ -821,21 +858,24 @@
    "label": "Approved By",
    "options": "User",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_approved_on",
    "fieldtype": "Datetime",
    "label": "Approved On",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_last_decision_reason",
    "fieldtype": "Small Text",
    "label": "Last Decision Reason",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_award_handover_section",
@@ -850,21 +890,24 @@
    "label": "Award State",
    "options": "\nNot Awarded\nAwarded",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_award_sequence_no",
    "fieldtype": "Int",
    "label": "Award Sequence No",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_award_reference",
    "fieldtype": "Data",
    "label": "Award Reference",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "description": "INCOMPLETE OPTION LIST: live register truncated this list with '...' after 'Email Confirmation'. Additional options exist on the live site but were not visible and were NOT guessed here.",
@@ -873,7 +916,8 @@
    "label": "Award Evidence Type",
    "options": "\nCustomer PO\nLetter of Award\nEmail Confirmation\nVerbal - Not Evidenced\nNot Provided",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_awarded_by",
@@ -881,21 +925,24 @@
    "label": "Awarded By",
    "options": "User",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_awarded_on",
    "fieldtype": "Datetime",
    "label": "Awarded On",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_award_notes",
    "fieldtype": "Small Text",
    "label": "Award Notes",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "default": "0",
@@ -903,14 +950,16 @@
    "fieldtype": "Check",
    "label": "Baseline Frozen",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_frozen_revision_no",
    "fieldtype": "Int",
    "label": "Frozen Revision No",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_frozen_total_cost",
@@ -918,7 +967,8 @@
    "label": "Frozen Total Cost",
    "options": "currency",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_frozen_total_selling",
@@ -926,14 +976,16 @@
    "label": "Frozen Total Selling",
    "options": "currency",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_frozen_margin_percent",
    "fieldtype": "Percent",
    "label": "Frozen Margin Percent",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_frozen_by",
@@ -941,14 +993,16 @@
    "label": "Frozen By",
    "options": "User",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_frozen_on",
    "fieldtype": "Datetime",
    "label": "Frozen On",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_award_reversal_section",
@@ -963,14 +1017,16 @@
    "label": "Award Reversal State",
    "options": "\nReversed",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_award_reversal_count",
    "fieldtype": "Int",
    "label": "Award Reversal Count",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_award_reversal_ref",
@@ -978,7 +1034,8 @@
    "label": "Award Reversal Ref",
    "options": "DCS Award Reversal",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_award_reversed_by",
@@ -986,21 +1043,24 @@
    "label": "Award Reversed By",
    "options": "User",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_award_reversed_on",
    "fieldtype": "Datetime",
    "label": "Award Reversed On",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_award_reversal_reason",
    "fieldtype": "Small Text",
    "label": "Award Reversal Reason",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "description": "INCOMPLETE OPTION LIST: live register truncated this list twice ('Required – Delivery Already...' and again with '...' after that). Real remaining option text was not visible and was NOT guessed here.",
@@ -1009,7 +1069,8 @@
    "label": "Operational Review State",
    "options": "\nNot Required\nRequired - Delivery Already Released",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_po_section",
@@ -1023,7 +1084,8 @@
    "fieldtype": "Data",
    "label": "PO Reference",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_po_value",
@@ -1031,7 +1093,8 @@
    "label": "PO Value",
    "options": "currency",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_po_value_match",
@@ -1039,14 +1102,16 @@
    "label": "PO Value Match",
    "options": "\nNot Checked\nMatch\nMismatch",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_po_scope_revision",
    "fieldtype": "Data",
    "label": "PO Scope Revision",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "description": "INCOMPLETE OPTION LIST: live register truncated this list with '...' after 'Mismatch – Superseded'. Additional options were not visible and were NOT guessed here.",
@@ -1055,14 +1120,16 @@
    "label": "PO Scope Match",
    "options": "\nNot Checked\nMatch\nMismatch – Superseded\nMismatch – Different Scope",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_po_payment_terms",
    "fieldtype": "Small Text",
    "label": "PO Payment Terms",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_po_terms_match",
@@ -1070,7 +1137,8 @@
    "label": "PO Terms Match",
    "options": "\nNot Checked\nAccepted\nMismatch",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_po_recon_state",
@@ -1078,7 +1146,8 @@
    "label": "PO Recon State",
    "options": "\nNot Started\nReconciled\nMismatch",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_po_recon_by",
@@ -1086,14 +1155,16 @@
    "label": "PO Recon By",
    "options": "User",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_po_recon_on",
    "fieldtype": "Datetime",
    "label": "PO Recon On",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_delivery_section",
@@ -1108,7 +1179,8 @@
    "label": "Delivery Owner",
    "options": "User",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "description": "INCOMPLETE OPTION LIST: live register truncated this list with '...' after 'Released'. Additional options were not visible and were NOT guessed here.",
@@ -1117,14 +1189,16 @@
    "label": "Delivery Release State",
    "options": "\nNot Applicable\nPending\nBlocked\nOn Hold\nReleased\nReleased with MD Override",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_handover_condition_no",
    "fieldtype": "Int",
    "label": "Handover Condition No",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_delivery_released_by",
@@ -1132,14 +1206,16 @@
    "label": "Delivery Released By",
    "options": "User",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_delivery_released_on",
    "fieldtype": "Datetime",
    "label": "Delivery Released On",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "default": "0",
@@ -1147,21 +1223,24 @@
    "fieldtype": "Check",
    "label": "Delivery Override",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_delivery_override_reason",
    "fieldtype": "Small Text",
    "label": "Delivery Override Reason",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_delivery_release_note",
    "fieldtype": "Small Text",
    "label": "Delivery Release Note",
    "permlevel": 1,
-   "read_only": 1
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "custom_negotiation_section",
@@ -1269,6 +1348,36 @@
    "fieldname": "dcs_details_tab",
    "fieldtype": "Tab Break",
    "label": "Deal & Scope"
+  },
+  {
+   "fieldname": "dcs_details_links_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "dcs_status_links_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "dcs_status_owner_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "dcs_costing_tools_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "dcs_quick_add_html",
+   "fieldtype": "HTML",
+   "label": "Quick add items"
+  },
+  {
+   "fieldname": "dcs_supporting_costs_section",
+   "fieldtype": "Section Break",
+   "label": "Additional charges & resources"
+  },
+  {
+   "fieldname": "dcs_costing_subject_section",
+   "fieldtype": "Section Break"
   }
  ],
  "grid_page_length": 50,

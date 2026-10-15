@@ -293,3 +293,44 @@ test('customer and scope entry precede draft summary and costing without losing 
   assert.deepEqual(order.filter(n=>d.fields.find(f=>f.fieldname===n).fieldtype==='Tab Break').map(n=>d.fields.find(f=>f.fieldname===n).label),['Deal & Scope','Costing','Revisions','Approval','Award & Handover','Overview']);
   assert.equal(new Set(order).size,order.length);assert.equal(order.length,d.fields.length);
 });
+test('near-floor margin displays enough precision to explain the blocked gate',()=>{
+  assert.equal(context.dcs_pct(19.996667),'19.9967%');
+  assert.equal(context.dcs_pct(20),'20.00%');
+});
+test('changed award takes priority over customer PO reconciliation',()=>{
+  const frm=fixture();
+  const result=context.dcs_next_step(frm,negotiator,{},sheet({
+    living:{revision_no:2,total_cost:1000,total_selling:1500,authorised:1},
+    states:{customer_award:'Awarded'},release_readiness:{commercially_aligned:0}
+  }));
+  assert.equal(result.label,'Review changed award');
+});
+test('unpriced draft rows are identified without blocking draft work',()=>{
+  const frm=fixture({docstatus:0,items:[{qty:1,cost_rate:1000,selling_rate:0}]});
+  let html;
+  context.dcs_render_draft_summary(frm,{$wrapper:{html:v=>html=v}});
+  assert.match(html,/no selling price/);
+  assert.match(html,/incomplete pricing estimate/);
+});
+test('timeline buying and selling labels state before to after and isolate direction',()=>{
+  assert.match(source,/Buying: before → after/);
+  assert.match(source,/dir="ltr" style="white-space:nowrap"/);
+});
+test('opportunity-derived customer field is never populated with a lead or organisation string',()=>{
+  assert.doesNotMatch(source,/frm\.set_value\("customer", res\.message\.custom_organization_name\)/);
+  assert.match(source,/customer:r\.opportunity_from === 'Customer' \? r\.party_name : ''/);
+});
+
+test('negative draft costs show an error instead of an inflated margin',()=>{
+  const frm=fixture({docstatus:0,items:[{qty:10,cost_rate:1250,selling_rate:1500}],resources:[{no_of_persons:1,no_of_days:1,cost_rate:-2000}]});
+  let html;
+  context.dcs_render_draft_summary(frm,{$wrapper:{html:v=>html=v}});
+  assert.match(html,/Correct invalid costing inputs/);
+  assert.doesNotMatch(html,/Gross margin|30.00%/);
+});
+test('revision movement isolates currency values and preserves before / after DOM order',()=>{
+  const html=context.dcs_revision_movement(fixture(),15000,14000,false);
+  assert.ok(html.indexOf('15000')<html.indexOf('→'));
+  assert.ok(html.indexOf('→')<html.indexOf('14000'));
+  assert.equal((html.match(/<bdi dir="ltr">/g)||[]).length,2);
+});

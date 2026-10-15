@@ -437,6 +437,7 @@ doc_events = {
 }
 
 override_whitelisted_methods = {
+    "erpnext.controllers.accounts_controller.update_child_qty_rate": "bsgroup.dcs.quotation_control.update_child_qty_rate",
 	"erpnext.selling.doctype.quotation.quotation.make_sales_order": "bsgroup.dcs.quotation_control.make_sales_order",
 	"erpnext.crm.doctype.opportunity.opportunity.make_quotation": "bsgroup.utils.quotation.make_quotation",
 	# The published "Living Deal Cost Sheet" Web Page calls the retired dcs_screen2 Server Script by its bare name.

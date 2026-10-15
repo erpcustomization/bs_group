@@ -31,12 +31,9 @@ class DealCostSheet(Document):
 			self.name = frappe.model.naming.make_autoname(f"DCS-{base}-.###")
 
 	def before_insert(self):
-		if self.amended_from:
-			# An amendment is a new submitted baseline, not a copy of the old
-			# negotiation, approval, award or delivery decisions.
-			for field in GOVERNED_TEXT + GOVERNED_NUM:
-				df = self.meta.get_field(field)
-				self.set(field, df.default if df and df.default is not None else (0 if field in GOVERNED_NUM else None))
+		# Every insertion is a new commercial record, including Duplicate and API copies.
+		# Decisions and revision references belong to the original sheet's history.
+		reset_commercial_state(self)
 		dcs_company_default_insert(self)
 		dcs_one_active_guard_insert(self)
 
@@ -102,6 +99,8 @@ class DealCostSheet(Document):
 
 	def validate(self):
 		apply_party_model(self)
+		from bsgroup.dcs.input_validation import validate_inputs
+		validate_inputs(self)
 		# D3: a Project (and therefore a Project Cost Baseline) may only hang off a
 		# sheet whose party is a real Customer record.
 		if self.project:
@@ -839,6 +838,8 @@ def validate_deal_cost(doc):
 
 
 def calculate_deal_financials(doc):
+	from bsgroup.dcs.input_validation import validate_inputs
+	validate_inputs(doc)
 	products_cost_total = 0
 	products_selling_total = 0
 	services_cost_total = 0
@@ -862,9 +863,10 @@ def calculate_deal_financials(doc):
 			else 0
 		)
 
-		is_stock_item = frappe.db.get_value("Item", d.item_code, "is_stock_item") if d.item_code else 1
+		from bsgroup.dcs.item_category import category_for_item
+		category = category_for_item(d.item_code)
 
-		if not is_stock_item:
+		if category == "Professional Services":
 			d.item_category = "Professional Services"
 			services_cost_total += d.cost_amount
 			services_selling_total += d.selling_amount
@@ -901,6 +903,9 @@ def calculate_deal_financials(doc):
 
 	doc.total_cost = products_cost_total + services_cost_total + additional_charges_total + total_resource_cost
 	doc.total_selling = products_selling_total + services_selling_total + sum(frappe.utils.flt(c.get("selling_amount")) for c in doc.addtional_charges or [])
+	from bsgroup.dcs.input_validation import non_negative
+	non_negative(doc.total_cost, "Calculated buying total")
+	non_negative(doc.total_selling, "Calculated selling total")
 	doc.margin_value = doc.total_selling - doc.total_cost
 	doc.margin_percent = (doc.margin_value / doc.total_selling) * 100 if doc.total_selling else 0
 
@@ -1034,3 +1039,16 @@ def read_deal_cost_sheet(file_url, docname):
 	doc.save(ignore_permissions=True)
 
 	return "Success"
+
+COPY_RESET_FIELDS = GOVERNED_TEXT + GOVERNED_NUM + [
+    "custom_deal_status", "custom_outcome_date", "custom_opportunity_status",
+    "custom_quotation", "custom_sales_order", "custom_lost_reason", "custom_closure_notes",
+    "custom_superseded_by",
+]
+
+def reset_commercial_state(doc):
+    for field in COPY_RESET_FIELDS:
+        df = doc.meta.get_field(field)
+        if df:
+            doc.set(field, 0 if field in GOVERNED_NUM else (df.default if df.default is not None else None))
+    doc.custom_deal_status = "Draft"

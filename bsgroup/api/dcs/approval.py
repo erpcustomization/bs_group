@@ -62,6 +62,8 @@ def dcs_approval_decision(args):
 			result["error"] = "The current revision is assigned to a different manager. Refresh before deciding."
 			return result
 		s.check_permission("read" if is_approver else "write")
+		from bsgroup.dcs.input_validation import validate_position
+		validate_position(s)
 		req = s.custom_approval_required
 		state = s.custom_approval_state
 		rev_ref = s.custom_revision_reference
@@ -261,10 +263,10 @@ def dcs_screen4(args):
 
 		result["why"] = {
 			"approval_reason": s.custom_approval_reason,
-			"threshold_crossed": "Concession from baseline " + str(s.custom_concession_percent_from_baseline or 0) + "% against a 16% manager approval threshold and a 26% ceiling.",
+			"threshold_crossed": "Concession from baseline " + format(s.custom_concession_percent_from_baseline or 0, ".2f") + "% against a 16% manager approval threshold and a 26% ceiling.",
 			"policy_basis": "Immediate manager approval is required below 20% gross margin or when another approval trigger applies (including concession of at least 16%). Concession above 26% cannot be authorised. A rejected revision stays audited; revise this sheet and recalculate. At or above 20% with no other trigger, Manager reapproval is not required. The submitter\'s immediate manager is the final approver.",
 			"margin_gate": s.custom_margin_gate, "margin_gate_reason": s.custom_margin_gate_reason,
-			"margin_gate_note": "The 20% margin floor is an independent commercial gate. Approving this position does not clear it.",
+			"margin_gate_note": "Manager approval records an exception for this exact commercial position. The below-floor warning remains visible; delivery release conditions remain separate.",
 		}
 
 		since = s.custom_approved_revision_no or 0
@@ -316,9 +318,9 @@ def dcs_screen4(args):
 		if req == "Blocked":
 			rec, conf, why = "Do not authorise", "High", "The position is above the 26% concession ceiling. No approver may authorise it."
 		elif s.custom_margin_gate == "Blocked":
-			rec, conf, why = "Return for Rework", "High", "Margin " + str(mar) + "% is below the 20% floor. Approval would authorise the price but would leave the margin gate outstanding."
+			rec, conf, why = "Return for Rework", "High", "Margin " + format(mar, ".4f" if 19.99 < mar < 20 else ".2f") + "% is below the 20% floor. Approval would authorise the price but would leave the margin gate outstanding."
 		elif conc >= 22:
-			rec, conf, why = "Return for Rework", "Medium", "Concession " + str(conc) + "% is close to the 26% ceiling with limited room for further movement."
+			rec, conf, why = "Return for Rework", "Medium", "Concession " + format(conc, ".2f") + "% is close to the 26% ceiling with limited room for further movement."
 		result["recommendation"] = {"recommended_action": rec, "confidence": conf, "reasoning": why, "advisory_only": 1,
 									"notice": "Advisory only. This is a recommendation, not a decision. No action is taken until an authorised approver presses a decision button."}
 

@@ -1,0 +1,36 @@
+Compact CRM DCS layout — maintenance notes
+
+Scope
+- Custom app only: Deal Cost Sheet JSON, controller JS, scoped CSS bundle and migration.
+- No ERPNext/Frappe core file edits, route replacements or cloned framework forms.
+- Keeps native columns, controls, tables, keyboard focus and permission evaluation.
+- All previous DCS fields remain. New fields are structural Column Break / Section Break / HTML.
+- Overview stays last. Import, exclude and quick-add controls follow the items table.
+- Secondary actions use the public form button API; the next action remains primary.
+- The asset is loaded as dcs_compact.bundle.css. bench build generates its fingerprint;
+  do not replace this with an unversioned CSS URL or patch the asset loader.
+
+Legacy script ownership
+The migration disables only the three marker-checked DCS Client Scripts whose
+behaviour is now owned by the app: Theme - Highlights, Quick Add Items, and AI
+Assistant. It retains their source and adds a retirement comment. Do not re-enable
+them alongside the controller: they would restore duplicate buttons/styles.
+Unknown or changed script contents stop migration for review.
+
+Upgrade checks
+1. Build bsgroup assets and run the idempotent layout migration.
+2. Run the DCS UI JavaScript tests and test_dcs_ui_contract integration module.
+3. Check that the stylesheet bundle is listed in assets.json and loads successfully.
+4. Inspect a draft, a submitted record, a reduced Sales User view and Presales view.
+5. Verify the three-column layout on desktop, two columns on tablet, one on mobile,
+   and that BOQ controls, primary actions and keyboard focus remain usable.
+6. Confirm existing approval/revision/award regression suites before a release.
+
+The scoped selectors depend on native Frappe form/grid class names. A future major
+framework release may change them; review the rendered form after each upgrade.
+This reduces upgrade risk but does not replace compatibility testing.
+
+Rollback
+Restore the previous application commit and its recorded layout/Property Setter
+values. Re-enable legacy scripts only if rolling the controller back as well.
+Never rewrite commercial history, decisions, awards or business values for a UI rollback.
