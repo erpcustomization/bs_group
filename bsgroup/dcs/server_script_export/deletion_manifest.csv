@@ -1,0 +1,155 @@
+name,script_type,reference_doctype,doctype_event,api_method,script_len,creation,modified,modified_by
+AIRA Helpdesk Report Test,API,,Before Insert,aira_helpdesk_report_test,7167,2026-04-28 13:59,2026-09-10 15:58,Administrator
+aira_cap_probe,API,,Before Insert,aira_cap_probe,712,2026-08-15 16:21,2026-08-15 17:02,mohan@bitssecureit.com
+aira_helpdesk_report_api,API,,Before Insert,aira_helpdesk_report_api,6977,2026-04-29 12:56,2026-05-10 09:22,mohan@bitssecureit.com
+aira_sales_report_test,API,,Before Insert,aira_sales_report_test,1747,2026-05-08 21:17,2026-09-10 15:58,Administrator
+attendance_api,API,,Before Insert,attendance_api,3861,2026-06-09 20:53,2026-08-18 12:41,mohan@bitssecureit.com
+bsi_communication_classifier,DocType Event,Communication,Before Insert,,3237,2026-05-10 20:14,2026-05-10 20:28,mohan@bitssecureit.com
+bsi_lead_after_insert_dispatch,DocType Event,Lead,After Insert,,1479,2026-05-10 20:14,2026-05-10 20:37,mohan@bitssecureit.com
+bsi_lead_enricher_pre,DocType Event,Lead,Before Insert,,2202,2026-05-10 20:14,2026-05-10 20:28,mohan@bitssecureit.com
+bsip_db_count_probe,API,,Before Insert,bsip_db_count_probe,2120,2026-07-31 21:02,2026-07-31 21:03,mohan@bitssecureit.com
+bsip_eng002_timing_probe,API,,Before Insert,bsip_eng002_timing_probe,3497,2026-08-01 23:16,2026-08-01 23:16,mohan@bitssecureit.com
+bsip_met004_vocab_probe,API,,Before Insert,bsip_met004_vocab_probe,5251,2026-07-31 22:58,2026-07-31 22:59,mohan@bitssecureit.com
+bsip_met005_json_probe,API,,Before Insert,bsip_met005_json_probe,3660,2026-08-01 20:03,2026-08-01 20:04,mohan@bitssecureit.com
+bsip_met005_vocab_probe,API,,Before Insert,bsip_met005_vocab_probe,7066,2026-08-01 19:13,2026-08-01 19:13,mohan@bitssecureit.com
+bsip_metrics_run,API,,Before Insert,bsip_metrics_run,21334,2026-07-30 14:13,2026-08-04 09:01,mohan@bitssecureit.com
+bsip_metrics_run Backup - 2026-07-31 21:07,API,,Before Insert,bsip_metrics_run_backup_20260731_2107,6182,2026-07-31 21:08,2026-07-31 21:08,mohan@bitssecureit.com
+bsip_metrics_run Backup - 2026-07-31 22:44,API,,Before Insert,bsip_metrics_run_backup_20260731_2244,7054,2026-07-31 22:44,2026-07-31 22:44,mohan@bitssecureit.com
+bsip_metrics_run Backup - 2026-08-01 19:48,API,,Before Insert,bsip_metrics_run_backup_202608011948,12600,2026-08-01 19:49,2026-08-01 19:49,mohan@bitssecureit.com
+bsip_metrics_run Backup - 2026-08-01 22:37,API,,Before Insert,bsip_metrics_run_backup_202608012237,16824,2026-08-01 22:37,2026-08-01 22:37,mohan@bitssecureit.com
+bsip_metrics_run Backup - 2026-08-01 23:00,API,,Before Insert,bsip_metrics_run_backup_202608012300,18095,2026-08-01 23:00,2026-08-01 23:00,mohan@bitssecureit.com
+bsip_metrics_run Backup - 2026-08-01 23:29,API,,Before Insert,bsip_metrics_run_backup_202608012329,18095,2026-08-01 23:29,2026-08-01 23:29,mohan@bitssecureit.com
+bsip_metrics_run Backup - undefined,API,,Before Insert,bsip_metrics_run_backup_20260801_1948_dup_naming_defect,12600,2026-08-01 19:48,2026-08-01 19:49,mohan@bitssecureit.com
+bsip_platform_probe,API,,Before Insert,bsip_platform_probe,5067,2026-07-29 10:00,2026-07-29 12:37,mohan@bitssecureit.com
+claude_helpdesk_reply,API,,Before Insert,claude_helpdesk_reply,1040,2026-04-28 11:53,2026-05-20 08:14,mohan@bitssecureit.com
+dcs_ai_item_analysis,API,,Before Insert,dcs_ai_item_analysis,2081,2026-05-07 15:47,2026-08-18 12:49,mohan@bitssecureit.com
+dcs_approval_authority_probe,API,,Before Insert,dcs_approval_authority_probe,2426,2026-08-08 17:37,2026-08-08 17:38,mohan@bitssecureit.com
+dcs_award_reversal_guard_probe,API,,Before Insert,dcs_award_reversal_guard_probe,1074,2026-08-08 19:44,2026-08-08 19:44,mohan@bitssecureit.com
+dcs_backfill_effort_and_pr,API,,Before Insert,dcs_backfill_effort_and_pr,1772,2026-08-05 11:43,2026-08-08 19:07,mohan@bitssecureit.com
+dcs_backfill_lifecycle,API,,Before Insert,dcs_backfill_lifecycle,2378,2026-08-05 11:40,2026-08-08 19:07,mohan@bitssecureit.com
+dcs_company_backfill,API,,Before Insert,dcs_company_backfill,5898,2026-08-15 22:06,2026-08-16 09:15,mohan@bitssecureit.com
+dcs_duplicate_scan,API,,Before Insert,dcs_duplicate_scan,12215,2026-08-15 19:24,2026-09-07 14:13,Administrator
+dcs_evidence_annotator,API,,Before Insert,dcs_evidence_annotator,1915,2026-08-08 19:49,2026-08-08 19:49,mohan@bitssecureit.com
+dcs_evidence_annotator_2,API,,Before Insert,dcs_evidence_annotator_2,1651,2026-08-08 20:11,2026-08-08 20:11,mohan@bitssecureit.com
+dcs_get_state,API,,Before Insert,dcs_get_state,11830,2026-08-08 16:12,2026-09-07 14:13,Administrator
+dcs_governance_baseline_backfill,API,,Before Insert,dcs_governance_baseline_backfill,4930,2026-08-14 23:19,2026-08-14 23:23,mohan@bitssecureit.com
+dcs_guard_dryrun,API,,Before Insert,dcs_guard_dryrun,5397,2026-08-15 20:22,2026-09-10 15:58,Administrator
+dcs_handover_authority_probe,API,,Before Insert,dcs_handover_authority_probe,3674,2026-08-08 17:59,2026-08-08 18:00,mohan@bitssecureit.com
+dcs_hardening_probe,API,,Before Insert,dcs_hardening_probe,506,2026-08-08 18:54,2026-08-08 19:07,mohan@bitssecureit.com
+dcs_ignore_permissions_probe,API,,Before Insert,dcs_ignore_permissions_probe,1244,2026-08-08 19:51,2026-08-08 19:51,mohan@bitssecureit.com
+dcs_negotiation_authority_probe,API,,Before Insert,dcs_negotiation_authority_probe,1895,2026-08-08 17:29,2026-08-08 17:30,mohan@bitssecureit.com
+dcs_nrc_writetest,API,,Before Insert,dcs_nrc_writetest,524,2026-08-15 13:03,2026-08-15 13:11,mohan@bitssecureit.com
+dcs_portfolio_totals,API,,Before Insert,dcs_portfolio_totals,4973,2026-08-15 22:05,2026-09-07 14:13,Administrator
+dcs_projection_probe,API,,Before Insert,dcs_projection_probe,1840,2026-08-08 16:14,2026-08-08 19:07,mohan@bitssecureit.com
+dcs_screen1,API,,Before Insert,dcs_screen1,23678,2026-08-08 18:23,2026-09-07 14:13,Administrator
+dcs_screen1_projection_probe,API,,Before Insert,dcs_screen1_projection_probe,1568,2026-08-08 18:31,2026-08-08 18:32,mohan@bitssecureit.com
+dcs_screen2,API,,Before Insert,dcs_screen2,8714,2026-08-08 16:55,2026-09-07 14:13,Administrator
+dcs_tl_probe,API,,Before Insert,dcs_tl_probe,1522,2026-08-10 21:28,2026-08-10 21:34,mohan@bitssecureit.com
+dcs_zz_ageing_probe,API,,Before Insert,dcs_zz_ageing_probe,1984,2026-08-16 08:54,2026-08-17 08:11,mohan@bitssecureit.com
+dcs_zz_audit_probe,API,,Before Insert,dcs_zz_audit_probe,556,2026-08-18 11:05,2026-08-18 11:27,mohan@bitssecureit.com
+dcs_zz_auth_probe,API,,Before Insert,dcs_zz_auth_probe,1348,2026-08-18 11:38,2026-08-18 11:38,mohan@bitssecureit.com
+dcs_zz_auth_probe10,API,,Before Insert,dcs_zz_auth_probe10,629,2026-08-18 11:43,2026-08-18 11:43,mohan@bitssecureit.com
+dcs_zz_auth_probe11,API,,Before Insert,dcs_zz_auth_probe11,257,2026-08-18 11:43,2026-08-18 11:43,mohan@bitssecureit.com
+dcs_zz_auth_probe12,API,,Before Insert,dcs_zz_auth_probe12,617,2026-08-18 11:43,2026-08-18 11:43,mohan@bitssecureit.com
+dcs_zz_auth_probe13,API,,Before Insert,dcs_zz_auth_probe13,170,2026-08-18 11:43,2026-08-18 11:43,mohan@bitssecureit.com
+dcs_zz_auth_probe14,API,,Before Insert,dcs_zz_auth_probe14,855,2026-08-18 11:44,2026-08-18 11:44,mohan@bitssecureit.com
+dcs_zz_auth_probe15,API,,Before Insert,dcs_zz_auth_probe15,790,2026-08-18 11:44,2026-08-18 11:44,mohan@bitssecureit.com
+dcs_zz_auth_probe16,API,,Before Insert,dcs_zz_auth_probe16,725,2026-08-18 11:44,2026-08-18 11:44,mohan@bitssecureit.com
+dcs_zz_auth_probe17,API,,Before Insert,dcs_zz_auth_probe17,208,2026-08-18 11:45,2026-08-18 11:45,mohan@bitssecureit.com
+dcs_zz_auth_probe18,API,,Before Insert,dcs_zz_auth_probe18,203,2026-08-18 11:45,2026-08-18 11:45,mohan@bitssecureit.com
+dcs_zz_auth_probe19,API,,Before Insert,dcs_zz_auth_probe19,406,2026-08-18 11:45,2026-08-18 11:45,mohan@bitssecureit.com
+dcs_zz_auth_probe2,API,,Before Insert,dcs_zz_auth_probe2,902,2026-08-18 11:39,2026-08-18 11:39,mohan@bitssecureit.com
+dcs_zz_auth_probe20,API,,Before Insert,dcs_zz_auth_probe20,174,2026-08-18 11:46,2026-08-18 11:46,mohan@bitssecureit.com
+dcs_zz_auth_probe21,API,,Before Insert,dcs_zz_auth_probe21,174,2026-08-18 11:46,2026-08-18 11:46,mohan@bitssecureit.com
+dcs_zz_auth_probe22,API,,Before Insert,dcs_zz_auth_probe22,295,2026-08-18 11:46,2026-08-18 11:46,mohan@bitssecureit.com
+dcs_zz_auth_probe23,API,,Before Insert,dcs_zz_auth_probe23,619,2026-08-18 11:46,2026-08-18 11:46,mohan@bitssecureit.com
+dcs_zz_auth_probe24,API,,Before Insert,dcs_zz_auth_probe24,946,2026-08-18 11:47,2026-08-18 11:47,mohan@bitssecureit.com
+dcs_zz_auth_probe25,API,,Before Insert,dcs_zz_auth_probe25,610,2026-08-18 11:47,2026-08-18 11:47,mohan@bitssecureit.com
+dcs_zz_auth_probe26,API,,Before Insert,dcs_zz_auth_probe26,339,2026-08-18 11:48,2026-08-18 11:48,mohan@bitssecureit.com
+dcs_zz_auth_probe27,API,,Before Insert,dcs_zz_auth_probe27,2477,2026-08-18 11:48,2026-08-18 11:48,mohan@bitssecureit.com
+dcs_zz_auth_probe28,API,,Before Insert,dcs_zz_auth_probe28,1967,2026-08-18 11:49,2026-08-18 11:49,mohan@bitssecureit.com
+dcs_zz_auth_probe29,API,,Before Insert,dcs_zz_auth_probe29,505,2026-08-18 11:50,2026-08-18 11:50,mohan@bitssecureit.com
+dcs_zz_auth_probe3,API,,Before Insert,dcs_zz_auth_probe3,1659,2026-08-18 11:39,2026-08-18 11:39,mohan@bitssecureit.com
+dcs_zz_auth_probe30,API,,Before Insert,dcs_zz_auth_probe30,2151,2026-08-18 11:50,2026-08-18 11:50,mohan@bitssecureit.com
+dcs_zz_auth_probe31,API,,Before Insert,dcs_zz_auth_probe31,345,2026-08-18 11:51,2026-08-18 11:51,mohan@bitssecureit.com
+dcs_zz_auth_probe32,API,,Before Insert,dcs_zz_auth_probe32,2851,2026-08-18 11:51,2026-08-18 11:51,mohan@bitssecureit.com
+dcs_zz_auth_probe33,API,,Before Insert,dcs_zz_auth_probe33,313,2026-08-18 11:51,2026-08-18 11:51,mohan@bitssecureit.com
+dcs_zz_auth_probe34,API,,Before Insert,dcs_zz_auth_probe34,2652,2026-08-18 11:52,2026-08-18 11:52,mohan@bitssecureit.com
+dcs_zz_auth_probe35,API,,Before Insert,dcs_zz_auth_probe35,3057,2026-08-18 11:52,2026-08-18 11:52,mohan@bitssecureit.com
+dcs_zz_auth_probe36,API,,Before Insert,dcs_zz_auth_probe36,608,2026-08-18 11:53,2026-08-18 11:53,mohan@bitssecureit.com
+dcs_zz_auth_probe37,API,,Before Insert,dcs_zz_auth_probe37,1613,2026-08-18 11:53,2026-08-18 11:53,mohan@bitssecureit.com
+dcs_zz_auth_probe38,API,,Before Insert,dcs_zz_auth_probe38,398,2026-08-18 11:53,2026-08-18 11:53,mohan@bitssecureit.com
+dcs_zz_auth_probe39,API,,Before Insert,dcs_zz_auth_probe39,407,2026-08-18 11:59,2026-08-18 11:59,mohan@bitssecureit.com
+dcs_zz_auth_probe4,API,,Before Insert,dcs_zz_auth_probe4,435,2026-08-18 11:40,2026-08-18 11:40,mohan@bitssecureit.com
+dcs_zz_auth_probe40,API,,Before Insert,dcs_zz_auth_probe40,516,2026-08-18 11:59,2026-08-18 11:59,mohan@bitssecureit.com
+dcs_zz_auth_probe41,API,,Before Insert,dcs_zz_auth_probe41,1280,2026-08-18 11:59,2026-08-18 11:59,mohan@bitssecureit.com
+dcs_zz_auth_probe42,API,,Before Insert,dcs_zz_auth_probe42,1128,2026-08-18 12:00,2026-08-18 12:00,mohan@bitssecureit.com
+dcs_zz_auth_probe43,API,,Before Insert,dcs_zz_auth_probe43,387,2026-08-18 12:00,2026-08-18 12:00,mohan@bitssecureit.com
+dcs_zz_auth_probe44,API,,Before Insert,dcs_zz_auth_probe44,323,2026-08-18 12:01,2026-08-18 12:01,mohan@bitssecureit.com
+dcs_zz_auth_probe45,API,,Before Insert,dcs_zz_auth_probe45,330,2026-08-18 12:01,2026-08-18 12:01,mohan@bitssecureit.com
+dcs_zz_auth_probe46,API,,Before Insert,dcs_zz_auth_probe46,420,2026-08-18 12:10,2026-08-18 12:10,mohan@bitssecureit.com
+dcs_zz_auth_probe47,API,,Before Insert,dcs_zz_auth_probe47,172,2026-08-18 12:11,2026-08-18 12:11,mohan@bitssecureit.com
+dcs_zz_auth_probe48,API,,Before Insert,dcs_zz_auth_probe48,377,2026-08-18 12:12,2026-08-18 12:12,mohan@bitssecureit.com
+dcs_zz_auth_probe5,API,,Before Insert,dcs_zz_auth_probe5,678,2026-08-18 11:41,2026-08-18 11:41,mohan@bitssecureit.com
+dcs_zz_auth_probe6,API,,Before Insert,dcs_zz_auth_probe6,413,2026-08-18 11:41,2026-08-18 11:41,mohan@bitssecureit.com
+dcs_zz_auth_probe7,API,,Before Insert,dcs_zz_auth_probe7,736,2026-08-18 11:42,2026-08-18 11:42,mohan@bitssecureit.com
+dcs_zz_auth_probe8,API,,Before Insert,dcs_zz_auth_probe8,432,2026-08-18 11:42,2026-08-18 11:42,mohan@bitssecureit.com
+dcs_zz_auth_probe9,API,,Before Insert,dcs_zz_auth_probe9,761,2026-08-18 11:42,2026-08-18 11:42,mohan@bitssecureit.com
+dcs_zz_capability_probe,API,,Before Insert,dcs_zz_capability_probe,3657,2026-08-16 08:25,2026-08-16 08:49,mohan@bitssecureit.com
+dcs_zz_company_default_selftest,API,,Before Insert,dcs_zz_company_default_selftest,4837,2026-08-16 08:27,2026-08-16 08:39,mohan@bitssecureit.com
+dcs_zz_d2a_probe,API,,Before Insert,dcs_zz_d2a_probe,5597,2026-08-19 18:24,2026-08-19 18:32,mohan@bitssecureit.com
+dcs_zz_d2b_probe,API,,Before Insert,dcs_zz_d2b_probe,7819,2026-08-19 21:09,2026-08-19 21:18,mohan@bitssecureit.com
+dcs_zz_d8_refscan,API,,Before Insert,dcs_zz_d8_refscan,3447,2026-08-18 12:47,2026-08-19 15:59,mohan@bitssecureit.com
+dcs_zz_disable_all,API,,Before Insert,dcs_zz_disable_all,580,2026-08-18 12:15,2026-08-18 12:16,mohan@bitssecureit.com
+dcs_zz_marker,API,,Before Insert,dcs_zz_marker,330,2026-08-18 12:13,2026-08-18 12:13,mohan@bitssecureit.com
+dcs_zz_outcome_probe,API,,Before Insert,dcs_zz_outcome_probe,2297,2026-08-17 08:21,2026-08-17 08:51,mohan@bitssecureit.com
+dcs_zz_regress,API,,Before Insert,dcs_zz_regress,3812,2026-08-18 12:14,2026-08-18 12:14,mohan@bitssecureit.com
+dcs_zz_regress2,API,,Before Insert,dcs_zz_regress2,1572,2026-08-18 12:15,2026-08-18 12:15,mohan@bitssecureit.com
+dcs_zz_ws_link,API,,Before Insert,dcs_zz_ws_link,1599,2026-08-18 12:12,2026-08-18 12:12,mohan@bitssecureit.com
+diagnostic_role_check_temp_1a4d,API,,Before Insert,diagnostic_role_check_temp_1a4d,454,2026-07-31 12:37,2026-07-31 12:37,mohan@bitssecureit.com
+fix_quotation_party_classification,API,,Before Insert,fix_quotation_party_classification,655,2026-05-08 13:19,2026-05-08 13:28,mohan@bitssecureit.com
+lead_feedback_aggregator,Scheduler Event,,Before Insert,,959,2026-05-10 20:17,2026-05-10 20:37,mohan@bitssecureit.com
+office365_login_url,API,,Before Insert,office365_login_url,31,2026-06-22 19:42,2026-06-22 19:46,mohan@bitssecureit.com
+POC - Scheduler Execution Field Protection (TEMP - Phase 1A.4B),DocType Event,Scheduler Execution,Before Save,,907,2026-07-29 12:18,2026-07-29 12:20,mohan@bitssecureit.com
+poc_1a4c_test_harness_temp,API,,Before Insert,poc_1a4c_test_harness_temp,467,2026-07-29 12:41,2026-07-29 12:48,mohan@bitssecureit.com
+poc_scheduler_execution_action_temp,API,,Before Insert,poc_scheduler_execution_action_temp,676,2026-07-29 12:19,2026-07-29 12:20,mohan@bitssecureit.com
+quotation_bulk_backfill_sp,API,,Before Insert,quotation_bulk_backfill_sp,1893,2026-05-31 15:41,2026-09-10 15:58,Administrator
+si_bulk_field_update,API,,Before Insert,si_bulk_field_update,652,2026-05-21 14:14,2026-09-10 15:58,Administrator
+Update Presales Dashboard JS,API,,Before Insert,update_presales_dashboard_js,3641,2026-05-30 20:38,2026-05-30 21:09,mohan@bitssecureit.com
+Write CSV File,API,,Before Insert,write_csv_file,347,2026-05-08 10:02,2026-09-10 15:58,Administrator
+zoho_amount_fix,API,,Before Insert,zoho_amount_fix,4573,2026-06-09 14:19,2026-06-09 14:37,mohan@bitssecureit.com
+zoho_bill_migrate,API,,Before Insert,zoho_bill_migrate,65763,2026-05-23 13:59,2026-06-09 13:00,mohan@bitssecureit.com
+zoho_books_test_org,API,,Before Insert,zoho_books_test_org,837,2026-05-04 18:27,2026-09-10 15:58,Administrator
+zoho_cleanup,API,,Before Insert,zoho_cleanup,6783,2026-05-25 10:13,2026-05-26 10:52,mohan@bitssecureit.com
+zoho_discover_company,API,,Before Insert,zoho_discover_company,1416,2026-05-04 18:42,2026-09-10 15:58,Administrator
+zoho_fetch_test,API,,Before Insert,zoho_fetch_test,4372,2026-06-09 11:42,2026-09-10 15:58,Administrator
+zoho_migrate,API,,Before Insert,zoho_migrate,14993,2026-05-20 15:48,2026-09-10 15:58,Administrator
+zoho_outbound_customer,DocType Event,Customer,After Save,,2854,2026-05-04 21:22,2026-05-04 21:22,mohan@bitssecureit.com
+zoho_outbound_item,DocType Event,Item,After Save,,2443,2026-05-04 21:22,2026-05-04 21:22,mohan@bitssecureit.com
+zoho_outbound_payment_entry,DocType Event,Payment Entry,After Submit,,3545,2026-05-04 21:24,2026-05-04 21:24,mohan@bitssecureit.com
+zoho_outbound_purchase_invoice,DocType Event,Purchase Invoice,After Submit,,3105,2026-05-04 21:24,2026-05-04 21:24,mohan@bitssecureit.com
+zoho_outbound_sales_invoice,DocType Event,Sales Invoice,After Submit,,3147,2026-05-04 21:24,2026-05-04 21:24,mohan@bitssecureit.com
+zoho_outbound_supplier,DocType Event,Supplier,After Save,,2539,2026-05-04 21:22,2026-05-04 21:22,mohan@bitssecureit.com
+zoho_payment_migrate,API,,Before Insert,zoho_payment_migrate,28619,2026-05-23 17:08,2026-06-09 13:29,mohan@bitssecureit.com
+zoho_phase1_backfill,API,,Before Insert,zoho_phase1_backfill,10055,2026-05-04 18:49,2026-09-10 15:58,Administrator
+zoho_phase1_enrich,API,,Before Insert,zoho_phase1_enrich,3923,2026-05-04 19:08,2026-09-10 15:58,Administrator
+zoho_receipt_migrate,API,,Before Insert,zoho_receipt_migrate,17663,2026-05-25 10:59,2026-05-26 10:52,mohan@bitssecureit.com
+zoho_so_po_migrate,API,,Before Insert,zoho_so_po_migrate,16899,2026-06-09 11:54,2026-09-10 15:58,Administrator
+zoho_test_customer_sync,API,,Before Insert,zoho_test_customer_sync,3341,2026-05-04 18:35,2026-09-10 15:58,Administrator
+ZZ BACKUP - aira_ai_gateway - 2026-08-24 (pre scheduler_assistant),API,,Before Insert,aira_ai_gateway_backup_20260824,7486,2026-08-24 18:26,2026-08-24 18:26,mohan@bitssecureit.com
+ZZ BACKUP - generate_scheduler_execution - 2026-08-04,API,,Before Insert,zz_backup_generate_scheduler_execution,4301,2026-08-04 21:31,2026-08-04 21:31,mohan@bitssecureit.com
+ZZ BACKUP - Scheduler Execution - Protected Field Validation - 2026-08-04,DocType Event,Scheduler Execution,Before Save,,17492,2026-08-04 21:15,2026-08-04 21:15,mohan@bitssecureit.com
+ZZ BACKUP - Tech Task Scheduler - Pre-Submission Validation - 2026-08-04,DocType Event,Tech Task Scheduler,Before Submit,,1494,2026-08-04 21:15,2026-08-04 21:15,mohan@bitssecureit.com
+ZZ Temp Flag Probe,DocType Event,DCS Handover Condition,Before Save,,193,2026-08-08 19:05,2026-08-08 19:06,mohan@bitssecureit.com
+zz_poc_hd_ticket_writeback,DocType Event,HD Ticket,After Save,,1715,2026-08-04 21:23,2026-09-10 10:23,Administrator
+zz_poc_probe,API,,Before Insert,zz_poc_probe,39,2026-08-04 22:02,2026-08-04 22:15,mohan@bitssecureit.com
+zz_poc_reassign_assignment,API,,Before Insert,zz_poc_reassign_assignment,5409,2026-08-04 21:59,2026-09-10 15:58,Administrator
+zz_poc_scheduler_execution_update_work,API,,Before Insert,zz_poc_scheduler_execution_update_work,18503,2026-08-04 21:21,2026-09-10 15:58,Administrator
+zz_poc_task_closure_guard,DocType Event,Task,Before Save,,3612,2026-08-04 21:22,2026-09-10 13:31,Administrator
+zz_poc_task_reopen,API,,Before Insert,zz_poc_task_reopen,5354,2026-08-04 21:23,2026-09-10 15:58,Administrator
+zz_poc_task_status_writeback,DocType Event,Task,After Save,,1812,2026-08-04 21:23,2026-09-10 10:11,Administrator
+zz_poc_timesheet_link_sync,DocType Event,Timesheet,After Save,,1602,2026-08-04 21:59,2026-09-09 09:49,Administrator
+zz_poc_timesheet_link_sync_submit,DocType Event,Timesheet,After Submit,,1618,2026-08-04 21:59,2026-09-09 09:49,Administrator
+zz_poc_timesheet_precancel,DocType Event,Timesheet,Before Cancel,,2540,2026-08-04 21:59,2026-09-09 09:49,Administrator
+zz_poc_tts_dispatch,DocType Event,Tech Task Scheduler,After Submit,,3335,2026-08-04 21:18,2026-09-11 18:12,Administrator
+zz_tmp_hook_probe,API,,Before Insert,zz_tmp_hook_probe,55,2026-09-07 18:34,2026-09-08 11:04,Administrator

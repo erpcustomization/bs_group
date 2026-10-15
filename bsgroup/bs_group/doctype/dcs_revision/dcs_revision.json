@@ -34,10 +34,19 @@
   "approval_requirement",
   "margin_gate",
   "approval_state",
+  "approval_policy",
+  "submitter_employee",
+  "manager_employee",
+  "approval_manager",
+  "approval_routing_error",
+  "manager_dcs_share",
   "cb_appr",
   "decided_by",
   "decided_on",
-  "decision_reason"
+  "decision_reason",
+  "boq_lines",
+  "settled_by",
+  "settled_on"
  ],
  "fields": [
   {
@@ -178,7 +187,7 @@
    "fieldname": "approval_requirement",
    "fieldtype": "Select",
    "label": "Approval Requirement",
-   "options": "None\nManaging Director\nBlocked"
+   "options": "None\nManaging Director\nBlocked\nManager"
   },
   {
    "description": "Independent commercial floor gate. Not an approver-routing rule.",
@@ -192,7 +201,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Approval State",
-   "options": "Not Required\nPending Endorsement\nEndorsed - Pending MD\nApproved\nReturned for Rework\nRejected\nBlocked"
+   "options": "Not Required\nPending Endorsement\nEndorsed - Pending MD\nApproved\nReturned for Rework\nRejected\nBlocked\nPending Manager"
   },
   {
    "fieldname": "cb_appr",
@@ -213,12 +222,72 @@
    "fieldname": "decision_reason",
    "fieldtype": "Small Text",
    "label": "Decision Reason"
+  },
+  {
+   "fieldname": "boq_lines",
+   "fieldtype": "Table",
+   "label": "BOQ Revision Lines",
+   "options": "DCS Revision Line",
+   "read_only": 1
+  },
+  {
+   "fieldname": "settled_by",
+   "fieldtype": "Link",
+   "label": "Superseded by Amendment",
+   "options": "Deal Cost Sheet",
+   "read_only": 1
+  },
+  {
+   "fieldname": "settled_on",
+   "fieldtype": "Datetime",
+   "label": "Superseded On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "approval_policy",
+   "fieldtype": "Data",
+   "label": "Approval Routing Policy",
+   "read_only": 1
+  },
+  {
+   "fieldname": "submitter_employee",
+   "fieldtype": "Link",
+   "label": "Submitter Employee",
+   "read_only": 1,
+   "options": "Employee"
+  },
+  {
+   "fieldname": "manager_employee",
+   "fieldtype": "Link",
+   "label": "Immediate Manager Employee",
+   "read_only": 1,
+   "options": "Employee"
+  },
+  {
+   "fieldname": "approval_manager",
+   "fieldtype": "Link",
+   "label": "Approval Manager",
+   "read_only": 1,
+   "options": "User"
+  },
+  {
+   "fieldname": "approval_routing_error",
+   "fieldtype": "Small Text",
+   "label": "Approval Routing Issue",
+   "read_only": 1
+  },
+  {
+   "fieldname": "manager_dcs_share",
+   "fieldtype": "Data",
+   "label": "Service-owned Manager Access",
+   "read_only": 1,
+   "hidden": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-10 13:06:58.572197",
+ "modified": "2026-10-12 17:50:00.000000",
  "modified_by": "Administrator",
  "module": "BS Group",
  "name": "DCS Revision",

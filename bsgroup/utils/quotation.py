@@ -28,7 +28,11 @@ def set_sales_person_from_customer(doc, method=None):
 	"""Quotation has no native Sales Team child table (unlike Sales Order/Sales
 	Invoice/Delivery Note), so mirror the Customer's primary Sales Person
 	(highest allocation row) onto custom_sales_person for permission
-	filtering and reporting. Only applies when quotation_to is Customer."""
+	filtering and reporting. Only applies when quotation_to is Customer.
+
+	Precedence: a valid Customer mapping always wins and overwrites the field;
+	when no mapping exists an existing value is preserved (never cleared) and
+	an empty field stays empty."""
 	if doc.quotation_to != "Customer" or not doc.party_name:
 		return
 
@@ -38,7 +42,11 @@ def set_sales_person_from_customer(doc, method=None):
 		"sales_person",
 		order_by="allocated_percentage desc",
 	)
-	doc.custom_sales_person = sales_person or ""
+	if sales_person:
+		doc.custom_sales_person = sales_person
+	# No Sales Person is mapped on this Customer: leave the field exactly as it
+	# is. An existing (manually set) value must never be replaced with blank,
+	# and an empty field simply stays empty until a mapping exists.
 
 
 LOST_REASON_STAGES = ("Lost", "Cancelled")

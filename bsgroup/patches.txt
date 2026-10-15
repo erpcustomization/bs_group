@@ -1,6 +1,8 @@
 [pre_model_sync]
 # Patches added in this section will be executed before doctypes are migrated
 # Read docs to understand patches: https://frappeframework.com/docs/v14/user/en/database-migrations
+bsgroup.patches.v0_1.reconcile_handover_condition_doctype
+bsgroup.patches.v0_1.fold_governance_change_rows
 
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
@@ -9,3 +11,20 @@ bsgroup.patches.set_missing_lead_company
 bsgroup.patches.share_existing_tech_task_scheduler_assignments
 bsgroup.patches.backfill_task_completed_on
 # bsgroup.patches.backfill_quotation_pipeline_stage  # run manually when ready to backfill existing quotations
+bsgroup.patches.v0_1.verify_handover_condition_doctype
+bsgroup.patches.v0_1.drop_orphan_governance_change
+bsgroup.patches.v0_1.lock_pcb_until_g_pcb
+bsgroup.patches.v0_1.backfill_party_fields
+bsgroup.patches.v0_1.normalize_po_scope_match
+bsgroup.patches.v0_1.dcs_audit_controls
+bsgroup.patches.v0_1.dcs_ui
+
+bsgroup.patches.v0_1.dcs_quotation_account_select
+bsgroup.patches.v0_1.dcs_workspace_counts
+
+bsgroup.patches.v0_1.dcs_manager_approval
+bsgroup.patches.v0_1.dcs_draft_entry_ui
+bsgroup.patches.v0_1.dcs_browser_audit
+bsgroup.patches.v0_1.dcs_compact_crm
+bsgroup.patches.v0_1.dcs_account_labels
+bsgroup.patches.v0_1.dcs_costing_subject

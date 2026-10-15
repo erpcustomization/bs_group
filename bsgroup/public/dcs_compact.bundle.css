@@ -1,0 +1,187 @@
+/* Compact CRM: deliberately limited to the custom DCS page wrapper.
+   Keep native Frappe controls, grid semantics, focus states and permissions. */
+.dcs-compact-crm.dcs-compact-crm {
+    --dcs-accent: #2465d9;
+    --dcs-header-ink: #2457a7;
+    --dcs-header-tint: rgba(36, 101, 217, 0.08);
+    --dcs-surface: var(--card-bg, #fff);
+    --dcs-subtle: var(--subtle-fg, #f6f8fa);
+    --dcs-border: var(--border-color, #e4e9ef);
+    --dcs-ink: var(--text-color, #273448);
+}
+.dcs-compact-crm.dcs-compact-crm .page-head, .dcs-compact-crm.dcs-compact-crm .form-tabs-list {
+    background: var(--dcs-surface);
+}
+.dcs-compact-crm.dcs-compact-crm .form-layout .form-section {
+    padding: 16px 20px;
+    margin: 0;
+    border-bottom: 1px solid var(--dcs-border);
+}
+.dcs-compact-crm.dcs-compact-crm .form-section .section-head {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--dcs-header-ink);
+    margin-bottom: 14px;
+}
+.dcs-compact-crm.dcs-compact-crm .form-section .section-body { margin-top: 0; }
+.dcs-compact-crm.dcs-compact-crm .form-column { min-width: 0; }
+.dcs-compact-crm.dcs-compact-crm .frappe-control { margin-bottom: 13px; }
+.dcs-compact-crm.dcs-compact-crm .frappe-control .control-label {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+.dcs-compact-crm.dcs-compact-crm .frappe-control .like-disabled-input {
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--dcs-border);
+    border-radius: 0;
+    padding: 4px 0 7px;
+    min-height: 30px;
+    overflow-wrap: anywhere;
+}
+.dcs-compact-crm.dcs-compact-crm .frappe-control .control-input input:not([type="checkbox"]),
+.dcs-compact-crm.dcs-compact-crm .frappe-control textarea {
+    border-radius: 5px;
+}
+.dcs-compact-crm.dcs-compact-crm .help-box {
+    font-size: 11px;
+    margin-top: 4px;
+    line-height: 1.45;
+}
+.dcs-compact-crm.dcs-compact-crm .form-tabs {
+    flex-wrap: wrap;
+    gap: 0 20px;
+    padding: 0 20px;
+}
+.dcs-compact-crm.dcs-compact-crm .form-tabs .nav-link {
+    padding: 12px 0 10px;
+    border-radius: 0;
+    font-size: 13px;
+}
+.dcs-compact-crm.dcs-compact-crm .form-tabs .nav-link.active {
+    color: var(--dcs-accent);
+    border-bottom-color: var(--dcs-accent);
+}
+.dcs-compact-crm.dcs-compact-crm .form-grid {
+    border: 1px solid var(--dcs-border);
+    border-radius: 6px;
+    box-shadow: none;
+}
+.dcs-compact-crm.dcs-compact-crm .form-grid .grid-heading-row,
+.dcs-compact-crm.dcs-compact-crm .form-grid .grid-heading-row .col,
+.dcs-compact-crm.dcs-compact-crm .form-grid .grid-heading-row .static-area {
+    background: var(--dcs-header-tint);
+    color: var(--dcs-ink);
+    font-size: 12px;
+    font-weight: 500;
+    border-color: var(--dcs-border);
+}
+.dcs-compact-crm.dcs-compact-crm .form-grid .grid-body .grid-row {
+    background: var(--dcs-surface);
+    border-color: var(--dcs-border);
+}
+.dcs-compact-crm.dcs-compact-crm .form-grid .grid-body .static-area {
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}
+.dcs-compact-crm.dcs-compact-crm .form-grid [data-fieldname="description"] .static-area,
+.dcs-compact-crm.dcs-compact-crm .form-grid [data-fieldname="item_code"] .static-area {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    height: auto;
+    max-height: none;
+}
+.dcs-compact-crm.dcs-compact-crm .form-grid [data-fieldname="cost_rate"] .static-area,
+.dcs-compact-crm.dcs-compact-crm .form-grid [data-fieldname="selling_rate"] .static-area {
+    direction: ltr;
+    unicode-bidi: isolate;
+    white-space: nowrap;
+}
+.dcs-compact-crm.dcs-compact-crm .page-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.dcs-compact-crm.dcs-compact-crm .page-actions .btn { border-radius: 5px; box-shadow: none; }
+.dcs-compact-crm.dcs-compact-crm .dcs-quick-add { margin: 0 0 8px; box-shadow: none; }
+.dcs-compact-crm.dcs-compact-crm .dcs-panel.dcs-overview {
+    border-radius: 6px;
+    padding: 18px;
+}
+.dcs-compact-crm.dcs-compact-crm .dcs-overview .dcs-metrics strong { font-size: 23px; }
+.dcs-compact-crm.dcs-compact-crm .dcs-overview .dcs-next { margin-top: 16px; padding-top: 14px; }
+.dcs-compact-crm.dcs-compact-crm .frappe-control[data-fieldname="dcs_quick_add_html"] p { margin: 0 0 8px; }
+@media (max-width: 991px) {
+    .dcs-compact-crm.dcs-compact-crm .page-head-content { flex-wrap: wrap; height: auto; }
+    .dcs-compact-crm.dcs-compact-crm .page-actions { max-width: 100%; }
+    .dcs-compact-crm.dcs-compact-crm .form-section .form-column { flex: 0 0 50%; max-width: 50%; }
+    .dcs-compact-crm.dcs-compact-crm .form-section .form-column:only-child { flex-basis: 100%; max-width: 100%; }
+}
+@media (max-width: 575px) {
+    .dcs-compact-crm.dcs-compact-crm .form-layout .form-section { padding: 14px 12px; }
+    .dcs-compact-crm.dcs-compact-crm .form-section .form-column { flex-basis: 100%; max-width: 100%; }
+    .dcs-compact-crm.dcs-compact-crm .form-tabs { padding: 0 12px; gap: 0 14px; }
+    .dcs-compact-crm.dcs-compact-crm .form-tabs .nav-link { font-size: 12px; }
+}
+
+/* Fill the DCS content area instead of inheriting the desk's centred narrow form. */
+.dcs-compact-crm.dcs-compact-crm .form-layout .section-head,
+.dcs-compact-crm.dcs-compact-crm .form-layout .section-body,
+.dcs-compact-crm.dcs-compact-crm .form-layout .form-section-description {
+    max-width: 100%;
+}
+.dcs-compact-crm.dcs-compact-crm .form-layout .section-head {
+    padding: 0 12px;
+}
+.dcs-compact-crm.dcs-compact-crm .form-layout .section-body {
+    padding-top: 0;
+}
+
+.dcs-compact-crm.dcs-compact-crm .page-actions .btn-primary,
+.dcs-compact-crm.dcs-compact-crm .page-actions .primary-action {
+    background: var(--dcs-accent);
+    border-color: var(--dcs-accent);
+    color: #fff;
+}
+
+.dcs-compact-crm.dcs-compact-crm .dcs-revision-movement {
+    display: inline-flex;
+    flex-direction: row;
+    direction: ltr;
+    unicode-bidi: isolate;
+    align-items: baseline;
+    gap: 5px;
+}
+.dcs-compact-crm.dcs-compact-crm .dcs-revision-movement bdi:last-child { font-weight: 600; }
+
+/* Theme-aware header accents; static CSS adds no scripts, fonts or requests. */
+[data-theme="dark"] .dcs-compact-crm.dcs-compact-crm,
+.dcs-compact-crm.dcs-compact-crm[data-theme="dark"] {
+    --dcs-header-ink: #adcaff;
+    --dcs-header-tint: rgba(105, 155, 255, 0.14);
+}
+
+/* DCS company identity replaces the default-company pill only on this form. */
+.dcs-compact-crm.dcs-compact-crm .bs-co-badge { display: none !important; }
+.dcs-compact-crm.dcs-compact-crm .title-area { flex-wrap: wrap; gap: 8px; }
+.dcs-compact-crm.dcs-compact-crm .dcs-country-badge {
+    display: inline-flex;
+    flex: 0 1 auto;
+    align-items: center;
+    padding: 4px 9px;
+    border-radius: 5px;
+    background: var(--blue-50, #edf5ff);
+    color: var(--blue-700, #215fa6);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.dcs-compact-crm.dcs-compact-crm .dcs-country-badge.dcs-country-oman {
+    background: var(--green-50, #edf7f2);
+    color: var(--green-700, #256a53);
+}
+[data-theme="dark"] .dcs-compact-crm.dcs-compact-crm .dcs-country-badge {
+    background: #253952; color: #b6d6ff;
+}
+[data-theme="dark"] .dcs-compact-crm.dcs-compact-crm .dcs-country-badge.dcs-country-oman {
+    background: #253d33; color: #a7dfc6;
+}

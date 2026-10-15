@@ -3,22 +3,27 @@ frappe.ui.form.on("Opportunity", {
         hide_create_button(frm);
         reduce_subject_height(frm);
         set_opportunity_status(frm);
+        // A-6 / D1-D2: hand over the real party (Lead or Customer). `customer` is
+        // never assigned from the organisation text - the server derives it from
+        // the party when, and only when, the party is a Customer record.
+        var party_defaults = {
+            opportunity: frm.doc.name,
+            party_type: frm.doc.opportunity_from,
+            party: frm.doc.party_name,
+            organisation_name: frm.doc.custom_organization_name,
+            subject: frm.doc.custom_subject || frm.doc.title,
+        };
         if(frm.doc.custom_presales_required == 1){
             frm.add_custom_button("Presales Request", ()=>{
-                frappe.new_doc("Presales Request", {
-                    opportunity: frm.doc.name,
-                    customer: frm.doc.custom_organization_name,
+                frappe.new_doc("Presales Request", Object.assign({}, party_defaults, {
                     subject: frm.doc.custom_subject,
                     expected_close_date: frm.doc.expected_closing,
-                })
+                }))
             },__("Create"))
         }
         else{
             frm.add_custom_button("Deal Cost Sheet", ()=>{
-                frappe.new_doc("Deal Cost Sheet", {
-                    opportunity: frm.doc.name,
-                    customer: frm.doc.custom_organization_name,
-                })
+                frappe.new_doc("Deal Cost Sheet", Object.assign({}, party_defaults))
             },__("Create"))
         }
     },
@@ -26,7 +31,7 @@ frappe.ui.form.on("Opportunity", {
         set_opportunity_status(frm);
     },
     onload: function(frm) {
-        set_lead_name(frm);
+        if (frm.is_new()) set_lead_name(frm);
     },
     party_name: function(frm){
         set_lead_name(frm);
@@ -100,4 +105,3 @@ function reduce_subject_height(frm){
             });
     }, 300);
 }
-

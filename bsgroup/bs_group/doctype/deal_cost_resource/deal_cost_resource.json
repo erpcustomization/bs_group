@@ -64,14 +64,16 @@
   {
    "fieldname": "hours",
    "fieldtype": "Float",
-   "label": "Hours"
+   "label": "Total Hours (if Days not used)",
+   "description": "Hours × rate is used only when Persons and Days are not both supplied. Enter total hours across all persons."
   },
   {
    "fieldname": "cost_rate",
    "fieldtype": "Currency",
    "in_list_view": 1,
    "label": "Cost Rate",
-   "options": "currency"
+   "options": "currency",
+   "description": "Per person per day when Persons and Days are supplied; otherwise per total hour. Do not combine the two bases."
   },
   {
    "fieldname": "cost_amount",

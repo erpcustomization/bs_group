@@ -2,20 +2,38 @@
 # For license information, please see license.txt
 
 import frappe
-import json
-import re
 from frappe.model.document import Document
+
+from bsgroup.dcs.governance import make_request_key, record_governance_event
+from bsgroup.utils.party import apply_party_model, require_customer, slug
 
 
 class DealCostSheet(Document):
-	def autoname(self):
-		if self.customer:
-			customer = re.sub(r'[^a-zA-Z0-9\s]', '', self.customer)
-			customer = re.sub(r'\s+', '-', customer.strip())
+	def _cancel(self):
+		self.flags.ignore_links = False
+		from bsgroup.dcs.presales_lineage import atomic_lifecycle
+		return atomic_lifecycle(super()._cancel)
 
-			self.name = frappe.model.naming.make_autoname(f"DCS-{customer}-.###")
+	def _submit(self):
+		from bsgroup.dcs.presales_lineage import atomic_lifecycle
+		return atomic_lifecycle(super()._submit)
+
+	def before_cancel(self):
+		from bsgroup.dcs.presales_lineage import before_cancel
+		before_cancel(self)
+
+	def autoname(self):
+		# Named after the organisation (D2) with the same slug rule the customer
+		# text used, so DCS-<slug>-### names are unchanged for existing parties.
+		apply_party_model(self)
+		base = slug(self.organisation_name or self.customer)
+		if base:
+			self.name = frappe.model.naming.make_autoname(f"DCS-{base}-.###")
 
 	def before_insert(self):
+		# Every insertion is a new commercial record, including Duplicate and API copies.
+		# Decisions and revision references belong to the original sheet's history.
+		reset_commercial_state(self)
 		dcs_company_default_insert(self)
 		dcs_one_active_guard_insert(self)
 
@@ -37,6 +55,8 @@ class DealCostSheet(Document):
 		dcs_record_authority_guard(self)
 
 	def before_submit(self):
+		from bsgroup.dcs.presales_lineage import amendment_request
+		amendment_request(self)
 		validate_deal_cost(self)
 		dcs_one_active_guard_submit(self)
 		dcs_submit_advance_presales_status(self)
@@ -44,9 +64,47 @@ class DealCostSheet(Document):
 	def on_update(self):
 		dcs_margin_canonicalisation(self)
 
+	def on_submit(self):
+		# Zero-selling costing sheets remain submittable, but cannot be awarded.
+		if frappe.utils.flt(self.total_selling) > 0:
+			from bsgroup.dcs.baseline import ensure_baseline
+			ensure_baseline(self.name, "deal_cost_sheet.on_submit")
+			self.reload()
+		from bsgroup.dcs.presales_lineage import on_submit
+		on_submit(self)
+		dcs_amend_quotation_linkback(self)
+		from bsgroup.api.dcs.boq_revision import settle_predecessor
+		settle_predecessor(self)
+
+	def before_update_after_submit(self):
+		from bsgroup.api.dcs.boq_revision import authorised_save, row_values
+		if not authorised_save(self):
+			previous = self.get_doc_before_save()
+			for table, kind in [("items", "Item"), ("resources", "Resource")]:
+				before = [(r.name, row_values(r, kind)) for r in previous.get(table) or []]
+				after = [(r.name, row_values(r, kind)) for r in self.get(table) or []]
+				if before != after:
+					frappe.throw("Submitted BOQ rows may only be changed through Negotiation → BOQ Revision.")
+			# A serialisable flag on an incoming document cannot disable the
+			# framework's protections for other submitted fields either.
+			self.flags.ignore_validate_update_after_submit = False
+		else:
+			previous = self.get_doc_before_save()
+			for field in ["party_type", "party", "organisation_name", "customer", "opportunity", "company", "project", "presales_request", "subject", "site_visit", "amended_from", "custom_quotation", "custom_deal_status"]:
+				if str(previous.get(field) or "") != str(self.get(field) or ""):
+					frappe.throw("BOQ Revision cannot change deal identity or links. Resolve the record's identity separately before revising its BOQ.")
+			calculate_deal_financials(self)
+			self.margin_percent = frappe.utils.flt((self.total_selling-self.total_cost)/self.total_selling*100, 3) if self.total_selling else 0
+		dcs_governed_field_guard(self)
+
 	def validate(self):
-		# if not self.project:
-		# 	frappe.throw("Project is mandatory on the Deal Cost Sheet before it can be used as a Project Cost Baseline source.")
+		apply_party_model(self)
+		from bsgroup.dcs.input_validation import validate_inputs
+		validate_inputs(self)
+		# D3: a Project (and therefore a Project Cost Baseline) may only hang off a
+		# sheet whose party is a real Customer record.
+		if self.project:
+			require_customer(self, "a Project is linked to this Deal Cost Sheet")
 
 		if self.presales_request:
 			site_visit_required = frappe.db.get_value(
@@ -60,7 +118,11 @@ class DealCostSheet(Document):
 
 @frappe.whitelist()
 def make_quotation(source_name):
+	# A-12: the caller must be allowed to read this sheet and to create a Quotation.
+	frappe.has_permission("Deal Cost Sheet", "read", source_name, throw=True)
+	frappe.has_permission("Quotation", "create", throw=True)
 	source = frappe.get_doc("Deal Cost Sheet", source_name)
+	refuse_stale_quotation_source(source)
 
 	opp = frappe.db.get_value(
 		"Opportunity",
@@ -141,7 +203,7 @@ def make_quotation(source_name):
 				"amount": qty * selling_rate,
 			})
 
-	additional_charges_total = sum(frappe.utils.flt(c.amount) for c in source.addtional_charges or [])
+	additional_charges_total = sum(frappe.utils.flt(c.get("selling_amount")) for c in source.addtional_charges or [])
 	if additional_charges_total:
 		dcs_addtional_item = frappe.db.get_single_value("BS Group Settings", "dcs_addtional_item")
 		if not dcs_addtional_item:
@@ -167,9 +229,32 @@ def make_quotation(source_name):
 			"amount": additional_charges_total,
 		})
 
+	if quotation.currency == "OMR" and (quotation.precision("grand_total") < 3 or any(row.precision("rate") < 3 or row.precision("amount") < 3 for row in quotation.items)):
+		frappe.throw("OMR quotations require three-decimal currency precision. Configure System Settings currency precision or the OMR currency number format before creating the quotation.")
+	quotation.custom_deal_cost_sheet = source.name
+	quotation.custom_dcs_revision_reference = source.custom_revision_reference
 	quotation.insert(ignore_permissions=True, ignore_mandatory=True)
-	frappe.db.commit()
 	return quotation.name
+
+
+def refuse_stale_quotation_source(source):
+	"""A Quotation is built from the BOQ rows. Refuse when the living commercial position has moved
+	away from those rows (totals-only negotiation), so a stale price can never be quoted."""
+	if source.docstatus == 2:
+		frappe.throw("This Deal Cost Sheet is cancelled. A Quotation cannot be created from it.")
+	if not frappe.utils.cint(source.custom_dcs_revision_no):
+		return
+	gap_cost = abs(frappe.utils.flt(source.custom_working_total_cost) - frappe.utils.flt(source.total_cost))
+	gap_sell = abs(frappe.utils.flt(source.custom_working_total_selling) - frappe.utils.flt(source.total_selling))
+	if gap_cost > 0.005 or gap_sell > 0.005:
+		frappe.throw(
+			"The living commercial position (revision {0}: cost {1}, selling {2}) differs from the BOQ rows "
+			"(cost {3}, selling {4}). A Quotation built from the rows would quote a superseded price. Record the "
+			"movement as a BOQ Revision (Managing Director reconciliation) before creating the Quotation.".format(
+				source.custom_revision_reference, source.custom_working_total_cost, source.custom_working_total_selling,
+				source.total_cost, source.total_selling),
+			title="Quotation would be stale",
+		)
 
 
 def dcs_company_default_insert(doc):
@@ -246,16 +331,13 @@ def dcs_one_active_guard_insert(doc):
 
 	Reproduced from the live-site "dcs_one_active_guard_insert" Server Script,
 	which was created disabled there ("activation is an owner decision").
-	Mirrored here behind BS Group Settings.enable_dcs_one_active_guard, which
-	defaults to unchecked so behaviour is unchanged until an owner opts in.
+	Always on since rel-1 (A-3): the BS Group Settings gate that could leave
+	this control silently off has been removed.
 
 	Fires only on insert of a brand new document, so it can never make a
 	pre-existing record fail to save, and never cancels/amends/merges/renames/
 	relinks/deletes anything. No role bypasses this control.
 	"""
-	if not frappe.db.get_single_value("BS Group Settings", "enable_dcs_one_active_guard"):
-		return
-
 	opp = doc.opportunity
 	if not opp:
 		return
@@ -292,9 +374,6 @@ def dcs_one_active_guard_submit(doc):
 	second independently active commercial position. Only already-submitted
 	independent siblings block; drafts never block a submit.
 	"""
-	if not frappe.db.get_single_value("BS Group Settings", "enable_dcs_one_active_guard"):
-		return
-
 	opp = doc.opportunity
 	if not opp:
 		return
@@ -389,13 +468,9 @@ def dcs_governed_field_guard(doc):
 	plus the NRC-1 protected-field-name channel on custom_closure_notes.
 
 	Reproduced from the live-site "Deal Cost Sheet - Governed Field Guard"
-	Server Script. Opt-in via BS Group Settings.enable_dcs_governed_field_guard
-	(default unchecked) since this is a real behavioural change: it can block
-	edits to fields that may currently be freely editable.
+	Server Script. Always on since rel-1 (A-3): the app copy is the control,
+	not an opt-in mirror of the script.
 	"""
-	if not frappe.db.get_single_value("BS Group Settings", "enable_dcs_governed_field_guard"):
-		return
-
 	prev = doc.get_doc_before_save()
 	if prev is not None:
 		changed = []
@@ -438,14 +513,9 @@ def dcs_record_authority_guard(doc):
 	Reproduced from the live-site "DCS Record Authority Guard" Server Script
 	(present twice, byte-identical, in the source file with no distinguishing
 	detail -- implemented once here). Never infers authority; never touches
-	financial, lifecycle, award, workflow or docstatus values. Opt-in via
-	BS Group Settings.enable_dcs_record_authority_guard (default unchecked),
-	as a distinct, independently-activatable control from the Governed Field
-	Guard.
+	financial, lifecycle, award, workflow or docstatus values. Always on since
+	rel-1 (A-3).
 	"""
-	if not frappe.db.get_single_value("BS Group Settings", "enable_dcs_record_authority_guard"):
-		return
-
 	auth = doc.custom_record_authority or ""
 	sup = doc.custom_superseded_by or ""
 
@@ -487,14 +557,22 @@ def dcs_record_authority_guard(doc):
 		if oldauth != auth or oldsup != sup:
 			doc.custom_authority_decided_by = frappe.session.user
 			doc.custom_authority_decided_on = frappe.utils.now()
-			chg = []
-			if oldauth != auth:
-				chg.append({"fieldname": "custom_record_authority", "field_label": "Record Authority", "target_doctype": "Deal Cost Sheet", "target_name": doc.name, "old_value": oldauth or "(blank)", "new_value": auth or "(blank)", "value_type": "Select"})
-			if oldsup != sup:
-				chg.append({"fieldname": "custom_superseded_by", "field_label": "Superseded By", "target_doctype": "Deal Cost Sheet", "target_name": doc.name, "old_value": oldsup or "(none)", "new_value": sup or "(none)", "value_type": "Link"})
-			ev = frappe.get_doc({"doctype": "DCS Governance Event", "dcs": doc.name, "event_code": "RECORD_AUTHORITY_SET", "action_label": "Record authority / supersession decision", "source_endpoint": "DCS Record Authority Guard", "actor": frappe.session.user, "event_timestamp": frappe.utils.now(), "outcome": "Success", "correlation_id": "AUTH-" + doc.name, "change_count": len(chg), "reason": doc.custom_supersession_reason or "(no reason recorded)", "changes": json.dumps(chg)})
-			ev.flags.dcs_audit_write = 1
-			ev.insert(ignore_permissions=True)
+			chg = [
+				{"field": "custom_record_authority", "old": oldauth, "new": auth},
+				{"field": "custom_superseded_by", "old": oldsup, "new": sup},
+			]
+			# Single governance writer (A-3): actor, timestamp and the per-request
+			# correlation id are derived server side; unchanged rows are dropped.
+			record_governance_event(
+				doc.name,
+				"RECORD_AUTHORITY_SET",
+				action_label="Record authority / supersession decision",
+				source_endpoint="DCS Record Authority Guard",
+				reason=doc.custom_supersession_reason or "(no reason recorded)",
+				changes=chg,
+				# one key per saved decision: the same move re-applied on a later save is a new event
+				request_key=make_request_key("record_authority", {"dcs": doc.name, "changes": chg, "saved": str(before.modified)}),
+			)
 
 
 def dcs_submit_advance_presales_status(doc):
@@ -508,8 +586,9 @@ def dcs_submit_advance_presales_status(doc):
 	the unambiguous direct-mapping fields (see dcs_presales_sync docstring
 	for the fields still pending the real cost/margin formula).
 	"""
-	frappe.db.set_value("Deal Cost Sheet", doc.name, "custom_deal_status", "Submitted to Sales", update_modified=False)
-	doc.custom_deal_status = "Submitted to Sales"
+	if not deal_status_preserved_on_submit(doc):
+		frappe.db.set_value("Deal Cost Sheet", doc.name, "custom_deal_status", "Submitted to Sales", update_modified=False)
+		doc.custom_deal_status = "Submitted to Sales"
 
 	if not doc.presales_request:
 		return
@@ -520,6 +599,146 @@ def dcs_submit_advance_presales_status(doc):
 		frappe.db.set_value("Presales Request", doc.presales_request, "status", "Submitted to Sales", update_modified=False)
 
 	dcs_presales_sync(doc.presales_request, source="submit")
+
+
+DEAL_STATUS_KEPT_ON_SUBMIT = ("Won", "Lost")
+
+QUOTATION_LINK_FIELDS = [
+	"name", "docstatus", "opportunity", "quotation_to", "party_name", "company", "custom_deal_cost_sheet", "total", "modified",
+]
+
+
+def quotation_deal_identity(doc, q):
+	"""Return "" when Quotation ``q`` verifiably belongs to this sheet's deal, otherwise the reason it does not.
+
+	Deal identity = the same NON-EMPTY Opportunity, the same company, and a compatible party: the sheet's
+	own (party_type, party), or the Opportunity's (opportunity_from, party_name) - a Quotation may still sit
+	on the Lead an Opportunity was raised from while the sheet already carries the Customer.
+	"""
+	if not doc.opportunity or not q.get("opportunity") or q.get("opportunity") != doc.opportunity:
+		return (
+			"the Quotation is not on this sheet's Opportunity (Quotation: " + str(q.get("opportunity") or "none")
+			+ ", sheet: " + str(doc.opportunity or "none") + ")"
+		)
+	if (q.get("company") or "") != (doc.company or ""):
+		return "company differs (Quotation: " + str(q.get("company") or "none") + ", sheet: " + str(doc.company or "none") + ")"
+	pair = (q.get("quotation_to") or "", q.get("party_name") or "")
+	if pair[1] and pair == ((doc.party_type or ""), (doc.party or "")):
+		return ""
+	opp = frappe.db.get_value("Opportunity", doc.opportunity, ["opportunity_from", "party_name"], as_dict=True) or {}
+	if pair[1] and pair == ((opp.get("opportunity_from") or ""), (opp.get("party_name") or "")):
+		return ""
+	return (
+		"party differs (Quotation: " + pair[0] + " " + pair[1] + "; sheet: " + str(doc.party_type or "") + " "
+		+ str(doc.party or "") + "; Opportunity: " + str(opp.get("opportunity_from") or "") + " " + str(opp.get("party_name") or "") + ")"
+	)
+
+
+def quotation_relationship_intact(doc):
+	"""True when the sheet's own Quotation still stands for this commercial position.
+
+	The Quotation must be linked from the sheet, exist, not be cancelled, carry the verified deal identity
+	(same non-empty Opportunity, compatible party, same company), link back to this sheet or to the sheet
+	this one amends, and quote the same selling total (a cost-only revision or amendment leaves selling
+	unchanged). Any other situation - selling moved, quotation cancelled, quotation of another sheet or
+	deal - is NOT intact, and the sheet advances to "Submitted to Sales" exactly as before.
+	"""
+	if not doc.custom_quotation:
+		return False
+	q = frappe.db.get_value("Quotation", doc.custom_quotation, QUOTATION_LINK_FIELDS, as_dict=True)
+	if not q or q.docstatus == 2:
+		return False
+	if quotation_deal_identity(doc, q):
+		return False
+	if not q.custom_deal_cost_sheet or q.custom_deal_cost_sheet not in (doc.name, doc.amended_from):
+		return False
+	return abs(frappe.utils.flt(q.total) - frappe.utils.flt(doc.total_selling)) <= 0.005
+
+
+def deal_status_preserved_on_submit(doc):
+	"""Won and Lost are never reset by a re-submit; Quoted is kept while the quotation relationship is intact."""
+	status = doc.custom_deal_status
+	if status in DEAL_STATUS_KEPT_ON_SUBMIT:
+		return True
+	if status == "Quoted" and quotation_relationship_intact(doc):
+		return True
+	return False
+
+
+def amendment_linkback_refusal(doc, q):
+	"""Why a stale back-link is NOT re-pointed automatically ("" = eligible).
+
+	Only a Draft Quotation with verified deal identity is ever changed; a submitted or cancelled Quotation,
+	or one whose deal identity cannot be verified, is left exactly as it is and reported instead.
+	"""
+	if q.docstatus != 0:
+		return "the Quotation is " + ("submitted" if q.docstatus == 1 else "cancelled") + " and is never changed automatically"
+	why = quotation_deal_identity(doc, q)
+	if why:
+		return "deal identity could not be verified: " + why
+	return ""
+
+
+def report_stale_quotation_link(doc, q, why):
+	"""Report a stale back-link that was deliberately left unchanged: an Info comment on the amendment
+	(auditable, visible in its timeline) and a message to the submitting user. Nothing is written to the Quotation."""
+	msg = (
+		"Quotation " + str(q.get("name")) + " still links the cancelled predecessor " + str(doc.amended_from)
+		+ " and was not re-pointed automatically: " + why + ". Review the Quotation and correct the link manually if appropriate."
+	)
+	frappe.get_doc({
+		"doctype": "Comment", "comment_type": "Info", "reference_doctype": "Deal Cost Sheet",
+		"reference_name": doc.name, "content": msg,
+	}).insert(ignore_permissions=True)
+	frappe.msgprint(msg, title="Quotation link not updated", indicator="orange")
+
+
+def dcs_amend_quotation_linkback(doc):
+	"""On Submit of an amendment: re-point the sheet's OWN Quotation from the cancelled predecessor to this sheet.
+
+	Scope: only the Quotation named in ``custom_quotation``; only while it still points at ``amended_from``;
+	only when it is a Draft with verified deal identity (``amendment_linkback_refusal``). Any other Quotation
+	(another sheet, a historical sheet, already this sheet) is not touched and not reported; a stale link that
+	fails the scope is left unchanged and reported.
+
+	Concurrency: the Quotation row is locked (SELECT ... FOR UPDATE) and re-checked on the locked row before
+	the single column is written; only ``custom_deal_cost_sheet`` is written (no whole-document save, so no
+	other field is overwritten) and ``modified`` is advanced so that a form save based on the older version is
+	refused by Frappe's timestamp check instead of silently reverting the link. Exactly one governance event
+	(request-keyed, so it can never be written twice) and one Version row on the Quotation record the change.
+	"""
+	if not (doc.amended_from and doc.custom_quotation):
+		return
+	q = frappe.db.get_value("Quotation", doc.custom_quotation, QUOTATION_LINK_FIELDS, as_dict=True)
+	if not q or q.custom_deal_cost_sheet != doc.amended_from:
+		return
+	why = amendment_linkback_refusal(doc, q)
+	if why:
+		report_stale_quotation_link(doc, q, why)
+		return
+	locked = frappe.db.get_value("Quotation", q.name, QUOTATION_LINK_FIELDS, as_dict=True, for_update=True)
+	if not locked or locked.custom_deal_cost_sheet != doc.amended_from or amendment_linkback_refusal(doc, locked):
+		report_stale_quotation_link(doc, locked or q, "the Quotation changed while this sheet was being submitted; nothing was written")
+		return
+	frappe.db.set_value("Quotation", q.name, "custom_deal_cost_sheet", doc.name, update_modified=True)
+	frappe.get_doc({
+		"doctype": "Version", "ref_doctype": "Quotation", "docname": q.name,
+		"data": frappe.as_json({
+			"added": [], "removed": [], "row_changed": [], "data_import": None, "updater_reference": None,
+			"changed": [["custom_deal_cost_sheet", doc.amended_from, doc.name]],
+		}),
+	}).insert(ignore_permissions=True)
+	record_governance_event(
+		doc.name,
+		"DCS_AMEND_QUOTATION_LINKBACK",
+		action_label="Re-point the sheet's Quotation from the cancelled predecessor to this amendment",
+		source_endpoint="deal_cost_sheet.on_submit",
+		reason=f"amended from {doc.amended_from}",
+		revision_no=doc.custom_dcs_revision_no or 0,
+		revision_reference=doc.custom_revision_reference or "",
+		changes=[{"field": "custom_deal_cost_sheet", "old": doc.amended_from, "new": doc.name, "dt": "Quotation", "dn": q.name}],
+		request_key=make_request_key("dcs_amend_quotation_linkback", {"dcs": doc.name, "quotation": q.name}),
+	)
 
 
 # Fields with an unambiguous 1:1 mapping from Presales Request. custom_presales_hourly_rate,
@@ -535,23 +754,33 @@ PRESALES_SYNC_FIELD_MAP = {
 }
 
 
-@frappe.whitelist()
+PRESALES_SYNC_SOURCES = ("interactive", "dcs_created", "submit")
+
+
 def dcs_presales_sync(presales_request, source="interactive"):
 	"""Refresh the presales projection held on every active (non-cancelled) Deal Cost
 	Sheet linked to `presales_request`. Only the direct-mapping fields in
 	PRESALES_SYNC_FIELD_MAP are written; only genuinely changed values are written;
 	update_modified is left False; one DCS Governance Event is recorded per sheet
 	that actually changed.
+
+	Internal only (A-2). This function is deliberately NOT whitelisted: it is
+	called from PresalesRequest.on_update, DealCostSheet.after_insert and
+	DealCostSheet.before_submit, each of which has already passed the
+	permission check of the document being saved. `source` is an internal enum.
 	"""
+	if source not in PRESALES_SYNC_SOURCES:
+		frappe.throw(f"dcs_presales_sync: unknown source '{source}'.")
 
 	pr = frappe.db.get_value(
 		"Presales Request",
 		presales_request,
-		list(PRESALES_SYNC_FIELD_MAP.values()),
+		list(PRESALES_SYNC_FIELD_MAP.values()) + ["modified"],
 		as_dict=True,
 	)
 	if not pr:
 		return {"error": f"Presales Request {presales_request} not found."}
+	pr_modified = pr.pop("modified", None)
 
 	sheets = frappe.get_all(
 		"Deal Cost Sheet",
@@ -562,49 +791,31 @@ def dcs_presales_sync(presales_request, source="interactive"):
 	synced = []
 	for sheet in sheets:
 		changed = {}
+		rows = []
 		for dcs_field, pr_field in PRESALES_SYNC_FIELD_MAP.items():
 			new_value = pr.get(pr_field)
-			if (sheet.get(dcs_field) or None) != (new_value or None):
+			old_value = sheet.get(dcs_field)
+			if (old_value or None) != (new_value or None):
 				changed[dcs_field] = new_value
+				rows.append({"field": dcs_field, "old": old_value, "new": new_value})
 
 		if not changed:
 			continue
 
 		frappe.db.set_value("Deal Cost Sheet", sheet.name, changed, update_modified=False)
-		_record_presales_sync_event(sheet.name, changed, source)
+		record_governance_event(
+			sheet.name,
+			"PRESALES_SYNC",
+			action_label="Presales projection synchronisation",
+			source_endpoint="dcs_presales_sync",
+			reason=f"source={source}",
+			changes=rows,
+			# one key per distinct projection change (an identical re-sync is a no-op and never gets here)
+			request_key=make_request_key("dcs_presales_sync", {"pr": presales_request, "dcs": sheet.name, "changes": rows, "pr_modified": str(pr_modified)}),
+		)
 		synced.append(sheet.name)
 
 	return {"synced": synced, "source": source}
-
-
-def _record_presales_sync_event(dcs_name, changed, source):
-	chg = [
-		{
-			"fieldname": fieldname,
-			"field_label": fieldname,
-			"target_doctype": "Deal Cost Sheet",
-			"target_name": dcs_name,
-			"new_value": str(new_value) if new_value is not None else "(blank)",
-			"value_type": "Data",
-		}
-		for fieldname, new_value in changed.items()
-	]
-	ev = frappe.get_doc({
-		"doctype": "DCS Governance Event",
-		"dcs": dcs_name,
-		"event_code": "PRESALES_SYNC",
-		"action_label": "Presales projection synchronisation",
-		"source_endpoint": "dcs_presales_sync",
-		"actor": frappe.session.user,
-		"event_timestamp": frappe.utils.now(),
-		"outcome": "Success",
-		"correlation_id": "PSYNC-" + dcs_name,
-		"change_count": len(chg),
-		"reason": f"source={source}",
-		"changes": json.dumps(chg),
-	})
-	ev.flags.dcs_audit_write = 1
-	ev.insert(ignore_permissions=True)
 
 
 def validate_deal_cost(doc):
@@ -629,6 +840,8 @@ def validate_deal_cost(doc):
 
 
 def calculate_deal_financials(doc):
+	from bsgroup.dcs.input_validation import validate_inputs
+	validate_inputs(doc)
 	products_cost_total = 0
 	products_selling_total = 0
 	services_cost_total = 0
@@ -642,11 +855,20 @@ def calculate_deal_financials(doc):
 		d.cost_amount = qty * cost_rate
 		d.selling_amount = qty * selling_rate
 		d.gp_value = d.selling_amount - d.cost_amount
-		d.gp_percent = (d.gp_value / d.selling_amount) * 100 if d.selling_amount else 0
+		# Rounded to the field's own precision (Percent, 2dp): Frappe stores the rounded
+		# value, so an unrounded recomputation never matches it and every save of a
+		# submitted sheet - including the permitted deal_owner edit - was refused with
+		# UpdateAfterSubmitError on GP %.
+		d.gp_percent = (
+			frappe.utils.flt((d.gp_value / d.selling_amount) * 100, d.precision("gp_percent"))
+			if d.selling_amount
+			else 0
+		)
 
-		is_stock_item = frappe.db.get_value("Item", d.item_code, "is_stock_item") if d.item_code else 1
+		from bsgroup.dcs.item_category import category_for_item
+		category = category_for_item(d.item_code)
 
-		if not is_stock_item:
+		if category == "Professional Services":
 			d.item_category = "Professional Services"
 			services_cost_total += d.cost_amount
 			services_selling_total += d.selling_amount
@@ -682,9 +904,12 @@ def calculate_deal_financials(doc):
 	doc.total_resource_cost = total_resource_cost
 
 	doc.total_cost = products_cost_total + services_cost_total + additional_charges_total + total_resource_cost
-	doc.total_selling = products_selling_total + services_selling_total
+	doc.total_selling = products_selling_total + services_selling_total + sum(frappe.utils.flt(c.get("selling_amount")) for c in doc.addtional_charges or [])
+	from bsgroup.dcs.input_validation import non_negative
+	non_negative(doc.total_cost, "Calculated buying total")
+	non_negative(doc.total_selling, "Calculated selling total")
 	doc.margin_value = doc.total_selling - doc.total_cost
-	doc.margin_percent = ((doc.total_selling / doc.total_cost) - 1) * 100 if doc.total_cost else 0
+	doc.margin_percent = (doc.margin_value / doc.total_selling) * 100 if doc.total_selling else 0
 
 
 @frappe.whitelist()
@@ -692,6 +917,8 @@ def get_site_visit_evidence(site_visit):
 	if not site_visit:
 		return {}
 
+	# A-12: evidence is returned only to a user who may read the Site Visit itself.
+	frappe.has_permission("Site Visit", "read", site_visit, throw=True)
 	doc = frappe.get_doc("Site Visit", site_visit)
 
 	return {
@@ -734,6 +961,8 @@ def read_deal_cost_sheet(file_url, docname):
 	if docname.startswith("new-"):
 		frappe.throw("Please save the document before importing.")
 
+	# A-12: importing lines rewrites the sheet, so write permission on it is required.
+	frappe.has_permission("Deal Cost Sheet", "write", docname, throw=True)
 	doc = frappe.get_doc("Deal Cost Sheet", docname)
 	doc.set("items", [])
 
@@ -812,3 +1041,16 @@ def read_deal_cost_sheet(file_url, docname):
 	doc.save(ignore_permissions=True)
 
 	return "Success"
+
+COPY_RESET_FIELDS = GOVERNED_TEXT + GOVERNED_NUM + [
+    "custom_deal_status", "custom_outcome_date", "custom_opportunity_status",
+    "custom_quotation", "custom_sales_order", "custom_lost_reason", "custom_closure_notes",
+    "custom_superseded_by",
+]
+
+def reset_commercial_state(doc):
+    for field in COPY_RESET_FIELDS:
+        df = doc.meta.get_field(field)
+        if df:
+            doc.set(field, 0 if field in GOVERNED_NUM else (df.default if df.default is not None else None))
+    doc.custom_deal_status = "Draft"

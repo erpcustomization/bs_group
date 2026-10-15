@@ -258,6 +258,7 @@ app_include_js = [
 ]
 app_include_css = [
     "/assets/bsgroup/css/sidebar.css",
+    "/assets/bsgroup/css/labor_preapproval.css",
     # "/assets/bsgroup/css/bs_welcome_banner.css",
 ]
 
@@ -373,13 +374,18 @@ doc_events = {
             "bsgroup.utils.hd_ticket.sync_zztest_scheduler_status",
         ],
     },
+    "Sales Order": {
+        "validate": "bsgroup.dcs.quotation_control.validate_sales_order",
+        "before_submit": "bsgroup.dcs.quotation_control.validate_sales_order",
+    },
     "Quotation": {
         "validate": [
+            "bsgroup.dcs.quotation_control.validate_quotation",
             "bsgroup.utils.quotation.validate_pipeline_stage",
             "bsgroup.utils.quotation.set_sales_person_from_customer",
         ],
         "on_update": "bsgroup.utils.quotation.sync_pipeline_result",
-        "before_update_after_submit": "bsgroup.utils.quotation.validate_pipeline_stage",
+        "before_update_after_submit": ["bsgroup.dcs.quotation_control.guard_lineage", "bsgroup.utils.quotation.validate_pipeline_stage"],
         "on_update_after_submit": "bsgroup.utils.quotation.sync_pipeline_result",
     },
     "Opportunity": {
@@ -431,7 +437,12 @@ doc_events = {
 }
 
 override_whitelisted_methods = {
+    "erpnext.controllers.accounts_controller.update_child_qty_rate": "bsgroup.dcs.quotation_control.update_child_qty_rate",
+	"erpnext.selling.doctype.quotation.quotation.make_sales_order": "bsgroup.dcs.quotation_control.make_sales_order",
 	"erpnext.crm.doctype.opportunity.opportunity.make_quotation": "bsgroup.utils.quotation.make_quotation",
+	# The published "Living Deal Cost Sheet" Web Page calls the retired dcs_screen2 Server Script by its bare name.
+	"dcs_screen2": "bsgroup.api.dcs.living.dcs_screen2",
+	"dcs_screen1": "bsgroup.api.dcs.command_center.dcs_screen1",
 	# "frappe.utils.print_format.report_to_pdf": "bsgroup.utils.pdf.report_to_pdf",
 	# "frappe.utils.print_format.download_pdf": "bsgroup.utils.pdf.download_pdf",
 }
@@ -455,7 +466,12 @@ scheduler_events = {
 }
 
 
-before_request = ["bsgroup.utils.email_threading.apply_patches"]
+before_request = [
+    "bsgroup.utils.email_threading.apply_patches",
+    # A-13: one governance correlation id per request; never reused across requests.
+    "bsgroup.dcs.governance.reset_correlation_id",
+]
+before_job = ["bsgroup.dcs.governance.reset_correlation_id"]
 
 fixtures = [
     {
