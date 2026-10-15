@@ -7,6 +7,7 @@ a reversal writes a separate ``DCS Award Reversal`` record and only moves
 service-owned state.
 """
 
+from bsgroup.dcs.currency import money_precision
 import frappe
 from frappe.utils import now_datetime
 
@@ -424,7 +425,7 @@ def dcs_po_reconcile(args):
 			frozen_ref = s.custom_revision_reference or ""
 			frozen_no = s.custom_frozen_revision_no or 0
 
-			v_state = "Match" if absf(po_val - frozen_sell) <= 0.01 else "Mismatch"
+			v_state = "Match" if absf(po_val - frozen_sell) <= 10 ** -money_precision(s.currency) else "Mismatch"
 
 			cited = str(po_scope).strip()
 			s_state = "Mismatch – Different Scope"

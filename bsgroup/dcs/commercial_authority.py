@@ -1,4 +1,5 @@
 """Only a decision on the current revision authorises a commercial exception."""
+from bsgroup.dcs.currency import money_tolerance
 import frappe
 from frappe.utils import flt
 
@@ -30,5 +31,5 @@ def authorised_position(sheet):
     return bool(revision and revision.dcs == sheet.name and revision.approval_state == "Approved"
                 and revision.decided_by == sheet.custom_approved_by
                 and revision.decided_by
-                and abs(flt(sheet.custom_approved_total_cost)-cost) <= 0.005
-                and abs(flt(sheet.custom_approved_total_selling)-selling) <= 0.005)
+                and abs(flt(sheet.custom_approved_total_cost)-cost) <= money_tolerance(sheet.currency)
+                and abs(flt(sheet.custom_approved_total_selling)-selling) <= money_tolerance(sheet.currency))

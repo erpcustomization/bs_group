@@ -6,6 +6,7 @@ that bare command to this app endpoint (``override_whitelisted_methods``). Busin
 the frozen award baseline and last approved position are added so management sees them on the same page.
 """
 
+from bsgroup.dcs.currency import money_tolerance
 import frappe
 from bsgroup.dcs.manager_approval import is_assigned_manager, route_for
 from bsgroup.dcs.commercial_authority import authorised_position
@@ -109,7 +110,7 @@ def dcs_screen2(args):
 		"approval_required": s.custom_approval_required, "approval_state": s.custom_approval_state, "approval_reason": s.custom_approval_reason,
 		"margin_gate": s.custom_margin_gate, "margin_gate_reason": s.custom_margin_gate_reason, "cancel_amend_required": 0,
         "authorised_position": int(authorised_position(s)),
-		"boq_matches_living": int(abs((s.total_selling or 0) - ws) <= 0.005 and abs((s.total_cost or 0) - wc) <= 0.005)}
+		"boq_matches_living": int(abs((s.total_selling or 0) - ws) <= money_tolerance(s.currency) and abs((s.total_cost or 0) - wc) <= money_tolerance(s.currency))}
 	result["manager_route"] = dict(route_for(s))
 	result["approved_position"] = {"revision_no": s.custom_approved_revision_no or 0, "total_cost": s.custom_approved_total_cost,
 		"total_selling": s.custom_approved_total_selling, "margin_percent": s.custom_approved_margin_percent,

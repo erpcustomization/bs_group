@@ -5,6 +5,7 @@ so submit, award and negotiation cannot create competing R1 baselines.
 """
 import math
 
+from bsgroup.dcs.currency import money_tolerance
 import frappe
 from frappe.utils import flt, now_datetime
 
@@ -51,7 +52,7 @@ def ensure_baseline(dcs_name, source_endpoint):
     for field, expected in (("custom_working_total_cost", cost), ("custom_working_total_selling", selling),
                             ("custom_baseline_selling", selling)):
         value = flt(sheet.get(field))
-        if value and abs(value - expected) > 0.005:
+        if value and abs(value - expected) > money_tolerance(sheet.currency):
             frappe.throw("Unrecorded commercial figures differ from the submitted baseline. Reconcile them before initialising.")
     if flt(sheet.custom_concession_percent_from_baseline):
         frappe.throw("An unrecorded concession exists. No baseline was overwritten.")

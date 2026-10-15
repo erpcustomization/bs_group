@@ -1,5 +1,6 @@
 """Read-only legacy Command Center, with request-local aggregation."""
 import frappe
+from bsgroup.dcs.currency import money_round
 from bsgroup.api.dcs._common import governed_endpoint
 
 @governed_endpoint("dcs_screen1", ptype="read", idempotent=False)
@@ -82,7 +83,7 @@ def dcs_screen1(args):
             g["count"] = g["count"] + 1
             g["exposure"] = g["exposure"] + float(amount or 0)
             if len(g["deals"]) < MAX_LIST:
-                g["deals"].append({"name": name, "amount": r2(amount), "owner": owner, "detail": detail})
+                g["deals"].append({"name": name, "amount": money(amount, currency_by.get(name)), "owner": owner, "detail": detail})
             else:
                 g["truncated"] = 1
             c["count"] = c["count"] + 1
@@ -102,9 +103,9 @@ def dcs_screen1(args):
                 o["reasons"][c["key"]] = (o["reasons"].get(c["key"]) or 0) + 1
         
         def finish(c):
-            c["exposure"] = r2(c["exposure"])
+            c["exposure"] = money(c["exposure"])
             for g in c["groups"]:
-                g["exposure"] = r2(g["exposure"])
+                g["exposure"] = money(g["exposure"])
             return c
         
         user = frappe.session.user
@@ -148,8 +149,12 @@ def dcs_screen1(args):
                         tt["title"] = "[withheld - governed redaction unavailable]"
                 frappe.response["message"] = {"projection": "technical", "authorised": 1, "user": user, "generated_on": str(now_dt), "open_technical_conditions": len(topen), "closed_technical_conditions": tclosed, "conditions": topen, "narrative_contract": "NRC-1", "note": "Technical projection. The server returns no cost, selling, margin, concession or exposure value."}
         else:
-            FIELDS = ["name", "docstatus", "customer", "deal_owner", "total_cost", "total_selling", "margin_percent", "modified", "custom_quotation", "custom_deal_status", "custom_approval_state", "custom_approval_required", "custom_margin_gate", "custom_concession_percent_from_baseline", "custom_award_state", "custom_delivery_release_state", "custom_po_recon_state", "custom_baseline_frozen", "custom_frozen_total_selling", "custom_dcs_revision_no", "custom_working_total_cost", "custom_working_total_selling", "custom_working_margin_percent", "custom_presales_cost", "custom_awarded_on", "custom_approved_on", "custom_endorsed_on", "project"]
+            FIELDS = ["currency", "name", "docstatus", "customer", "deal_owner", "total_cost", "total_selling", "margin_percent", "modified", "custom_quotation", "custom_deal_status", "custom_approval_state", "custom_approval_required", "custom_margin_gate", "custom_concession_percent_from_baseline", "custom_award_state", "custom_delivery_release_state", "custom_po_recon_state", "custom_baseline_frozen", "custom_frozen_total_selling", "custom_dcs_revision_no", "custom_working_total_cost", "custom_working_total_selling", "custom_working_margin_percent", "custom_presales_cost", "custom_awarded_on", "custom_approved_on", "custom_endorsed_on", "project"]
             sheets = frappe.get_list("Deal Cost Sheet", filters={"docstatus": ["!=", 2]}, fields=FIELDS, limit_page_length=0)
+            currency_by = {s.get("name"): s.get("currency") for s in sheets}
+            report_currency = "OMR" if "OMR" in currency_by.values() else frappe.defaults.get_global_default("currency")
+            def money(value, currency=None):
+                return money_round(value, currency or report_currency)
             conds = frappe.get_list("DCS Handover Condition", fields=["name", "dcs", "condition_no", "condition_title", "category", "original_category", "domain", "state", "exposure_amount", "assigned_to", "raised_on", "cleared_on", "accepted_on", "follow_up_date"], limit_page_length=0)
             revs = frappe.get_list("DCS Revision", fields=["name", "dcs", "revision_no", "source", "changed_by", "changed_on", "approval_state", "approval_requirement", "margin_gate", "decided_by", "decided_on"], limit_page_length=0)
             for s in sheets:
@@ -241,7 +246,7 @@ def dcs_screen1(args):
             for s in sheets:
                 if float(s.get("total_selling") or 0) <= 0:
                     cause = "Cost entered with no selling price" if float(s.get("total_cost") or 0) > 0 else "No cost and no selling price"
-                    add_group(c, cause, s.get("name"), s.get("total_cost"), s.get("deal_owner"), "Cost " + str(r2(s.get("total_cost"))) + " with no selling price")
+                    add_group(c, cause, s.get("name"), s.get("total_cost"), s.get("deal_owner"), "Cost " + str(money(s.get("total_cost"), s.get("currency"))) + " with no selling price")
             cards.append(finish(c))
         
             c = card("stale_drafts", "Stale drafts", "Draft sheets untouched for more than 30 days.", "Submit, update or close the draft.", "Draft value is neither live pipeline nor closed, so the forecast is wrong.")
@@ -278,7 +283,7 @@ def dcs_screen1(args):
                 tcst = float(s.get("total_cost") or 0)
                 tsel = float(s.get("total_selling") or 0)
                 if tsel > 0 and tcst > tsel:
-                    add_group(c, "Cost exceeds the selling price", nm, tsel, ow, "Cost " + str(r2(tcst)) + " against selling " + str(r2(tsel)))
+                    add_group(c, "Cost exceeds the selling price", nm, tsel, ow, "Cost " + str(money(tcst)) + " against selling " + str(money(tsel)))
                 if not s.get("customer"):
                     add_group(c, "No customer recorded", nm, tsel, ow, "")
                 if not s.get("deal_owner"):
@@ -303,7 +308,7 @@ def dcs_screen1(args):
                     for dn in o["deals"]:
                         ex = ex + float(o["deals"][dn])
                         nd = nd + 1
-                    help_list.append({"owner": o["owner"], "stuck": nd, "issues": o["issues"], "exposure": r2(ex), "reasons": rl})
+                    help_list.append({"owner": o["owner"], "stuck": nd, "issues": o["issues"], "exposure": money(ex), "reasons": rl})
         
             acts = []
             rev_today = 0
@@ -338,7 +343,7 @@ def dcs_screen1(args):
             for s in sheets:
                 sum_sell = sum_sell + float(s.get("total_selling") or 0)
                 sum_cost = sum_cost + float(s.get("total_cost") or 0)
-                browse.append({"name": s.get("name"), "customer": s.get("customer"), "owner": s.get("deal_owner"), "selling": r2(s.get("total_selling")), "cost": r2(s.get("total_cost")), "margin": r2(s.get("margin_percent")), "status": s.get("custom_deal_status"), "docstatus": s.get("docstatus"), "approval_state": s.get("custom_approval_state") or "", "margin_gate": s.get("custom_margin_gate") or "", "award_state": s.get("custom_award_state") or "", "delivery": s.get("custom_delivery_release_state") or "", "revision_no": s.get("custom_dcs_revision_no") or 0, "living": s.get("living")})
+                browse.append({"currency": s.get("currency"), "name": s.get("name"), "customer": s.get("customer"), "owner": s.get("deal_owner"), "selling": money(s.get("total_selling"), s.get("currency")), "cost": money(s.get("total_cost"), s.get("currency")), "margin": r2(s.get("margin_percent")), "status": s.get("custom_deal_status"), "docstatus": s.get("docstatus"), "approval_state": s.get("custom_approval_state") or "", "margin_gate": s.get("custom_margin_gate") or "", "award_state": s.get("custom_award_state") or "", "delivery": s.get("custom_delivery_release_state") or "", "revision_no": s.get("custom_dcs_revision_no") or 0, "living": s.get("living")})
             cancelled = frappe.get_list("Deal Cost Sheet", filters={"docstatus": 2}, fields=["name"], limit_page_length=0)
         
             want_roles = ["Managing Director", "Commercial Controller", "Technical Engineer", "Project Engineer"]
@@ -351,7 +356,7 @@ def dcs_screen1(args):
                 if w not in pnames:
                     missing.append(w)
         
-            frappe.response["message"] = {"projection": "commercial", "authorised": 1, "user": user, "generated_on": str(now_dt), "today": today, "cards": cards, "who_needs_help": help_list, "handled_today": {"revisions": rev_today, "awards": aw_today, "conditions_cleared": cl_today, "risks_accepted": ar_today, "events": acts}, "browse": browse, "portfolio": {"live_sheets": len(sheets), "cancelled_sheets": len(cancelled), "total_sheets": len(sheets) + len(cancelled), "sum_total_selling": r2(sum_sell), "sum_total_cost": r2(sum_cost), "revisions": len(revs), "handover_conditions": len(conds)}, "structural_notes": [{"note": "Sheets without a linked Project are counted from the current records.", "sheets_without_project": no_project[0], "live_sheets": len(sheets)}], "role_blocker": {"missing_roles": missing, "note": "Approval and domain clearance paths that depend on these roles cannot be validated in a real session until the roles exist and are assigned."}}
+            frappe.response["message"] = {"projection": "commercial", "authorised": 1, "user": user, "generated_on": str(now_dt), "today": today, "cards": cards, "who_needs_help": help_list, "handled_today": {"revisions": rev_today, "awards": aw_today, "conditions_cleared": cl_today, "risks_accepted": ar_today, "events": acts}, "browse": browse, "portfolio": {"live_sheets": len(sheets), "cancelled_sheets": len(cancelled), "total_sheets": len(sheets) + len(cancelled), "sum_total_selling": money(sum_sell), "sum_total_cost": money(sum_cost), "revisions": len(revs), "handover_conditions": len(conds)}, "structural_notes": [{"note": "Sheets without a linked Project are counted from the current records.", "sheets_without_project": no_project[0], "live_sheets": len(sheets)}], "role_blocker": {"missing_roles": missing, "note": "Approval and domain clearance paths that depend on these roles cannot be validated in a real session until the roles exist and are assigned."}}
         return frappe.response.get("message")
     finally:
         frappe.response["message"] = previous

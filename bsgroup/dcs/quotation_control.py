@@ -1,4 +1,5 @@
 """Validate the live DCS position before quoting or ordering."""
+from bsgroup.dcs.currency import money_round, money_tolerance
 import frappe
 from frappe.utils import flt
 
@@ -27,15 +28,15 @@ def validate_position(sheet, quotation):
     if quotation.docstatus == 1 and reference and reference != sheet.custom_revision_reference:
         frappe.throw("Quotation is stale: its DCS revision has changed. Review a replacement quotation.")
     selling = sheet.custom_working_total_selling if sheet.custom_dcs_revision_no else sheet.total_selling
-    if abs(flt(quotation.total) - flt(selling)) > 0.005:
+    if abs(flt(quotation.total) - flt(selling)) > money_tolerance(currency):
         frappe.throw("Quotation selling total differs from the current DCS position.")
-    expected = sorted((r.item_code, flt(r.qty), flt(r.selling_rate, 2)) for r in sheet.items)
+    expected = sorted((r.item_code, flt(r.qty), money_round(r.selling_rate, currency)) for r in sheet.items)
     charges = sum(flt(r.get("selling_amount")) for r in sheet.addtional_charges or [])
     if charges:
         item = frappe.db.get_single_value("BS Group Settings", "dcs_addtional_item")
-        expected.append((item, 1.0, flt(charges, 2)))
+        expected.append((item, 1.0, money_round(charges, currency)))
         expected.sort()
-    actual = sorted((r.item_code, flt(r.qty), flt(r.rate, 2)) for r in quotation.items)
+    actual = sorted((r.item_code, flt(r.qty), money_round(r.rate, currency)) for r in quotation.items)
     if expected != actual:
         frappe.throw("Quotation scope or selling rates differ from the current DCS BOQ.")
 

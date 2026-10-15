@@ -14,6 +14,7 @@ Ported from the production Server Scripts of the same names
 result shapes are unchanged; authority is derived from the session only.
 """
 
+from bsgroup.dcs.currency import money_round, money_tolerance
 import frappe
 from frappe.utils import now_datetime
 
@@ -338,19 +339,19 @@ def pre_award_position_note(s):
 	lv_cost = float(s.custom_working_total_cost or 0)
 	sb_sell = float(s.total_selling or 0)
 	sb_cost = float(s.total_cost or 0)
-	if absf(lv_sell - sb_sell) <= 0.005 and absf(lv_cost - sb_cost) <= 0.005:
+	if absf(lv_sell - sb_sell) <= money_tolerance(s.currency) and absf(lv_cost - sb_cost) <= money_tolerance(s.currency):
 		return ""
 	head = (
-		"The living position (cost " + str(r2(lv_cost)) + ", selling " + str(r2(lv_sell)) + ", revision "
-		+ str(lv_rev) + ") differs from the submitted baseline (cost " + str(r2(sb_cost)) + ", selling "
-		+ str(r2(sb_sell)) + "). "
+		"The living position (cost " + str(money_round(lv_cost, s.currency)) + ", selling " + str(money_round(lv_sell, s.currency)) + ", revision "
+		+ str(lv_rev) + ") differs from the submitted baseline (cost " + str(money_round(sb_cost, s.currency)) + ", selling "
+		+ str(money_round(sb_sell, s.currency)) + "). "
 	)
 	if int(s.custom_baseline_frozen or 0) == 1:
 		origin = "of the reversed award" if s.custom_award_reversal_state == "Reversed" else "from an earlier award"
 		return head + (
 			"No award is currently recorded. The frozen baseline " + origin + " (revision "
-			+ str(int(s.custom_frozen_revision_no or 0)) + ", cost " + str(r2(s.custom_frozen_total_cost)) + ", selling "
-			+ str(r2(s.custom_frozen_total_selling))
+			+ str(int(s.custom_frozen_revision_no or 0)) + ", cost " + str(money_round(s.custom_frozen_total_cost, s.currency)) + ", selling "
+			+ str(money_round(s.custom_frozen_total_selling, s.currency))
 			+ ") is retained as history and does not govern release; a re-award freezes the living position again."
 		)
 	return head + "No award is recorded and no baseline is frozen; the award, when recorded, freezes the living position."
@@ -367,7 +368,7 @@ def release_drift(s):
 	fz_cost = float(s.custom_frozen_total_cost or 0)
 	lv_sell = float(s.custom_working_total_selling or 0)
 	lv_cost = float(s.custom_working_total_cost or 0)
-	if has_frozen_award(s) and lv_rev > 0 and (absf(lv_sell - fz_sell) > 0.005 or absf(lv_cost - fz_cost) > 0.005):
+	if has_frozen_award(s) and lv_rev > 0 and (absf(lv_sell - fz_sell) > money_tolerance(s.currency) or absf(lv_cost - fz_cost) > money_tolerance(s.currency)):
 		return "living"
 	if (
 		s.custom_po_recon_state == "Reconciled" and s.custom_po_scope_revision and s.custom_revision_reference
@@ -652,20 +653,20 @@ def dcs_screen5(args):
 		}
 		result["frozen_baseline"] = {
 			"frozen": s.custom_baseline_frozen or 0, "revision_no": s.custom_frozen_revision_no or 0,
-			"total_cost": r2(s.custom_frozen_total_cost), "total_selling": r2(s.custom_frozen_total_selling),
-			"gp": r2((s.custom_frozen_total_selling or 0) - (s.custom_frozen_total_cost or 0)),
+			"total_cost": money_round(s.custom_frozen_total_cost, s.currency), "total_selling": money_round(s.custom_frozen_total_selling, s.currency),
+			"gp": money_round((s.custom_frozen_total_selling or 0) - (s.custom_frozen_total_cost or 0), s.currency),
 			"margin_percent": s.custom_frozen_margin_percent or 0, "frozen_by": s.custom_frozen_by,
 			"frozen_on": s.custom_frozen_on, "currency": s.currency,
 			"note": "The frozen baseline is the authorised commercial position at the moment of award. It does not move with later negotiation.",
 		}
 		result["living"] = {
-			"revision_no": s.custom_dcs_revision_no or 0, "total_cost": r2(s.custom_working_total_cost),
-			"total_selling": r2(s.custom_working_total_selling), "margin_percent": s.custom_working_margin_percent or 0,
+			"revision_no": s.custom_dcs_revision_no or 0, "total_cost": money_round(s.custom_working_total_cost, s.currency),
+			"total_selling": money_round(s.custom_working_total_selling, s.currency), "margin_percent": s.custom_working_margin_percent or 0,
 			"approval_state": s.custom_approval_state, "approval_required": s.custom_approval_required,
 			"margin_gate": s.custom_margin_gate, "authorised_position": int(authorised_position(s)),
 		}
 		result["po"] = {
-			"reference": s.custom_po_reference, "value": r2(s.custom_po_value), "scope_revision": s.custom_po_scope_revision,
+			"reference": s.custom_po_reference, "value": money_round(s.custom_po_value, s.currency), "scope_revision": s.custom_po_scope_revision,
 			"payment_terms": s.custom_po_payment_terms, "value_check": s.custom_po_value_match or "Not Checked",
 			"scope_check": s.custom_po_scope_match or "Not Checked", "terms_check": s.custom_po_terms_match or "Not Checked",
 			"reconciliation_state": s.custom_po_recon_state or "Not Started", "reconciled_by": s.custom_po_recon_by,
@@ -674,7 +675,7 @@ def dcs_screen5(args):
 		}
 		exposure = (s.custom_frozen_total_cost or 0) if s.custom_baseline_frozen else 0.0
 		result["supplier_exposure"] = {
-			"amount": r2(exposure), "currency": s.currency, "label": "Cost exposure not yet committed",
+			"amount": money_round(exposure, s.currency), "currency": s.currency, "label": "Cost exposure not yet committed",
 			"note": "This is the buying cost of the awarded position. It is a cost exposure not yet committed. It is not a realised loss and must never be reported as one.",
 		}
 		result["conditions"] = {"blockers": blockers, "watch_items": watch, "accepted_risks": risks, "open_blockers": open_blk}

@@ -6,6 +6,7 @@ silently added to or removed from a replacement BOQ.
 import json
 import math
 
+from bsgroup.dcs.currency import money_tolerance
 import frappe
 from frappe.utils import flt, now_datetime
 
@@ -208,7 +209,7 @@ def _sync_quotation(sheet, requested):
     # not when the governed BOQ sync refreshes its lines.
     q.flags.ignore_mandatory = True
     q.save()
-    if abs(flt(q.total)-flt(sheet.total_selling)) > 0.005:
+    if abs(flt(q.total)-flt(sheet.total_selling)) > money_tolerance(sheet.currency):
         frappe.throw("Quotation pricing rules or discounts changed the derived selling total. Review them before synchronising; this revision was not saved.")
     return f"Draft Quotation {q.name} updated from the revised BOQ."
 
@@ -270,7 +271,7 @@ def _apply(args):
         ensure_baseline(sheet.name, "dcs_apply_boq_revision")
         sheet.reload()
         pc, ps = flt(sheet.custom_working_total_cost), flt(sheet.custom_working_total_selling)
-    gap = abs(pc-flt(sheet.total_cost)) > 0.005 or abs(ps-flt(sheet.total_selling)) > 0.005
+    gap = abs(pc-flt(sheet.total_cost)) > money_tolerance(sheet.currency) or abs(ps-flt(sheet.total_selling)) > money_tolerance(sheet.currency)
     if gap and not (MD in roles and truthy_flag(args.get("reconcile_header_adjustments"))):
         frappe.throw("Totals-only adjustments do not match the current BOQ. The Managing Director must explicitly reconcile them to this replacement BOQ; no hidden amount is carried forward.")
     before = snapshot("Deal Cost Sheet", sheet.name, D2A_FIELDS)
