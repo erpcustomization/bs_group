@@ -210,7 +210,7 @@
   {
    "fieldname": "party_type",
    "fieldtype": "Select",
-   "label": "Party Type",
+   "label": "Account Type",
    "options": "Lead\nCustomer",
    "reqd": 1,
    "in_standard_filter": 1,
@@ -219,7 +219,7 @@
   {
    "fieldname": "party",
    "fieldtype": "Dynamic Link",
-   "label": "Party",
+   "label": "Account",
    "options": "party_type",
    "reqd": 1,
    "in_list_view": 1
@@ -232,7 +232,8 @@
    "read_only": 1,
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "description": ""
+   "description": "",
+   "depends_on": "eval:doc.organisation_name && doc.organisation_name !== doc.party"
   },
   {
    "fieldname": "customer",
@@ -240,7 +241,8 @@
    "label": "Customer",
    "options": "Customer",
    "read_only": 1,
-   "description": "Derived from the selected Customer."
+   "description": "Derived from the selected Customer.",
+   "hidden": 1
   },
   {
    "fetch_from": "presales_request.site_visit",

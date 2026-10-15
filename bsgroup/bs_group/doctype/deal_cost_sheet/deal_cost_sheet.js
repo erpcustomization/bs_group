@@ -3609,6 +3609,12 @@ frappe.ui.form.on('Additional Charges Item', {
     amount: dcs_refresh_draft, selling_amount: dcs_refresh_draft
 });
 
+function dcs_account_labels(frm) {
+    var label = frm.doc.party_type === 'Customer' ? __('Customer')
+        : frm.doc.party_type === 'Lead' ? __('Lead') : __('Account');
+    frm.set_df_property('party', 'label', label);
+}
+
 function dcs_fetch_party_details(frm) {
     if (frm.doc.docstatus !== 0 || !frm.doc.party || !['Lead','Customer'].includes(frm.doc.party_type)) return;
     var type=frm.doc.party_type, party=frm.doc.party;
@@ -3624,8 +3630,10 @@ function dcs_fetch_party_details(frm) {
     });
 }
 frappe.ui.form.on('Deal Cost Sheet', {
+    refresh:dcs_account_labels,
     party:dcs_fetch_party_details,
     party_type:function(frm) {
+        dcs_account_labels(frm);
         if (frm.doc.docstatus !== 0) return;
         frm.set_value({customer:'', organisation_name:''});
         dcs_fetch_party_details(frm);
