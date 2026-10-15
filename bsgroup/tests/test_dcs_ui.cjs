@@ -346,3 +346,43 @@ test('reference prices never silently cross currency',()=>{
   assert.equal(context.dcs_reference_price('sample','OMR'),null);
   assert.equal(context.dcs_reference_price('sample','AED').cost,100);
 });
+
+for (const currency of ['OMR','AED']) for (const revision of [0,2]) {
+  test(`${currency} submitted Overview R${revision} renders currency precision in metrics ledger and movements`,()=>{
+    const cost=970.960, selling=currency==='OMR'?1138.425:1138.42, gp=currency==='OMR'?167.465:167.46;
+    const frm=fixture({currency,total_cost:cost,total_selling:selling,margin_value:gp,margin_percent:14.71});
+    let html;
+    frm.fields_dict.custom_deal_summary_dashboard={$wrapper:{html:v=>html=v}};
+    const position={cost,selling,gp,margin_percent:14.71};
+    frm.__dcs={s2:{ok:1,projection:'commercial',margin_bridge:{original:position,current:position,
+      gp_movement:0.001,gp_impacts:{customer:0.001,vendor:-0.001}}},
+      s5:sheet({living:{revision_no:revision,total_cost:position.cost,total_selling:position.selling}})};
+    context.render_summary_dashboard(frm);
+    if(currency==='OMR') {
+      assert.match(html,/OMR 1138\.425/);
+      assert.match(html,/OMR 970\.960/);
+      assert.match(html,/OMR 167\.465/);
+      assert.match(html,/<td>970\.960<\/td><td>1138\.425<\/td><td>167\.465<\/td>/);
+      assert.match(html,/OMR 0\.001/);assert.match(html,/OMR -0\.001/);
+    } else {
+      assert.match(html,/AED 1138\.42/);assert.match(html,/AED 970\.96/);
+      assert.match(html,/<td>970\.96<\/td><td>1138\.42<\/td><td>167\.46<\/td>/);
+      assert.doesNotMatch(html,/AED 1138\.425|AED 970\.960/);
+    }
+    assert.match(html,/14\.71%/);
+  });
+}
+test('OMR revision timeline preserves a one-baisa profit movement',()=>{
+  const frm=fixture({currency:'OMR'});let html;
+  frm.get_field=()=>({$wrapper:{html:v=>html=v}});
+  context.dcs_render_negotiation(frm,{revisions:[{revision_no:2,name:'ZZTEST-R2',gp_movement:0.001,
+    prev_total_cost:970.961,new_total_cost:970.960,prev_total_selling:1138.425,new_total_selling:1138.425}]});
+  assert.match(html,/\+OMR 0\.001/);assert.match(html,/OMR 970\.960/);
+});
+for(const customerSide of [false,true]) test(`OMR BOQ preview preserves three decimals with customer-side permission ${customerSide}`,()=>{
+  const frm=fixture({currency:'OMR',total_cost:970.960,total_selling:1138.425,
+    items:[{name:'ZZTEST-ROW',item_code:'Generic',qty:1,cost_rate:970.960,selling_rate:1138.425}],resources:[],addtional_charges:[]});
+  context.dcs_boq_revision_dialog(frm,{can_customer_side:customerSide,can_vendor_side:true});
+  assert.match(dialog.fields_dict.preview.html,/OMR 970\.960/);
+  if(customerSide) {assert.match(dialog.fields_dict.preview.html,/OMR 1138\.425/);assert.match(dialog.fields_dict.preview.html,/OMR 167\.465/);}
+});
