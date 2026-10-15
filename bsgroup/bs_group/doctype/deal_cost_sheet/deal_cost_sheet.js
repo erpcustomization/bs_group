@@ -3639,12 +3639,25 @@ frappe.ui.form.on('Deal Cost Sheet', {
         dcs_fetch_party_details(frm);
     }
 });
+function dcs_company_selection(frm, info) {
+    frm.toggle_display('company', false);
+    if (frm.doc.docstatus === 0 && !info.hide_company &&
+            frm.fields_dict.company && !frm.fields_dict.company.df.read_only) {
+        frm.add_custom_button(__('Change company'), function() {
+            frm.toggle_display('company', true);
+            if (frm.scroll_to_field) frm.scroll_to_field('company');
+        }, __('More actions'));
+    }
+}
 function dcs_company_identity(frm) {
     if (!frm.page || !frm.page.get_title_area) return;
     var company = frm.doc.company || '';
     var cache = frm.__dcs_company_identity;
-    if (cache && cache.company === company) return cache.promise;
-    // Fail visibly: retain the selector until the server confirms a single-company site.
+    if (cache && cache.company === company) {
+        if (cache.info) dcs_company_selection(frm, cache.info);
+        return cache.promise;
+    }
+    // Retain the selector until the selected company's identity is confirmed.
     frm.toggle_display('company', true);
     var area = frm.page.get_title_area();
     area.find('.dcs-country-badge').remove();
@@ -3660,7 +3673,8 @@ function dcs_company_identity(frm) {
             return frm.set_value('company', info.company);
         }
         if (info.company !== frm.doc.company) return;
-        frm.toggle_display('company', !info.hide_company);
+        entry.info = info;
+        dcs_company_selection(frm, info);
         var label = ['Bits Secure', info.country_label, info.base_currency].filter(Boolean).join(' · ');
         var badge = $('<span class="dcs-country-badge" role="status"></span>');
         badge.text(label).attr('title', info.company + ' · Base currency: ' + info.base_currency);
