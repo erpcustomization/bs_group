@@ -328,3 +328,9 @@ test('negative draft costs show an error instead of an inflated margin',()=>{
   assert.match(html,/Correct invalid costing inputs/);
   assert.doesNotMatch(html,/Gross margin|30.00%/);
 });
+test('revision movement isolates currency values and preserves before / after DOM order',()=>{
+  const html=context.dcs_revision_movement(fixture(),15000,14000,false);
+  assert.ok(html.indexOf('15000')<html.indexOf('→'));
+  assert.ok(html.indexOf('→')<html.indexOf('14000'));
+  assert.equal((html.match(/<bdi dir="ltr">/g)||[]).length,2);
+});

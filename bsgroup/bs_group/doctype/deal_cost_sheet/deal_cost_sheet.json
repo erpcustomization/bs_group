@@ -10,18 +10,19 @@
   "dcs_details_tab",
   "section_break_giph",
   "currency",
-  "opportunity",
-  "presales_request",
+  "organisation_name",
   "party_type",
   "party",
-  "organisation_name",
-  "customer",
+  "dcs_details_links_column",
+  "opportunity",
+  "presales_request",
   "site_visit",
   "project",
   "column_break_wlnj",
   "company",
   "territory",
   "deal_owner",
+  "customer",
   "dcs_scope_section",
   "subject",
   "scope_overview",
@@ -31,24 +32,29 @@
   "custom_deal_status_section",
   "custom_deal_status",
   "custom_presales_status",
-  "custom_presales_owner",
   "custom_presales_completion_date",
-  "custom_opportunity_status",
+  "dcs_status_links_column",
   "custom_quotation",
   "custom_quotation_status",
+  "custom_sales_order",
+  "dcs_status_owner_column",
+  "custom_presales_owner",
+  "amended_from",
+  "custom_opportunity_status",
   "custom_lost_reason",
   "custom_outcome_date",
-  "custom_sales_order",
   "custom_closure_notes",
-  "amended_from",
   "workflow_state",
   "dcs_costing_tab",
+  "section_break_jbpa",
+  "items",
   "section_break_dsjr",
   "document_upload",
   "get_data",
-  "section_break_jbpa",
+  "dcs_costing_tools_column",
+  "dcs_quick_add_html",
   "apply_exclude_to_all_items",
-  "items",
+  "dcs_supporting_costs_section",
   "addtional_charges",
   "resources",
   "site_visit_evidence_section",
@@ -208,7 +214,7 @@
    "options": "Lead\nCustomer",
    "reqd": 1,
    "in_standard_filter": 1,
-   "description": "Costing can start for a Lead. A Customer record is required to link a Project."
+   "description": "A Lead can be costed before conversion to a Customer."
   },
   {
    "fieldname": "party",
@@ -226,7 +232,7 @@
    "read_only": 1,
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "description": "Uses the linked organisation name."
+   "description": ""
   },
   {
    "fieldname": "customer",
@@ -234,7 +240,7 @@
    "label": "Customer",
    "options": "Customer",
    "read_only": 1,
-   "description": "Set automatically from Party when Party Type is Customer. A Project may be linked only when a Customer is set."
+   "description": "Derived from the selected Customer."
   },
   {
    "fetch_from": "presales_request.site_visit",
@@ -264,7 +270,7 @@
   {
    "fieldname": "section_break_jbpa",
    "fieldtype": "Section Break",
-   "label": "BOQ"
+   "label": "Bill of quantities"
   },
   {
    "fieldname": "items",
@@ -382,12 +388,14 @@
    "default": "0",
    "fieldname": "apply_exclude_to_all_items",
    "fieldtype": "Check",
-   "label": "Apply Exclude to all Items"
+   "label": "Exclude item name & brand on quotation"
   },
   {
    "fieldname": "section_break_dsjr",
    "fieldtype": "Section Break",
-   "label": "Import costing"
+   "label": "Costing tools",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.docstatus === 0"
   },
   {
    "fieldname": "document_upload",
@@ -397,7 +405,7 @@
   {
    "fieldname": "get_data",
    "fieldtype": "Button",
-   "label": "Get Data"
+   "label": "Import costing"
   },
   {
    "fieldname": "company",
@@ -495,10 +503,10 @@
   {
    "fieldname": "custom_deal_status_section",
    "fieldtype": "Section Break",
-   "label": "Deal Status & Traceability"
+   "label": "Status & linked records"
   },
   {
-   "description": "Current sales outcome, synchronized with quotation and award events.",
+   "description": "Updated from quotation and award events.",
    "fieldname": "custom_deal_status",
    "fieldtype": "Select",
    "label": "Deal Status",
@@ -1337,6 +1345,32 @@
    "fieldname": "dcs_details_tab",
    "fieldtype": "Tab Break",
    "label": "Deal & Scope"
+  },
+  {
+   "fieldname": "dcs_details_links_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "dcs_status_links_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "dcs_status_owner_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "dcs_costing_tools_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "dcs_quick_add_html",
+   "fieldtype": "HTML",
+   "label": "Quick add items"
+  },
+  {
+   "fieldname": "dcs_supporting_costs_section",
+   "fieldtype": "Section Break",
+   "label": "Additional charges & resources"
   }
  ],
  "grid_page_length": 50,

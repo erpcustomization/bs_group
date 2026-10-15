@@ -137,3 +137,42 @@ class IntegrationTestDCSUIContract(IntegrationTestCase):
         self.assertEqual(read["negotiation_guard"]["approval_required"],"Manager")
         award=frappe.call(S5,dcs=self.doc.name)
         self.assertEqual(award["ok"],0,award)
+    def test_compact_layout_uses_native_columns_and_keeps_boq_before_tools(self):
+        import json
+        meta=frappe.get_meta("Deal Cost Sheet")
+        order=json.loads(frappe.db.get_value("Property Setter",
+            {"doc_type":"Deal Cost Sheet","property":"field_order"},"value"))
+        self.assertLess(order.index("items"),order.index("section_break_dsjr"))
+        self.assertLess(order.index("items"),order.index("get_data"))
+        self.assertLess(order.index("items"),order.index("dcs_quick_add_html"))
+        self.assertLess(order.index("items"),order.index("apply_exclude_to_all_items"))
+        self.assertEqual(order[-2:],["dcs_overview_tab","custom_deal_summary_dashboard"])
+        for field in ("dcs_details_links_column","column_break_wlnj",
+                      "dcs_status_links_column","dcs_status_owner_column"):
+            self.assertEqual(meta.get_field(field).fieldtype,"Column Break")
+        self.assertEqual(meta.get_field("dcs_quick_add_html").fieldtype,"HTML")
+
+    def test_compact_migration_is_repeatable_and_preserves_controls_and_records(self):
+        from bsgroup.patches.v0_1.dcs_compact_crm import execute
+        def metadata():
+            meta=frappe.get_meta("Deal Cost Sheet")
+            return {
+                "permissions":[row.as_dict() for row in meta.permissions],
+                "fields":{field.fieldname:(field.fieldtype,field.permlevel,field.read_only,field.no_copy)
+                          for field in meta.fields if field.fieldtype not in ("Column Break","Section Break","Tab Break","HTML")},
+            }
+        before=metadata()
+        counts={dt:frappe.db.count(dt) for dt in ("Deal Cost Sheet","DCS Revision","DCS Governance Event")}
+        execute()
+        execute()
+        self.assertEqual(metadata(),before)
+        self.assertEqual({dt:frappe.db.count(dt) for dt in counts},counts)
+
+    def test_duplicate_client_scripts_are_disabled_with_source_retained(self):
+        from bsgroup.patches.v0_1.dcs_compact_crm import execute, RETIRED_CLIENT_SCRIPTS
+        before={name:frappe.db.get_value("Client Script",name,"script")
+                for name in RETIRED_CLIENT_SCRIPTS if frappe.db.exists("Client Script",name)}
+        execute()
+        for name,source in before.items():
+            self.assertEqual(frappe.db.get_value("Client Script",name,"script"),source)
+            self.assertFalse(frappe.db.get_value("Client Script",name,"enabled"))
