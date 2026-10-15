@@ -29,8 +29,9 @@ def pct(numer, denom):
 	return (numer * 100.0) / denom
 
 
-def r2(v):
-	return int((v * 100.0) + 0.5) / 100.0
+def r2(v, currency=None):
+	from frappe.utils import flt
+	return flt(v, 3 if currency == "OMR" else 2)
 
 
 def num(v, fallback):
@@ -294,7 +295,7 @@ def advisory_win(c, m, req):
 	return p
 
 
-def scenario(key, label, cost, sell, baseline, rationale):
+def scenario(key, label, cost, sell, baseline, rationale, currency=None):
 	m = pct((sell - cost), sell)
 	c = pct((baseline - sell), baseline)
 	req = requirement(c, m)
@@ -305,7 +306,7 @@ def scenario(key, label, cost, sell, baseline, rationale):
 	elif g == "Blocked":
 		blocker = "Margin is below the 20% floor. The margin gate is independent of approval routing."
 	return {
-		"key": key, "label": label, "total_cost": r2(cost), "total_selling": r2(sell), "gp": r2(sell - cost),
+		"key": key, "label": label, "total_cost": r2(cost, currency), "total_selling": r2(sell, currency), "gp": r2(sell - cost, currency),
 		"margin_percent": m, "concession_percent": c, "approval_required": req, "margin_gate": g,
 		"advisory_win_probability": advisory_win(c, m, req), "blocker": blocker, "rationale": rationale,
 		"submittable": 0 if req == "Blocked" else 1,
@@ -377,7 +378,7 @@ def dcs_screen3(args):
 			if_nothing = "The margin remains below the floor. A recorded manager approval is required before award; delivery conditions remain separate."
 		result["header"] = {
 			"decision": decision,
-			"money": {"total_cost": r2(wc), "total_selling": r2(ws), "gp": r2(ws - wc), "margin_percent": wm, "currency": s.currency},
+			"money": {"total_cost": r2(wc, s.currency), "total_selling": r2(ws, s.currency), "gp": r2(ws - wc, s.currency), "margin_percent": wm, "currency": s.currency},
 			"if_nothing": if_nothing, "resolvable_here": 1,
 		}
 
@@ -385,8 +386,8 @@ def dcs_screen3(args):
 			"name": s.name, "customer": s.customer, "subject": s.subject, "deal_owner": s.deal_owner,
 			"opportunity": s.opportunity, "docstatus": s.docstatus, "currency": s.currency, "initialised": initialised,
 			"revision_no": s.custom_dcs_revision_no or 0, "revision_reference": s.custom_revision_reference,
-			"baseline_selling": r2(baseline), "working_total_cost": r2(wc), "working_total_selling": r2(ws),
-			"working_gp": r2(ws - wc), "working_margin_percent": wm,
+			"baseline_selling": r2(baseline, s.currency), "working_total_cost": r2(wc, s.currency), "working_total_selling": r2(ws, s.currency),
+			"working_gp": r2(ws - wc, s.currency), "working_margin_percent": wm,
 			"concession_percent_from_baseline": s.custom_concession_percent_from_baseline or 0,
 			"approval_required": s.custom_approval_required, "approval_state": s.custom_approval_state,
 			"approval_reason": s.custom_approval_reason, "margin_gate": s.custom_margin_gate,
@@ -426,14 +427,14 @@ def dcs_screen3(args):
 		target = None
 		if target_raw and target_raw != "":
 			target = float(target_raw)
-		scn = [scenario("hold", "Hold", wc, ws, baseline, "Do not move. Defend the current position on value.")]
+		scn = [scenario("hold", "Hold", wc, ws, baseline, "Do not move. Defend the current position on value.", currency=s.currency)]
 		if target is not None:
 			if target > 0:
 				mid = (ws + target) / 2.0
-				scn.append(scenario("counter", "Counter", wc, mid, baseline, "Meet the customer approximately half way between the current position and their target."))
-				scn.append(scenario("accept", "Accept customer target", wc, target, baseline, "Concede fully to the stated customer target."))
+				scn.append(scenario("counter", "Counter", wc, mid, baseline, "Meet the customer approximately half way between the current position and their target.", currency=s.currency))
+				scn.append(scenario("accept", "Accept customer target", wc, target, baseline, "Concede fully to the stated customer target.", currency=s.currency))
 		else:
-			scn.append(scenario("counter", "Counter (indicative 5% move)", wc, ws * 0.95, baseline, "Indicative only. Enter a customer target to model a real counter."))
+			scn.append(scenario("counter", "Counter (indicative 5% move)", wc, ws * 0.95, baseline, "Indicative only. Enter a customer target to model a real counter.", currency=s.currency))
 		result["scenarios"] = scn
 		result["scenario_notice"] = "Scenarios are advisory modelling only. They are not decisions, are not recorded, and no revision exists until Apply and Continue is used."
 
@@ -443,7 +444,7 @@ def dcs_screen3(args):
 			pc = float(p_cost) if p_cost else wc
 			ps = float(p_sell) if p_sell else ws
 			if ps > 0:
-				result["preview"] = scenario("preview", "Proposed position", pc, ps, baseline, "Live impact of the values currently entered.")
+				result["preview"] = scenario("preview", "Proposed position", pc, ps, baseline, "Live impact of the values currently entered.", currency=s.currency)
 
 		ci = {"customer": s.customer, "available": 0}
 		if s.customer:

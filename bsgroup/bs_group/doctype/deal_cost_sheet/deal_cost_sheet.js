@@ -39,8 +39,8 @@ frappe.ui.form.on("Deal Cost Sheet", {
 							'<td style="padding:4px 8px;border:1px solid #e0e0e0;"><b>v' + v.version + '</b></td>' +
 							'<td style="padding:4px 8px;border:1px solid #e0e0e0;">' + (v.revised_by || '-') + '</td>' +
 							'<td style="padding:4px 8px;border:1px solid #e0e0e0;">' + (v.revised_on ? v.revised_on.substring(0,16) : '-') + '</td>' +
-							'<td style="padding:4px 8px;border:1px solid #e0e0e0;text-align:right;">AED ' + parseFloat(v.total_cost || 0).toLocaleString() + '</td>' +
-							'<td style="padding:4px 8px;border:1px solid #e0e0e0;text-align:right;">AED ' + parseFloat(v.total_selling || 0).toLocaleString() + '</td>' +
+							'<td style="padding:4px 8px;border:1px solid #e0e0e0;text-align:right;">' + dcs_money(frm, v.total_cost || 0) + '</td>' +
+							'<td style="padding:4px 8px;border:1px solid #e0e0e0;text-align:right;">' + dcs_money(frm, v.total_selling || 0) + '</td>' +
 						'</tr>';
 					}).join('');
 
@@ -199,8 +199,11 @@ frappe.ui.form.on("Deal Cost Resource", {
 
 function render_summary_with_currency(frm) {
 	if (frm.doc.company) {
-		frappe.db.get_value("Company", frm.doc.company, "default_currency").then(r => {
-			const currency = (r.message && r.message.default_currency) || "AED";
+		const selected_company = frm.doc.company;
+        frappe.db.get_value("Company", selected_company, "default_currency").then(r => {
+            if (frm.doc.company !== selected_company) return;
+			const currency = (r.message && r.message.default_currency) || frm.doc.currency;
+            if (!currency) return;
 			frm.doc.currency = currency;
 			propagate_currency(frm, currency);
 			render_summary(frm, currency);
@@ -211,6 +214,19 @@ function render_summary_with_currency(frm) {
 }
 
 function propagate_currency(frm, currency) {
+    const decimals = currency === "OMR" ? 3 : 2;
+    if (frm.__dcs_currency_decimals !== decimals) {
+        frm.__dcs_currency_decimals = decimals;
+        Object.keys(frm.fields_dict).forEach(function(name) {
+            const control = frm.fields_dict[name];
+            if (control.df.fieldtype === "Currency") frm.set_df_property(name, "precision", decimals);
+            if (control.grid) {
+                (control.grid.docfields || []).filter(df => df.fieldtype === "Currency").forEach(function(df) {
+                    control.grid.update_docfield_property(df.fieldname, "precision", decimals);
+                });
+            }
+        });
+    }
 	(frm.doc.items || []).forEach(row => {
 		frappe.model.set_value(row.doctype, row.name, "currency", currency);
 	});
@@ -226,7 +242,7 @@ function render_summary(frm, currency) {
 	const doc = frm.doc;
 	const $wrapper = $(frm.fields_dict["commercial_summary_html"].wrapper);
 
-	const fmt = (val) => format_currency(flt(val), currency);
+	const fmt = (val) => format_currency(flt(val), currency, currency === "OMR" ? 3 : 2);
 	const pct = (val) => flt(val, 2).toFixed(2) + "%";
 
 	const can_see_selling=frappe.user.has_role(["Sales Manager","Sales User","Presales","Commercial Controller","Managing Director","System Manager"]);
@@ -788,7 +804,7 @@ const AI_PRICE_DB = {
 };
 
 // ── Exchange rate: 1 AED = X OMR ──────────────────────────────────────
-const AED_TO_OMR = 0.1023;
+// Cross-currency reference prices are withheld until a dated rate is explicitly supplied.
 
 // ══════════════════════════════════════════════════════════════════════
 // FORM EVENTS
@@ -863,7 +879,7 @@ function dcs_ai_run_full_check(frm) {
     const isOM     = company.toUpperCase().includes('-OM');
     const isAED    = currency === 'AED';
     const isOMR    = currency === 'OMR';
-    const fxRate   = isOMR ? AED_TO_OMR : 1.0;
+    const fxRate   = 1.0;
 
     // ── Check 1: Company/Currency Match ───────────────────────────────
     if (isAE && isOMR)
@@ -885,7 +901,7 @@ function dcs_ai_run_full_check(frm) {
 
     items.forEach((item, idx) => {
         const key     = (item.item_code || '').toLowerCase().trim();
-        const ref     = AI_PRICE_DB[key];
+        const ref     = dcs_reference_price(key, currency);
         const rowNum  = idx + 1;
         const rowName = item.item_code || 'Unknown';
 
@@ -905,16 +921,16 @@ function dcs_ai_run_full_check(frm) {
         } else {
             const dev = Math.abs((myCost - refCost) / refCost * 100);
             if (dev > 25)
-                issues.push('Row ' + rowNum + ' — <b>' + rowName + '</b>: Cost ' + myCost.toFixed(2) + ' deviates <b>' + dev.toFixed(1) + '%</b> from reference (' + refCost.toFixed(2) + ' ' + currency + ')');
+                issues.push('Row ' + rowNum + ' — <b>' + rowName + '</b>: Cost ' + myCost.toFixed(dcs_money_precision(frm)) + ' deviates <b>' + dev.toFixed(1) + '%</b> from reference (' + refCost.toFixed(dcs_money_precision(frm)) + ' ' + currency + ')');
             else if (dev > 15)
-                warnings.push('Row ' + rowNum + ' — <b>' + rowName + '</b>: Cost ' + myCost.toFixed(2) + ' deviates ' + dev.toFixed(1) + '% from reference (' + refCost.toFixed(2) + ' ' + currency + ')');
+                warnings.push('Row ' + rowNum + ' — <b>' + rowName + '</b>: Cost ' + myCost.toFixed(dcs_money_precision(frm)) + ' deviates ' + dev.toFixed(1) + '% from reference (' + refCost.toFixed(dcs_money_precision(frm)) + ' ' + currency + ')');
             else
                 passed.push('Row ' + rowNum + ' ' + rowName + ': Cost within 15% of reference (' + dev.toFixed(1) + '% deviation)');
         }
 
         // Selling below cost check
         if (mySell > 0 && mySell < refCost)
-            issues.push('Row ' + rowNum + ' — <b>' + rowName + '</b>: Selling price (' + mySell.toFixed(2) + ') is BELOW reference cost (' + refCost.toFixed(2) + ') — <b>loss-making!</b>');
+            issues.push('Row ' + rowNum + ' — <b>' + rowName + '</b>: Selling price (' + mySell.toFixed(dcs_money_precision(frm)) + ') is BELOW reference cost (' + refCost.toFixed(dcs_money_precision(frm)) + ') — <b>loss-making!</b>');
         else if (mySell <= 0)
             warnings.push('Row ' + rowNum + ' — <b>' + rowName + '</b>: Selling Rate is 0 — no revenue from this item');
 
@@ -970,10 +986,10 @@ function dcs_ai_run_full_check(frm) {
 function dcs_ai_price_suggestions(frm) {
     const items    = frm.doc.items || [];
     const currency = (frm.doc.currency || 'AED').toUpperCase();
-    const fxRate   = currency === 'OMR' ? AED_TO_OMR : 1.0;
+    const fxRate   = 1.0;
 
     let html = '<div style="font-size:13px">';
-    html += '<p style="color:#555;margin-bottom:10px">AI Reference Prices (converted to <b>' + currency + '</b>). Add items to the database for best results.</p>';
+    html += '<p style="color:#555;margin-bottom:10px">Same-currency reference prices (<b>' + currency + '</b>). Cross-currency references are omitted; no automatic conversion is applied.</p>';
 
     // Current items comparison table
     html += '<table style="width:100%;border-collapse:collapse">';
@@ -990,12 +1006,12 @@ function dcs_ai_price_suggestions(frm) {
 
     items.forEach((item, idx) => {
         const key     = (item.item_code || '').toLowerCase().trim();
-        const ref     = AI_PRICE_DB[key];
+        const ref     = dcs_reference_price(key, currency);
         const bg      = idx % 2 === 0 ? '#f4f6f7' : '#fff';
-        const refCost = ref ? (ref.cost * fxRate).toFixed(2) : '—';
-        const refSell = ref ? (ref.sell * fxRate).toFixed(2) : '—';
-        const myCost  = (item.cost_rate  || 0).toFixed(2);
-        const mySell  = (item.selling_rate || 0).toFixed(2);
+        const refCost = ref ? (ref.cost * fxRate).toFixed(dcs_money_precision(frm)) : '—';
+        const refSell = ref ? (ref.sell * fxRate).toFixed(dcs_money_precision(frm)) : '—';
+        const myCost  = (item.cost_rate  || 0).toFixed(dcs_money_precision(frm));
+        const mySell  = (item.selling_rate || 0).toFixed(dcs_money_precision(frm));
         const myGP    = item.gp_percent !== undefined ? item.gp_percent.toFixed(1) + '%' : '—';
 
         let status = '⚠️ No Ref'; let stClr = '#e67e22';
@@ -1028,11 +1044,11 @@ function dcs_ai_price_suggestions(frm) {
     const dbKeys = Object.keys(AI_PRICE_DB);
     html += '<br><details style="margin-top:8px"><summary style="cursor:pointer;font-weight:bold;color:#2980b9;background:#eaf4fb;padding:7px 12px;border-radius:4px">📚 Full AI Price Database (' + dbKeys.length + ' items — click to expand)</summary>';
     html += '<table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:12px">';
-    html += '<thead><tr style="background:#27ae60;color:white"><th style="padding:6px 8px;text-align:left">Item Code</th><th style="padding:6px 8px;text-align:right">Cost (AED)</th><th style="padding:6px 8px;text-align:right">Sell (AED)</th><th style="padding:6px 8px">Notes</th></tr></thead><tbody>';
+    html += '<thead><tr style="background:#27ae60;color:white"><th style="padding:6px 8px;text-align:left">Item Code</th><th style="padding:6px 8px;text-align:right">Cost</th><th style="padding:6px 8px;text-align:right">Selling</th><th style="padding:6px 8px">Currency</th><th style="padding:6px 8px">Notes</th></tr></thead><tbody>';
     dbKeys.forEach((k, i) => {
         const v = AI_PRICE_DB[k];
         const bg = i % 2 === 0 ? '#f9f9f9' : '#fff';
-        html += '<tr style="background:' + bg + '"><td style="padding:5px 8px">' + k + '</td><td style="padding:5px 8px;text-align:right">' + v.cost + '</td><td style="padding:5px 8px;text-align:right">' + v.sell + '</td><td style="padding:5px 8px;color:#777">' + (v.notes||'') + '</td></tr>';
+        html += '<tr style="background:' + bg + '"><td style="padding:5px 8px">' + k + '</td><td style="padding:5px 8px;text-align:right">' + v.cost + '</td><td style="padding:5px 8px;text-align:right">' + v.sell + '</td><td style="padding:5px 8px">' + frappe.utils.escape_html(v.currency || '') + '</td><td style="padding:5px 8px;color:#777">' + (v.notes||'') + '</td></tr>';
     });
     html += '</tbody></table>';
     html += '<p style="margin:8px 0 0;color:#999;font-size:11px">💡 To add more items: Go to Build → Client Script → Deal Cost Sheet AI Assistant and update the AI_PRICE_DB object.</p>';
@@ -1058,6 +1074,7 @@ function dcs_ai_compare_proposals(frm) {
             doctype:  'Deal Cost Sheet',
             filters: [
                 ['customer', '=', frm.doc.customer],
+                ['currency', '=', frm.doc.currency],
                 ['name',     '!=', frm.doc.name || '__new__'],
             ],
             fields:   ['name', 'company', 'currency', 'total_cost', 'total_selling', 'status', 'creation'],
@@ -1099,8 +1116,8 @@ function dcs_ai_compare_proposals(frm) {
                     html += '<td style="padding:8px"><a href="' + frappe.utils.get_form_link('Deal Cost Sheet', doc.name) + '" target="_blank" style="color:#2980b9">' + doc.name + '</a></td>';
                     html += '<td style="padding:8px">' + (doc.company || '') + '</td>';
                     html += '<td style="padding:8px">' + (doc.currency || '') + '</td>';
-                    html += '<td style="padding:8px;text-align:right">' + ((doc.total_cost || 0).toFixed(2)) + '</td>';
-                    html += '<td style="padding:8px;text-align:right">' + ((doc.total_selling || 0).toFixed(2)) + '</td>';
+                    html += '<td style="padding:8px;text-align:right">' + ((doc.total_cost || 0).toFixed(dcs_money_precision(frm))) + '</td>';
+                    html += '<td style="padding:8px;text-align:right">' + ((doc.total_selling || 0).toFixed(dcs_money_precision(frm))) + '</td>';
                     html += '<td style="padding:8px;text-align:right">' + margin + '</td>';
                     html += '<td style="padding:8px;text-align:center"><span style="background:' + stColor + ';color:white;padding:2px 8px;border-radius:3px;font-size:11px">' + (doc.status || '') + '</span></td>';
                     html += '<td style="padding:8px;color:#777">' + date + '</td>';
@@ -1115,8 +1132,8 @@ function dcs_ai_compare_proposals(frm) {
 
                 html += '<br><div style="background:#eaf4fb;padding:12px 16px;border-radius:6px;border-left:4px solid #3498db">';
                 html += '<b>📌 Current Deal:</b> ';
-                html += 'Cost: <b>' + ((frm.doc.total_cost || 0).toFixed(2)) + '</b> | ';
-                html += 'Selling: <b>' + ((frm.doc.total_selling || 0).toFixed(2)) + '</b> | ';
+                html += 'Cost: <b>' + ((frm.doc.total_cost || 0).toFixed(dcs_money_precision(frm))) + '</b> | ';
+                html += 'Selling: <b>' + ((frm.doc.total_selling || 0).toFixed(dcs_money_precision(frm))) + '</b> | ';
                 html += 'Margin: <b>' + currMargin + '</b>';
                 if (docs.length > 0 && docs[0].total_selling > 0) {
                     const lastSell = docs[0].total_selling;
@@ -1321,8 +1338,8 @@ frappe.ui.form.on("Deal Cost Sheet", {
                             '<td style="padding:4px 8px;border:1px solid #e0e0e0;"><b>v' + v.version + '</b></td>' +
                             '<td style="padding:4px 8px;border:1px solid #e0e0e0;">' + (v.revised_by || '-') + '</td>' +
                             '<td style="padding:4px 8px;border:1px solid #e0e0e0;">' + (v.revised_on ? v.revised_on.substring(0,16) : '-') + '</td>' +
-                            '<td style="padding:4px 8px;border:1px solid #e0e0e0;text-align:right;">AED ' + parseFloat(v.total_cost || 0).toLocaleString() + '</td>' +
-                            '<td style="padding:4px 8px;border:1px solid #e0e0e0;text-align:right;">AED ' + parseFloat(v.total_selling || 0).toLocaleString() + '</td>' +
+                            '<td style="padding:4px 8px;border:1px solid #e0e0e0;text-align:right;">' + dcs_money(frm, v.total_cost || 0) + '</td>' +
+                            '<td style="padding:4px 8px;border:1px solid #e0e0e0;text-align:right;">' + dcs_money(frm, v.total_selling || 0) + '</td>' +
                         '</tr>';
                     }).join('');
 
@@ -1787,7 +1804,7 @@ function dcsLiveCalc(frm, applyToDoc) {
             _lvHead +
             '<table class="table table-bordered table-sm" style="font-size:13px">' +
             '<thead style="background:#f5f5f5"><tr>' +
-            '<th>Category</th><th style="text-align:right">Cost (AED)</th>' +
+            '<th>Category</th><th style="text-align:right">Cost</th>' +
             '<th style="text-align:right">Selling (AED)</th>' +
             '<th style="text-align:right">Margin (AED)</th>' +
             '<th style="text-align:right">Margin %</th></tr></thead>' +
@@ -2796,7 +2813,7 @@ function dcs_render_draft_summary(frm, field) {
         field.$wrapper.html('<div class="dcs-panel dcs-quiet"><b>Prepare the draft costing</b><p>'+ (frm.doc.party && frm.doc.subject ? 'Add BOQ lines in Costing. Your draft figures will appear here as you enter them.' : 'Enter customer and scope details first, then add BOQ lines in Costing. Your draft figures will appear here as you enter them.') + '</p></div>');
         return;
     }
-    var money=function(v){return esc(frm.doc.currency || 'AED')+' '+format_number(v,null,2);};
+    var money=function(v){return esc(frm.doc.currency || 'AED')+' '+format_number(v,null,dcs_money_precision(frm));};
     var html='<div class="dcs-panel dcs-overview"><div class="dcs-eyebrow">DRAFT ESTIMATE</div>'
         +'<h2>'+esc(frm.doc.organisation_name || frm.doc.customer || frm.doc.subject || 'New deal')+'</h2>'
         +'<div class="dcs-metrics"><div><span>Draft selling</span><strong>'+money(p.selling)+'</strong>'
@@ -3010,11 +3027,17 @@ function dcs_esc(v) {
 	return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+function dcs_money_precision(frm) { return (frm.doc.currency || '').toUpperCase() === 'OMR' ? 3 : 2; }
+function dcs_reference_price(key, currency) {
+    var ref = AI_PRICE_DB[key];
+    return ref && ref.currency === currency ? ref : null;
+}
+
 function dcs_cur(frm) { return frm.doc.currency || frappe.defaults.get_default('currency'); }
 
 function dcs_money(frm, v) {
 	if (v === null || v === undefined || v === '') { return '&mdash;'; }
-	return format_currency(v, dcs_cur(frm));
+	return format_currency(v, dcs_cur(frm), dcs_money_precision(frm));
 }
 
 function dcs_pct(v) {

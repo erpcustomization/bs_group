@@ -229,6 +229,8 @@ def make_quotation(source_name):
 			"amount": additional_charges_total,
 		})
 
+	if quotation.currency == "OMR" and (quotation.precision("grand_total") < 3 or any(row.precision("rate") < 3 or row.precision("amount") < 3 for row in quotation.items)):
+		frappe.throw("OMR quotations require three-decimal currency precision. Configure System Settings currency precision or the OMR currency number format before creating the quotation.")
 	quotation.custom_deal_cost_sheet = source.name
 	quotation.custom_dcs_revision_reference = source.custom_revision_reference
 	quotation.insert(ignore_permissions=True, ignore_mandatory=True)
