@@ -1,16 +1,52 @@
-"""Place the existing live number cards above DCS Governance shortcuts."""
+"""Install portable DCS count cards and preserve existing workspace content."""
 import json
 import frappe
 
 CARDS = ("Open DCS Handover Blockers", "DCS Awarded Pending Delivery Release",
          "DCS PO Reconciliation Mismatch")
 
-def execute():
-    if not frappe.db.exists("Workspace", "DCS Governance"):
-        frappe.throw("DCS Governance workspace is missing; restore it before this layout migration.")
-    for name in CARDS:
+def ensure_components():
+    definitions = (
+        (CARDS[0], "DCS Handover Condition", "#e0a336", [
+            ["DCS Handover Condition", "category", "=", "Blocker"],
+            ["DCS Handover Condition", "state", "=", "Open"],
+            ["DCS Handover Condition", "dcs", "not like", "%ZZTEST%"],
+            ["DCS Handover Condition", "dcs", "not like", "%ZZ-TEST%"]]),
+        (CARDS[1], "Deal Cost Sheet", "#4287f5", [
+            ["Deal Cost Sheet", "custom_award_state", "=", "Awarded"],
+            ["Deal Cost Sheet", "custom_delivery_release_state", "in", ["", "Pending", "Blocked", "On Hold"]],
+            ["Deal Cost Sheet", "docstatus", "=", 1],
+            ["Deal Cost Sheet", "name", "not like", "%ZZTEST%"],
+            ["Deal Cost Sheet", "name", "not like", "%ZZ-TEST%"]]),
+        (CARDS[2], "Deal Cost Sheet", "#e03636", [
+            ["Deal Cost Sheet", "custom_po_recon_state", "=", "Mismatch"],
+            ["Deal Cost Sheet", "docstatus", "=", 1],
+            ["Deal Cost Sheet", "name", "not like", "%ZZTEST%"],
+            ["Deal Cost Sheet", "name", "not like", "%ZZ-TEST%"]]),
+    )
+    for name, doctype, color, filters in definitions:
         if not frappe.db.exists("Number Card", name):
-            frappe.throw("Required DCS number card is missing: " + name)
+            frappe.get_doc({"doctype": "Number Card", "name": name, "label": name,
+                "type": "Document Type", "document_type": doctype, "function": "Count",
+                "is_public": 1, "is_standard": 0, "color": color,
+                "filters_json": json.dumps(filters), "show_percentage_stats": 1,
+                "stats_time_interval": "Daily"}).insert(ignore_permissions=True)
+    if not frappe.db.exists("Workspace", "DCS Governance"):
+        shortcuts = ("Deal Cost Sheet", "DCS Handover Condition", "DCS Revision", "DCS Governance Event")
+        blocks = [{"id": "dcs_governance_header", "type": "header", "data": {
+            "text": '<span class="h4"><b>DCS Governance</b></span>', "col": 12}}]
+        blocks += [{"id": "dcs_governance_shortcut_" + str(i), "type": "shortcut",
+            "data": {"shortcut_name": name, "col": 3}} for i, name in enumerate(shortcuts)]
+        frappe.get_doc({"doctype": "Workspace", "label": "DCS Governance", "title": "DCS Governance",
+            "public": 1, "module": frappe.get_meta("Deal Cost Sheet").module,
+            "content": json.dumps(blocks), "roles": [{"role": role} for role in
+                ("Sales Manager", "Commercial Controller", "Managing Director") if frappe.db.exists("Role", role)],
+            "shortcuts": [{"type": "DocType", "link_to": name, "label": name, "doc_view": "List"}
+                for name in shortcuts]}).insert(ignore_permissions=True)
+
+
+def execute():
+    ensure_components()
     workspace = frappe.get_doc("Workspace", "DCS Governance")
     blocks = json.loads(workspace.content or "[]")
     # Remove only our cards from their previous positions; preserve every other block.
