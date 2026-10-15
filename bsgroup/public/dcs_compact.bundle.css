@@ -158,3 +158,30 @@
     --dcs-header-ink: #adcaff;
     --dcs-header-tint: rgba(105, 155, 255, 0.14);
 }
+
+/* DCS company identity replaces the default-company pill only on this form. */
+.dcs-compact-crm.dcs-compact-crm .bs-co-badge { display: none !important; }
+.dcs-compact-crm.dcs-compact-crm .title-area { flex-wrap: wrap; gap: 8px; }
+.dcs-compact-crm.dcs-compact-crm .dcs-country-badge {
+    display: inline-flex;
+    flex: 0 1 auto;
+    align-items: center;
+    padding: 4px 9px;
+    border-radius: 5px;
+    background: var(--blue-50, #edf5ff);
+    color: var(--blue-700, #215fa6);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.dcs-compact-crm.dcs-compact-crm .dcs-country-badge.dcs-country-oman {
+    background: var(--green-50, #edf7f2);
+    color: var(--green-700, #256a53);
+}
+[data-theme="dark"] .dcs-compact-crm.dcs-compact-crm .dcs-country-badge {
+    background: #253952; color: #b6d6ff;
+}
+[data-theme="dark"] .dcs-compact-crm.dcs-compact-crm .dcs-country-badge.dcs-country-oman {
+    background: #253d33; color: #a7dfc6;
+}

@@ -3639,3 +3639,42 @@ frappe.ui.form.on('Deal Cost Sheet', {
         dcs_fetch_party_details(frm);
     }
 });
+function dcs_company_identity(frm) {
+    if (!frm.page || !frm.page.get_title_area) return;
+    var company = frm.doc.company || '';
+    var cache = frm.__dcs_company_identity;
+    if (cache && cache.company === company) return cache.promise;
+    // Fail visibly: retain the selector until the server confirms a single-company site.
+    frm.toggle_display('company', true);
+    var area = frm.page.get_title_area();
+    area.find('.dcs-country-badge').remove();
+    var entry = {company:company};
+    frm.__dcs_company_identity = entry;
+    entry.promise = frappe.call({
+        method:'bsgroup.api.dcs.presentation.company_context', args:{company:company || null}
+    }).then(function(r) {
+        if (frm.__dcs_company_identity !== entry || (frm.doc.company || '') !== company) return;
+        var info = r.message || {};
+        if (!info.company) return;
+        if (!company && frm.is_new()) {
+            return frm.set_value('company', info.company);
+        }
+        if (info.company !== frm.doc.company) return;
+        frm.toggle_display('company', !info.hide_company);
+        var label = ['Bits Secure', info.country_label, info.base_currency].filter(Boolean).join(' · ');
+        var badge = $('<span class="dcs-country-badge" role="status"></span>');
+        badge.text(label).attr('title', info.company + ' · Base currency: ' + info.base_currency);
+        badge.toggleClass('dcs-country-oman', info.country === 'Oman');
+        area.append(badge);
+    }).catch(function() {
+        if (frm.__dcs_company_identity === entry) {
+            frm.__dcs_company_identity = null;
+            frm.toggle_display('company', true);
+        }
+    });
+    return entry.promise;
+}
+frappe.ui.form.on('Deal Cost Sheet', {
+    refresh:dcs_company_identity,
+    company:dcs_company_identity
+});
