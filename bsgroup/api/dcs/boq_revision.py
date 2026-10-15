@@ -70,8 +70,8 @@ def line_history(before, after, baseline=False):
                 "label": (b or a).get("description" if kind == "Item" else "role"),
                 "before_values": json.dumps(av, sort_keys=True, default=str),
                 "after_values": json.dumps(bv, sort_keys=True, default=str),
-                "previous_cost": pc, "new_cost": nc, "cost_delta": flt(nc-pc, 2),
-                "previous_selling": ps, "new_selling": ns, "selling_delta": flt(ns-ps, 2)})
+                "previous_cost": pc, "new_cost": nc, "cost_delta": flt(nc-pc, 3 if after.currency == "OMR" else 2),
+                "previous_selling": ps, "new_selling": ns, "selling_delta": flt(ns-ps, 3 if after.currency == "OMR" else 2)})
     return rows
 
 
@@ -146,9 +146,11 @@ def _proposal(sheet, args, roles):
             if not key:
                 row.name = frappe.generate_hash(length=10)
                 row.currency = sheet.currency
+            row.currency = sheet.currency
             numeric = ["qty", "cost_rate", "selling_rate"] if kind == "Item" else ["no_of_persons", "no_of_days", "hours", "cost_rate"]
             for field in numeric:
-                row.set(field, flt(row.get(field), row.precision(field)))
+                precision = 3 if sheet.currency == "OMR" and field in ("cost_rate", "selling_rate") else row.precision(field)
+                row.set(field, flt(row.get(field), precision))
             if kind == "Item" and row.qty <= 0:
                 frappe.throw("Item quantity must remain positive at the field's stored precision.")
     from bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet import calculate_deal_financials

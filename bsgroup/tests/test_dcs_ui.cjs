@@ -7,7 +7,7 @@ const source = fs.readFileSync(path.join(__dirname,'../bs_group/doctype/deal_cos
 let dialog;
 const context = {
   __:x=>x, flt:(x,p)=>p === undefined ? Number(x)||0 : Number((Number(x)||0).toFixed(p)),
-  cint:x=>Number(x)||0, format_currency:x=>'AED '+Number(x).toFixed(2), format_number:x=>Number(x).toFixed(2),
+  cint:x=>Number(x)||0, format_currency:(x,c='AED',p=2)=>c+' '+Number(x).toFixed(p), format_number:(x,f,p=2)=>Number(x).toFixed(p),
   frappe:{
     ui:{form:{on(){}},Dialog:class {
       constructor(options) {
@@ -333,4 +333,16 @@ test('revision movement isolates currency values and preserves before / after DO
   assert.ok(html.indexOf('15000')<html.indexOf('→'));
   assert.ok(html.indexOf('→')<html.indexOf('14000'));
   assert.equal((html.match(/<bdi dir="ltr">/g)||[]).length,2);
+});
+
+test('OMR draft overview preserves three-decimal buying selling and profit',()=>{
+  const frm=fixture({docstatus:0,currency:'OMR',items:[{qty:1,cost_rate:970.960,selling_rate:1138.425}],resources:[],addtional_charges:[]});
+  let html;context.dcs_render_draft_summary(frm,{$wrapper:{html:v=>html=v}});
+  assert.match(html,/OMR 1138\.425/);assert.match(html,/OMR 970\.960/);assert.match(html,/OMR 167\.465/);
+  assert.equal(context.dcs_money(frm,900.123),'OMR 900.123');
+});
+test('reference prices never silently cross currency',()=>{
+  context.AI_PRICE_DB={sample:{currency:'AED',cost:100,sell:150}};
+  assert.equal(context.dcs_reference_price('sample','OMR'),null);
+  assert.equal(context.dcs_reference_price('sample','AED').cost,100);
 });
