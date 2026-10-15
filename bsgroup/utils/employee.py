@@ -63,6 +63,7 @@ def send_login_details(employee):
 		frappe.throw(_("This Employee has no linked User account"))
 
 	site_url = get_url()
+	app_url = f"{site_url.rstrip('/')}/hrms"
 	company = doc.company or frappe.defaults.get_global_default("company") or ""
 
 	message = f"""
@@ -70,6 +71,7 @@ def send_login_details(employee):
 		<p>Your user account has been created successfully.</p>
 		<p>Please use the link below to access the site:</p>
 		<p><b>Site URL:</b> <a href="{site_url}">{site_url}</a></p>
+		<p><b>Mobile App Download Link:</b> <a href="{app_url}">{app_url}</a></p>
 		<p>If you need to set or reset your password, click <b>&quot;Forgot Password&quot;</b>
 		on the login page and follow the instructions to create a new password.</p>
 		<p>Regards,<br>{company}</p>

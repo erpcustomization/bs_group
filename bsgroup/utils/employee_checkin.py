@@ -26,11 +26,18 @@ def validate_checkin_location(doc, method=None):
     if not ho or not ho.latitude or not ho.longitude:
         return
 
-    distance_m = _haversine_distance_meters(
-        float(doc.latitude), float(doc.longitude),
-        float(ho.latitude), float(ho.longitude),
-    )
-    allowed_m = float(ho.allowd_distance_meters or 0)
+    coords = [_to_float(v) for v in (doc.latitude, doc.longitude, ho.latitude, ho.longitude)]
+    if any(c is None for c in coords):
+        # Unparseable coordinates (Head Office lat/long are Data fields) - don't
+        # break check-in with a server error; log it and skip the geofence.
+        frappe.log_error(
+            title="Employee Checkin: invalid coordinates",
+            message=f"Checkin: ({doc.latitude}, {doc.longitude}) Head Office {employee.custom_head_office}: ({ho.latitude}, {ho.longitude})",
+        )
+        return
+
+    distance_m = _haversine_distance_meters(*coords)
+    allowed_m = _to_float(ho.allowd_distance_meters) or 0
 
     if distance_m > allowed_m:
         frappe.throw(
@@ -39,6 +46,13 @@ def validate_checkin_location(doc, method=None):
             f"Your current distance is {distance_m:.0f} m.",
             title="Location Validation Failed",
         )
+
+
+def _to_float(value):
+    try:
+        return float(str(value).strip().replace(",", "."))
+    except (TypeError, ValueError):
+        return None
 
 
 def _haversine_distance_meters(lat1, lon1, lat2, lon2):
