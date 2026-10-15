@@ -24,7 +24,6 @@
   "deal_owner",
   "customer",
   "dcs_scope_section",
-  "subject",
   "scope_overview",
   "customer_notes",
   "custom_lifecycle_section",
@@ -46,6 +45,8 @@
   "custom_closure_notes",
   "workflow_state",
   "dcs_costing_tab",
+  "dcs_costing_subject_section",
+  "subject",
   "section_break_jbpa",
   "items",
   "section_break_dsjr",
@@ -1373,6 +1374,10 @@
    "fieldname": "dcs_supporting_costs_section",
    "fieldtype": "Section Break",
    "label": "Additional charges & resources"
+  },
+  {
+   "fieldname": "dcs_costing_subject_section",
+   "fieldtype": "Section Break"
   }
  ],
  "grid_page_length": 50,
