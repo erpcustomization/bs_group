@@ -1793,8 +1793,8 @@ function dcsLiveCalc(frm, applyToDoc) {
         if (_lvRev > 0) {
             _lvHead = '<div style="margin:0 0 10px;padding:8px 10px;background:#f0f6ff;border-left:3px solid #1f6fd0;border-radius:4px;font-size:12px">' +
                 '<div style="color:#555;margin-bottom:2px">Living commercial position &middot; revision ' + _lvRev + '</div>' +
-                '<div style="font-weight:600">Selling ' + format_currency(_lvSell, _lvCur) +
-                ' &nbsp;&middot;&nbsp; Cost ' + format_currency(_lvCost, _lvCur) +
+                '<div style="font-weight:600">Selling ' + format_currency(_lvSell, _lvCur,dcs_money_precision(frm)) +
+                ' &nbsp;&middot;&nbsp; Cost ' + format_currency(_lvCost, _lvCur,dcs_money_precision(frm)) +
                 ' &nbsp;&middot;&nbsp; Margin ' + _lvMpc.toFixed(3) + '%</div>' +
                 '<div style="color:#777;margin-top:3px">Figures below include items, labour and additional charges. Earlier totals-only adjustments may differ until reconciled to a BOQ revision.</div>' +
                 '</div>';
@@ -2732,7 +2732,7 @@ function render_summary_dashboard(frm) {
     var d=frm.doc, bridge=s2.margin_bridge, p=dcs_effective_position(frm,s5);
     var approval=dcs_approval_presentation(frm,s5), st=s5.states || {}, cond=s5.conditions || {};
     var next=dcs_next_step(frm,state.s3,state.s4,s5), esc=dcs_esc;
-    var number=function(v){return format_number(Number(v)||0,null,2);};
+    var number=function(v){return format_number(Number(v)||0,null,dcs_money_precision(frm));};
     var money=function(v){return esc(d.currency || '') + ' ' + number(v);};
     var margin=function(v){
         return '<span class="' + dcs_margin_tone(v.selling > 0 ? Number(v.margin_percent)||0 : null) + '">'
@@ -3177,7 +3177,7 @@ function dcs_render_negotiation(frm, s3) {
 	} else {
 		var rows = revs.map(function (r) {
 			var gp = r.gp_movement || 0;
-			var gpTxt = (gp > 0 ? '+' : '') + format_currency(gp, dcs_cur(frm));
+			var gpTxt = (gp > 0 ? '+' : '') + format_currency(gp, dcs_cur(frm),dcs_money_precision(frm));
 			var gpCls = gp > 0 ? 'text-success' : (gp < 0 ? 'text-danger' : 'text-muted');
 			var req = (r.approval_requirement && r.approval_requirement !== 'None') ? '<span class="indicator-pill orange">' + dcs_esc(r.approval_requirement) + '</span>' : '<span class="text-muted">None</span>';
 			return '<tr>'
@@ -3544,10 +3544,10 @@ function dcs_boq_revision_dialog(frm, cap) {
         var totals=dcs_boq_totals(items,labour,frm.doc.addtional_charges);
         var cost=totals.cost, sell=totals.selling;
         if (!cap.can_customer_side) {
-            d.fields_dict.preview.$wrapper.html('<div class="alert alert-info">Derived cost: <b>' + format_currency(cost, frm.doc.currency) + '</b>. Selling is preserved and margin is re-evaluated on the server.</div>');
+            d.fields_dict.preview.$wrapper.html('<div class="alert alert-info">Derived cost: <b>' + format_currency(cost, frm.doc.currency,dcs_money_precision(frm)) + '</b>. Selling is preserved and margin is re-evaluated on the server.</div>');
             return;
         }
-        d.fields_dict.preview.$wrapper.html('<div class="alert alert-info">Derived cost: <b>' + format_currency(cost, frm.doc.currency) + '</b> · Selling: <b>' + format_currency(sell, frm.doc.currency) + '</b> · GP: <b>' + format_currency(sell-cost, frm.doc.currency) + '</b> · Margin: ' + (totals.margin === null ? 'Not priced' : totals.margin.toFixed(2) + '%') + '</div>');
+        d.fields_dict.preview.$wrapper.html('<div class="alert alert-info">Derived cost: <b>' + format_currency(cost, frm.doc.currency,dcs_money_precision(frm)) + '</b> · Selling: <b>' + format_currency(sell, frm.doc.currency,dcs_money_precision(frm)) + '</b> · GP: <b>' + format_currency(sell-cost, frm.doc.currency,dcs_money_precision(frm)) + '</b> · Margin: ' + (totals.margin === null ? 'Not priced' : totals.margin.toFixed(2) + '%') + '</div>');
     };
     var f = function (type, name, label, options, readonly) {
         return {fieldtype:type, fieldname:name, label:__(label), options:options, in_list_view:1, read_only:readonly ? 1 : 0, onchange:preview};
@@ -3582,7 +3582,7 @@ function dcs_boq_revision_dialog(frm, cap) {
     d = new frappe.ui.Dialog({
         title:__('BOQ Revision'), size:'extra-large',
         fields:[
-            {fieldtype:'HTML',fieldname:'notice',options:'<p>Revise items and labour on this submitted sheet. Totals are derived from the rows. Approval and margin gates are re-evaluated; this does not award or release delivery. Additional charges remain unchanged. Labour uses persons × days × rate; when persons/days are not supplied, it uses total hours × rate.</p>' + (gap ? '<div class="alert alert-warning">Earlier totals-only adjustments differ from these rows: cost ' + format_currency(gapCost,frm.doc.currency) + ', selling ' + format_currency(gapSell,frm.doc.currency) + '. MD reconciliation is required.</div>' : '')},
+            {fieldtype:'HTML',fieldname:'notice',options:'<p>Revise items and labour on this submitted sheet. Totals are derived from the rows. Approval and margin gates are re-evaluated; this does not award or release delivery. Additional charges remain unchanged. Labour uses persons × days × rate; when persons/days are not supplied, it uses total hours × rate.</p>' + (gap ? '<div class="alert alert-warning">Earlier totals-only adjustments differ from these rows: cost ' + format_currency(gapCost,frm.doc.currency,dcs_money_precision(frm)) + ', selling ' + format_currency(gapSell,frm.doc.currency,dcs_money_precision(frm)) + '. MD reconciliation is required.</div>' : '')},
             {fieldtype:'Select',fieldname:'source',label:__('Source'),options:'Vendor\nCustomer\nTechnical\nInternal',reqd:1},
             {fieldtype:'Small Text',fieldname:'reason',label:__('Reason'),reqd:1},
             {fieldtype:'Small Text',fieldname:'technical_impact',label:__('Technical Impact')},
