@@ -3636,6 +3636,10 @@ function dcs_account_labels(frm) {
     var label = frm.doc.party_type === 'Customer' ? __('Customer')
         : frm.doc.party_type === 'Lead' ? __('Lead') : __('Account');
     frm.set_df_property('party', 'label', label);
+    // Older sheets can have a Customer link without the newer account fields.
+    // Show that native read-only link until a complete primary account is present.
+    var has_account = !!frm.doc.party && ['Lead','Customer'].includes(frm.doc.party_type);
+    frm.toggle_display('customer', !!frm.doc.customer && !has_account);
 }
 
 function dcs_fetch_party_details(frm) {
@@ -3654,7 +3658,11 @@ function dcs_fetch_party_details(frm) {
 }
 frappe.ui.form.on('Deal Cost Sheet', {
     refresh:dcs_account_labels,
-    party:dcs_fetch_party_details,
+    customer:dcs_account_labels,
+    party:function(frm) {
+        dcs_account_labels(frm);
+        return dcs_fetch_party_details(frm);
+    },
     party_type:function(frm) {
         dcs_account_labels(frm);
         if (frm.doc.docstatus !== 0) return;
