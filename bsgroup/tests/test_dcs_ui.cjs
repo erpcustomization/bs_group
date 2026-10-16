@@ -5,11 +5,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname,'../bs_group/doctype/deal_cost_sheet/deal_cost_sheet.js'),'utf8');
 let dialog;
+const formEvents={};
 const context = {
   __:x=>x, flt:(x,p)=>p === undefined ? Number(x)||0 : Number((Number(x)||0).toFixed(p)),
   cint:x=>Number(x)||0, format_currency:(x,c='AED',p=2)=>c+' '+Number(x).toFixed(p), format_number:(x,f,p=2)=>Number(x).toFixed(p),
   frappe:{
-    ui:{form:{on(){}},Dialog:class {
+    ui:{form:{on(type,handlers){
+      const events=formEvents[type] ||= {};
+      for(const [event,handler] of Object.entries(handlers)) (events[event] ||= []).push(handler);
+    }},Dialog:class {
       constructor(options) {
         Object.assign(this,options); this.values={}; this.fields_dict={};
         for(const f of options.fields) {
@@ -385,4 +389,53 @@ for(const customerSide of [false,true]) test(`OMR BOQ preview preserves three de
   context.dcs_boq_revision_dialog(frm,{can_customer_side:customerSide,can_vendor_side:true});
   assert.match(dialog.fields_dict.preview.html,/OMR 970\.960/);
   if(customerSide) {assert.match(dialog.fields_dict.preview.html,/OMR 1138\.425/);assert.match(dialog.fields_dict.preview.html,/OMR 167\.465/);}
+});
+
+
+function accountFixture(extra={}) {
+  const frm=fixture(extra);frm.visible={};frm.properties={};
+  frm.set_df_property=(field,property,value)=>{(frm.properties[field] ||= {})[property]=value;};
+  frm.toggle_display=(field,visible)=>{frm.visible[field]=Boolean(visible);};
+  frm.set_value=()=>{throw new Error('Account presentation must not rewrite the document');};
+  return frm;
+}
+for(const status of [0,1,2]) test(`existing customer remains visible with empty account fields at docstatus ${status}`,()=>{
+  const frm=accountFixture({docstatus:status,party_type:null,party:null,customer:'Mina Petroleum SPC'});
+  const before=JSON.stringify(frm.doc);context.dcs_account_labels(frm);
+  assert.equal(frm.visible.customer,true);
+  assert.equal(frm.properties.party.label,'Account');
+  assert.equal(JSON.stringify(frm.doc),before);
+});
+test('modern Customer selection shows one customer control without a duplicate',()=>{
+  const frm=accountFixture({party_type:'Customer',party:'Selected Customer',customer:'Selected Customer'});
+  context.dcs_account_labels(frm);
+  assert.equal(frm.visible.customer,false);assert.equal(frm.properties.party.label,'Customer');
+});
+test('Lead selection stays a Lead even with a separately linked converted customer',()=>{
+  const frm=accountFixture({party_type:'Lead',party:'CRM-LEAD-001',customer:'Converted Customer'});
+  const before=JSON.stringify(frm.doc);context.dcs_account_labels(frm);
+  assert.equal(frm.visible.customer,false);assert.equal(frm.properties.party.label,'Lead');
+  assert.equal(JSON.stringify(frm.doc),before);
+});
+test('a partial account still exposes the actual customer link without inferring its account type',()=>{
+  const frm=accountFixture({party_type:null,party:'Old reference',customer:'Existing Customer'});
+  context.dcs_account_labels(frm);
+  assert.equal(frm.visible.customer,true);assert.equal(frm.doc.party_type,null);
+});
+test('switching from a legacy sheet to an empty draft hides the old customer fallback',()=>{
+  const frm=accountFixture({party_type:null,party:null,customer:'Existing Customer'});
+  context.dcs_account_labels(frm);assert.equal(frm.visible.customer,true);
+  frm.doc={name:'new-deal-cost-sheet',docstatus:0,__islocal:1,party_type:'Lead',party:'',customer:''};
+  context.dcs_account_labels(frm);assert.equal(frm.visible.customer,false);
+});
+test('customer and account selection events update fallback visibility without reloading or writing data',()=>{
+  const frm=accountFixture({docstatus:1,party_type:'Customer',party:'',customer:'Existing Customer'});
+  for(const handler of formEvents['Deal Cost Sheet'].customer) handler(frm);
+  assert.equal(frm.visible.customer,true);
+  frm.doc.party='Existing Customer';
+  for(const handler of formEvents['Deal Cost Sheet'].party) handler(frm);
+  assert.equal(frm.visible.customer,false);
+  const definition=JSON.parse(fs.readFileSync(path.join(__dirname,'../bs_group/doctype/deal_cost_sheet/deal_cost_sheet.json'),'utf8'));
+  const customer=definition.fields.find(field=>field.fieldname==='customer');
+  assert.equal(customer.fieldtype,'Link');assert.equal(customer.options,'Customer');assert.equal(customer.read_only,1);
 });
