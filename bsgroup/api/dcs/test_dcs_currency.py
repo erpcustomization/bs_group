@@ -50,6 +50,15 @@ class IntegrationTestDCSCurrency(IntegrationTestCase):
         screen=frappe.call("bsgroup.api.dcs.negotiation.dcs_screen3",dcs=doc.name)
         self.assertEqual(screen["ok"],1,screen)
         self.assertAlmostEqual(screen["header"]["money"]["total_cost"],revised,6)
+        management=frappe.call("bsgroup.api.dcs.living.dcs_screen2",dcs=doc.name)
+        self.assertEqual(management["ok"],1,management)
+        bridge=management["margin_bridge"]
+        precision=3 if currency=="OMR" else 2
+        self.assertAlmostEqual(bridge["original"]["gp"],round(selling-970.960,precision),6)
+        self.assertAlmostEqual(bridge["current"]["gp"],round(selling-revised,precision),6)
+        self.assertAlmostEqual(bridge["gp_movement"],round(970.960-revised,precision),6)
+        self.assertAlmostEqual(bridge["gp_impacts"]["vendor"],round(970.960-revised,precision),6)
+        self.assertAlmostEqual(bridge["unreconciled_gp"],0,6)
         default_reader=frappe.db.get_default
         if currency == "OMR":
             with patch.object(frappe.db,"get_default",side_effect=lambda key,*a,**kw: 2 if key=="currency_precision" else default_reader(key,*a,**kw)):
@@ -132,3 +141,24 @@ class IntegrationTestDCSCurrency(IntegrationTestCase):
             self.assertFalse(authorised_position(sheet))
             sheet.custom_approved_total_cost=90.001
             self.assertTrue(authorised_position(sheet))
+
+
+    def test_omr_bridge_reconciles_rejected_and_awarded_baisa_movements(self):
+        from bsgroup.dcs.margin_bridge import margin_bridge
+        sheet=frappe._dict(currency="OMR",total_cost=1000.001,total_selling=1500.123,
+            custom_dcs_revision_no=3,custom_working_total_cost=1000.003,
+            custom_working_total_selling=1500.124,custom_baseline_frozen=1,
+            custom_frozen_total_cost=1000.002,custom_frozen_total_selling=1500.123,
+            custom_approval_required="None",custom_approval_state="Not Required")
+        revisions=[{"source":"Vendor","prev_total_cost":1000.001,"prev_total_selling":1500.123,
+            "gp_movement":-0.001,"approval_state":"Rejected"},
+            {"source":"Customer","gp_movement":0.001},
+            {"source":"Vendor","gp_movement":-0.001}]
+        bridge=margin_bridge(sheet,revisions)
+        self.assertAlmostEqual(bridge["original"]["gp"],500.122,6)
+        self.assertAlmostEqual(bridge["current"]["gp"],500.121,6)
+        self.assertAlmostEqual(bridge["awarded"]["gp"],500.121,6)
+        self.assertAlmostEqual(bridge["gp_movement"],-0.001,6)
+        self.assertAlmostEqual(bridge["gp_impacts"]["vendor"],-0.002,6)
+        self.assertAlmostEqual(bridge["gp_impacts"]["customer"],0.001,6)
+        self.assertAlmostEqual(bridge["unreconciled_gp"],0,6)
