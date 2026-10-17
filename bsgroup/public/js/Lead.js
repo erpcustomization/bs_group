@@ -43,6 +43,14 @@ const bsi_customer_brief = (() => {
             return '<a href="' + esc(url.href) + '" target="_blank" rel="noopener noreferrer">' + esc(value) + '</a>';
         } catch (_) { return text(value); }
     }
+    function responsibility(lead) {
+        let assigned = lead._assign;
+        try { assigned = typeof assigned === "string" ? JSON.parse(assigned) : assigned; } catch (_) { assigned = []; }
+        assigned = Array.isArray(assigned) ? [...new Set(assigned.filter(u => typeof u === "string" && u.trim()))] : [];
+        const names = assigned.map(user => typeof frappe.user?.full_name === "function" ? frappe.user.full_name(user) || user : user);
+        if (names.length) return { label: "Assigned team", value: names.join(", ") };
+        return { label: "Lead owner", value: lead.lead_owner || "Unassigned — assign a salesperson" };
+    }
     function ai_result(doc) {
         try { return JSON.parse(doc.bsli_ai_result || "{}"); } catch (_) { return {}; }
     }
@@ -92,7 +100,7 @@ const bsi_customer_brief = (() => {
             badge(words(doc.ai_intent), "blue") + badge("Confidence: " + (completed ? percent(doc.ai_confidence) : "Not available"), "gray") +
             badge(review, awaiting ? "orange" : "gray") + '</div>' +
             '<div style="background:var(--control-bg);border-radius:6px;padding:12px 16px;margin:12px 0">' + paragraph("Requirement at a glance · AI summary", doc.ai_summary) + '</div>' + '<div style="border-left:3px solid var(--primary);padding:4px 14px;margin:18px 0;background:var(--control-bg);border-radius:4px">' +
-            paragraph("Next action", next) + '<p class="small"><strong>Owner: </strong>' + text(lead.lead_owner || "Unassigned — assign a salesperson") + '</p></div>' +
+            paragraph("Next action", next) + '<p class="small"><strong>' + esc(responsibility(lead).label) + ': </strong>' + text(responsibility(lead).value) + '</p></div>' +
             disclosure("Products, urgency and extracted details", extracted, expanded) +
             disclosure("AI reasoning, routing and audit", diagnostics, expanded);
     }
@@ -103,7 +111,7 @@ const bsi_customer_brief = (() => {
             item("Email", text(doc.normalized_email || doc.email || lead.email_id)),
             item("Phone", text(doc.normalized_phone || doc.phone || lead.mobile_no)),
             item("Receiving company", text(lead.company)),
-            item("Lead owner", text(lead.lead_owner || "Unassigned — assign a salesperson"))
+            item(responsibility(lead).label, text(responsibility(lead).value))
         ]) + paragraph("Enquiry type / subject", doc.subject) + paragraph("Customer message", doc.transcript) +
             group([item("Received on", text(frappe.datetime.str_to_user(doc.creation))),
                 item("Website reference", text(doc.bsli_submission_ref)),
