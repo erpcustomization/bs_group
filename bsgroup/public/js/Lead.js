@@ -79,19 +79,21 @@ const bsi_customer_brief = (() => {
                 group([item("Reviewed by", text(doc.bsli_reviewed_by)), item("Reviewed on", text(doc.bsli_reviewed_on ? frappe.datetime.str_to_user(doc.bsli_reviewed_on) : null))]) +
                 paragraph("Review note", doc.bsli_review_note) : "") +
             '<p class="small text-muted">Confidence describes classification certainty; it is not a lead score or probability of winning. Unprovided customer facts are not inferred.</p>';
-        return '<div aria-label="AI processing and review status" style="display:flex;flex-wrap:wrap;gap:8px;margin:14px 0">' +
-            badge("AI: " + (doc.ai_status || "Pending"), completed ? "green" : (doc.ai_status === "Failed" ? "red" : "gray")) +
-            badge(words(doc.ai_intent), "blue") + badge("Confidence: " + (completed ? percent(doc.ai_confidence) : "Not available"), "gray") +
-            badge(review, awaiting ? "orange" : "gray") + '</div>' +
-            '<div style="background:var(--control-bg);border-radius:6px;padding:12px 16px;margin:12px 0">' + paragraph("Requirement at a glance · AI summary", doc.ai_summary) + '</div>' + group([
+        const extracted = group([
             item("Products / services", text(list(ai.products_or_services))),
             item("Customer type (AI)", text(ai.customer_type && words(ai.customer_type))),
             item("Urgency (AI)", text(ai.urgency && words(ai.urgency))),
             item("Deadline mentioned", text(ai.deadline_mentioned)),
             item("Quantity / value mentioned", text(ai.estimated_value_hint)),
             item("Verdict", text(ai.verdict && words(ai.verdict)))
-        ]) + '<div style="border-left:3px solid var(--primary);padding:4px 14px;margin:18px 0;background:var(--control-bg);border-radius:4px">' +
+        ]);
+        return '<div aria-label="AI processing and review status" style="display:flex;flex-wrap:wrap;gap:8px;margin:14px 0">' +
+            badge("AI: " + (doc.ai_status || "Pending"), completed ? "green" : (doc.ai_status === "Failed" ? "red" : "gray")) +
+            badge(words(doc.ai_intent), "blue") + badge("Confidence: " + (completed ? percent(doc.ai_confidence) : "Not available"), "gray") +
+            badge(review, awaiting ? "orange" : "gray") + '</div>' +
+            '<div style="background:var(--control-bg);border-radius:6px;padding:12px 16px;margin:12px 0">' + paragraph("Requirement at a glance · AI summary", doc.ai_summary) + '</div>' + '<div style="border-left:3px solid var(--primary);padding:4px 14px;margin:18px 0;background:var(--control-bg);border-radius:4px">' +
             paragraph("Next action", next) + '<p class="small"><strong>Owner: </strong>' + text(lead.lead_owner || "Unassigned — assign a salesperson") + '</p></div>' +
+            disclosure("Products, urgency and extracted details", extracted, expanded) +
             disclosure("AI reasoning, routing and audit", diagnostics, expanded);
     }
     function enquiry_html(doc, lead) {
