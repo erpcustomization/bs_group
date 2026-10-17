@@ -1,19 +1,16 @@
+/* Lead workflow and permission-aware customer brief.
+ * Use standard Frappe field/section visibility. Never hide a section because
+ * its parent tab is inactive. No timers, polling, metadata mutation or AI calls.
+ */
 frappe.ui.form.on("Lead", {
-    refresh: function(frm) {
-        setTimeout(() => {
-            $('a[data-label="Customer"]').hide();
-            $('a[data-label="Quotation"]').hide();
-            $('a[data-label="Prospect"]').hide();
-        }, 500);
-
+    refresh(frm) {
         frm.page.remove_inner_button("Opportunity", "Create");
-
         frm.page.add_inner_button("Opportunity", function () {
             frappe.call({
                 method: "erpnext.crm.doctype.lead.lead.make_opportunity",
                 args: { source_name: frm.docname },
                 freeze: true,
-                callback: function(r) {
+                callback(r) {
                     if (!r.exc && r.message) {
                         r.message.sales_stage = "Proposal";
                         r.message.custom_organization_name = frm.doc.company_name;
@@ -23,213 +20,152 @@ frappe.ui.form.on("Lead", {
                 }
             });
         }, "Create");
+        bsi_customer_brief.refresh(frm);
     }
 });
 
-// LEAD - ENTERPRISE GRADE UI ENHANCEMENT (Client Script Only)
-// Theme adapts to ERPNext Company: AE -> corporate emerald, OM -> corporate crimson
-frappe.ui.form.on('Lead', {
-    onload: function(frm) { if (frm.doc.company) inject_enterprise_styles(frm); else inject_neutral_styles(); },
-    refresh: function(frm) {
-        if (frm.doc.company) { inject_enterprise_styles(frm); } else { inject_neutral_styles(); }
-        hide_unused_fields(frm);
-        setTimeout(function(){ relocate_company_field(frm); }, 100);
-        decorate_status_indicator(frm);
-        setTimeout(function(){ decorate_sections(frm); }, 300);
-        setTimeout(function(){ add_dashboard_summary(frm); }, 350);
-    },
-    status: function(frm) { decorate_status_indicator(frm); },
-    company: function(frm) {
-        var el = document.getElementById('ent-lead-styles'); if (el) el.remove();
-        // Reset section header styles so they re-decorate with new theme
-        $(frm.wrapper).find('.section-head').each(function(){
-            var $s = $(this); $s.removeData('ent-styled'); $s.find('.ent-section-icon').remove();
-            $s.css({'border-left':'','padding-left':'','color':'','font-weight':'','letter-spacing':''});
+const bsi_customer_brief = (() => {
+    const esc = value => frappe.utils.escape_html(String(value ?? ""));
+    const words = value => String(value || "Not available").replace(/_/g, " ");
+    const text = value => value ? esc(value) : '<span class="text-muted">Not provided</span>';
+    const route = (doctype, name, label) => '<a href="/desk/' + doctype + '/' +
+        encodeURIComponent(name) + '">' + esc(label || name) + '</a>';
+    const item = (label, value) => '<div style="min-width:180px;flex:1;overflow-wrap:anywhere">' +
+        '<div class="text-muted small">' + esc(label) + '</div><div>' + value + '</div></div>';
+    const group = items => '<div style="display:flex;flex-wrap:wrap;gap:16px;margin:12px 0">' + items.join("") + '</div>';
+    const paragraph = (title, value) => '<div style="margin:14px 0"><strong>' + esc(title) +
+        '</strong><div style="white-space:pre-wrap;overflow-wrap:anywhere;margin-top:4px">' + text(value) + '</div></div>';
+    function safe_url(value) {
+        try {
+            const url = new URL(value);
+            if (!["https:", "http:"].includes(url.protocol)) return text(value);
+            return '<a href="' + esc(url.href) + '" target="_blank" rel="noopener noreferrer">' + esc(value) + '</a>';
+        } catch (_) { return text(value); }
+    }
+    function ai_result(doc) {
+        try { return JSON.parse(doc.bsli_ai_result || "{}"); } catch (_) { return {}; }
+    }
+    function percent(value) {
+        return value === null || value === undefined || value === "" ? "Not available" : esc(Number(value).toFixed(0)) + "%";
+    }
+    function ai_html(doc) {
+        const ai = ai_result(doc);
+        const completed = doc.ai_status === "Completed";
+        const list = value => Array.isArray(value) && value.length ? value.join(", ") : null;
+        const review = doc.bsli_review_state || "Not recorded";
+        const awaiting = review === "Awaiting Review";
+        return '<h5>AI analysis and sales handover</h5>' + group([
+            item("AI processing", text(doc.ai_status || "Pending")),
+            item("Classification", text(words(doc.ai_intent))),
+            item("Classification confidence", completed ? percent(doc.ai_confidence) : "Not available"),
+            item("Review", text(review))
+        ]) + paragraph("AI summary", doc.ai_summary) + group([
+            item("Products / services", text(list(ai.products_or_services))),
+            item("Customer type (AI)", text(ai.customer_type && words(ai.customer_type))),
+            item("Urgency (AI)", text(ai.urgency && words(ai.urgency))),
+            item("Deadline mentioned", text(ai.deadline_mentioned)),
+            item("Quantity / value mentioned", text(ai.estimated_value_hint)),
+            item("Verdict", text(ai.verdict && words(ai.verdict)))
+        ]) + paragraph("AI reasoning", Array.isArray(ai.reasons) ? ai.reasons.join("\n") : null) +
+            group([item("Risk flags", text(list(ai.risk_flags))),
+                item("Country signals", text(list(ai.country_signals))),
+                item("AI model", text(doc.bsli_ai_model)),
+                item("Processed on", text(doc.ai_processed_on ? frappe.datetime.str_to_user(doc.ai_processed_on) : null))]) +
+            paragraph("Routing decision", [doc.bsli_proposed_outcome && words(doc.bsli_proposed_outcome), doc.bsli_decision_reason].filter(Boolean).join(" — ")) +
+            paragraph("Next action", awaiting ? "Review the original enquiry and AI findings, then confirm or correct the outcome in Lead Intake before following up." :
+                (doc.ai_next_action || (completed ? "Review the customer requirement and follow up through the normal sales workflow." : "Review the original enquiry; AI analysis is not complete."))) +
+            '<p class="small text-muted">Confidence describes classification certainty; it is not a lead score or probability of winning. Unprovided customer facts are not inferred.</p>' +
+            '<p>' + route("lead-intake", doc.name, "Open full enquiry and review controls") + '</p>';
+    }
+    function enquiry_html(doc, lead) {
+        return '<h5>Original customer enquiry</h5>' + group([
+            item("Customer / contact", text(doc.full_name || lead.lead_name)),
+            item("Organization", text(doc.organization_name || lead.company_name)),
+            item("Email", text(doc.normalized_email || doc.email || lead.email_id)),
+            item("Phone", text(doc.normalized_phone || doc.phone || lead.mobile_no)),
+            item("Receiving company", text(lead.company)),
+            item("Lead owner", text(lead.lead_owner || "Unassigned — assign a salesperson"))
+        ]) + paragraph("Enquiry type / subject", doc.subject) + paragraph("Customer message", doc.transcript) +
+            group([item("Received on", text(frappe.datetime.str_to_user(doc.creation))),
+                item("Website reference", text(doc.bsli_submission_ref)),
+                item("Source page", safe_url(doc.source_url)),
+                item("Source record", route("lead-intake", doc.name))]);
+    }
+    function primary(docs, name) {
+        // A later support/job enquiry matched to this person must not overwrite the
+        // sales enquiry that actually created the Lead.
+        return docs.find(d => d.converted_lead === name) || docs[0];
+    }
+    function related_html(docs, selected) {
+        const others = docs.filter(d => d.name !== selected.name);
+        if (!others.length) return "";
+        return '<details style="margin-top:16px"><summary>Recent linked enquiries (' + others.length + ')</summary>' +
+            others.map(d => '<p>' + route("lead-intake", d.name) + ' · ' + esc(words(d.ai_intent || d.subject)) +
+                ' · ' + esc(d.status || "") + ' · ' + esc(d.bsli_review_state || "") + '</p>').join("") +
+            '<p class="small text-muted">Each enquiry retains its own classification and review. Up to 20 recent linked records are shown. Other linked enquiries do not replace the sales brief above.</p></details>';
+    }
+    function mount(frm, html) {
+        const wrap = $(frm.wrapper);
+        const panes = wrap.find('.tab-pane');
+        const details = panes.first();
+        let ai = wrap.find('#lead-bsi_ai_tab');
+        if (!ai.length) ai = wrap.find('[data-fieldname="bsi_ai_section"]').closest('.tab-pane');
+        [details, ai].forEach(pane => {
+            if (!pane.length) return;
+            let box = pane.children('.bsi-customer-brief');
+            if (!box.length) box = $('<section class="bsi-customer-brief" aria-label="Customer enquiry and AI brief" style="padding:20px;border:1px solid var(--border-color);border-radius:8px;margin:12px 0 20px"></section>').prependTo(pane);
+            box.html(html);
         });
-        if (frm.doc.company) inject_enterprise_styles(frm); else inject_neutral_styles();
-        setTimeout(function(){ decorate_sections(frm); }, 50);
-        setTimeout(function(){ add_dashboard_summary(frm); }, 80);
     }
-});
-
-function get_theme(frm) {
-    var c = (frm && frm.doc && frm.doc.company) ? String(frm.doc.company) : '';
-    if (/-\s*AE\s*$/i.test(c) || /UAE/i.test(c)) {
-        return {
-            key: 'UAE',
-            primary: '#0E5E3A',     // deep emerald
-            secondary: '#1F8A5A',   // muted green
-            accent: '#0E5E3A',
-            gradient: 'linear-gradient(135deg,#0E5E3A 0%,#1F8A5A 100%)',
-            btnGradient: 'linear-gradient(135deg,#0E5E3A 0%,#1F8A5A 100%)',
-            section_colors: { 'Contact Info':'#0E5E3A','Organization':'#1F8A5A','Address':'#0E5E3A','Notes':'#1F8A5A','Lead Details':'#0E5E3A' }
-        };
+    function legacy_fields(frm, website) {
+        // The authoritative website analysis is in the brief. Pilot review is
+        // separate from model confidence; never show an uncalculated score as 0.
+        if (!website) return;
+        ["bsi_intake_section", "bsi_ai_section", "bsi_rfq_section"].forEach(name => {
+            if (frm.fields_dict[name]) frm.toggle_display(name, false);
+        });
     }
-    if (/-\s*OM\s*$/i.test(c) || /Oman/i.test(c)) {
-        return {
-            key: 'OM',
-            primary: '#7A1F2B',     // corporate crimson
-            secondary: '#B23A48',   // softer red
-            accent: '#7A1F2B',
-            gradient: 'linear-gradient(135deg,#7A1F2B 0%,#B23A48 100%)',
-            btnGradient: 'linear-gradient(135deg,#7A1F2B 0%,#B23A48 100%)',
-            section_colors: { 'Contact Info':'#7A1F2B','Organization':'#B23A48','Address':'#7A1F2B','Notes':'#B23A48','Lead Details':'#7A1F2B' }
-        };
-    }
-    return {
-        key: 'DEFAULT',
-        primary: '#1e3a8a', secondary: '#3b82f6', accent: '#3b82f6',
-        gradient: 'linear-gradient(135deg,#1e3a8a 0%,#3b82f6 100%)',
-        btnGradient: 'linear-gradient(135deg,#1e40af,#3b82f6)',
-        section_colors: { 'Contact Info':'#0ea5e9','Organization':'#8b5cf6','Address':'#f59e0b','Notes':'#10b981','Lead Details':'#3b82f6' }
-    };
-}
-
-function hide_unused_fields(frm) {
-    var candidate_fields = ['salutation','middle_name','gender','job_title','phone_ext','fax','website','whatsapp','market_segment','industry','territory','annual_revenue','no_of_employees','request_type','lead_type','blog_subscriber','unsubscribed','naming_series','company_name','qualification_status','qualified_by','qualified_on','image','campaign_name','source','city','state','country','pincode','county','address_line1','address_line2','address_title','address_type'];
-    candidate_fields.forEach(function(fn){
-        var df = frappe.meta.get_docfield(frm.doctype, fn, frm.docname);
-        if (!df) return;
-        var val = frm.doc[fn];
-        var is_empty = (val === undefined || val === null || val === '' || val === 0);
-        if (!df.reqd && is_empty) { frm.set_df_property(fn, 'hidden', 1); }
-        else { frm.set_df_property(fn, 'hidden', 0); }
-    });
-    if (frappe.meta.get_docfield(frm.doctype, 'company', frm.docname)) {
-        frm.set_df_property('company', 'hidden', 0);
-    }
-    setTimeout(function(){ hide_empty_sections(frm); }, 250);
-}
-
-function hide_empty_sections(frm) {
-    if (!frm.fields) return;
-    frm.fields.forEach(function(field){
-        if (field.df && field.df.fieldtype === 'Section Break') {
-            var $section = $(field.wrapper);
-            var $pane = $section.closest('.tab-pane');
-            if ($pane.length && /activities_tab|notes_tab|dashboard_tab/.test($pane.attr('id') || '')) { return; }
-            var $visible = $section.find('.frappe-control').filter(function(){ return $(this).is(':visible'); });
-            if ($visible.length === 0) { $section.hide(); } else { $section.show(); }
+    async function refresh(frm) {
+        if (frm.is_new()) return;
+        const name = frm.doc.name;
+        const generation = (frm._bsi_brief_generation || 0) + 1;
+        frm._bsi_brief_generation = generation;
+        mount(frm, '<h5>Customer enquiry and AI brief</h5><p role="status">Loading saved enquiry and analysis…</p>');
+        try {
+            const query = {
+                method: "frappe.client.get_list",
+                args: {
+                    doctype: "Lead Intake",
+                    filters: { external_system: "website-form" },
+                    or_filters: [["converted_lead", "=", name], ["matched_lead", "=", name]],
+                    fields: ["name", "creation", "full_name", "organization_name", "email", "phone", "normalized_email", "normalized_phone",
+                        "subject", "transcript", "source_url", "converted_lead", "matched_lead", "status", "ai_status", "ai_intent", "ai_confidence",
+                        "ai_summary", "ai_next_action", "ai_processed_on", "bsli_submission_ref", "bsli_ai_result", "bsli_ai_model",
+                        "bsli_review_state", "bsli_proposed_outcome", "bsli_decision_reason"],
+                    order_by: "creation desc", limit_page_length: 20
+                }
+            };
+            // Fetch the creating enquiry independently so later linked enquiries
+            // cannot push it out of the bounded recent-history window.
+            const originalQuery = { method: query.method, args: {
+                ...query.args, filters: { external_system: "website-form", converted_lead: name },
+                or_filters: undefined, order_by: "creation asc", limit_page_length: 1
+            }};
+            const [original, recent] = await Promise.all([frappe.call(originalQuery), frappe.call(query)]);
+            if (frm.doc.name !== name || frm._bsi_brief_generation !== generation) return;
+            const docs = [...(original.message || []), ...(recent.message || [])]
+                .filter((d, i, all) => all.findIndex(x => x.name === d.name) === i);
+            if (!docs.length) {
+                mount(frm, '<h5>Customer enquiry and AI brief</h5><p>No website enquiry is linked to this Lead. Existing Lead details and any other source analysis remain below.</p>');
+                return;
+            }
+            const doc = primary(docs, name);
+            legacy_fields(frm, true);
+            mount(frm, enquiry_html(doc, frm.doc) + '<hr>' + ai_html(doc) + related_html(docs, doc));
+        } catch (_) {
+            if (frm.doc.name !== name || frm._bsi_brief_generation !== generation) return;
+            mount(frm, '<h5>Customer enquiry and AI brief</h5><p role="alert">The linked enquiry could not be loaded. Refresh to retry. If this persists, ask your administrator to check your existing Lead Intake access.</p>');
         }
-    });
-}
-
-function decorate_status_indicator(frm) {
-    var status = frm.doc.status;
-    if (!status) return;
-    var color_map = {'Lead':'gray','Open':'blue','Replied':'cyan','Opportunity':'orange','Quotation':'purple','Lost Quotation':'red','Interested':'yellow','Converted':'green','Do Not Contact':'red'};
-    var color = color_map[status] || 'gray';
-    if (frm.page && frm.page.set_indicator) { frm.page.set_indicator(status, color); }
-}
-
-function decorate_sections(frm) {
-    var theme = get_theme(frm);
-    var $form = $(frm.wrapper);
-    var icon_map = { 'Contact Info':'☎','Organization':'⌂','Address':'⚑','Notes':'✍','Lead Details':'★' };
-    $form.find('.section-head').each(function(){
-        var $sec = $(this);
-        var text = ($sec.text() || '').trim();
-        var color = theme.section_colors[text];
-        var icon = icon_map[text];
-        if (color && !$sec.data('ent-styled')) {
-            if (icon) { $sec.prepend('<span class="ent-section-icon" style="margin-right:8px;">' + icon + '</span>'); }
-            $sec.css({'border-left':'4px solid '+color,'padding-left':'10px','color':color,'font-weight':'600','letter-spacing':'0.3px'});
-            $sec.data('ent-styled', true);
-        }
-    });
-}
-
-function add_dashboard_summary(frm) {
-    if (frm.is_new && frm.is_new()) return;
-    var $w0 = $(frm.wrapper); $w0.find('.ent-summary-card').remove();
-    if (!frm.doc.company) { return; }
-    var theme = get_theme(frm);
-    var $wrap = $(frm.wrapper);
-    var org   = frm.doc.company_name || frm.doc.organization_name || '-';
-    var company = frm.doc.company || '-';
-    var stat  = frm.doc.status || '-';
-    var esc = function(s){ return frappe.utils.escape_html(String(s)); };
-    var textColor = '#ffffff';
-    var labelColor = 'rgba(255,255,255,.78)';
-    var tile = function(label, value){
-        return '<div style="flex:1;min-width:150px;">' +
-               '<div style="color:'+labelColor+';font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">' + label + '</div>' +
-               '<div style="font-weight:700;font-size:14px;color:'+textColor+';">' + esc(value) + '</div>' +
-               '</div>';
-    };
-    var badge = '<span style="background:rgba(255,255,255,.18);color:#fff;font-size:10px;padding:2px 8px;border-radius:999px;letter-spacing:1px;margin-left:8px;border:1px solid rgba(255,255,255,.3);">' + theme.key + '</span>';
-    var html = '<div class="ent-summary-card" style="position:relative;display:flex;flex-wrap:wrap;gap:14px;align-items:center;background:'+theme.gradient+';border-radius:10px;padding:14px 18px;margin:8px 0 18px 0;box-shadow:0 4px 14px rgba(0,0,0,0.18);">' +
-               tile('Company', company) +
-               tile('Organization', org) +
-               tile('Status', stat) +
-               '<div style="position:absolute;top:8px;right:12px;">'+badge+'</div>' +
-               '</div>';
-    var $layout = $wrap.find('.form-layout').first();
-    if ($layout.length) { $layout.prepend(html); }
-}
-
-function inject_neutral_styles() {
-    if (document.getElementById('ent-lead-styles')) return;
-    var css = '<style id="ent-lead-styles" data-theme="NEUTRAL">'
-        + '[data-doctype="Lead"] .form-layout { background:#f8fafc; border-radius:10px; }'
-        + '[data-doctype="Lead"] .form-section { background:#ffffff; border:1px solid #e5e7eb; border-radius:8px; padding:14px 18px; margin-bottom:14px; box-shadow:0 1px 2px rgba(15,23,42,0.04); }'
-        + '[data-doctype="Lead"] .control-label { color:#475569 !important; font-weight:600 !important; font-size:11.5px !important; text-transform:uppercase; letter-spacing:.4px; }'
-        + '[data-doctype="Lead"] .form-control, [data-doctype="Lead"] .like-disabled-input { border-radius:6px !important; border:1px solid #cbd5e1 !important; background:#fbfdff !important; }'
-        + '[data-doctype="Lead"] .form-control:focus { border-color:#94a3b8 !important; box-shadow:0 0 0 3px rgba(148,163,184,.18) !important; background:#fff !important; }'
-        + '[data-doctype="Lead"] .title-text { color:#0f172a !important; font-weight:700 !important; }'
-        + '</style>';
-    $('head').append(css);
-}
-
-function inject_enterprise_styles(frm) {
-    var existing = document.getElementById('ent-lead-styles');
-    var desiredKey = get_theme(frm).key;
-    if (existing && existing.getAttribute('data-theme') === desiredKey) return;
-    if (existing) existing.remove();
-    var theme = get_theme(frm);
-    var css = '<style id="ent-lead-styles" data-theme="'+theme.key+'">'
-        + '[data-doctype="Lead"] .form-layout { background:#f8fafc; border-radius:10px; }'
-        + '[data-doctype="Lead"] .form-section { background:#ffffff; border:1px solid #e5e7eb; border-radius:8px; padding:14px 18px; margin-bottom:14px; box-shadow:0 1px 2px rgba(15,23,42,0.04); transition:box-shadow .2s ease; }'
-        + '[data-doctype="Lead"] .form-section:hover { box-shadow:0 4px 12px rgba(15,23,42,0.08); }'
-        + '[data-doctype="Lead"] .control-label { color:#475569 !important; font-weight:600 !important; font-size:11.5px !important; text-transform:uppercase; letter-spacing:.4px; }'
-        + '[data-doctype="Lead"] .form-control, [data-doctype="Lead"] .like-disabled-input { border-radius:6px !important; border:1px solid #cbd5e1 !important; background:#fbfdff !important; transition:border-color .15s,box-shadow .15s; }'
-        + '[data-doctype="Lead"] .form-control:focus { border-color:'+theme.primary+' !important; box-shadow:0 0 0 3px '+hexToRgba(theme.primary,0.15)+' !important; background:#fff !important; }'
-        + '[data-doctype="Lead"] .form-tabs-list .nav-link.active { color:'+theme.primary+' !important; border-bottom:2px solid '+theme.primary+' !important; font-weight:600; }'
-        + '[data-doctype="Lead"] .title-text { color:#0f172a !important; font-weight:700 !important; }'
-        + '[data-doctype="Lead"] .standard-actions .btn-primary { background:'+theme.btnGradient+' !important; border:none !important; box-shadow:0 2px 6px '+hexToRgba(theme.primary,0.35)+'; }'
-        + '</style>';
-    $('head').append(css);
-}
-
-function hexToRgba(hex, a) {
-    var h = hex.replace('#','');
-    if (h.length === 3) { h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2]; }
-    var r = parseInt(h.substring(0,2),16), g = parseInt(h.substring(2,4),16), b = parseInt(h.substring(4,6),16);
-    return 'rgba('+r+','+g+','+b+','+a+')';
-}
-
-function relocate_company_field(frm) {
-    try {
-        var f = frm.fields_dict.company;
-        if (!f || !f.wrapper) return;
-        var $w = $(f.wrapper);
-        var $ctrl = $w.closest('.frappe-control');
-        if (!$ctrl.length) $ctrl = $w;
-        var $layout = $(frm.wrapper).find('.form-layout').first();
-        var $first = $layout.find('.form-section').first();
-        if (!$first.length) return;
-        var $col = $first.find('.form-column').first();
-        if (!$col.length) $col = $first;
-        if ($ctrl.closest('.form-section')[0] === $first[0]) {
-            $ctrl.show(); $w.show(); f.df.hidden = 0;
-            if (f.refresh) f.refresh();
-            return;
-        }
-        $ctrl.detach().appendTo($col);
-        $ctrl.show(); $w.show();
-        f.df.hidden = 0;
-        if (f.df.label !== 'Company') { f.df.label = 'Company'; }
-        frm.set_df_property('company', 'hidden', 0);
-        if (f.refresh) f.refresh();
-    } catch(e) { console.warn('relocate_company_field failed', e); }
-}
+    }
+    return { refresh, primary, safe_url, ai_html, enquiry_html };
+})();
