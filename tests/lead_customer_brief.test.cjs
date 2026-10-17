@@ -22,6 +22,11 @@ const sale={name:'LI-SALES',converted_lead:'LEAD1',ai_status:'Completed',ai_conf
  check(boxes.ai.includes('&lt;img'),'Escaped data remains readable');
  check(boxes.ai.includes('Not provided'),'Unknown values explicitly marked');
  check(boxes.ai.includes('Unassigned'),'Missing owner explicit');
+ check(ctx.brief.ai_html(sale, {_assign:'["priya@example.org","rahul@example.org"]'}).includes('Assigned team'),'Shared assignment label shown');
+ check(ctx.brief.ai_html(sale, {_assign:'["priya@example.org","rahul@example.org"]'}).includes('priya@example.org, rahul@example.org'),'Stored assignees retained');
+ check(!ctx.brief.ai_html(sale, {_assign:'["priya@example.org"]'}).includes('Unassigned'),'Assigned Lead never says unassigned');
+ check(ctx.brief.ai_html(sale, {_assign:'invalid',lead_owner:'owner@example.org'}).includes('owner@example.org'),'Malformed assignment retains owner fallback');
+ check(!ctx.brief.ai_html(sale, {_assign:['<img src=x>']}).includes('<img src=x>'),'Assignment names escaped');
  check(boxes.ai.includes('Recent linked enquiries (1)'),'Related enquiry separate');
  check(ctx.brief.primary([{name:'SUPPORT'},sale],'LEAD1').name==='LI-SALES','Original sales record preferred');
  check(!ctx.brief.safe_url('javascript:alert(1)').includes('href='),'Executable source URL rejected');
