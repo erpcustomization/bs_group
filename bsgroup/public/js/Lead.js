@@ -125,20 +125,30 @@ const bsi_customer_brief = (() => {
         // The authoritative website analysis is in the brief. Pilot review is
         // separate from model confidence; never show an uncalculated score as 0.
         if (!website) return;
-        ["bsi_ai_status", "bsi_ai_score"].forEach(name => {
-            if (frm.fields_dict[name]) frm.toggle_display(name, false);
+        const fields = ["bsi_ai_status", "bsi_ai_score"];
+        if (!frm.doc.bsi_rfq_value_estimate) fields.push("bsi_rfq_value_estimate");
+        frm._bsi_legacy_visibility = {};
+        fields.forEach(name => {
+            const field = frm.fields_dict[name];
+            if (!field) return;
+            frm._bsi_legacy_visibility[name] = !field.df.hidden;
+            frm.toggle_display(name, false);
         });
-        if (frm.fields_dict.bsi_rfq_value_estimate && !frm.doc.bsi_rfq_value_estimate) {
-            frm.toggle_display("bsi_rfq_value_estimate", false);
-        }
         // Keep native summary/confidence fields and their Section Breaks intact:
         // Frappe hides an entire tab if every native section is marked hidden.
     }
     async function refresh(frm) {
-        if (frm.is_new()) return;
-        const name = frm.doc.name;
         const generation = (frm._bsi_brief_generation || 0) + 1;
         frm._bsi_brief_generation = generation;
+        Object.entries(frm._bsi_legacy_visibility || {}).forEach(([name, visible]) => {
+            if (frm.fields_dict[name]) frm.toggle_display(name, visible);
+        });
+        frm._bsi_legacy_visibility = null;
+        if (frm.is_new()) {
+            $(frm.wrapper).find('.bsi-customer-brief').remove();
+            return;
+        }
+        const name = frm.doc.name;
         mount(frm, '<h5>Customer enquiry and AI brief</h5><p role="status">Loading saved enquiry and analysis…</p>');
         try {
             const query = {
