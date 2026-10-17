@@ -443,7 +443,9 @@ def dcs_delivery_release(args):
 		result["narrative_guard"] = "blocked"
 		return result
 
-	s = frappe.get_doc("Deal Cost Sheet", dcs_name)
+	s = frappe.get_doc("Deal Cost Sheet", dcs_name, for_update=True)
+	from bsgroup.dcs.obligation import assert_clearance
+	assert_clearance(s)
 	s.check_permission("write")
 	blk = open_blockers(dcs_name)
 	names = [str(b.get("condition_title")) + " (" + str(b.get("domain")) + ")" for b in blk]

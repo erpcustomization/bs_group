@@ -1,0 +1,105 @@
+{
+ "doctype": "DocType",
+ "name": "DCS Commercial Obligation Event",
+ "module": "BS Group",
+ "autoname": "hash",
+ "engine": "InnoDB",
+ "track_changes": 0,
+ "allow_rename": 0,
+ "allow_copy": 0,
+ "index_web_pages_for_search": 0,
+ "show_name_in_global_search": 0,
+ "field_order": [
+  "dcs",
+  "obligation",
+  "revision",
+  "action",
+  "actor",
+  "occurred_on",
+  "reason",
+  "snapshot"
+ ],
+ "fields": [
+  {
+   "fieldname": "dcs",
+   "label": "Dcs",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "Deal Cost Sheet",
+   "reqd": 1
+  },
+  {
+   "fieldname": "obligation",
+   "label": "Obligation",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "DCS Commercial Obligation",
+   "reqd": 1
+  },
+  {
+   "fieldname": "revision",
+   "label": "Revision",
+   "fieldtype": "Int",
+   "read_only": 1
+  },
+  {
+   "fieldname": "action",
+   "label": "Action",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "actor",
+   "label": "Actor",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "User"
+  },
+  {
+   "fieldname": "occurred_on",
+   "label": "Occurred On",
+   "fieldtype": "Datetime",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reason",
+   "label": "Reason",
+   "fieldtype": "Small Text",
+   "read_only": 1
+  },
+  {
+   "fieldname": "snapshot",
+   "label": "Snapshot",
+   "fieldtype": "Code",
+   "read_only": 1,
+   "options": "JSON"
+  }
+ ],
+ "permissions": [
+  {
+   "role": "Sales User",
+   "read": 1,
+   "select": 1
+  },
+  {
+   "role": "Sales Manager",
+   "read": 1,
+   "select": 1
+  },
+  {
+   "role": "Commercial Controller",
+   "read": 1,
+   "select": 1
+  },
+  {
+   "role": "Managing Director",
+   "read": 1,
+   "select": 1
+  },
+  {
+   "role": "System Manager",
+   "read": 1,
+   "select": 1
+  }
+ ]
+}

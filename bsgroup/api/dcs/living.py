@@ -27,6 +27,8 @@ def dcs_screen2(args):
 	dcs_name = args.get("dcs")
 	roles = get_user_roles()
 	is_comm = has_any(roles, SCREEN2_COMMERCIAL) or bool(dcs_name and frappe.db.exists("Deal Cost Sheet",dcs_name) and is_assigned_manager(dcs_name))
+	from bsgroup.dcs.obligation import delivery_reader, audience
+	is_comm = is_comm or delivery_reader() or bool(dcs_name and frappe.db.exists("Deal Cost Sheet",dcs_name) and audience(frappe.get_doc("Deal Cost Sheet",dcs_name)))
 	is_tech = has_any(roles, TECHNICAL_ROLES)
 
 	if not dcs_name:
