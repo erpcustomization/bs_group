@@ -28,3 +28,5 @@ bsgroup.patches.v0_1.dcs_browser_audit
 bsgroup.patches.v0_1.dcs_compact_crm
 bsgroup.patches.v0_1.dcs_account_labels
 bsgroup.patches.v0_1.dcs_costing_subject
+
+bsgroup.patches.v0_1.dcs_procurement

@@ -24,7 +24,7 @@ frappe.ui.form.on('Quotation', {
         prompt_lost_reason_if_needed(frm);
     },
     onload: function(frm) {
-        if (!frm.doc.custom_designation) {
+        if (!frm.doc.custom_designation && frappe.model.can_read("Employee")) {
             frappe.db.get_value("Employee",
                 { user_id: frappe.session.user },
                 [ "designation", "cell_number"]
@@ -64,7 +64,8 @@ frappe.ui.form.on('Quotation Item', {
 });
 
 function set_lead_name(frm) {
-    if (!frm.doc.party_name) return;
+    // Submitted quotation identity must remain frozen while recording Won / PO.
+    if (frm.doc.docstatus !== 0 || !frm.doc.party_name) return;
 
     if (frm.doc.quotation_to === "Lead") {
         frappe.db.get_value("Lead", frm.doc.party_name, ["lead_name", "company_name"])
@@ -297,3 +298,32 @@ frappe.ui.form.on(cur_frm ? cur_frm.doctype : 'Quotation', {
     if (document.documentElement.classList.contains('lite-theme')) colorize();
   }, 1500);
 })();
+// Customer purchase order and sales-to-procurement handoff.
+frappe.ui.form.on('Quotation', {
+    refresh(frm) {
+        if (!frm.doc.custom_deal_cost_sheet) return;
+        const sent = Boolean(frm.doc.custom_purchase_request);
+        ['custom_customer_po', 'custom_customer_po_reference'].forEach(field => frm.set_df_property(field, 'read_only', sent));
+        if (sent) {
+            frm.add_custom_button(__('View Purchase Request'), () => frappe.set_route('Form', 'DCS Purchase Request', frm.doc.custom_purchase_request));
+            frm.set_intro(__('Sent to Procurement: {0}', [frappe.utils.escape_html(frm.doc.custom_purchase_request)]), 'green');
+        } else if (frm.doc.docstatus === 1 && frm.doc.custom_pipeline_stage === 'Won' && !frm.is_dirty()
+                && frappe.user.has_role(['Sales Manager','Commercial Controller','Managing Director'])) {
+            frm.add_custom_button(__('Send to Procurement'), () => {
+                if (frm.is_dirty()) { frappe.msgprint(__('Save the quotation before sending to procurement.')); return; }
+                frappe.call({method:'bsgroup.dcs.procurement.send_to_procurement', args:{quotation:frm.doc.name}, freeze:true,
+                    freeze_message:__('Preparing procurement documents…'), callback(r) {
+                        if (!r.message) return;
+                        frm.reload_doc();
+                        frappe.set_route('Form','DCS Purchase Request',r.message.name);
+                    }});
+            });
+        }
+    },
+    custom_pipeline_stage(frm) {
+        if (frm.doc.custom_deal_cost_sheet && frm.doc.custom_pipeline_stage === 'Won' && !frm.doc.custom_customer_po) {
+            frappe.msgprint(__('Upload the Customer PO and enter its reference, then save to confirm Won.'));
+            frm.scroll_to_field('custom_customer_po_reference');
+        }
+    }
+});

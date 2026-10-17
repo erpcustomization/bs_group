@@ -483,3 +483,17 @@ fixtures = [
     # {"doctype": "Workflow State"},
     # {"doctype": "Role"},
 ]
+# Awarded quotation -> mandatory customer PO -> immutable procurement request.
+has_permission["DCS Purchase Request"] = "bsgroup.dcs.procurement.has_permission"
+permission_query_conditions["DCS Purchase Request"] = "bsgroup.dcs.procurement.query_conditions"
+for _event in ("validate", "before_update_after_submit"):
+    doc_events["Quotation"][_event].extend(["bsgroup.dcs.procurement.guard_reference", "bsgroup.dcs.procurement.validate_won"])
+for _event in ("on_update", "on_update_after_submit"):
+    _previous = doc_events["Quotation"][_event]
+    doc_events["Quotation"][_event] = ["bsgroup.dcs.procurement.sync_won"] + ([_previous] if isinstance(_previous,str) else _previous)
+for _event in ("validate", "before_insert", "on_trash"):
+    _previous = doc_events.setdefault("File", {}).get(_event, [])
+    doc_events["File"][_event] = ([_previous] if isinstance(_previous,str) else list(_previous)) + ["bsgroup.dcs.procurement.file_guard"]
+
+extend_doctype_class.setdefault("File", []).append("bsgroup.dcs.procurement.ProcurementFileMixin")
+doc_events["Quotation"]["before_cancel"] = "bsgroup.dcs.procurement.before_cancel"

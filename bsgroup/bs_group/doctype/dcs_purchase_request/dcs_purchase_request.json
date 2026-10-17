@@ -1,0 +1,164 @@
+{
+ "doctype": "DocType",
+ "name": "DCS Purchase Request",
+ "module": "BS Group",
+ "autoname": "format:DCS-PR-{#####}",
+ "engine": "InnoDB",
+ "allow_rename": 0,
+ "allow_copy": 0,
+ "track_changes": 0,
+ "field_order": [
+  "dcs",
+  "quotation",
+  "company",
+  "customer_po_reference",
+  "revision_reference",
+  "award_sequence",
+  "status",
+  "sent_by",
+  "sent_on",
+  "awarded_quotation",
+  "customer_po",
+  "costing_sheet",
+  "award_key",
+  "packet_manifest"
+ ],
+ "fields": [
+  {
+   "fieldname": "dcs",
+   "label": "Deal Cost Sheet",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "Deal Cost Sheet",
+   "ignore_user_permissions": 1
+  },
+  {
+   "fieldname": "quotation",
+   "label": "Quotation",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "Quotation",
+   "ignore_user_permissions": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "company",
+   "label": "Company",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "Company",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "customer_po_reference",
+   "label": "Customer PO Reference",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "revision_reference",
+   "label": "Revision Reference",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "award_sequence",
+   "label": "Award Sequence",
+   "fieldtype": "Int",
+   "read_only": 1
+  },
+  {
+   "fieldname": "status",
+   "label": "Status",
+   "fieldtype": "Data",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "sent_by",
+   "label": "Sent By",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "User",
+   "ignore_user_permissions": 1
+  },
+  {
+   "fieldname": "sent_on",
+   "label": "Sent On",
+   "fieldtype": "Datetime",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "awarded_quotation",
+   "label": "Awarded Quotation",
+   "fieldtype": "Attach",
+   "read_only": 1
+  },
+  {
+   "fieldname": "customer_po",
+   "label": "Customer PO",
+   "fieldtype": "Attach",
+   "read_only": 1
+  },
+  {
+   "fieldname": "costing_sheet",
+   "label": "Costing Sheet",
+   "fieldtype": "Attach",
+   "read_only": 1
+  },
+  {
+   "fieldname": "award_key",
+   "label": "Award Key",
+   "fieldtype": "Data",
+   "read_only": 1,
+   "hidden": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "packet_manifest",
+   "label": "Packet Manifest",
+   "fieldtype": "Long Text",
+   "read_only": 1,
+   "hidden": 1
+  }
+ ],
+ "permissions": [
+  {
+   "role": "Purchase User",
+   "read": 1,
+   "select": 1,
+   "print": 1
+  },
+  {
+   "role": "Purchase Manager",
+   "read": 1,
+   "select": 1,
+   "print": 1
+  },
+  {
+   "role": "Sales Manager",
+   "read": 1,
+   "select": 1,
+   "print": 1
+  },
+  {
+   "role": "Commercial Controller",
+   "read": 1,
+   "select": 1,
+   "print": 1
+  },
+  {
+   "role": "Managing Director",
+   "read": 1,
+   "select": 1,
+   "print": 1
+  },
+  {
+   "role": "System Manager",
+   "read": 1,
+   "select": 1,
+   "print": 1
+  }
+ ]
+}
