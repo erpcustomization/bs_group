@@ -214,11 +214,14 @@ const bsi_customer_brief = (() => {
                 if (!doc) throw new Error("Linked enquiry not readable");
             }
             legacy_fields(frm, true);
-            const context = header(doc, frm.doc);
-            const source = disclosure("Original customer enquiry and source", enquiry_html(doc, frm.doc));
+            // Frappe loads active ToDos in docinfo, separately from the Lead document.
+            const assignments = frm.get_docinfo?.()?.assignments;
+            const lead = Array.isArray(assignments) ? { ...frm.doc, _assign: assignments.map(row => row.owner) } : frm.doc;
+            const context = header(doc, lead);
+            const source = disclosure("Original customer enquiry and source", enquiry_html(doc, lead));
             const history = related_html(docs, doc);
-            mount(frm, context + ai_html(doc, frm.doc, false) + source + history,
-                context + ai_html(doc, frm.doc, true) + source + history);
+            mount(frm, context + ai_html(doc, lead, false) + source + history,
+                context + ai_html(doc, lead, true) + source + history);
         } catch (_) {
             if (frm.doc.name !== name || frm._bsi_brief_generation !== generation) return;
             mount(frm, '<h5>Customer enquiry and AI brief</h5><p role="alert">The linked enquiry could not be loaded. Refresh to retry. If this persists, ask your administrator to check your existing Lead Intake access.</p>');
