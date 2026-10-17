@@ -1,6 +1,6 @@
 /* Lead workflow and permission-aware customer brief.
  * Use standard Frappe field/section visibility. Never hide a section because
- * its parent tab is inactive. No timers, polling, metadata mutation or AI calls.
+ * its parent tab is inactive. No global layout changes, timers, polling or AI calls.
  */
 frappe.ui.form.on("Lead", {
     refresh(frm) {
@@ -26,13 +26,14 @@ frappe.ui.form.on("Lead", {
 
 const bsi_customer_brief = (() => {
     const esc = value => frappe.utils.escape_html(String(value ?? ""));
-    const words = value => String(value || "Not available").replace(/_/g, " ");
+    const labels = { rfq: "Quotation request", tender: "Tender", general_sales: "Sales enquiry", job_seeker: "Careers enquiry", support: "Support request", other: "Other", end_user: "End user", reseller_partner: "Reseller / partner", genuine_lead: "Genuine sales enquiry", needs_review: "Needs review", existing_lead: "Existing lead", duplicate_submission: "Duplicate submission" };
+    const words = value => labels[value] || String(value || "Not available").replace(/_/g, " ");
     const text = value => value ? esc(value) : '<span class="text-muted">Not provided</span>';
     const route = (doctype, name, label) => '<a href="/desk/' + doctype + '/' +
         encodeURIComponent(name) + '">' + esc(label || name) + '</a>';
-    const item = (label, value) => '<div style="min-width:180px;flex:1;overflow-wrap:anywhere">' +
-        '<div class="text-muted small">' + esc(label) + '</div><div>' + value + '</div></div>';
-    const group = items => '<div style="display:flex;flex-wrap:wrap;gap:16px;margin:12px 0">' + items.join("") + '</div>';
+    const item = (label, value) => '<div style="min-width:0;overflow-wrap:anywhere">' +
+        '<div class="text-muted small">' + esc(label) + '</div><div style="font-weight:500">' + value + '</div></div>';
+    const group = items => '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:12px 20px;margin:14px 0">' + items.join("") + '</div>';
     const paragraph = (title, value) => '<div style="margin:14px 0"><strong>' + esc(title) +
         '</strong><div style="white-space:pre-wrap;overflow-wrap:anywhere;margin-top:4px">' + text(value) + '</div></div>';
     function safe_url(value) {
@@ -48,38 +49,50 @@ const bsi_customer_brief = (() => {
     function percent(value) {
         return value === null || value === undefined || value === "" ? "Not available" : esc(Number(value).toFixed(0)) + "%";
     }
-    function ai_html(doc) {
+    const disclosure = (title, body, open = false) => '<details style="margin-top:14px;border-top:1px solid var(--border-color);padding-top:12px"' + (open ? ' open' : '') + '><summary style="cursor:pointer;font-weight:600;padding:4px 0">' + esc(title) + '</summary>' + body + '</details>';
+    const badge = (value, color) => '<span class="indicator-pill ' + color + '">' + esc(value) + '</span>';
+    function header(doc, lead) {
+        return '<div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:start"><div><h4 style="margin:0 0 4px">Website enquiry</h4>' +
+            '<div class="text-muted small">' + esc(doc.bsli_submission_ref || doc.name) + ' · ' + esc(frappe.datetime.str_to_user(doc.creation)) + '</div></div>' +
+            route("lead-intake", doc.name, "Open enquiry / review").replace('<a ', '<a class="btn btn-sm btn-primary" ') + '</div>' + group([
+                item("Organization", text(doc.organization_name || lead.company_name)),
+                item("Contact", text(doc.full_name || lead.lead_name)),
+                item("Email", text(doc.normalized_email || doc.email || lead.email_id)),
+                item("Phone", text(doc.normalized_phone || doc.phone || lead.mobile_no))
+            ]);
+    }
+    function ai_html(doc, lead = {}, expanded = true) {
         const ai = ai_result(doc);
         const completed = doc.ai_status === "Completed";
         const list = value => Array.isArray(value) && value.length ? value.join(", ") : null;
         const review = doc.bsli_review_state || "Not recorded";
         const awaiting = review === "Awaiting Review";
-        return '<h5>AI analysis and sales handover</h5>' + group([
-            item("AI processing", text(doc.ai_status || "Pending")),
-            item("Classification", text(words(doc.ai_intent))),
-            item("Classification confidence", completed ? percent(doc.ai_confidence) : "Not available"),
-            item("Review", text(review))
-        ]) + paragraph("AI summary", doc.ai_summary) + group([
+        const next = awaiting ? "Review the original enquiry and AI findings, then confirm or correct the outcome before following up." :
+            (doc.bsli_human_outcome && ["spam", "job_seeker", "support", "duplicate_submission"].includes(doc.bsli_human_outcome) ?
+                "Follow the recorded human review outcome; this enquiry is not an approved new sales requirement." : doc.ai_next_action ||
+                (completed ? "Review the customer requirement and follow up through the normal sales workflow." : "Review the original enquiry; AI analysis is not complete."));
+        const diagnostics = paragraph("AI reasoning", Array.isArray(ai.reasons) ? ai.reasons.join("\n") : null) +
+            group([item("Risk flags", text(list(ai.risk_flags))), item("Country signals", text(list(ai.country_signals))),
+                item("AI model", text(doc.bsli_ai_model)), item("Processed on", text(doc.ai_processed_on ? frappe.datetime.str_to_user(doc.ai_processed_on) : null))]) +
+            paragraph("AI routing recommendation", [doc.bsli_proposed_outcome && words(doc.bsli_proposed_outcome), doc.bsli_decision_reason].filter(Boolean).join(" — ")) +
+            (doc.bsli_human_outcome ? paragraph("Human review outcome", words(doc.bsli_human_outcome)) +
+                group([item("Reviewed by", text(doc.bsli_reviewed_by)), item("Reviewed on", text(doc.bsli_reviewed_on ? frappe.datetime.str_to_user(doc.bsli_reviewed_on) : null))]) +
+                paragraph("Review note", doc.bsli_review_note) : "") +
+            '<p class="small text-muted">Confidence describes classification certainty; it is not a lead score or probability of winning. Unprovided customer facts are not inferred.</p>';
+        return '<div aria-label="AI processing and review status" style="display:flex;flex-wrap:wrap;gap:8px;margin:14px 0">' +
+            badge("AI: " + (doc.ai_status || "Pending"), completed ? "green" : (doc.ai_status === "Failed" ? "red" : "gray")) +
+            badge(words(doc.ai_intent), "blue") + badge("Confidence: " + (completed ? percent(doc.ai_confidence) : "Not available"), "gray") +
+            badge(review, awaiting ? "orange" : "gray") + '</div>' +
+            '<div style="background:var(--control-bg);border-radius:6px;padding:12px 16px;margin:12px 0">' + paragraph("Requirement at a glance · AI summary", doc.ai_summary) + '</div>' + group([
             item("Products / services", text(list(ai.products_or_services))),
             item("Customer type (AI)", text(ai.customer_type && words(ai.customer_type))),
             item("Urgency (AI)", text(ai.urgency && words(ai.urgency))),
             item("Deadline mentioned", text(ai.deadline_mentioned)),
             item("Quantity / value mentioned", text(ai.estimated_value_hint)),
             item("Verdict", text(ai.verdict && words(ai.verdict)))
-        ]) + paragraph("AI reasoning", Array.isArray(ai.reasons) ? ai.reasons.join("\n") : null) +
-            group([item("Risk flags", text(list(ai.risk_flags))),
-                item("Country signals", text(list(ai.country_signals))),
-                item("AI model", text(doc.bsli_ai_model)),
-                item("Processed on", text(doc.ai_processed_on ? frappe.datetime.str_to_user(doc.ai_processed_on) : null))]) +
-            paragraph("AI routing recommendation", [doc.bsli_proposed_outcome && words(doc.bsli_proposed_outcome), doc.bsli_decision_reason].filter(Boolean).join(" — ")) +
-            (doc.bsli_human_outcome ? paragraph("Human review outcome", words(doc.bsli_human_outcome)) +
-                group([item("Reviewed by", text(doc.bsli_reviewed_by)), item("Reviewed on", text(doc.bsli_reviewed_on ? frappe.datetime.str_to_user(doc.bsli_reviewed_on) : null))]) +
-                paragraph("Review note", doc.bsli_review_note) : "") +
-            paragraph("Next action", awaiting ? "Review the original enquiry and AI findings, then confirm or correct the outcome in Lead Intake before following up." :
-                (doc.bsli_human_outcome && ["spam", "job_seeker", "support", "duplicate_submission"].includes(doc.bsli_human_outcome) ?
-                    "Follow the recorded human review outcome; this enquiry is not an approved new sales requirement." : doc.ai_next_action || (completed ? "Review the customer requirement and follow up through the normal sales workflow." : "Review the original enquiry; AI analysis is not complete."))) +
-            '<p class="small text-muted">Confidence describes classification certainty; it is not a lead score or probability of winning. Unprovided customer facts are not inferred.</p>' +
-            '<p>' + route("lead-intake", doc.name, "Open full enquiry and review controls") + '</p>';
+        ]) + '<div style="border-left:3px solid var(--primary);padding:4px 14px;margin:18px 0;background:var(--control-bg);border-radius:4px">' +
+            paragraph("Next action", next) + '<p class="small"><strong>Owner: </strong>' + text(lead.lead_owner || "Unassigned — assign a salesperson") + '</p></div>' +
+            disclosure("AI reasoning, routing and audit", diagnostics, expanded);
     }
     function enquiry_html(doc, lead) {
         return '<h5>Original customer enquiry</h5>' + group([
@@ -108,17 +121,17 @@ const bsi_customer_brief = (() => {
                 ' · ' + esc(d.status || "") + ' · ' + esc(d.bsli_review_state || "") + '</p>').join("") +
             '<p class="small text-muted">Each enquiry retains its own classification and review. Up to 20 recent linked records are shown. Other linked enquiries do not replace the sales brief above.</p></details>';
     }
-    function mount(frm, html) {
+    function mount(frm, html, aiHtml = html) {
         const wrap = $(frm.wrapper);
         const panes = wrap.find('.tab-pane');
         const details = panes.first();
         let ai = wrap.find('#lead-bsi_ai_tab');
         if (!ai.length) ai = wrap.find('[data-fieldname="bsi_ai_section"]').closest('.tab-pane');
-        [details, ai].forEach(pane => {
+        [details, ai].forEach((pane, index) => {
             if (!pane.length) return;
             let box = pane.children('.bsi-customer-brief');
-            if (!box.length) box = $('<section class="bsi-customer-brief" aria-label="Customer enquiry and AI brief" style="padding:20px;border:1px solid var(--border-color);border-radius:8px;margin:12px 0 20px"></section>').prependTo(pane);
-            box.html(html);
+            if (!box.length) box = $('<section class="bsi-customer-brief" aria-label="Customer enquiry and AI brief" style="padding:20px;border:1px solid var(--border-color);border-radius:8px;margin:12px 0 20px;font-size:var(--text-base,14px);line-height:1.55"></section>').prependTo(pane);
+            box.html(index === 0 ? html : aiHtml);
         });
     }
     function legacy_fields(frm, website) {
@@ -157,18 +170,19 @@ const bsi_customer_brief = (() => {
                     doctype: "Lead Intake",
                     filters: { external_system: "website-form" },
                     or_filters: [["converted_lead", "=", name], ["matched_lead", "=", name]],
-                    fields: ["name", "creation", "full_name", "organization_name", "email", "phone", "normalized_email", "normalized_phone",
-                        "subject", "transcript", "source_url", "converted_lead", "matched_lead", "status", "ai_status", "ai_intent", "ai_confidence",
-                        "ai_summary", "ai_next_action", "ai_processed_on", "bsli_submission_ref", "bsli_ai_result", "bsli_ai_model",
-                        "bsli_review_state", "bsli_proposed_outcome", "bsli_decision_reason", "bsli_human_outcome", "bsli_reviewed_by", "bsli_reviewed_on", "bsli_review_note"],
+                    fields: ["name", "creation", "ai_intent", "subject", "status", "bsli_review_state", "converted_lead", "matched_lead"],
                     order_by: "creation desc", limit_page_length: 20
                 }
             };
+            const detailFields = ["name", "creation", "full_name", "organization_name", "email", "phone", "normalized_email", "normalized_phone",
+                        "subject", "transcript", "source_url", "converted_lead", "matched_lead", "status", "ai_status", "ai_intent", "ai_confidence",
+                        "ai_summary", "ai_next_action", "ai_processed_on", "bsli_submission_ref", "bsli_ai_result", "bsli_ai_model",
+                        "bsli_review_state", "bsli_proposed_outcome", "bsli_decision_reason", "bsli_human_outcome", "bsli_reviewed_by", "bsli_reviewed_on", "bsli_review_note"];
             // Fetch the creating enquiry independently so later linked enquiries
             // cannot push it out of the bounded recent-history window.
             const originalQuery = { method: query.method, args: {
                 ...query.args, filters: { external_system: "website-form", converted_lead: name },
-                or_filters: undefined, order_by: "creation asc", limit_page_length: 1
+                fields: detailFields, or_filters: undefined, order_by: "creation asc", limit_page_length: 1
             }};
             const [original, recent] = await Promise.all([frappe.call(originalQuery), frappe.call(query)]);
             if (frm.doc.name !== name || frm._bsi_brief_generation !== generation) return;
@@ -178,9 +192,23 @@ const bsi_customer_brief = (() => {
                 mount(frm, '<h5>Customer enquiry and AI brief</h5><p>No website enquiry is linked to this Lead. Existing Lead details and any other source analysis remain below.</p>');
                 return;
             }
-            const doc = primary(docs, name);
+            let doc = primary(docs, name);
+            if (!(original.message || []).length) {
+                // Only one full enquiry is loaded. The history list never fetches
+                // every customer's message or model JSON merely to show links.
+                const detail = await frappe.call({ method: query.method, args: {
+                    ...query.args, filters: { external_system: "website-form", name: doc.name }, fields: detailFields, limit_page_length: 1
+                }});
+                if (frm.doc.name !== name || frm._bsi_brief_generation !== generation) return;
+                doc = (detail.message || [])[0];
+                if (!doc) throw new Error("Linked enquiry not readable");
+            }
             legacy_fields(frm, true);
-            mount(frm, enquiry_html(doc, frm.doc) + '<hr>' + ai_html(doc) + related_html(docs, doc));
+            const context = header(doc, frm.doc);
+            const source = disclosure("Original customer enquiry and source", enquiry_html(doc, frm.doc));
+            const history = related_html(docs, doc);
+            mount(frm, context + ai_html(doc, frm.doc, false) + source + history,
+                context + ai_html(doc, frm.doc, true) + source + history);
         } catch (_) {
             if (frm.doc.name !== name || frm._bsi_brief_generation !== generation) return;
             mount(frm, '<h5>Customer enquiry and AI brief</h5><p role="alert">The linked enquiry could not be loaded. Refresh to retry. If this persists, ask your administrator to check your existing Lead Intake access.</p>');
