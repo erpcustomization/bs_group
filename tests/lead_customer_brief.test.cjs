@@ -63,6 +63,13 @@ const sale={name:'LI-SALES',converted_lead:'LEAD1',ai_status:'Completed',ai_conf
  resolveOriginal({message:[sale]});resolveRecent({message:[sale]});await pending;
  check(!boxes.details&&!boxes.ai,'Late response cannot repopulate a new Lead with prior customer data');
  check(!code.includes('setTimeout')&&!code.includes('setInterval'),'No timer-based hiding/polling');
+ frm.is_new=()=>false; frm.get_docinfo=()=>({assignments:[{owner:'priya@example.org'},{owner:'rahul@example.org'}]});
+ responses.push({message:[sale]},{message:[sale]});await ctx.brief.refresh(frm);
+ check(boxes.details.includes('Assigned team')&&boxes.details.includes('priya@example.org, rahul@example.org'),'Real Frappe docinfo assignments appear in Details');
+ check(boxes.ai.includes('Assigned team')&&!boxes.ai.includes('Unassigned'),'Real docinfo assignment shown on AI tab');
+ frm.get_docinfo=()=>({assignments:[]}); responses.push({message:[sale]},{message:[sale]});await ctx.brief.refresh(frm);
+ check(boxes.details.includes('Unassigned'),'Closed assignments clear the team display on refresh');
+ delete frm.get_docinfo;
  check(!hidden.some(([n])=>n.endsWith('_section')),'Native AI sections never hidden');
  check(ctx.brief.ai_html({...sale,bsli_review_state:'Reviewed',bsli_human_outcome:'spam',bsli_reviewed_by:'Reviewer'}).includes('not an approved new sales requirement'),'Human override controls next action');
  check(ctx.brief.ai_html({...sale,bsli_review_state:'Reviewed',bsli_human_outcome:'spam'}).includes('Human review outcome'),'Review outcome distinct from AI recommendation');
