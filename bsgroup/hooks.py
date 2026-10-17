@@ -483,3 +483,36 @@ fixtures = [
     # {"doctype": "Workflow State"},
     # {"doctype": "Role"},
 ]
+# Phase C: confidential records never inherit DCS access or File owner/shares.
+permission_query_conditions.update({
+    "DCS Commercial Obligation": "bsgroup.dcs.obligation.query_conditions",
+    "DCS Commercial Obligation Event": "bsgroup.dcs.obligation.query_conditions",
+    "Comment": "bsgroup.dcs.obligation.comment_query",
+    "Communication": "bsgroup.dcs.obligation.communication_query",
+    "Version": "bsgroup.dcs.obligation.version_query",
+    "File": "bsgroup.dcs.obligation.file_query",
+    "ToDo": "bsgroup.dcs.obligation.todo_query",
+    "DocShare": "bsgroup.dcs.obligation.docshare_query",
+    "Notification Log": "bsgroup.dcs.obligation.notification_log_query",
+})
+has_permission.update({
+    "DCS Commercial Obligation": "bsgroup.dcs.obligation.has_permission",
+    "DCS Commercial Obligation Event": "bsgroup.dcs.obligation.has_permission",
+    "Comment": "bsgroup.dcs.obligation.auxiliary_permission",
+    "Communication": "bsgroup.dcs.obligation.auxiliary_permission",
+    "Version": "bsgroup.dcs.obligation.auxiliary_permission",
+    "File": "bsgroup.dcs.obligation.auxiliary_permission",
+    "ToDo": "bsgroup.dcs.obligation.auxiliary_permission",
+    "DocShare": "bsgroup.dcs.obligation.auxiliary_permission",
+    "Notification Log": "bsgroup.dcs.obligation.auxiliary_permission",
+})
+for _dt in ("Comment", "Communication", "Version", "File", "ToDo", "DocShare", "Notification Log"):
+    doc_events.setdefault(_dt, {})["validate"] = ([doc_events.get(_dt, {}).get("validate")] if isinstance(doc_events.get(_dt, {}).get("validate"), str) else list(doc_events.get(_dt, {}).get("validate") or [])) + ["bsgroup.dcs.obligation.auxiliary_guard"]
+
+extend_doctype_class["File"] = ["bsgroup.dcs.obligation.ConfidentialFileMixin"]
+doc_events["File"]["before_insert"] = "bsgroup.dcs.obligation.auxiliary_guard"
+
+override_whitelisted_methods.update({
+    "frappe.desk.reportview.export_query": "bsgroup.dcs.obligation.export_query",
+    "frappe.core.doctype.data_export.exporter.export_data": "bsgroup.dcs.obligation.export_data",
+})
