@@ -71,9 +71,13 @@ const bsi_customer_brief = (() => {
                 item("Country signals", text(list(ai.country_signals))),
                 item("AI model", text(doc.bsli_ai_model)),
                 item("Processed on", text(doc.ai_processed_on ? frappe.datetime.str_to_user(doc.ai_processed_on) : null))]) +
-            paragraph("Routing decision", [doc.bsli_proposed_outcome && words(doc.bsli_proposed_outcome), doc.bsli_decision_reason].filter(Boolean).join(" — ")) +
+            paragraph("AI routing recommendation", [doc.bsli_proposed_outcome && words(doc.bsli_proposed_outcome), doc.bsli_decision_reason].filter(Boolean).join(" — ")) +
+            (doc.bsli_human_outcome ? paragraph("Human review outcome", words(doc.bsli_human_outcome)) +
+                group([item("Reviewed by", text(doc.bsli_reviewed_by)), item("Reviewed on", text(doc.bsli_reviewed_on ? frappe.datetime.str_to_user(doc.bsli_reviewed_on) : null))]) +
+                paragraph("Review note", doc.bsli_review_note) : "") +
             paragraph("Next action", awaiting ? "Review the original enquiry and AI findings, then confirm or correct the outcome in Lead Intake before following up." :
-                (doc.ai_next_action || (completed ? "Review the customer requirement and follow up through the normal sales workflow." : "Review the original enquiry; AI analysis is not complete."))) +
+                (doc.bsli_human_outcome && ["spam", "job_seeker", "support", "duplicate_submission"].includes(doc.bsli_human_outcome) ?
+                    "Follow the recorded human review outcome; this enquiry is not an approved new sales requirement." : doc.ai_next_action || (completed ? "Review the customer requirement and follow up through the normal sales workflow." : "Review the original enquiry; AI analysis is not complete."))) +
             '<p class="small text-muted">Confidence describes classification certainty; it is not a lead score or probability of winning. Unprovided customer facts are not inferred.</p>' +
             '<p>' + route("lead-intake", doc.name, "Open full enquiry and review controls") + '</p>';
     }
@@ -121,9 +125,14 @@ const bsi_customer_brief = (() => {
         // The authoritative website analysis is in the brief. Pilot review is
         // separate from model confidence; never show an uncalculated score as 0.
         if (!website) return;
-        ["bsi_intake_section", "bsi_ai_section", "bsi_rfq_section"].forEach(name => {
+        ["bsi_ai_status", "bsi_ai_score"].forEach(name => {
             if (frm.fields_dict[name]) frm.toggle_display(name, false);
         });
+        if (frm.fields_dict.bsi_rfq_value_estimate && !frm.doc.bsi_rfq_value_estimate) {
+            frm.toggle_display("bsi_rfq_value_estimate", false);
+        }
+        // Keep native summary/confidence fields and their Section Breaks intact:
+        // Frappe hides an entire tab if every native section is marked hidden.
     }
     async function refresh(frm) {
         if (frm.is_new()) return;
@@ -141,7 +150,7 @@ const bsi_customer_brief = (() => {
                     fields: ["name", "creation", "full_name", "organization_name", "email", "phone", "normalized_email", "normalized_phone",
                         "subject", "transcript", "source_url", "converted_lead", "matched_lead", "status", "ai_status", "ai_intent", "ai_confidence",
                         "ai_summary", "ai_next_action", "ai_processed_on", "bsli_submission_ref", "bsli_ai_result", "bsli_ai_model",
-                        "bsli_review_state", "bsli_proposed_outcome", "bsli_decision_reason"],
+                        "bsli_review_state", "bsli_proposed_outcome", "bsli_decision_reason", "bsli_human_outcome", "bsli_reviewed_by", "bsli_reviewed_on", "bsli_review_note"],
                     order_by: "creation desc", limit_page_length: 20
                 }
             };
