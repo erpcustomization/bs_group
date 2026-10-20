@@ -1,0 +1,28 @@
+const {test}=require("node:test");
+const assert=require("node:assert/strict");
+const rules=require("../../bsgroup/bs_group/page/bs_procurement/bs_procurement.js");
+const po=()=>({group:"Software",supplier:"OEM",contact:"Tester",email:"qa@example.com",phone:"000",address:"Dubai",terms:"Custom",customTerms:"50/50",delivery:"2026-11-01",na:true,explanation:"Sole OEM",selectedQuote:null,selectionReason:"",items:[{sourceId:"L1",description:"Licences",qty:20,uom:"Nos",rate:205,cost:200},{sourceId:"L2",description:"Migration",qty:1,uom:"Job",rate:1000,cost:1000}],quotes:[{supplier:"A",file:"a.pdf",rates:{L1:205,L2:1000}}]});
+test("purchasing is Not started for all pre-approval states",()=>{for(const status of ["New","Pending Approval","Rejected","Not sent"])assert.equal(rules.status({status,orders:[]}),"Not started");});
+test("active, cancelled and approved counts agree",()=>{const r={orders:[{status:"Approved"},{status:"Pending Approval"},{status:"Cancelled"},{status:"Cancelled"}]};assert.deepEqual(rules.orderCounts(r),{active:2,cancelled:2,approved:1});assert.equal(rules.orderSummary(r),"2 active · 2 cancelled");});
+test("zero quantity has a positive-number message, not an allocation message",()=>{const p=po(),r={items:structuredClone(p.items),orders:[]};p.items[0].qty=0;assert.ok(rules.allocationErrors(r,p).some(x=>x.includes("greater than zero")));assert.ok(!rules.allocationErrors(r,p).some(x=>x.includes("unallocated")));});
+test("submission snapshot preserves original lines and quote values after edits",()=>{const p=po(),v=rules.recordSubmission(p,"t1","Procurement");p.items[0].rate=195;p.items.pop();p.quotes[0].rates.L1=195;p.quotes[0].file="revised.pdf";assert.equal(v.snapshot.items.length,2);assert.equal(v.snapshot.items[0].rate,205);assert.equal(v.snapshot.quotes[0].rates.L1,205);assert.equal(v.snapshot.quotes[0].file,"a.pdf");});
+test("resubmission records price, removed line, supplier, terms, delivery and attachment changes",()=>{const p=po();rules.recordSubmission(p,"t1","Procurement");rules.recordDecision(p,"Rejected","t2","Manager","Lower cost; remove migration");p.items[0].rate=195;p.items.pop();p.supplier="OEM revised";p.customTerms="30 days";p.delivery="2026-11-05";p.quotes[0].file="revised.pdf";const v=rules.recordSubmission(p,"t3","Procurement");assert.equal(v.version,2);assert.deepEqual(v.changes.find(x=>x.field==="L1 unit price"),{field:"L1 unit price",before:205,after:195});assert.equal(v.changes.find(x=>x.field==="L2 quantity").after,null);for(const field of ["Supplier","Custom terms","Delivery date","Quote 1 attachment"])assert.ok(v.changes.some(x=>x.field===field));assert.equal(p.submissions[0].decision.reason,"Lower cost; remove migration");rules.recordDecision(p,"Approved","t4","Manager");assert.equal(p.submissions[0].decision.status,"Rejected");assert.equal(p.submissions[1].decision.status,"Approved");});
+test("unchanged resubmission is explicit with empty changes",()=>{const p=po();rules.recordSubmission(p,"t1","Procurement");assert.deepEqual(rules.recordSubmission(p,"t2","Procurement").changes,[]);});
+test("submission records are isolated across POs",()=>{const a=po(),b=po();rules.recordSubmission(a,"t1","Procurement");rules.recordDecision(a,"Rejected","t2","Manager","Change");assert.equal(b.submissions,undefined);});
+
+test("empty cancelled PO has no quotation basis and no released-line claim",()=>{
+ const p={status:"Cancelled",supplier:"",items:[],quotes:[]};
+ assert.equal(rules.quotationBasis(p),"Not provided");assert.equal(rules.orderLines(p),"No line items");
+});
+test("cancelled PO with retained lines marks the actual quantities released",()=>{
+ const p={status:"Cancelled",items:[{sourceId:"L2",qty:1}],quotes:[]};
+ assert.equal(rules.orderLines(p),"L2: 1 (released)");assert.equal(rules.quotationBasis(p),"Not provided");
+});
+test("quotation basis distinguishes incomplete and complete evidence",()=>{
+ const p={status:"Draft",items:[{sourceId:"L1",qty:1}],quotes:[]};
+ assert.equal(rules.quotationBasis(p),"Not provided");
+ p.quotes=[{supplier:"A",file:"A.pdf",rates:{L1:10}},{supplier:"B",file:"",rates:{L1:12}},{supplier:"C",file:"C.pdf",rates:{L1:13}}];
+ assert.equal(rules.quotationBasis(p),"Quotations incomplete (2/3)");
+ p.quotes[1].file="B.pdf";assert.equal(rules.quotationBasis(p),"Three quotations");
+ p.na=true;assert.equal(rules.quotationBasis(p),"Quotation exception");
+});

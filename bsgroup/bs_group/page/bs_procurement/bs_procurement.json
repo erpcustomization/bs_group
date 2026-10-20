@@ -1,0 +1,36 @@
+{
+  "doctype": "Page",
+  "name": "bs-procurement",
+  "page_name": "bs-procurement",
+  "module": "BS Group",
+  "title": "BS Procurement",
+  "standard": "Yes",
+  "system_page": 0,
+  "roles": [
+    {
+      "role": "System Manager"
+    },
+    {
+      "role": "Purchase User"
+    },
+    {
+      "role": "Purchase Manager"
+    },
+    {
+      "role": "Sales Manager"
+    },
+    {
+      "role": "Commercial Controller"
+    },
+    {
+      "role": "Managing Director"
+    },
+    {
+      "role": "Accounts User"
+    },
+    {
+      "role": "Accounts Manager"
+    }
+  ],
+  "modified": "2026-10-20 17:26:55.463429"
+}

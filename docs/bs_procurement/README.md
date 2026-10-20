@@ -1,0 +1,171 @@
+# BS Procurement — standard ERPNext documents
+
+Implemented on `rel1-test.local` on 20 October 2026. Build `20261020-standard-1`.
+
+The BS Procurement screen now saves Purchase Requisitions as standard **Material Request** documents with purpose **Purchase**, and orders as standard **Purchase Order** documents. There are no replacement PR or PO DocTypes. Custom fields and scoped hooks add the BS approval, comparison and audit controls to those standard documents.
+
+Route: `http://rel1-test.local:8001/desk/bs-group/bs-procurement`
+
+## Process
+
+1. On a submitted, Won quotation with its private Customer PO, use **Send to Procurement**. Review the awarded DCS item quantities and cost rates, choose the required date and warehouse, then create the draft requisition. Procurement can also create a manual requisition.
+2. Send for approval through the existing Material Request Approval workflow. Approval submits the standard Material Request. Rejection requires a reason; revisions and resubmissions retain history.
+3. Select approved PR lines, quantities and a supplier. The standard Material Request-to-Purchase Order mapper creates a draft PO with native `material_request` and `material_request_item` links.
+4. Complete the PO and compare three distinct suppliers using actual private quotation attachments and prices. An explained quotation exception is allowed for manager review. Above-budget prices and deviations from the selected quote require a selection explanation.
+5. Request PO approval. Approval submits the standard Purchase Order; its standard ordered quantities update the Material Request. The approved PO is available to ERPNext's Purchase Receipt and Purchase Invoice processes, subject to their normal permissions.
+6. Open the approved PO PDF. The dedicated BS Procurement print format reads the saved standard PO and excludes internal comparison and approval history.
+
+Each PR shows its own approval, purchasing status, progress tracker, line allocations, linked POs and history. Partial quantities and different suppliers can create multiple POs for one PR. A BS PO is restricted to one PR.
+
+Draft, pending, rejected and submitted POs reserve quantities. A withdrawn draft remains a standard draft with BS state Cancelled, releases its reservation and cannot be revived. Cancelling a submitted PO uses standard ERPNext cancellation. Standard amendment creates a fresh draft with the original lineage retained. A PR with active POs cannot be cancelled.
+
+## Permissions and integrity
+
+- Buyers need Purchase User and the site's normal company/master permissions. Approvers need Purchase User plus Purchase Manager. No real user roles were changed.
+- The existing Material Request workflow is reused. Its Draft/Rejected → Send for Approval transitions now allow creators to request review. Actual approval self-approval restrictions remain; Administrator retains Frappe's built-in exception.
+- Server checks protect both the BS screen and standard forms. Native submit, editable APIs, print, amendment and the existing Update Items override cannot bypass the applicable BS controls.
+- Saved pending/approved commercial data and quotation evidence are protected. Submitted snapshots retain earlier prices, supplier, terms and comparison values.
+- Parent Material Request locking and current allocation reads prevent simultaneous orders from over-allocating a line. A transaction conflict asks the second user to refresh.
+- Controls are scoped to BS-managed Material Requests and their linked Purchase Orders. Existing ordinary Purchase Orders retain their normal behavior.
+
+## Setup and deployment
+
+`bsgroup.procurement_setup.execute` idempotently creates the standard-document custom fields and `BS Procurement Purchase Order` Print Format. It is also registered in `after_migrate`. The format is explicitly selected by the BS PDF action; it does not replace the global default Purchase Order print format.
+
+The test site's `host_name` is `http://rel1-test.local:8001`, so the standard PDF renderer can resolve its assets. The imported default letterhead contained a missing image, so the BS format renders company details from the PO without that image.
+
+From `/home/bitssecureit/rel1-bench/sites`, run the page deployment helper after JavaScript edits:
+
+```sh
+/home/bitssecureit/rel1-bench/env/bin/python ../apps/bsgroup/tests/bs_procurement/deploy_standard.py
+```
+
+It checks the runtime folder and JavaScript syntax, updates Page.modified, reloads the Page and clears cache so a normal browser reload receives the current code. Reports and documentation must stay outside the Page runtime directory: Frappe treats HTML files there as page templates.
+
+## Verification
+
+Run these independently from the same sites directory; do not run the database-mutating suites concurrently:
+
+```sh
+/home/bitssecureit/rel1-bench/env/bin/python ../apps/bsgroup/tests/bs_procurement/test_standard_documents.py
+/home/bitssecureit/rel1-bench/env/bin/python ../apps/bsgroup/tests/bs_procurement/test_concurrent_orders.py
+```
+
+On 20 October 2026, all **43 backend assertions** passed. They cover standard document persistence and mapping, approval permissions, rejection/resubmission history, stale edits, native bypass prevention, actual quotation attachments, partial and multiple-vendor allocation, cancellation/amendment, printing and access restrictions. The main suite rolls back its test users and transactions.
+
+The separate two-process concurrency test passed: one PO was saved, the competing request was blocked, and allocation stayed within the PR. Its PO was withdrawn and PR cancelled with audit retained.
+
+Native Chrome verified creation, approval, saving, refresh persistence, matching records in the standard ERPNext form, partial order progress and the PDF action. Review records retained on the test site:
+
+- Material Request `MAT-MR-2026-00002`: approved, four units requested, two ordered, two available.
+- Purchase Order `PUR-ORD-2026-02408`: approved/submitted, two units at AED 90, total AED 180, status To Receive and Bill. Terms identify it as QC TEST ONLY — DO NOT ISSUE.
+
+The final PDF was generated using Frappe, extracted and visually checked as a single page. Purchase Receipt and Purchase Invoice mappings were verified; actual receipt/invoice posting was outside this test.
+
+Logs: `qa_reports/standard_documents_test.log`, `qa_reports/concurrent_orders_test.log`.
+Report: `qa_reports/QA_STANDARD_DOCUMENTS_BS_Procurement_20261020.html`.
+
+## Sales handover integration — 20 October 2026
+
+`bsgroup.dcs.procurement.send_to_procurement` now creates a standard Material Request. It preserves the quotation, DCS revision/award, customer, project, customer PO reference and original DCS row identities. Three private source files are attached: awarded quotation, customer PO and costing sheet. File hashes and a snapshot preserve the evidence. The quotation's **View Purchase Requisition** opens that exact PR in BS Procurement.
+
+Sales Manager, Commercial Controller and Managing Director authority is checked against the source documents and company. The sender receives a read-only share of their PR, without purchasing approval rights. No email or supplier message is sent. The PR starts as Draft; Procurement requests its normal independent approval.
+
+Warehouse choices are limited to the source company and explicit user restrictions, without granting general warehouse access to Sales. A dedicated Sales Customer field is used because ERPNext clears its standard Customer field for Purchase-purpose Material Requests. The inherited DCS budget is preserved rather than replaced by a default buying price list.
+
+Repeated sends for the same award return the existing PR. Source locks and a unique award key prevent simultaneous sends from creating duplicates. DCS revision/award changes block subsequent purchasing. Source references, quantities and budget are protected; source evidence cannot be detached or deleted. Cancelling an approved PR keeps the quotation backlink as history while retaining the existing active-PO cancellation guard.
+
+The four earlier DCS Purchase Request packets remain read-only historical evidence; new sends do not create that DocType. The restored historical controller allows those records to remain accessible.
+
+Verification: **30 handover assertions + 43 purchasing regression assertions passed**, plus a real two-process send collision test. Native Chrome created `MAT-MR-2026-00007` from `SAL-QTN-2026-01213`, retained the correct AED 1,000 budget, opened its saved costing PDF, and verified the quotation-to-PR return link. The review PR remains Draft. Concurrency test PRs were cancelled with evidence retained. Temporary test users were rolled back.
+
+Logs: `qa_reports/sales_handover_test.log`, `qa_reports/standard_documents_after_handover.log`, `qa_reports/concurrent_handover_test.log`, `qa_reports/handover_delivery_verified.json`.
+
+Deploy changed quotation/page scripts with `tests/bs_procurement/deploy_handover.py` from the bench's sites directory. This helper is restricted to the test site, refreshes quotation metadata caching and invokes the standard procurement page deployment.
+
+## Accounting continuity review — 20 October 2026
+
+Actual Purchase Receipts, Purchase Invoices, Sales Orders, Sales Invoices and Payment Entries were submitted in rolled-back test transactions. All **39 accounting continuity assertions**, **43 procurement regressions** and **30 sales handover regressions** passed. Invoice and payment GL entries balance; stock receipts post stock ledger entries. Tests cover split suppliers, partial delivery/billing/payment, accounting approval roles, source-row links, project attribution, cancellation and over-receipt/over-billing rejection.
+
+Two corrections were made:
+
+- The PR's custom header project now reaches the standard PO header before validation, including the native MR-to-PO form path. It remains protected against removal or substitution. PO approval snapshots also include header project/cost center and row expense/cost-center dimensions.
+- `bsgroup.utils.project_cost_baseline` now counts only unbilled PO net value as commitment, using company currency and row project attribution. Invoice submission replaces the corresponding commitment rather than adding its full value again. An exact-budget invoice and a genuinely additional over-budget PO were tested under Block policy; invoice cancellation restores commitment and reduces actual cost.
+
+Run `tests/bs_procurement/test_accounts_continuity.py` from the bench's sites directory. It uses the existing clearly labelled review quotation/PR and rolls back all changes. `verify_accounts_continuity.py` confirms the original review records, absence of temporary fixtures and restored site policy. Logs: `qa_reports/accounts_continuity_test.log`, `standard_documents_after_accounts.log`, `handover_after_accounts.log`. Report: `qa_reports/QA_CONTINUITY_BS_Procurement_20261020.html`.
+
+At the time of that initial audit, matching requirements and project overrun blocking were off. The Payment Order release below supersedes those findings. Sales invoicing remains a separate explicit Sales Order → Sales Invoice → customer receipt flow; Send to Procurement does not post customer invoices.
+
+## Payment Order release — 20 October 2026
+
+BS Procurement now contains **Purchase Requisition**, **Purchase Order**, and **Payment Order**. A Payment Order is the BS view of one standard Purchase Invoice (supplier/vendor invoice). It does not create a second liability or a separate payment ledger. Receipts, invoice approval, outstanding balances and Payment Entry allocations appear in this section; PR and PO screens keep their purchasing responsibilities.
+
+Payment Orders are listed by invoice ID, vendor invoice number, supplier, due date, approval, payment status, total and outstanding. The detail view includes source POs, invoiced items, matched receipt lines and permitted Payment Entry records. A shared bank payment displays only the allocation against the selected invoice. Draft/cancelled invoices do not display a payable balance. Released allocations remain identifiable after invoice cancellation through server-controlled source history.
+
+**New Payment Order** prepares an unsaved native Purchase Invoice from a submitted receipt, or from non-stock/non-asset lines of an approved BS PO. Users review the vendor's invoice number, date, taxes, attachments and terms in the standard form before saving. **Record payment** prepares a native Payment Entry against an approved outstanding invoice for review. No payments are automatically submitted or transferred.
+
+The existing Purchase Invoice workflow is retained: Draft → Send for Approval → Pending Approval → Accounts Manager approval. Accounts User cannot approve. Existing document/company permissions control all invoice, receipt and payment data. Accounts User and Accounts Manager can access the procurement page; this adds no permissions to the underlying documents.
+
+Explicitly activated on **rel1-test.local only**:
+
+- Buying Settings: PO required **Yes**, receipt required **Yes**.
+- Price matching remains enabled with **Stop**, no override role.
+- BS Group Settings: cost overrun policy **Block**.
+- BS receipt/invoice rows must preserve the approved PO row, PR row and project. Invoice receipt rows must match the same PO row.
+- Project-linked BS POs require an approved Project Cost Baseline before requesting/receiving approval. All header and line projects participate in the transaction overrun check.
+
+ERPNext's stock/fixed-asset receipt requirement is preserved. Non-stock services require an approved PO but not a stock receipt. Standard return/internal-transfer exceptions remain in place. Project remains optional for non-project buying. Perpetual inventory was not changed.
+
+There are currently **zero approved project baselines** on the test site. Real project budgets must be created and approved through the existing baseline workflow; no amounts were invented.
+
+Validation: **66 invoice/accounting/control assertions + 43 procurement regressions + 30 handover regressions = 139 passed**. Real test receipts, invoices, ledger entries and payments were rolled back. Coverage includes service and stock invoices, missing/wrong PO/receipt links, price mismatch, partial receipts/billing/payments, shared payment allocations, cancellations, access roles, over-receipt/over-billing and exact-budget/over-budget behavior. Foreign currencies, credit notes, landed costs and advance reconciliation were not newly certified by this release.
+
+Local Chrome verified the three sections, New Payment Order → standard Purchase Invoice, saved draft, deep link and refresh. Retained QC draft `ACC-PINV-2026-09339`, vendor invoice no. `ZZTEST-PAYMENT-ORDER-20261020`, references review PO `PUR-ORD-2026-02408` for AED 180. It has no posted ledger entries or payments.
+
+Runtime: `bsgroup/procurement_accounts.py`; schema: `bsgroup/procurement_setup.py`; idempotent installation: `tests/bs_procurement/install_payment_orders.py`. `enable_matching_controls.py` is a separate, explicit test-site activation and is never run automatically by migration. `verify_payment_orders.py` verifies persisted settings, test counts and review invoice state.
+
+Evidence: `qa_reports/payment_order_test.log`, `standard_after_payment_orders.log`, `handover_after_payment_orders.log`, `matching_controls_activation.json`, `payment_orders_verified.json`, and `QA_PAYMENT_ORDERS_BS_Procurement_20261020.html`.
+
+## Remaining scope
+
+- DCS Item rows become PR lines, including purchasable service Items. Labour/resource and additional-charge tables remain in the attached costing evidence and are explicitly identified in the handover preview; they are not silently converted into purchasable Items.
+- A separate Service Entry Sheet document is not part of the clarified invoice-based Payment Order scope.
+- Comparison prices use the selected PO currency and purchase UOM. Enter an approved transaction exchange rate; configure Item UOM conversions first. All three quotations must use that same currency and unit basis.
+- Supplier quotations are preserved as comparison data and private File attachments on the standard PO; this release does not create separate Supplier Quotation documents.
+- Supplier contact/address, tax templates and payment schedules are maintained through the standard Purchase Order form. Supplier/master data completeness remains operational setup.
+- Only BS-managed requisitions are listed. Previous browser-only preview records were not ERP transactions and were not migrated.
+- Production was not deployed or changed.
+
+The former preview is archived as `docs/bs_procurement/archive_qc4_screen.js`. Legacy preview tests are disabled under tests/bs_procurement/archive; sample-PDF endpoints were removed in the QC hardening release below.
+
+
+## QC hardening release � 20 October 2026
+
+Build `20261020-standard-2` addresses report G-01 through G-25. This supersedes the old matching-activation and comparison-currency notes above. `procurement_setup.execute` now reapplies the required settings on migration; row-level BS controls remain effective even if global allowances are later relaxed.
+
+- A creator, preparer or sender cannot approve their PR, PO or supplier invoice, including Administrator. A separate authorised user is required. The participant history is server-controlled and intentionally conservative across revisions.
+- Pending and approved POs lock business fields, including descriptions, addresses, contacts, tax treatment and accounting dimensions. Only explicit fulfilment/lifecycle counters and regenerated tax presentation are excluded.
+- File guards run before core file deletion or privacy moves. Three quotations must be distinct nonempty uploaded files of an allowed document type, checked against actual bytes.
+- Manual PRs cannot claim an awarded quotation or DCS budget; use Send to Procurement. An existing ordinary MR or PO cannot be converted by changing its BS flag. Sales handover descriptions, item names and required dates are frozen.
+- Each above-budget or selected-quotation price variance needs its own explanation of at least 15 characters. Supplier address, contact and explicit tax template are required before PO submission for approval. No tax rate or TRN is invented. The PDF button uses the existing September `Purchase Order Print Format` and `Order Letterhead`, unchanged, as explicitly requested. It retains Tax %, Tax, delivery, terms, signature area and its original E-Approved line. Missing test-site logo/stamp files remain missing; no replacement artwork or template changes were made. The new BS template remains installed but is no longer forced by the PDF button. Actual approver identity remains in the PO audit history.
+- A closed PO retains the greater of received and billed quantity; its remaining balance can be re-sourced. Reopening checks the remaining PR allocation. Withdrawn draft POs have a distinct indicator and filter. Standard draft reports still follow ERPNext docstatus; use the BS approval filter to exclude withdrawals.
+- BS receipt and invoice rows require their approved PO and row, enforce quantity/rate limits and configured UOM conversions, and require accepted receipts for stock/assets. Non-stock services remain invoiceable against their approved PO. Standard return exceptions are retained.
+- PR summaries and Payment Order headers are batched; payment audit associations use an indexed table. The PO list is independently paginated and searched on the server.
+- Cancellation reasons are mandatory on the server. The screen avoids duplicating ERP validation popups. UI tests execute the actual page with controlled server responses.
+- Setup appends hooks, scopes BS send transitions and preserves locally customised print formats. Old sample-PDF endpoints are removed.
+
+### Verification and operation
+
+Run the standard-document, QC-gap, accounts-continuity and sales-handover Python suites sequentially from the bench sites directory. Their business transactions roll back. `test_concurrent_orders.py` requires independent committed transactions; it withdraws the winning PO, cancels the PR and disables a newly created test approver, retaining audit evidence. Never run these suites on production.
+
+For UI tests, run `npm ci --prefix tests/bs_procurement/ui` then `node tests/bs_procurement/test_ui.cjs` from the app repository. The exact dev dependency and lockfile are checked in. `test_deployment.py` checks setup idempotency and restores its temporary print customization. `test_pdf.py` generates a QC-only PDF from a rolled-back approval.
+
+The complete per-gap closure report and validation counts are recorded in `docs/bs_procurement/QC_CLOSURE_standard-2.html`. Business fixtures require the existing labelled test Items, suppliers and source review quotation/PR described above.
+
+### Deployment and rollback
+
+Current execution is restricted to `rel1-test.local`. Production deployment remains a separate activity. Take a full database and private/public files backup before a production migration; review vendor master data, tax templates, project baselines and independent approver assignments first. Deploy the exact reviewed commit, run the normal site migration, rebuild assets and restart the application.
+
+The release commit is the source checkpoint. A source revert alone does not reverse schema, settings, workflow changes, source history or accounting transactions. Restore a matched predeployment database/files backup for a full rollback, or use a separately reviewed forward correction. Preserve operational records and audit evidence.
+
+Foreign-currency PO creation and configured Box/UOM allocation are tested; cross-currency settlement, credit-note exceptions, landed costs and advance reconciliation are not newly certified by this release. Three quotations are attached evidence and comparison records, not separate Supplier Quotation documents.

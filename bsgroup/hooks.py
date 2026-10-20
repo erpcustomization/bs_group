@@ -516,3 +516,64 @@ override_whitelisted_methods.update({
     "frappe.desk.reportview.export_query": "bsgroup.dcs.obligation.export_query",
     "frappe.core.doctype.data_export.exporter.export_data": "bsgroup.dcs.obligation.export_data",
 })
+
+# BS Procurement: scoped controls on standard buying documents.
+for _dt, _events in {
+    'Material Request': {'before_validate': 'prepare_new', 'validate': 'validate_request', 'before_update_after_submit': 'validate_request', 'before_cancel': 'before_cancel', 'on_trash': 'before_trash'},
+    'Purchase Order': {'before_validate': 'prepare_new', 'validate': 'validate_order', 'before_update_after_submit': 'validate_order', 'before_cancel': 'before_cancel', 'on_trash': 'before_trash'},
+}.items():
+    for _event, _method in _events.items():
+        _prior = doc_events.setdefault(_dt, {}).get(_event, [])
+        doc_events[_dt][_event] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ['bsgroup.procurement.' + _method]
+_prior = globals().get('after_migrate', [])
+after_migrate = ([_prior] if isinstance(_prior, str) else list(_prior)) + ['bsgroup.procurement_setup.execute']
+
+for _event in ('validate', 'on_trash'):
+    _prior = doc_events.setdefault('File', {}).get(_event, [])
+    doc_events['File'][_event] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ['bsgroup.procurement.protect_file']
+
+_prior = doc_events['Purchase Order'].get('before_print', [])
+doc_events['Purchase Order']['before_print'] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ['bsgroup.procurement.before_print']
+# Sales handover now creates a standard Material Request; retain legacy packet access.
+has_permission["DCS Purchase Request"] = "bsgroup.dcs.procurement.has_permission"
+permission_query_conditions["DCS Purchase Request"] = "bsgroup.dcs.procurement.query_conditions"
+for _event in ("validate", "before_update_after_submit"):
+    _prior = doc_events.setdefault("Quotation", {}).get(_event, [])
+    doc_events["Quotation"][_event] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.dcs.procurement.guard_reference", "bsgroup.dcs.procurement.validate_won"]
+for _event in ("on_update", "on_update_after_submit"):
+    _prior = doc_events["Quotation"].get(_event, [])
+    doc_events["Quotation"][_event] = ["bsgroup.dcs.procurement.sync_won"] + ([_prior] if isinstance(_prior, str) else list(_prior))
+for _event in ("validate", "before_insert", "on_trash"):
+    _prior = doc_events.setdefault("File", {}).get(_event, [])
+    doc_events["File"][_event] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.dcs.procurement.file_guard"]
+extend_doctype_class.setdefault("File", []).append("bsgroup.dcs.procurement.ProcurementFileMixin")
+_prior = doc_events["Quotation"].get("before_cancel", [])
+doc_events["Quotation"]["before_cancel"] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.dcs.procurement.before_cancel"]
+
+# Preserve BS purchasing lineage in standard receiving and invoicing.
+for _dt in ("Purchase Receipt", "Purchase Invoice"):
+    _prior = doc_events.setdefault(_dt, {}).get("before_validate", [])
+    doc_events[_dt]["before_validate"] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.procurement_accounts.validate_matches"]
+
+# Keep supplier payment lineage after native invoice cancellation.
+for _dt, _event, _method in (
+    ("Payment Entry", "before_validate", "remember_payment_sources"),
+    ("Payment Entry", "before_update_after_submit", "remember_payment_sources"),
+    ("Purchase Invoice", "before_cancel", "remember_invoice_payments"),
+):
+    _prior = doc_events.setdefault(_dt, {}).get(_event, [])
+    doc_events[_dt][_event] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.procurement_accounts." + _method]
+
+# BS Procurement QC gap controls v2
+for _dt, _event, _method in (
+    ("Purchase Invoice", "validate", "validate_invoice_approval"),
+    ("Purchase Invoice", "before_update_after_submit", "validate_invoice_approval"),
+    ("Purchase Invoice", "validate", "enforce_line_limits"),
+    ("Purchase Receipt", "validate", "enforce_line_limits"),
+    ("Payment Entry", "on_update", "sync_payment_index"),
+    ("Payment Entry", "on_update_after_submit", "sync_payment_index"),
+):
+    _prior = doc_events.setdefault(_dt, {}).get(_event, [])
+    doc_events[_dt][_event] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.procurement_accounts." + _method]
+extend_doctype_class.setdefault("Purchase Order", []).append("bsgroup.procurement_controls.ProcurementOrderMixin")
+doctype_list_js["Purchase Order"] = "public/js/bs_procurement_purchase_order_list.js"

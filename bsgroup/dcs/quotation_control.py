@@ -104,6 +104,9 @@ def guard_lineage(doc, method=None):
 
 @frappe.whitelist()
 def update_child_qty_rate(parent_doctype, trans_items, parent_doctype_name, child_docname="items"):
+    if parent_doctype == "Purchase Order":
+        from bsgroup.procurement import guard_item_update
+        guard_item_update(parent_doctype_name)
     # Core updates child rows directly before saving the parent; a document hook
     # alone cannot compare the original prices or protect them atomically.
     if parent_doctype == "Quotation":

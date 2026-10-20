@@ -1,0 +1,115 @@
+"""Run with bench Python from /home/bitssecureit/rel1-bench/sites."""
+import base64
+import copy
+import io
+import json
+import unittest
+import time
+import secrets
+from urllib.parse import parse_qs, urlsplit
+from pathlib import Path
+from unittest.mock import patch
+import frappe
+from pypdf import PdfReader
+from bsgroup.bs_group.page.bs_procurement import bs_procurement as module
+
+DATA = {"pr":"DEMO-PRQ-2026-0003","po":"DEMO-PO-DXB-2026-0003-02","status":"Approved",
+"supplier":"QA OEM Direct","contact":"QA Contact","email":"qa@example.com","phone":"0000000000",
+"address":"QA Supplier Address, Dubai","trn":"","group":"Software","terms":"50% on order; 50% after activation.",
+"delivery":"2026-11-01","approved":"20 Oct 2026, 12:00","version":2,"quote":"N/A exception: Sole authorised OEM",
+"items":[{"sourceId":"L1","description":"TEST Microsoft 365 licences (dummy)","qty":20,"rate":195,"uom":"Nos"}]}
+
+class SamplePDFTests(unittest.TestCase):
+    def test_totals_and_references(self):
+        html=module.render_sample_html(DATA)
+        for expected in ["3,900.00","195.00","4,095.00","01 Nov 2026","20 Oct 2026","L1","NOT VALID FOR PURCHASE"]:
+            self.assertIn(expected,html)
+    def test_html_is_escaped(self):
+        data=copy.deepcopy(DATA)
+        data["supplier"]='<img src="http://example.invalid/private">'
+        self.assertIn("&lt;img",module.render_sample_html(data))
+        self.assertNotIn('<img',module.render_sample_html(data))
+    def test_invalid_numbers_and_refs(self):
+        for value in [0,-1,"NaN","Infinity",True,1000000001]:
+            data=copy.deepcopy(DATA);data["items"][0]["qty"]=value
+            with self.subTest(value=value),self.assertRaises(ValueError):module.render_sample_html(data)
+        for key,value in [("pr","REAL-PR"),("po","PO-0001"),("status","Pending Approval"),("version",0),("delivery","not-a-date")]:
+            data=copy.deepcopy(DATA);data[key]=value
+            with self.subTest(key=key),self.assertRaises(ValueError):module.render_sample_html(data)
+    def test_duplicate_or_empty_lines(self):
+        for lines in [[],DATA["items"]*2]:
+            data=copy.deepcopy(DATA);data["items"]=lines
+            with self.assertRaises(ValueError):module.render_sample_html(data)
+    def test_guest_cannot_download(self):
+        old=frappe.session.user
+        try:
+            frappe.set_user("Guest")
+            with self.assertRaises(frappe.PermissionError):module.download_sample_pdf(json.dumps(DATA))
+        finally:frappe.set_user(old)
+    def test_page_permission_required(self):
+        with patch.object(module.frappe,"get_doc") as doc:
+            doc.return_value.is_permitted.return_value=False
+            with self.assertRaises(frappe.PermissionError):module.download_sample_pdf(json.dumps(DATA))
+    def test_payload_limit(self):
+        with self.assertRaises(frappe.ValidationError):module.download_sample_pdf(" " * 65537)
+
+    def test_attachment_and_inline_responses(self):
+        token=secrets.token_urlsafe(32)
+        key="bsp:sample-pdf:"+token
+        content=b"%PDF-1.4\nSample test bytes"
+        frappe.cache.set_value(key,{"user":frappe.session.user,"filename":"DEMO-PO-SAMPLE.pdf","content":content,"expires_at":time.time()+300},expires_in_sec=300)
+        try:
+            for inline,disposition in [("0","attachment"),("1","inline")]:
+                response=module.fetch_sample_pdf(token,inline)
+                self.assertEqual(response.status_code,200)
+                self.assertEqual(response.mimetype,"application/pdf")
+                self.assertEqual(response.data,content)
+                self.assertEqual(response.content_length,len(content))
+                self.assertIn(disposition,response.headers["Content-Disposition"])
+                self.assertIn("DEMO-PO-SAMPLE.pdf",response.headers["Content-Disposition"])
+                self.assertIn("no-store",response.headers["Cache-Control"])
+                self.assertEqual(response.headers["X-Content-Type-Options"],"nosniff")
+        finally:frappe.cache.delete_value(key)
+    def test_file_links_are_user_bound_and_expire(self):
+        token=secrets.token_urlsafe(32);key="bsp:sample-pdf:"+token
+        for user,expiry in [("another-user@example.com",time.time()+300),(frappe.session.user,time.time()-1)]:
+            frappe.cache.set_value(key,{"user":user,"filename":"sample.pdf","content":b"PDF","expires_at":expiry},expires_in_sec=300)
+            with self.assertRaises(frappe.PermissionError):module.fetch_sample_pdf(token)
+        frappe.cache.delete_value(key)
+        with self.assertRaises(frappe.PermissionError):module.fetch_sample_pdf(token)
+    def test_file_endpoint_rechecks_permission(self):
+        with patch.object(module.frappe,"get_doc") as doc:
+            doc.return_value.is_permitted.return_value=False
+            with self.assertRaises(frappe.PermissionError):module.fetch_sample_pdf("A"*43)
+    def test_file_endpoint_rejects_bad_token_and_display_option(self):
+        for token in ["", "../sample", "A"*42, "A"*44]:
+            with self.assertRaises(frappe.PermissionError):module.fetch_sample_pdf(token)
+        with self.assertRaises(frappe.ValidationError):module.fetch_sample_pdf("A"*43,"something")
+
+    def test_actual_pdf(self):
+        result=module.download_sample_pdf(json.dumps(DATA))
+        token=parse_qs(urlsplit(result["download_url"]).query)["token"][0]
+        response=module.fetch_sample_pdf(token)
+        pdf=response.data;reader=PdfReader(io.BytesIO(pdf))
+        self.assertEqual(pdf,base64.b64decode(result["content"]))
+        self.assertIn("inline=1",result["view_url"])
+        self.assertEqual(len(reader.pages),1)
+        text=reader.pages[0].extract_text()
+        for expected in ["3,900.00","4,095.00","L1","SAMPLE"]:self.assertIn(expected,text)
+        self.assertAlmostEqual(float(reader.pages[0].mediabox.width),595,delta=2)
+        out=Path("/home/bitssecureit/qa_bsp_20261020/fixed");out.mkdir(parents=True,exist_ok=True)
+        (out/result["filename"]).write_bytes(pdf)
+    def test_multipage_pdf(self):
+        data=copy.deepcopy(DATA)
+        data["items"]=[dict(DATA["items"][0],sourceId="L"+str(i),description="TEST long procurement item "+str(i),qty=1) for i in range(1,51)]
+        pdf=base64.b64decode(module.download_sample_pdf(json.dumps(data))["content"])
+        reader=PdfReader(io.BytesIO(pdf));self.assertGreater(len(reader.pages),1)
+        text=" ".join(page.extract_text() for page in reader.pages)
+        self.assertIn("L50",text);self.assertIn("10,237.50",text)
+        Path("/home/bitssecureit/qa_bsp_20261020/fixed/multipage-SAMPLE.pdf").write_bytes(pdf)
+
+if __name__=="__main__":
+    frappe.init(site="rel1-test.local",sites_path="/home/bitssecureit/rel1-bench/sites")
+    frappe.connect();frappe.set_user("Administrator")
+    try: unittest.main()
+    finally: frappe.destroy()
