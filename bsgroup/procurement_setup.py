@@ -28,6 +28,8 @@ def execute():
             field("customer_po_file", "Customer PO attachment", "Attach"),
             field("source_snapshot", "Sales handover evidence", "Long Text",
                   read_only=1, hidden=1, print_hide=1),
+            field("request_evidence", "PR quotations and invoice copies", "Long Text",
+                  read_only=1, hidden=1, print_hide=1, no_copy=1),
         ],
         "Material Request Item": [
             dict(fieldname="custom_bsp_dcs_item", label="Source DCS item",

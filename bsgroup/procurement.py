@@ -155,6 +155,7 @@ def mr_values(doc):
                 quotation=doc.get("custom_bsp_quotation"), customer=doc.get("custom_bsp_customer") or doc.customer,
                 customer_po=doc.get("custom_bsp_customer_po"),
                 customer_po_file=doc.get("custom_bsp_customer_po_file"),
+                request_evidence=parse(doc.get("custom_bsp_request_evidence")),
                 items=[{k:row.get(k) for k in (
                     "name", "item_code", "item_name", "description", "qty", "uom",
                     "conversion_factor", "rate", "warehouse", "project", "schedule_date"
@@ -237,7 +238,7 @@ def validate_request(doc, method=None):
         fail("An existing ordinary Material Request cannot be converted into a BS requisition.")
     if doc.material_request_type != "Purchase":
         fail("A BS Purchase Requisition must have purpose Purchase.")
-    protected(doc, old, ["history", "reason", "key", "source_snapshot"])
+    protected(doc, old, ["history", "reason", "key", "source_snapshot", "request_evidence"])
     if doc.get("custom_bsp_source_snapshot"):
         from bsgroup.dcs.procurement import validate_handover_request
         validate_handover_request(doc, old)
@@ -250,6 +251,14 @@ def validate_request(doc, method=None):
         number(row.rate, "Budget rate", zero=True)
     old_state = old.workflow_state if old else None
     state = doc.workflow_state or "Draft"
+    if not doc.get("custom_bsp_source_snapshot"):
+        from bsgroup.procurement_requests import validate_support
+        if not old or old_state in ("Draft", "Rejected") or (
+                state != old_state and state in ("Pending Approval", "Approved")):
+            validate_support(doc, required=state in ("Pending Approval", "Approved"))
+        for row in doc.items:
+            if frappe.get_cached_value("Item", row.item_code, "is_stock_item") and not row.warehouse:
+                fail("Select a receiving warehouse for stock items.")
     track_preparers(doc, old, state, old_state)
     if old and old_state in ("Pending Approval", "Approved") and encoded(mr_values(old)) != encoded(mr_values(doc)):
         fail("Requested/approved PR lines and source references are locked. Reject or amend the PR first.")
@@ -494,20 +503,26 @@ def protect_file(doc, method=None):
     """Once submitted for review, preserve the original quotation evidence."""
     before = doc.get_doc_before_save()
     target = before or doc
-    if target.attached_to_doctype != PO or not target.attached_to_name:
+    if target.attached_to_doctype not in (MR, PO) or not target.attached_to_name:
         return
-    if not frappe.db.get_value(PO, target.attached_to_name, "custom_bsp_managed"):
+    if not frappe.db.get_value(target.attached_to_doctype, target.attached_to_name, "custom_bsp_managed"):
         return
-    order = frappe.get_doc(PO, target.attached_to_name)
-    references = [q.get("file") for q in parse(order.custom_bsp_comparison).get("quotes", [])]
-    # Earlier submission evidence remains protected after rejection/revision.
-    for event in history(order):
-        snapshot = event.get("snapshot") or {}
-        references += [q.get("file") for q in snapshot.get("comparison", {}).get("quotes", [])]
+    parent = frappe.get_doc(target.attached_to_doctype, target.attached_to_name)
+    if target.attached_to_doctype == MR:
+        from bsgroup.procurement_requests import file_references
+        references = file_references(parse(parent.get("custom_bsp_request_evidence")))
+        for event in history(parent):
+            references |= file_references((event.get("snapshot") or {}).get("request_evidence"))
+    else:
+        references = [q.get("file") for q in parse(parent.custom_bsp_comparison).get("quotes", [])]
+        # Earlier submission evidence remains protected after rejection/revision.
+        for event in history(parent):
+            snapshot = event.get("snapshot") or {}
+            references += [q.get("file") for q in snapshot.get("comparison", {}).get("quotes", [])]
     if doc.name and doc.name in references and (method == "on_trash" or
             any(doc.has_value_changed(k) for k in ("file_url", "file_name", "content_hash", "file_size",
                   "is_private", "attached_to_name", "attached_to_doctype")) or doc.get("content")):
-        fail("This file is quotation evidence. Upload a new file to revise it; keep the original for the audit trail.")
+        fail("This file is procurement evidence. Upload a new file to revise it; keep the original for the audit trail.")
 
 
 def normalize_comparison(data):
@@ -553,6 +568,7 @@ def create_request(payload):
     if not isinstance(items, list) or not 1 <= len(items) <= 100:
         fail("Enter between one and 100 requisition lines.")
     doc = frappe.new_doc(MR)
+    from bsgroup.procurement_requests import normalize
     doc.update(dict(material_request_type="Purchase", company=data.get("company"),
                     schedule_date=data.get("schedule_date"), transaction_date=nowdate(),
                     custom_bsp_managed=1, custom_bsp_key=key,
@@ -560,6 +576,7 @@ def create_request(payload):
                     custom_bsp_customer_po=text(data.get("customer_po")),
                     custom_bsp_quotation=data.get("quotation"),
                     custom_deal_cost_sheet=data.get("dcs"),
+                    custom_bsp_request_evidence=encoded(normalize(data.get("supporting"))),
                     title=text(data.get("title") or "Purchase", 140)))
     # Standard item master supplies description and UOM; no free-form fake items.
     for row in items:
@@ -578,6 +595,21 @@ def create_request(payload):
     with operation("create"):
         doc.insert()
     access(doc)
+    return request_data(doc)
+
+
+@frappe.whitelist(methods=["POST"])
+@transaction_conflicts
+def save_request_evidence(name, modified, payload):
+    require_purchaser()
+    doc = load(MR, name, "write", modified)
+    if (not doc.custom_bsp_managed or doc.get("custom_bsp_source_snapshot") or doc.docstatus
+            or doc.workflow_state not in ("Draft", "Rejected")):
+        fail("Supporting documents can only be edited on draft or rejected manual PRs.")
+    from bsgroup.procurement_requests import normalize
+    doc.custom_bsp_request_evidence = encoded(normalize(payload))
+    with operation("save-request-evidence"):
+        doc.save()
     return request_data(doc)
 
 
@@ -768,6 +800,7 @@ def order_data(doc, source=None):
 def request_data(doc):
     access(doc)
     source = parse(doc.get("custom_bsp_source_snapshot"))
+    from bsgroup.procurement_requests import support_data
     names = frappe.get_list(PO, filters={"custom_bsp_material_request":doc.name,
                                         "custom_bsp_managed":1}, pluck="name", limit_page_length=0,
                             order_by="creation asc") if frappe.has_permission(PO, "read") else []
@@ -823,6 +856,10 @@ def request_data(doc):
                 approval=approval, purchasing=status, erpStatus=doc.status, approver=approver_details(),
                 reason=doc.get("custom_bsp_reason") or "", items=items, orders=orders,
                 actions=actions, history=history(doc),
+                supporting=support_data(doc), manual=not bool(source),
+                canEditSupporting=not source and not doc.docstatus
+                    and (doc.workflow_state or "Draft") in ("Draft", "Rejected")
+                    and purchaser() and doc.has_permission("write"),
                 canPrepare=purchaser() and approval=="Approved" and doc.status not in ("Stopped","Cancelled")
                            and frappe.has_permission(PO,"create"))
 

@@ -17,8 +17,8 @@ let po={id:"PO-OLD",request:"PR-OLD",company:"QC Company",supplier:"Supplier A",
   {supplier:"Supplier B",file:"",rates:{ROW:95}},{supplier:"Supplier C",file:"",rates:{ROW:100}}],
   items:[{sourceId:"ROW",item_code:"QC-ITEM",description:"QC scope",qty:2,rate:90,cost:100,
   uom:"Nos",conversionFactor:1,uoms:["Nos","Box"],uomFactors:{Nos:1,Box:2}}]};
-let failSave=null,lastDialog=null,uploads=[],saved=null;
-const detail=()=>({...clone(summary),history:[],actions:[],canPrepare:true,orders:[clone(po)],
+let failSave=null,lastDialog=null,uploads=[],saved=null,manual=null;
+const detail=()=>manual?clone(manual):({...clone(summary),history:[],actions:[],canPrepare:true,orders:[clone(po)],
   items:[{...po.items[0],qty:4,cost:100,available:2,reserved:2,ordered:0}]});
 const frappe={
   pages:{"bs-procurement":{}},route_options:{},defaults:{get_user_default:()=>"QC Company"},
@@ -34,6 +34,20 @@ const frappe={
     else if(method.endsWith("get_requests"))data={requests:[clone(summary)],has_more:true,user:"buyer@example.com",canCreate:true};
     else if(method.endsWith("get_orders"))data={orders:[clone(po)],has_more:!args.start};
     else if(method.endsWith("get_request"))data=detail();
+    else if(method.endsWith("create_request")){
+      const value=JSON.parse(args.payload);
+      manual={...clone(summary),id:"PR-UTILITY",modified:"pr-v1",approval:"Draft",purchasing:"Not started",
+        manual:true,canEditSupporting:true,canPrepare:false,orders:[],history:[],actions:["Send for Approval"],
+        supporting:{...value.supporting,exception:false,explanation:"",invoices:[],
+          quotes:[0,1,2].map(()=>({supplier:"",file:"",filename:"",url:""}))}};
+      data=clone(manual);
+    } else if(method.endsWith("save_request_evidence")){
+      manual.supporting=JSON.parse(args.payload);manual.modified="pr-saved";data=clone(manual);
+    } else if(method.endsWith("request_action")){
+      assert.equal(args.modified,"pr-saved");manual.approval="Pending Approval";manual.canEditSupporting=false;
+      manual.actions=[];manual.history=[{action:"Pending Approval",actor:"buyer@example.com",snapshot:{request_evidence:clone(manual.supporting)}}];
+      data=clone(manual);
+    }
     else if(method.endsWith("save_order")){
       if(failSave)throw failSave;
       saved=JSON.parse(args.payload);po={...po,...saved,lineReasons:saved.comparison.line_reasons};data=clone(po);
@@ -88,7 +102,28 @@ async function input(s,value){const el=find(s);if(el.tagName==="SELECT"){
   await click('[data-action="list"]');
   await click('[data-action="new-pr"]');
   check("Manual PR cannot choose arbitrary quotation or DCS budget",!lastDialog.options.fields.some(f=>["quotation","dcs"].includes(f.fieldname)));
-  lastDialog.hide();await tick();
+  check("Manual PR offers utility/direct invoice type",lastDialog.options.fields.some(f=>f.fieldname==="request_type"&&f.options.includes("Utility bill")));
+  check("Service PR does not require a warehouse in the dialog",!lastDialog.options.fields.find(f=>f.fieldname==="warehouse").reqd);
+  lastDialog.options.primary_action({request_type:"Utility bill / direct invoice",company:"QC Company",title:"Electricity bill",items:[]});await tick();
+  check("Utility PR displays its own invoice and quotation evidence section",document.body.textContent.includes("Invoice copies (required)")&&!!document.querySelector('[data-pr-field="exception"]'));
+  await click('[data-action="pr-upload-invoice"]');
+  const invoiceUpload=uploads.at(-1);
+  check("Invoice uploader attaches private copies to the standard Material Request",
+    invoiceUpload.doctype==="Material Request"&&invoiceUpload.docname==="PR-UTILITY"&&invoiceUpload.allow_multiple&&!invoiceUpload.allow_toggle_private&&!invoiceUpload.allow_web_link);
+  invoiceUpload.on_success({name:"FILE-INVOICE",file_name:"Utility-October.pdf",file_url:"/private/files/Utility-October.pdf"});await tick();
+  const exception=find('[data-pr-field="exception"]');exception.checked=true;exception.dispatchEvent(new Event("input",{bubbles:true}));await tick();
+  await input('[data-pr-field="explanation"]',"Regulated electricity provider; three quotations are not applicable.");
+  await click('[data-action="save-pr-supporting"]');
+  check("Saving PR evidence retains invoice, exception and notes",
+    manual.supporting.exception&&manual.supporting.explanation.includes("Regulated")&&manual.supporting.invoices[0].file==="FILE-INVOICE");
+  await click('[data-action="pr-action"]');
+  check("Sending PR saves current evidence before approval request",
+    calls.at(-2).method.endsWith("save_request_evidence")&&calls.at(-1).method.endsWith("request_action"));
+  check("Pending PR shows invoice links and locks exception fields",
+    !!document.querySelector('a[href="/private/files/Utility-October.pdf"]')&&find('[data-pr-field="exception"]').hasAttribute("disabled")
+    &&!document.querySelector('[data-action="pr-upload-invoice"]'));
+  check("Approval history exposes supporting evidence and explanation",
+    document.body.textContent.includes("Invoice copy")&&document.body.textContent.includes("Regulated electricity provider"));
   await click('[data-action="services"]');
   check("Payment Order remains third module section",document.body.textContent.includes("Supplier / vendor invoices, approvals and payments."));
   console.log(JSON.stringify({passed:checks.length,tests:checks},null,2));

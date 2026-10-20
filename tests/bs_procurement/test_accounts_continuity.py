@@ -254,6 +254,7 @@ def run():
     baseline.submit()
     frappe.db.set_single_value("BS Group Settings", "cost_overrun_policy", "Block")
     r = p.create_request(dict(key=str(uuid.uuid4()), company=COMPANY,
+        supporting=dict(exception=True,explanation="QC single-source continuity fixture."),
         project=project.name, customer=q.party_name, title="ZZTEST continuity split vendors",
         schedule_date=add_days(nowdate(), 7), warehouse="Stores - AE",
         items=[dict(item_code=item.name, qty=4, rate=100)]))
@@ -402,6 +403,7 @@ def run():
           close(baseline.reload().remaining_amount, 0))
     def overspend():
         extra = p.create_request(dict(key=str(uuid.uuid4()), company=COMPANY,
+            supporting=dict(exception=True,explanation="QC single-source overrun fixture."),
             project=project.name, customer=q.party_name, title="ZZTEST excess budget",
             schedule_date=add_days(nowdate(), 7), warehouse="Stores - AE",
             items=[dict(item_code=item.name, qty=1, rate=1)]))

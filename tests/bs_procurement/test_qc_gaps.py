@@ -17,6 +17,7 @@ ACCM2="zztest-gap-accounts-manager2@example.com"
 def approved_pr(p, item=None):
     frappe.set_user(BUYER)
     r=new_request(p) if not item else p.create_request(dict(key=str(uuid.uuid4()),company=COMPANY,
+        supporting=dict(exception=True,explanation="QC single-source controls fixture."),
         title="ZZTEST gaps",schedule_date=add_days(nowdate(),7),warehouse="Stores - AE",
         items=[dict(item_code=item,qty=4,rate=100)]))
     r=action(p,r,"Send for Approval")
@@ -157,11 +158,11 @@ def run():
     po3=p.save_order(po3["id"],po3["modified"],data)
     po3=po_action_without_fixture(p,po3["id"],"Send for Approval")
     path=Path(files[0].get_full_path());before=hashlib.sha256(path.read_bytes()).hexdigest()
-    blocked("G04 Quotation deletion rejected",lambda:frappe.delete_doc("File",files[0].name),"quotation evidence")
+    blocked("G04 Quotation deletion rejected",lambda:frappe.delete_doc("File",files[0].name),"procurement evidence")
     check("G04 Blocked deletion preserves exact file bytes",path.exists() and hashlib.sha256(path.read_bytes()).hexdigest()==before)
     def publish():
         f=frappe.get_doc("File",files[0].name);f.is_private=0;f.save()
-    blocked("G04 Making quotation public is rejected before moving it",publish,"quotation evidence")
+    blocked("G04 Making quotation public is rejected before moving it",publish,"procurement evidence")
     check("G04 Privacy rejection preserves original private file",path.exists() and hashlib.sha256(path.read_bytes()).hexdigest()==before)
     plain_po=frappe.get_doc(dict(doctype="Purchase Order",company=COMPANY,supplier=suppliers[0],
         schedule_date=add_days(nowdate(),7),items=[dict(item_code="ZZTEST-CLAUDE-DCS-ITEM-A",

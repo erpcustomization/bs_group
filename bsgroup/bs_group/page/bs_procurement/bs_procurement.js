@@ -1,7 +1,7 @@
 /* Standard ERPNext Material Requests and Purchase Orders. No simulated records. */
 frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
   const page=frappe.ui.make_app_page({parent:wrapper,title:"BS Procurement",single_column:true});
-  const root=document.createElement("div");root.className="bsp";root.dataset.build="20261020-mohan-approval";page.main.append(root);
+  const root=document.createElement("div");root.className="bsp";root.dataset.build="20261020-pr-evidence";page.main.append(root);
   const esc=v=>frappe.utils.escape_html(String(v??""));
   const money=(v,currency)=>{const digits=(currency||order()?.currency||req()?.currency)==="OMR"?3:2;return new Intl.NumberFormat("en-AE",{minimumFractionDigits:digits,maximumFractionDigits:digits}).format(Number(v)||0);};
   const api=async(method,args={})=>(await frappe.call({method:"bsgroup.procurement."+method,args,freeze:true})).message;
@@ -48,7 +48,41 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
     const comparison=s.comparison||{};
     return facts(Object.entries(labels).filter(([k])=>s[k]!==undefined).map(([k,v])=>[v,s[k]]))+
       `<div class="bsp-tablewrap"><table><thead><tr><th>Item</th><th>Quantity</th><th>UOM</th><th>Unit rate</th></tr></thead><tbody>${(s.items||[]).map(x=>`<tr><td>${esc(x.item_code)}</td><td>${x.qty}</td><td>${esc(x.uom)}</td><td>${money(x.rate)}</td></tr>`).join("")}</tbody></table></div>`+
-      (s.comparison?facts([["Quotation basis",comparison.exception?"Exception":"Three quotations"],["Exception reason",comparison.explanation],["Selection / negotiation notes",comparison.selection_reason],["Selected quotation",comparison.selected===null||comparison.selected===undefined?"—":String(comparison.selected+1)]])+`<div class="bsp-tablewrap"><table><thead><tr><th>Quotation</th><th>Supplier</th><th>Quoted net total</th></tr></thead><tbody>${(comparison.quotes||[]).map((q,i)=>`<tr><td>${i+1}</td><td>${esc(q.supplier)}</td><td>${money((s.items||[]).reduce((sum,x)=>sum+x.qty*Number(q.rates?.[x.material_request_item]||0),0))}</td></tr>`).join("")}</tbody></table></div>`:"");
+      (s.comparison?facts([["Quotation basis",comparison.exception?"Exception":"Three quotations"],["Exception reason",comparison.explanation],["Selection / negotiation notes",comparison.selection_reason],["Selected quotation",comparison.selected===null||comparison.selected===undefined?"—":String(comparison.selected+1)]])+`<div class="bsp-tablewrap"><table><thead><tr><th>Quotation</th><th>Supplier</th><th>Quoted net total</th></tr></thead><tbody>${(comparison.quotes||[]).map((q,i)=>`<tr><td>${i+1}</td><td>${esc(q.supplier)}</td><td>${money((s.items||[]).reduce((sum,x)=>sum+x.qty*Number(q.rates?.[x.material_request_item]||0),0))}</td></tr>`).join("")}</tbody></table></div>`:"")+
+      (s.request_evidence?.kind?supportSnapshot(s.request_evidence):"");
+  }
+  function supportSnapshot(s){
+    return facts([["Request type",s.kind==="direct_invoice"?"Utility bill / direct invoice":"Purchase"],
+      ["Quotation requirement",s.exception?"No three quotations required":"Three quotations"],["Notes",s.explanation]])+
+      (s.quotes||[]).filter(q=>q.file).map(q=>`<p>${esc(q.supplier)} · ${fileLink(q.url,q.filename)}</p>`).join("")+
+      (s.invoices||[]).map(f=>`<p>Invoice copy · ${fileLink(f.url,f.filename)}</p>`).join("");
+  }
+  function prSupporting(r){
+    if(!r.manual)return "";
+    const s=r.supporting,editable=r.canEditSupporting,disabled=editable?"":"disabled";
+    return `<section class="bsp-card"><h3>PR quotations and supporting invoices</h3>
+      <p class="muted">Attach three supplier quotations, or select the exception and explain why. Utility bills and direct invoices require invoice copies, the exception and notes before approval.</p>
+      <label>Request type<select data-pr-field="kind" ${disabled}><option value="purchase" ${s.kind==="purchase"?"selected":""}>Purchase</option><option value="direct_invoice" ${s.kind==="direct_invoice"?"selected":""}>Utility bill / direct invoice</option></select></label>
+      <div class="bsp-grid">${s.quotes.map((q,i)=>`<div class="bsp-quote"><h4>Quotation ${i+1}</h4><strong>${esc(q.supplier||"Select supplier")}</strong><p>${fileLink(q.url,q.filename)}</p>${editable?btn("Select supplier","pr-quote-supplier",`data-index="${i}"`)+btn("Upload quotation","pr-upload-quote",`data-index="${i}"`)+(q.file?btn("Remove from draft","pr-remove-quote",`data-index="${i}"`):""):""}</div>`).join("")}</div>
+      <label class="bsp-check"><input type="checkbox" data-pr-field="exception" ${s.exception?"checked":""} ${disabled}> No three quotations required</label>
+      <label>Notes — explain why three quotations are not required<textarea data-pr-field="explanation" ${s.exception?"required":""} ${disabled}>${esc(s.explanation)}</textarea></label>
+      <h4>Invoice copies ${s.kind==="direct_invoice"?"(required)":"(optional)"}</h4>
+      ${(s.invoices||[]).map((f,i)=>`<p>${fileLink(f.url,f.filename)} ${editable?btn("Remove from draft","pr-remove-invoice",`data-index="${i}"`):""}</p>`).join("")||"<p class='muted'>No invoice copies attached.</p>"}
+      ${editable?btn("Attach invoice copies","pr-upload-invoice")+btn("Save supporting documents","save-pr-supporting","",true):""}
+      <p class="bsp-pr-save-status muted">${dirty&&editable?"Unsaved supporting documents / notes":"Supporting documents and notes saved in ERPNext"}</p>
+      ${editable?"<p class='muted'>Send for Approval saves these details and sends the complete PR to Mohan. Missing evidence or notes will prevent submission.</p>":"<p class='muted'>Submitted evidence is locked. Earlier versions remain in the approval history.</p>"}
+      </section>`;
+  }
+  function changedPR(){
+    dirty=true;
+    const status=root.querySelector(".bsp-pr-save-status");
+    if(status)status.textContent="Unsaved supporting documents / notes";
+  }
+  async function savePR(){
+    const r=req();
+    if(!r.canEditSupporting)return r;
+    const updated=await api("save_request_evidence",{name:r.id,modified:r.modified,payload:JSON.stringify(r.supporting)});
+    replace(updated);dirty=false;return updated;
   }
   function render(){
     root.innerHTML=`<aside class="bsp-side"><div class="bsp-brand"><span>B</span><div>BS Procurement<small>BS Group</small></div></div><nav>${btn("Purchase Requisition","list",view==="list"||view==="detail"?'aria-current="page"':"")}${btn("Purchase Order","orders",view==="orders"||view==="po"?'aria-current="page"':"")}${btn("Payment Order","services",view==="services"?'aria-current="page"':"")}</nav><div class="bsp-profile">${esc(user)}<small>Your ERP permissions apply</small></div></aside><div class="bsp-main"><header class="bsp-top"><span>BS Procurement / <strong>${view==="services"?"Payment Order":["po","orders"].includes(view)?"Purchase Order":"Purchase Requisition"}</strong></span>${btn("Refresh","refresh")}</header><section class="bsp-body"><div class="bsp-preview"><strong>BS Procurement</strong> · Purchase requisitions → purchase orders → supplier invoices and payments.</div><div class="bsp-view"></div></section></div>`;
@@ -74,7 +108,7 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
   }
   function detail(){
     const r=req();if(!r)return "<p>Open a requisition.</p>";
-    return `<div class="bsp-heading"><div><h2>${esc(r.id)} ${badge(r.approval)}</h2><p class="muted">${esc(r.company)} · ${esc(r.project)}</p></div><div>${btn("All requisitions","list")}${btn("Open Material Request","standard-mr")}${actions(r)}</div></div><section class="bsp-card"><h3>PR status and approval</h3>${facts([["Approver",r.approver?.name], ["Approver account",r.approver?.user],["Approval status",r.approval],["Purchasing status",r.purchasing],["ERP status",r.erpStatus],["Latest decision reason",r.reason]])}${rail(r)}</section><section class="bsp-card"><h3>Source documents</h3>${facts([["Requested by",r.person],["Customer",r.customer],["Customer PO",r.customerPO],["Quotation",r.quotation],["Deal Cost Sheet",r.dcs]])}<div>${r.quotation?btn("Open Quotation","source",`data-type="Quotation" data-name="${esc(r.quotation)}"`):""}${r.dcs?btn("Open Deal Cost Sheet","source",`data-type="Deal Cost Sheet" data-name="${esc(r.dcs)}"`):""}${fileLink(r.customerPOFile,r.customerPOFile?"Open Customer PO attachment":"")}</div><p class="muted">${r.handoverRevision?"Budget copied from awarded DCS revision "+esc(r.handoverRevision)+". Source quantities and budget are preserved.":"Budget rates come from this Material Request."}</p>${(r.handoverFiles||[]).map(f=>`<p>${fileLink(f.url,({quotation:"Awarded quotation",customer_po:"Customer PO",costing:"Awarded costing sheet"})[f.kind]||f.filename)}</p>`).join("")}${r.handoverResources||r.handoverCharges?`<p class="muted">${r.handoverResources} labour/resource rows and ${r.handoverCharges} additional charge rows remain in the costing evidence; purchasing lines contain the DCS Item rows.</p>`:""}</section><section class="bsp-card"><h3>PR line items and purchasing progress</h3><p class="muted">Draft and pending POs reserve quantities. Submitted POs count as ordered. Select a supplier and quantities for each separate PO.</p><div class="bsp-tablewrap"><table><thead><tr><th>Select</th><th>Item</th><th>Requested</th><th>Ordered</th><th>Reserved, including ordered</th><th>Available</th><th>New PO qty</th><th>Budget rate (${esc(r.currency)})</th></tr></thead><tbody>${r.items.map(x=>`<tr><td><input type="checkbox" data-pick="${esc(x.sourceId)}" aria-label="Select ${esc(x.item_code)}" ${r.canPrepare&&x.available>0?"":"disabled"} ${picks[x.sourceId]!==undefined?"checked":""}></td><td>${esc(x.item_code)}<small style="display:block">${esc(x.description)}</small></td><td>${x.qty} ${esc(x.uom)}</td><td>${x.ordered}</td><td>${x.reserved}</td><td>${x.available}</td><td><input type="number" data-pick-qty="${esc(x.sourceId)}" aria-label="New PO quantity ${esc(x.item_code)}" value="${picks[x.sourceId]??x.available}" min="0" max="${x.available}" step="any" ${r.canPrepare?"":"disabled"}></td><td>${money(x.cost)}</td></tr>`).join("")}</tbody></table></div>${r.canPrepare?btn("Prepare Purchase Order","create-po","",true):'<p class="muted">An approved, open PR and Purchase Order creation permission are required.</p>'}</section><section class="bsp-card"><h3>Linked Purchase Orders</h3>${ordersTable(r.orders)}</section><section class="bsp-activity"><h3>PR approval history</h3>${history(r.history)}</section>`;
+    return `<div class="bsp-heading"><div><h2>${esc(r.id)} ${badge(r.approval)}</h2><p class="muted">${esc(r.company)} · ${esc(r.project)}</p></div><div>${btn("All requisitions","list")}${btn("Open Material Request","standard-mr")}${actions(r)}</div></div><section class="bsp-card"><h3>PR status and approval</h3>${facts([["Approver",r.approver?.name], ["Approver account",r.approver?.user],["Approval status",r.approval],["Purchasing status",r.purchasing],["ERP status",r.erpStatus],["Latest decision reason",r.reason]])}${rail(r)}</section>${prSupporting(r)}<section class="bsp-card"><h3>Source documents</h3>${facts([["Requested by",r.person],["Customer",r.customer],["Customer PO",r.customerPO],["Quotation",r.quotation],["Deal Cost Sheet",r.dcs]])}<div>${r.quotation?btn("Open Quotation","source",`data-type="Quotation" data-name="${esc(r.quotation)}"`):""}${r.dcs?btn("Open Deal Cost Sheet","source",`data-type="Deal Cost Sheet" data-name="${esc(r.dcs)}"`):""}${fileLink(r.customerPOFile,r.customerPOFile?"Open Customer PO attachment":"")}</div><p class="muted">${r.handoverRevision?"Budget copied from awarded DCS revision "+esc(r.handoverRevision)+". Source quantities and budget are preserved.":"Budget rates come from this Material Request."}</p>${(r.handoverFiles||[]).map(f=>`<p>${fileLink(f.url,({quotation:"Awarded quotation",customer_po:"Customer PO",costing:"Awarded costing sheet"})[f.kind]||f.filename)}</p>`).join("")}${r.handoverResources||r.handoverCharges?`<p class="muted">${r.handoverResources} labour/resource rows and ${r.handoverCharges} additional charge rows remain in the costing evidence; purchasing lines contain the DCS Item rows.</p>`:""}</section><section class="bsp-card"><h3>PR line items and purchasing progress</h3><p class="muted">Draft and pending POs reserve quantities. Submitted POs count as ordered. Select a supplier and quantities for each separate PO.</p><div class="bsp-tablewrap"><table><thead><tr><th>Select</th><th>Item</th><th>Requested</th><th>Ordered</th><th>Reserved, including ordered</th><th>Available</th><th>New PO qty</th><th>Budget rate (${esc(r.currency)})</th></tr></thead><tbody>${r.items.map(x=>`<tr><td><input type="checkbox" data-pick="${esc(x.sourceId)}" aria-label="Select ${esc(x.item_code)}" ${r.canPrepare&&x.available>0?"":"disabled"} ${picks[x.sourceId]!==undefined?"checked":""}></td><td>${esc(x.item_code)}<small style="display:block">${esc(x.description)}</small></td><td>${x.qty} ${esc(x.uom)}</td><td>${x.ordered}</td><td>${x.reserved}</td><td>${x.available}</td><td><input type="number" data-pick-qty="${esc(x.sourceId)}" aria-label="New PO quantity ${esc(x.item_code)}" value="${picks[x.sourceId]??x.available}" min="0" max="${x.available}" step="any" ${r.canPrepare?"":"disabled"}></td><td>${money(x.cost)}</td></tr>`).join("")}</tbody></table></div>${r.canPrepare?btn("Prepare Purchase Order","create-po","",true):'<p class="muted">An approved, open PR and Purchase Order creation permission are required.</p>'}</section><section class="bsp-card"><h3>Linked Purchase Orders</h3>${ordersTable(r.orders)}</section><section class="bsp-activity"><h3>PR approval history</h3>${history(r.history)}</section>`;
   }
   function ordersTable(orders){
     return `<div class="bsp-tablewrap"><table><thead><tr><th>Purchase Order</th><th>PR</th><th>Supplier</th><th>Approval</th><th>ERP status</th><th>Net total</th><th>Grand total</th></tr></thead><tbody>${orders.map(p=>`<tr data-search-text="${esc([p.id,p.request,p.supplier,p.status,p.erpStatus].join(" ").toLowerCase())}"><td>${btn(esc(p.id),"open-po",`data-id="${esc(p.id)}" data-request="${esc(p.request)}"`)}</td><td>${esc(p.request)}</td><td>${esc(p.supplier)}</td><td>${badge(p.status)}</td><td>${esc(p.erpStatus)}</td><td>${p.status==="Cancelled"?"—":esc(p.currency)+" "+money(p.net,p.currency)}</td><td>${p.status==="Cancelled"?"—":esc(p.currency)+" "+money(p.grand,p.currency)}</td></tr>`).join("")||'<tr><td colspan="7">No Purchase Orders yet.</td></tr>'}</tbody></table></div>`;
@@ -134,9 +168,10 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
   async function createPR(){
     const values=await ask([
       {fieldname:"title",label:"Requisition title",fieldtype:"Data",reqd:1},
+      {fieldname:"request_type",label:"Request type",fieldtype:"Select",options:"Purchase\nUtility bill / direct invoice",default:"Purchase",reqd:1},
       {fieldname:"company",label:"Company",fieldtype:"Link",options:"Company",reqd:1,default:frappe.defaults.get_user_default("Company")},
       {fieldname:"schedule_date",label:"Required by",fieldtype:"Date",reqd:1,default:frappe.datetime.add_days(frappe.datetime.get_today(),7)},
-      {fieldname:"warehouse",label:"Receiving warehouse",fieldtype:"Link",options:"Warehouse",reqd:1},
+      {fieldname:"warehouse",label:"Receiving warehouse",fieldtype:"Link",options:"Warehouse",description:"Required for stock items; leave blank for non-stock services and utility bills."},
       {fieldname:"project",label:"Project",fieldtype:"Link",options:"Project"},
       {fieldname:"customer",label:"Customer",fieldtype:"Link",options:"Customer"},
       {fieldname:"customer_po",label:"Customer PO reference",fieldtype:"Data"},
@@ -144,8 +179,9 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
         fields:[{fieldname:"item_code",label:"Item",fieldtype:"Link",options:"Item",reqd:1,in_list_view:1},
                 {fieldname:"qty",label:"Quantity",fieldtype:"Float",reqd:1,in_list_view:1},
                 {fieldname:"uom",label:"Purchase UOM",fieldtype:"Link",options:"UOM",in_list_view:1},{fieldname:"rate",label:"Budget per UOM",fieldtype:"Currency",in_list_view:1}]}
-    ],"New Purchase Requisition","Create");
-    if(!values)return;values.key=key();const r=await api("create_request",{payload:JSON.stringify(values)});replace(r);active=r.id;view="detail";picks={};render();
+      ,{fieldname:"supporting_help",fieldtype:"HTML",options:"<p>Create the draft, then attach three quotations or select No three quotations required and enter notes. Utility bills / direct invoices also require invoice copies.</p>"}
+    ],"New Purchase Requisition","Create draft");
+    if(!values)return;values.key=key();values.supporting={kind:values.request_type==="Utility bill / direct invoice"?"direct_invoice":"purchase"};const r=await api("create_request",{payload:JSON.stringify(values)});replace(r);active=r.id;view="detail";picks={};dirty=false;render();
   }
   async function run(b){
     if(b.dataset.action==="new-payment-order"){
@@ -194,7 +230,10 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
         const answer=await ask([{fieldname:"reason",label:value==="Reject"?"Rejection reason":"Cancellation / withdrawal reason",fieldtype:"Small Text",reqd:1}],value+" "+(action==="pr-action"?r.id:p.id),value);
         if(!answer)return;reason=answer.reason;
       }
-      if(action==="pr-action")replace(await api("request_action",{name:r.id,modified:r.modified,action:value,reason}));
+      if(action==="pr-action"){
+        const fresh=value==="Send for Approval"?await savePR():r;
+        replace(await api("request_action",{name:fresh.id,modified:fresh.modified,action:value,reason}));
+      }
       else{
         const fresh=value==="Send for Approval"?await save():p;
         await api("order_action",{name:fresh.id,modified:fresh.modified,action:value,reason});
@@ -210,6 +249,27 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
       po=newPO.id;view="po";picks={};await refresh(r.id);return;
     }
     if(action==="save-po"){await save();await refresh(r.id);frappe.show_alert({message:"Purchase Order saved",indicator:"green"});return;}
+    if(action==="save-pr-supporting"){await savePR();render();frappe.show_alert({message:"PR supporting documents saved",indicator:"green"});return;}
+    if(action.startsWith("pr-")&&r?.canEditSupporting){
+      const s=r.supporting,index=+b.dataset.index;
+      if(action==="pr-quote-supplier"){
+        const answer=await ask([{fieldname:"supplier",label:"Supplier",fieldtype:"Link",options:"Supplier",reqd:1}],"Select PR quotation supplier");
+        if(answer){s.quotes[index].supplier=answer.supplier;changedPR();render();}return;
+      }
+      if(action==="pr-remove-quote"){s.quotes[index]={supplier:s.quotes[index].supplier,file:"",filename:"",url:""};changedPR();render();return;}
+      if(action==="pr-remove-invoice"){s.invoices.splice(index,1);changedPR();render();return;}
+      if(action==="pr-upload-quote"||action==="pr-upload-invoice"){
+        const invoice=action==="pr-upload-invoice";
+        new frappe.ui.FileUploader({doctype:"Material Request",docname:r.id,make_attachments_public:false,
+          allow_toggle_private:false,allow_web_link:false,allow_multiple:invoice,
+          on_success:file=>{
+            if(req()?.id!==r.id||!req()?.canEditSupporting)return;
+            const support=req().supporting,value={file:file.name,filename:file.file_name,url:file.file_url};
+            if(invoice)support.invoices.push(value);else support.quotes[index]={...support.quotes[index],...value};
+            changedPR();render();frappe.show_alert({message:"File uploaded. Save the supporting documents or send the PR for approval.",indicator:"green"});
+          }});return;
+      }
+    }
     if(!p?.editable)return;
     if(action==="currency"){
       const values=await ask([
@@ -251,6 +311,10 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
     if(t.hasAttribute("data-search")){query=t.value;if(view==="orders"){clearTimeout(searchTimer);searchTimer=setTimeout(()=>refreshOrders().catch(console.error),300);}else filter();return;}
     if(t.dataset.pick!==undefined){if(t.checked)picks[t.dataset.pick]=Number(root.querySelector(`[data-pick-qty="${t.dataset.pick}"]`).value);else delete picks[t.dataset.pick];return;}
     if(t.dataset.pickQty!==undefined){if(picks[t.dataset.pickQty]!==undefined)picks[t.dataset.pickQty]=Number(t.value);return;}
+    if(t.dataset.prField&&view==="detail"&&req()?.canEditSupporting){
+      req().supporting[t.dataset.prField]=t.type==="checkbox"?t.checked:t.value;
+      changedPR();if(t.dataset.prField!=="explanation")render();return;
+    }
     const p=order();if(view!=="po"||!p?.editable)return;
     if(t.dataset.lineReason){(p.lineReasons??={})[t.dataset.lineReason]=t.value;changed();return;}
     if(t.dataset.field)p[t.dataset.field]=t.type==="checkbox"?t.checked:t.value;
@@ -267,7 +331,7 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
   root.addEventListener("click",async e=>{
     const b=e.target.closest("[data-action]");if(!b||b.disabled||busy)return;
     const navigate=["list","orders","services","refresh","open-pr","back-pr","open-po","standard-mr","standard-po","source"].includes(b.dataset.action);
-    if(dirty&&navigate){frappe.confirm("Discard unsaved PO changes?",()=>{dirty=false;execute(b);});return;}
+    if(dirty&&navigate){frappe.confirm("Discard unsaved changes?",()=>{dirty=false;execute(b);});return;}
     await execute(b);
   });
   async function execute(b){

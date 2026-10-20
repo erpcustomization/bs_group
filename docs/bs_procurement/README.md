@@ -1,6 +1,6 @@
 # BS Procurement — standard ERPNext documents
 
-Implemented on `rel1-test.local` on 20 October 2026. Current build `20261020-mohan-approval`.
+Implemented on `rel1-test.local` on 20 October 2026. Current build `20261020-pr-evidence`.
 
 Current PR/PO approver: **Mohan Babu (`mohan@bitssecureit.com`)**, irrespective of creator, preparer or sender, including Mohan himself. This explicit policy supersedes the earlier PR/PO maker-checker rule described in the historical QC release below. Supplier invoice approvals retain their independent Accounts Manager rule.
 
@@ -183,3 +183,22 @@ The shared Material Request workflow has separate BS decision transitions using 
 `test_mohan_approval.py` exercises buyer-, manager-, Administrator- and Mohan-initiated PR/PO creation, rejection, resubmission and approval; workflow routing; native bypass attempts; identity substitution; and invoice separation. Business transactions are rolled back. Existing regression suites now use the designated approver for purchase decisions. Evidence: `qa_reports/mohan_approval_test.log`, `mohan_deployment.log`, `mohan_regressions.log` and per-suite `mohan_*.log`.
 
 Verification: **302 checks passed** — 90 designated-approver scenarios/assertions, 43 standard purchasing, 67 accounting continuity, 34 sales handover, 43 adversarial controls, 19 UI and 6 deployment checks. Local Chrome also confirmed the displayed approver inside the saved PR and PO. Test business transactions were rolled back; completed historical approvals retain their original actors.
+
+## Manual PR quotations and direct invoice evidence — 20 October 2026
+
+**New Purchase Requisition** offers **Purchase** and **Utility bill / direct invoice**. Create a draft, then complete the supporting-documents section inside that PR:
+
+- Manual Purchase: attach three distinct quotations from three enabled suppliers, or tick **No three quotations required** and enter mandatory explanatory notes. One or two quotations alone cannot satisfy the requirement.
+- Utility bill / direct invoice: attach one or more invoice copies, tick **No three quotations required**, and enter the explanation. Invoice copies alone do not bypass the quotation requirement.
+- A warehouse is optional for non-stock services/utility bills and remains required for stock items. Existing purchase/service Items are used; no free-form item or expense account is invented.
+- **Save supporting documents** preserves draft work. **Send for Approval** saves current evidence and notes before requesting Mohan's decision. Missing requirements block both the BS action and native Material Request workflow.
+
+The standard Material Request stores server-controlled supporting evidence. Attachments must be private, nonempty files on that exact PR. Quotation and invoice duplicate content is checked. Pending/approved evidence is locked; rejection permits a revised submission, while original files and snapshots remain protected in the audit history. Mohan sees the files, suppliers, request type and explanation inside the PR.
+
+Sales-handover PRs continue to use their awarded quotation/customer PO/costing packet and are not reclassified as manual PRs. Existing completed approvals are preserved. This release handles PR evidence and approval; downstream PO creation and supplier-invoice/Payment Order matching retain their current rules.
+
+Setup: `bsgroup.procurement_setup.execute` creates the `custom_bsp_request_evidence` field idempotently. `tests/bs_procurement/install_pr_evidence.py` is the explicit test-site installer. Runtime: `bsgroup/procurement_requests.py`, the Material Request hooks in `bsgroup/procurement.py`, and the BS Procurement page.
+
+Focused verification: `test_pr_supporting.py` exercises missing/partial/duplicate quotations, explained exceptions, invoice copies, no-warehouse service requests, stale saves, permission checks, native workflow bypasses, file privacy/deletion protection and rejection/resubmission history. Transactions and temporary files are rolled back/removed. UI coverage uses the actual page with controlled API responses. Logs: `qa_reports/pr_evidence_test.log`, `pr_evidence_ui.log`, `pr_evidence_regressions.log`, and per-suite `pr_evidence_*.log`.
+
+Final verification: **347 checks passed** — 37 manual PR evidence, 27 UI, 90 Mohan approval, 43 standard purchasing, 67 accounting continuity, 34 sales handover, 43 adversarial controls and 6 deployment checks. Local Chrome verified the request-type selector, optional service warehouse and creation instructions. No new QC business records were retained.

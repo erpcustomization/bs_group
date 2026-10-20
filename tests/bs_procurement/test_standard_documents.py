@@ -34,9 +34,11 @@ def blocked(name, function, message=None):
         raise AssertionError("Expected rejection: "+name)
 
 
-def new_request(p, count=4):
+def new_request(p, count=4, supporting=None):
     return p.create_request(dict(key=str(uuid.uuid4()),company=COMPANY,
         title="ZZTEST BSP regression",schedule_date=add_days(nowdate(),10),
+        supporting=supporting if supporting is not None else
+            dict(exception=True,explanation="QC fixture: single-source requisition for regression testing."),
         warehouse="Stores - AE",items=[
             dict(item_code="ZZTEST-CLAUDE-DCS-ITEM-A",qty=count,rate=100),
             dict(item_code="ZZTEST-CLAUDE-DCS-ITEM-B",qty=2,rate=200)]))

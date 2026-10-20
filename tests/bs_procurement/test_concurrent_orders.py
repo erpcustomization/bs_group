@@ -37,6 +37,7 @@ def main():
     from bsgroup import procurement as p
     from bsgroup.procurement_controls import PROCUREMENT_APPROVER
     r=p.create_request(dict(key=str(uuid.uuid4()),title="ZZTEST BSP concurrency (completed)",
+        supporting=dict(exception=True,explanation="QC single-source concurrency fixture."),
         company="Bits Secure IT Infrastructure LLC - AE",warehouse="Stores - AE",
         schedule_date=add_days(nowdate(),10),
         items=[dict(item_code="ZZTEST-CLAUDE-DCS-ITEM-A",qty=4,rate=100)]))
