@@ -141,6 +141,7 @@ class ProcurementOrderMixin:
         return super()._update_children(args, update_modified)
 
     def update_status(self, status):
+        previous_status = self.status
         if not self.get("custom_bsp_managed") and self.status == "Closed" and status != "Closed":
             frappe.throw("Create a new Purchase Order from an approved BS Purchase Requisition; "
                          "historical orders without a BS PR cannot be reopened.")
@@ -154,4 +155,11 @@ class ProcurementOrderMixin:
         if self.get("custom_bsp_managed"):
             self.update_prevdoc_status()
             self.update_requested_qty()
+            from bsgroup.utils.project_cost_baseline import (
+                recalculate_project_baseline, check_cost_overrun_for_project)
+            if previous_status == "Closed" and status != "Closed":
+                for project in sorted({self.project, *(row.project for row in self.items)} - {None, ""}):
+                    check_cost_overrun_for_project(
+                        project, raise_from=f"Purchase Order {self.name}", force_block=True)
+            recalculate_project_baseline(self)
         return result

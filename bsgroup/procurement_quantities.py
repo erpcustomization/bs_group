@@ -43,6 +43,8 @@ def sync_closed_orders(doc, method=None):
         if order.docstatus == 1 and order.get("custom_bsp_managed") and order.status == "Closed":
             order.update_prevdoc_status()
             order.update_requested_qty()
+            from bsgroup.utils.project_cost_baseline import recalculate_project_baseline
+            recalculate_project_baseline(order)
 
 
 def repair_closed_requests():
@@ -53,3 +55,5 @@ def repair_closed_requests():
                       (order.custom_bsp_material_request,))
         order.update_prevdoc_status()
         order.update_requested_qty()
+        from bsgroup.utils.project_cost_baseline import recalculate_project_baseline
+        recalculate_project_baseline(order)

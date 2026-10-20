@@ -169,20 +169,36 @@ def get_active_baseline(project):
 # duplicating that logic.
 # ---------------------------------------------------------------------------
 
+def purchase_row_commitment(row, billed_amt=None):
+	"""Open scope, or accepted scope on a closed BS PO, less billed value."""
+	cap = 1.0
+	if row.status == "Closed":
+		if not row.custom_bsp_managed:
+			return 0.0
+		cap = min(1, max(0, flt(row.received_qty) / flt(row.qty))) if row.qty else 0.0
+	billed = flt(row.billed_amt if billed_amt is None else billed_amt)
+	fraction = min(1, max(0, billed / flt(row.amount))) if row.amount else 0.0
+	return flt(row.base_net_amount) * max(0, cap - fraction)
+
+
 def get_purchase_committed_cost(project):
 	"""Unbilled PO net cost in company currency, matching Project actual cost.
 
-	Use each row's billed amount to release commitment as invoices are posted.
+	Closed BS POs retain accepted-but-unbilled cost; only their unused scope is
+	released. Use each row's billed amount to release cost as invoices post.
 	Header grand totals include VAT and would double-count already billed POs.
 	"""
 	result = frappe.db.sql(
 		"""
-		SELECT COALESCE(SUM(i.base_net_amount *
-			(1 - LEAST(1, GREATEST(0, COALESCE(i.billed_amt / NULLIF(i.amount, 0), 0))))), 0)
+		SELECT COALESCE(SUM(i.base_net_amount * GREATEST(0,
+			CASE WHEN po.status='Closed'
+				THEN LEAST(1, GREATEST(0, COALESCE(i.received_qty / NULLIF(i.qty, 0), 0)))
+				ELSE 1 END
+			- LEAST(1, GREATEST(0, COALESCE(i.billed_amt / NULLIF(i.amount, 0), 0))))), 0)
 		FROM `tabPurchase Order Item` i
 		JOIN `tabPurchase Order` po ON po.name=i.parent
 		WHERE COALESCE(NULLIF(i.project, ''), po.project) = %(project)s
-		  AND po.docstatus = 1 AND po.status != 'Closed'
+		  AND po.docstatus = 1 AND (po.status != 'Closed' OR po.custom_bsp_managed=1)
 		""",
 		{"project": project},
 	)
@@ -204,18 +220,17 @@ def purchase_submission_exposure(doc, project):
 			increments[row.po_detail] = increments.get(row.po_detail, 0) + flt(row.base_amount)
 	for name in sorted(increments):
 		found = frappe.db.sql("""
-			SELECT i.amount, i.billed_amt, i.base_net_amount, po.conversion_rate
+			SELECT i.amount, i.billed_amt, i.base_net_amount, i.qty, i.received_qty,
+				po.conversion_rate, po.status, po.custom_bsp_managed
 			FROM `tabPurchase Order Item` i JOIN `tabPurchase Order` po ON po.name=i.parent
-			WHERE i.name=%s AND po.docstatus=1 AND po.status!='Closed'
+			WHERE i.name=%s AND po.docstatus=1
 			  AND COALESCE(NULLIF(i.project,''),po.project)=%s FOR UPDATE
 		""", (name, project), as_dict=True)
 		if not found or not flt(found[0].amount):
 			continue
 		po = found[0]
-		old_fraction = min(1, max(0, flt(po.billed_amt) / flt(po.amount)))
 		new_billed = flt(po.billed_amt) + increments[name] / flt(po.conversion_rate or 1)
-		new_fraction = min(1, max(0, new_billed / flt(po.amount)))
-		amount -= flt(po.base_net_amount) * (new_fraction - old_fraction)
+		amount -= purchase_row_commitment(po) - purchase_row_commitment(po, new_billed)
 	return amount
 
 

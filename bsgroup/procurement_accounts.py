@@ -114,6 +114,17 @@ def quantity_used(doctype, field, value, exclude):
     return sum(flt(r.qty) * flt(r.conversion_factor or 1) for r in rows)
 
 
+def receipt_unbilled_stock_qty(row, exclude_invoice=None):
+    """Accepted stock units left after submitted returns and supplier invoices."""
+    billed = quantity_used("Purchase Invoice", "pr_detail", row.name, exclude_invoice)
+    returned = -sum(min(0, flt(r.qty) * flt(r.conversion_factor or 1)) for r in
+        frappe.db.sql("""select i.qty, i.conversion_factor from `tabPurchase Receipt Item` i
+        join `tabPurchase Receipt` p on p.name=i.parent
+        where p.docstatus=1 and p.is_return=1 and i.purchase_receipt_item=%s for update""",
+        (row.name,), as_dict=True))
+    return flt(row.stock_qty) - returned - billed
+
+
 def enforce_line_limits(doc):
     """BS limits remain effective even if global/item/supplier allowances change."""
     old = doc.get_doc_before_save()
@@ -129,8 +140,15 @@ def enforce_line_limits(doc):
         frappe.db.sql("select name from `tabPurchase Order` where name=%s for update", row.purchase_order)
         po = frappe.get_doc("Purchase Order", row.purchase_order)
         source = next((r for r in po.items if r.name == row.get(po_field)), None)
-        if po.docstatus != 1 or po.status == "Closed" or not source:
-            fail("Select an open, submitted Purchase Order and its matching row.")
+        if po.docstatus != 1 or not source:
+            fail("Select a submitted Purchase Order and its matching row.")
+        if po.status == "Closed" and (
+                is_receipt or not row.purchase_receipt or not row.pr_detail or doc.get("update_stock")):
+            # Closing releases the undelivered balance, not the liability for
+            # goods/services already accepted. Native ERPNext also permits
+            # closed-PO invoices with a receipt, without reopening the PO.
+            fail("A closed Purchase Order can only be invoiced against its existing accepted "
+                 "Purchase Receipt. New receipts and stock-updating invoices are not allowed.")
         if po.get("custom_bsp_managed") and po.custom_bsp_approval_state != "Approved":
             fail("The BS Purchase Order must be approved.")
         if doc.supplier != po.supplier or doc.company != po.company or row.item_code != source.item_code:
@@ -157,16 +175,13 @@ def enforce_line_limits(doc):
             if row.purchase_receipt:
                 receipt = frappe.get_doc("Purchase Receipt", row.purchase_receipt)
                 source_receipt = next((r for r in receipt.items if r.name == row.pr_detail), None)
-                if receipt.docstatus != 1 or not source_receipt or source_receipt.purchase_order_item != key:
+                if (receipt.docstatus != 1 or receipt.is_return
+                        or receipt.company != doc.company or receipt.supplier != doc.supplier
+                        or not source_receipt or source_receipt.purchase_order != po.name
+                        or source_receipt.purchase_order_item != key):
                     fail("The invoice receipt row must come from the same approved PO row.")
                 received[row.pr_detail] = received.get(row.pr_detail, 0) + flt(row.qty)*factor
-                billed = quantity_used("Purchase Invoice", "pr_detail", row.pr_detail, doc.name)
-                returned = -sum(min(0, flt(r.qty)*flt(r.conversion_factor or 1)) for r in
-                    frappe.db.sql("""select i.qty, i.conversion_factor from `tabPurchase Receipt Item` i
-                    join `tabPurchase Receipt` p on p.name=i.parent
-                    where p.docstatus=1 and p.is_return=1 and i.purchase_receipt_item=%s for update""",
-                    (row.pr_detail,), as_dict=True))
-                if billed + received[row.pr_detail] > flt(source_receipt.stock_qty) - returned + 0.000001:
+                if received[row.pr_detail] > receipt_unbilled_stock_qty(source_receipt, doc.name) + 0.000001:
                     fail("Invoiced quantity exceeds the accepted, unreturned receipt quantity.")
 
 
@@ -352,11 +367,26 @@ def prepare_payment_order(source_doctype, source_name):
         from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_invoice
         invoice = make_purchase_invoice(source.name, args={"filtered_children": rows})
     else:
+        if source.is_return:
+            fail("Select the original accepted Purchase Receipt, not a return.")
         if not any(frappe.db.get_value("Purchase Order", r.purchase_order, "custom_bsp_managed")
                    for r in source.items if r.purchase_order):
             fail("Select a receipt linked to BS Procurement.")
         from erpnext.stock.doctype.purchase_receipt.purchase_receipt import make_purchase_invoice
         invoice = make_purchase_invoice(source.name)
+        # The native mapper can include returned/rejected quantities when the
+        # global rejected-quantity billing setting is enabled. BS approval
+        # always bills accepted, unreturned scope; show that same cap up front.
+        source_rows = {r.name: r for r in source.items}
+        for row in list(invoice.items):
+            available = receipt_unbilled_stock_qty(source_rows[row.pr_detail])
+            row.qty = min(flt(row.qty), max(0, available) / flt(row.conversion_factor or 1))
+            row.stock_qty = row.qty * flt(row.conversion_factor or 1)
+            if row.qty <= 0:
+                invoice.remove(row)
+        if invoice.items:
+            invoice.calculate_taxes_and_totals()
+            invoice.set_payment_schedule()
     if not invoice.items:
         fail("There are no unbilled items for this source.")
     return invoice

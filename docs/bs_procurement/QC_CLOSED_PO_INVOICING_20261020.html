@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BS Procurement — closed PO invoicing fix</title>
+<style>
+body{font:16px/1.55 system-ui,sans-serif;color:#19314a;background:#f3f6f9;margin:0}
+main{max-width:940px;margin:36px auto;padding:36px;background:white;border-radius:12px}
+h1{font-size:29px;line-height:1.2}h2{font-size:20px;margin-top:30px}
+.badge{display:inline-block;padding:6px 12px;background:#e4f5ed;color:#126c46;border-radius:20px;font-weight:650}
+.muted{color:#5a6a79}.flow{padding:20px;background:#eff5fc;border-left:4px solid #2673bb}
+table{border-collapse:collapse;width:100%;font-size:15px}th,td{padding:12px;border-bottom:1px solid #dfe6ed;text-align:left;vertical-align:top}
+th{background:#f5f7fa}.pass{color:#126c46;font-weight:650}
+@media print{body{background:white}main{margin:0;padding:12px}}
+</style>
+<main>
+<p class="muted">ERP Development · 20 October 2026 · rel1-test.local</p>
+<h1>Closed PO invoicing blocker resolved</h1>
+<p class="badge">647 automated checks passed</p>
+<p>Received goods can now be invoiced and paid after their Purchase Order is closed. The unused quantity remains available for a replacement supplier, and the original PO stays closed.</p>
+<h2>Verified business flow</h2>
+<div class="flow">PR: 10 units → original PO: 10 at AED 90 → receive 3 → close original PO → replacement PO: 7 at AED 95 → Mohan approves both Payment Orders → pay both suppliers.</div>
+<p>Original supplier: <strong>AED 270 paid</strong>. Replacement supplier: <strong>AED 665 paid</strong>. Both invoice balances: <strong>zero</strong>. Project budget: <strong>AED 935</strong>. Stock received: <strong>10 units</strong>.</p>
+<table>
+<thead><tr><th>Scenario</th><th>Verified result</th></tr></thead>
+<tbody>
+<tr><td>Invoice prepared before closure or created afterward</td><td class="pass">Approves through Mohan and pays against the existing receipt.</td></tr>
+<tr><td>Partial payment, reversal and corrected invoice</td><td class="pass">Balances reconcile; original PO stays closed and replacement allocation is preserved.</td></tr>
+<tr><td>Non-stock services with accepted receipts; two-unit boxes</td><td class="pass">Correct quantities, invoice totals and payments.</td></tr>
+<tr><td>Return 2 of 5 received units</td><td class="pass">Only 3 units are proposed for billing. Returned units cannot be invoiced.</td></tr>
+<tr><td>Duplicate or excess billing; wrong or missing receipt</td><td class="pass">Blocked.</td></tr>
+<tr><td>New receipt or stock-updating invoice on a closed PO</td><td class="pass">Blocked.</td></tr>
+<tr><td>Budget and reopening controls</td><td class="pass">Received-but-unbilled cost stays reserved. Excess replacement cost and unsafe reopening are blocked.</td></tr>
+<tr><td>Approvals, supplier payments and direct cash-journal bypass</td><td class="pass">Existing controls remain effective. Supplier exception flags remain off.</td></tr>
+<tr><td>Quotation handover, manual PR evidence and September print format</td><td class="pass">Existing regression checks pass.</td></tr>
+</tbody>
+</table>
+<h2>Verification scope</h2>
+<p>106 checks cover this fix, 511 cover existing business/setup/print behavior, and 30 cover the interface. The test used standard ERP documents, accounting entries and stock entries, then rolled them back. Read-only checks confirmed that this test's temporary records were removed. The existing computer Chrome tab also loaded BS Procurement successfully.</p>
+<h2>Release status</h2>
+<p><strong>Fixed and tested on the test site. Production has not been deployed.</strong> Independent user acceptance, review of older unpaid invoices without recorded Mohan approval, production-version compatibility and a verified backup/rollback plan remain release checks.</p>
+<p class="muted">Detailed evidence on the test server: closed_po_invoicing.log, closed_invoice_regressions.log, closed_invoice_*.log and closed_invoice_verified.json in the application's qa_reports directory.</p>
+</main>
+</html>
