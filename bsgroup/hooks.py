@@ -553,7 +553,15 @@ doc_events["Quotation"]["before_cancel"] = ([_prior] if isinstance(_prior, str) 
 # Preserve BS purchasing lineage in standard receiving and invoicing.
 for _dt in ("Purchase Receipt", "Purchase Invoice"):
     _prior = doc_events.setdefault(_dt, {}).get("before_validate", [])
-    doc_events[_dt]["before_validate"] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.procurement_accounts.validate_matches"]
+    doc_events[_dt]["before_validate"] = ["bsgroup.procurement_quantities.lock_fulfilment_requests"] + ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.procurement_accounts.validate_matches"]
+    for _event, _method in (
+        ("before_cancel", "lock_fulfilment_requests"),
+        ("on_submit", "sync_closed_orders"),
+        ("on_cancel", "sync_closed_orders"),
+    ):
+        _prior = doc_events[_dt].get(_event, [])
+        doc_events[_dt][_event] = ([_prior] if isinstance(_prior, str) else list(_prior)) + [
+            "bsgroup.procurement_quantities." + _method]
 
 # Keep supplier payment lineage after native invoice cancellation.
 for _dt, _event, _method in (

@@ -75,6 +75,9 @@ def allocations(doc):
 def validate_payment(doc, method=None):
     if doc.docstatus == 2:
         return
+    if doc.doctype == "Journal Entry":
+        from bsgroup.procurement_journals import validate_cash_journal
+        validate_cash_journal(doc, method)
     if doc.doctype == "Payment Entry" and not (
             doc.party_type == "Supplier" and doc.payment_type == "Pay"):
         return

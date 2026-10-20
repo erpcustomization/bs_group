@@ -132,6 +132,14 @@ def closed_stock_qty(row):
 
 
 class ProcurementOrderMixin:
+    def _update_children(self, args, update_modified):
+        if (args.get("source_dt") == "Purchase Order Item"
+                and args.get("target_dt") == "Material Request Item"
+                and args.get("target_field") == "ordered_qty"):
+            from bsgroup.procurement_quantities import effective_source_field
+            args = dict(args, source_field=effective_source_field(args["source_field"]))
+        return super()._update_children(args, update_modified)
+
     def update_status(self, status):
         if not self.get("custom_bsp_managed") and self.status == "Closed" and status != "Closed":
             frappe.throw("Create a new Purchase Order from an approved BS Purchase Requisition; "
@@ -142,4 +150,8 @@ class ProcurementOrderMixin:
             if self.status == "Closed" and status != "Closed":
                 # Native reopen uses db_set and otherwise bypasses validate().
                 allocation(self, request)
-        return super().update_status(status)
+        result = super().update_status(status)
+        if self.get("custom_bsp_managed"):
+            self.update_prevdoc_status()
+            self.update_requested_qty()
+        return result

@@ -664,6 +664,8 @@ def create_order(request, modified, supplier, lines, key):
     from erpnext.stock.doctype.material_request.material_request import make_purchase_order
     doc = make_purchase_order(source.name, args=dict(
         supplier=supplier, filtered_children=list(quantities), requested_qty=quantities))
+    if {row.material_request_item for row in doc.items} != set(quantities):
+        fail("One or more selected lines have no unallocated PR quantity. Refresh the requisition.")
     doc.custom_bsp_managed = 1
     doc.custom_bsp_material_request = source.name
     doc.custom_bsp_key = key

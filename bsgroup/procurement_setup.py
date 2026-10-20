@@ -6,6 +6,7 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 
 def execute():
+    from bsgroup.procurement_journals import CATEGORIES
     def field(name, label, kind="Data", **kw):
         return dict(fieldname="custom_bsp_" + name, label=label,
                     fieldtype=kind, insert_after="amended_from", **kw)
@@ -44,6 +45,17 @@ def execute():
             dict(fieldname="custom_bsp_settlement_sources", label="BS settlement source history",
                  fieldtype="Long Text", insert_after="amended_from", hidden=1,
                  read_only=1, allow_on_submit=1, print_hide=1, no_copy=1),
+        ],
+        "Journal Entry": [
+            field("cash_category", "Non-procurement cash category", "Select",
+                  options="\n" + "\n".join(CATEGORIES), no_copy=1,
+                  description="For genuine tax, employee, financing/capital or customer settlements only. "
+                              "Utility/vendor expenses must use BS Procurement. Mohan must submit this journal."),
+            field("cash_reason", "Non-procurement settlement explanation", "Small Text", no_copy=1),
+            field("cash_approved_by", "Cash journal approved by", "Link", options="User",
+                  read_only=1, no_copy=1),
+            field("cash_approved_on", "Cash journal approved on", "Datetime",
+                  read_only=1, no_copy=1),
         ],
         "Purchase Invoice": [
             field("managed", "BS Procurement", "Check", read_only=1, default="0", print_hide=1),
@@ -102,6 +114,8 @@ def execute():
         frappe.logger("bsgroup").warning("Preserved customised BS Procurement Purchase Order print format")
     enforce_policy()
     install_payment_source_index()
+    from bsgroup.procurement_quantities import repair_closed_requests
+    repair_closed_requests()
 
 
 def enforce_policy():

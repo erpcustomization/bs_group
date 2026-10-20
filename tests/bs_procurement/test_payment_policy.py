@@ -198,6 +198,15 @@ def run():
             "RAK BANK - AE"), "supplier account")
     blocked("Journal supplier advance without Payment Order is rejected",
             lambda: journal(inv, reference=False).insert(), "approved Payment Orders")
+    def mixed_journal():
+        doc = journal(inv)
+        doc.accounts[1].credit_in_account_currency += 5
+        doc.append("accounts", dict(account="Cooling Energy Bill - AE",
+            debit_in_account_currency=5, exchange_rate=1,
+            cost_center=frappe.get_cached_value("Company", COMPANY, "cost_center")))
+        doc.insert()
+    blocked("Approved supplier allocation cannot hide an extra utility debit",
+            mixed_journal, "Keep supplier settlement separate")
     j = journal(inv)
     j.insert()
     j.submit()
