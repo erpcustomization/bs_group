@@ -7,6 +7,31 @@ import frappe
 from frappe.utils import flt
 
 
+PROCUREMENT_APPROVER = "mohan@bitssecureit.com"
+APPROVER_ROLE = "BS Procurement Approver"
+
+
+def approver_details():
+    name, enabled = frappe.get_cached_value(
+        "User", PROCUREMENT_APPROVER, ["full_name", "enabled"]) or (None, 0)
+    return dict(user=PROCUREMENT_APPROVER, name=name or PROCUREMENT_APPROVER, enabled=bool(enabled))
+
+
+def approval_allowed(doc, throw=False):
+    """BS PR/PO decisions belong to Mohan, including documents he prepared."""
+    if doc.doctype not in ("Material Request", "Purchase Order") or not doc.get("custom_bsp_managed"):
+        return independent(doc, throw=throw)
+    allowed = (
+        frappe.session.user == PROCUREMENT_APPROVER
+        and bool(frappe.get_cached_value("User", PROCUREMENT_APPROVER, "enabled"))
+        and {APPROVER_ROLE, "Purchase Manager"}.issubset(frappe.get_roles())
+    )
+    if not allowed and throw:
+        frappe.throw("Only Mohan Babu (mohan@bitssecureit.com) can approve or reject "
+                     "BS Purchase Requisitions and Purchase Orders.", frappe.PermissionError)
+    return bool(allowed)
+
+
 def preparers(doc):
     result = set(json.loads(doc.get("custom_bsp_preparers") or "[]"))
     if doc.owner:
@@ -35,7 +60,7 @@ def track_preparers(doc, old, state, old_state):
         people.add(frappe.session.user)
     doc.custom_bsp_preparers = json.dumps(sorted(people))
     if state in ("Approved", "Rejected") and state != old_state:
-        independent(doc, throw=True)
+        approval_allowed(doc, throw=True)
 
 
 def business_values(doc):

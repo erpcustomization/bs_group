@@ -59,28 +59,30 @@ def run():
     frappe.db.set_value("Material Request",r["id"],"owner",ACCU,update_modified=False)
     frappe.set_user(MANAGER2)
     r=action(p,r,"Send for Approval")
-    blocked("G02 PR sender cannot approve Sales-owned PR",lambda:action(p,r,"Approve"),"different authorised")
+    blocked("G02 Non-designated PR sender cannot approve Sales-owned PR",lambda:action(p,r,"Approve"),"Only Mohan")
     frappe.set_user(MANAGER)
     r=action(p,r,"Approve")
     po=ready_po(p,r)
     frappe.set_user(MANAGER2)
     po=p.save_order(po["id"],po["modified"],payload(po,95))
     po=po_action(p,po,"Send for Approval")
-    blocked("G01 PO preparer cannot approve buyer-owned PO",lambda:po_action(p,po,"Approve"),"different authorised")
-    check("G01 UI hides self-approval action",not p.order_data(frappe.get_doc("Purchase Order",po["id"]))["canApprove"])
+    blocked("G01 Non-designated PO preparer cannot approve buyer-owned PO",lambda:po_action(p,po,"Approve"),"Only Mohan")
+    check("G01 UI hides approval from other managers",not p.order_data(frappe.get_doc("Purchase Order",po["id"]))["canApprove"])
     frappe.set_user(MANAGER)
     po=po_action(p,po,"Approve")
-    check("G01 Independent manager can approve",po["docstatus"]==1)
+    check("G01 Mohan can approve",po["docstatus"]==1)
     frappe.set_user("Administrator")
     admin_r=new_request(p)
     admin_r=action(p,admin_r,"Send for Approval")
-    blocked("G15 Administrator cannot approve their own PR",lambda:action(p,admin_r,"Approve"),"different authorised")
-    from bsgroup.procurement_controls import independent
+    blocked("G15 Administrator cannot substitute for Mohan",lambda:action(p,admin_r,"Approve"),"Only Mohan")
+    from bsgroup.procurement_controls import approval_allowed
     for doctype in ("Purchase Order","Purchase Invoice"):
         owned=frappe.new_doc(doctype)
         owned.owner="Administrator"
-        blocked("G15 Administrator maker-checker guard also covers "+doctype,
-                lambda:independent(owned,throw=True),"different authorised")
+        owned.custom_bsp_managed=1
+        blocked("G15 Administrator approval guard also covers "+doctype,
+                lambda:approval_allowed(owned,throw=True),
+                "Only Mohan" if doctype=="Purchase Order" else "different authorised")
     # Supplier invoice maker-checker must also catch an editor who is not owner.
     invoice=invoice_fields(a.prepare_payment_order("Purchase Order",po["id"]))
     frappe.set_user(ACCU);invoice.insert()

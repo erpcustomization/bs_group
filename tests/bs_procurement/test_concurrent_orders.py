@@ -35,16 +35,14 @@ def worker(request, barrier, queue, supplier):
 def main():
     connect()
     from bsgroup import procurement as p
-    from bsgroup.tests.dcs_fixtures import make_user
-    created_manager=not frappe.db.exists("User","zztest-bsp-concurrency-manager@example.com")
-    make_user("zztest-bsp-concurrency-manager@example.com",["Purchase User","Purchase Manager"])
+    from bsgroup.procurement_controls import PROCUREMENT_APPROVER
     r=p.create_request(dict(key=str(uuid.uuid4()),title="ZZTEST BSP concurrency (completed)",
         company="Bits Secure IT Infrastructure LLC - AE",warehouse="Stores - AE",
         schedule_date=add_days(nowdate(),10),
         items=[dict(item_code="ZZTEST-CLAUDE-DCS-ITEM-A",qty=4,rate=100)]))
     for action in ["Send for Approval","Approve"]:
         if action=="Approve":
-            frappe.set_user("zztest-bsp-concurrency-manager@example.com")
+            frappe.set_user(PROCUREMENT_APPROVER)
         r=p.request_action(r["id"],r["modified"],action)
     frappe.db.commit()
     request=r["id"]
@@ -68,10 +66,6 @@ def main():
     p.order_action(po["id"],po["modified"],"Cancel","QC concurrency test completed")
     r=p.get_request(request)
     p.request_action(r["id"],r["modified"],"Cancel","QC concurrency test completed")
-    if created_manager:
-        user=frappe.get_doc("User","zztest-bsp-concurrency-manager@example.com")
-        user.enabled=0
-        user.save()
     frappe.db.commit()
     frappe.destroy()
     print(json.dumps(dict(passed=True,request=request,workers=results,

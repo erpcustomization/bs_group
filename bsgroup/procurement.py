@@ -16,8 +16,8 @@ from frappe.model.workflow import (
     apply_workflow, get_transitions, get_workflow_name, has_approval_access,
 )
 from bsgroup.procurement_controls import (
-    business_values, closed_stock_qty, evidence, independent, track_preparers,
-    validate_supplier_details,
+    business_values, closed_stock_qty, evidence, approval_allowed, track_preparers,
+    validate_supplier_details, approver_details,
 )
 
 MR = "Material Request"
@@ -433,7 +433,7 @@ def validate_order(doc, method=None):
     elif state in ("Approved", "Rejected") and state != old_state:
         if not manager() or old_state != "Pending Approval":
             fail("Purchase Manager approval is required.", frappe.PermissionError)
-        independent(doc, throw=True)
+        approval_allowed(doc, throw=True)
         if state == "Rejected" and not (op() and op()[1]):
             fail("A rejection reason is required.")
         append_event(doc, state)
@@ -592,6 +592,8 @@ def request_action(name, modified, action, reason=""):
         fail("Invalid approval action.")
     if action in ("Reject", "Cancel") and not text(reason):
         fail("A rejection/cancellation reason is required.")
+    if action in ("Approve", "Reject"):
+        approval_allowed(doc, throw=True)
     with operation(action, reason):
         result = apply_workflow(doc, action)
     return request_data(result)
@@ -732,7 +734,7 @@ def order_data(doc, source=None):
         q["filename"], q["url"] = (f.file_name, f.file_url) if f else ("", "")
     state = "Cancelled" if doc.docstatus == 2 else doc.custom_bsp_approval_state or "Draft"
     editable = purchaser() and doc.has_permission("write") and state in ("Draft", "Rejected") and not doc.docstatus
-    can_approve = manager() and state == "Pending Approval" and doc.has_permission("submit") and independent(doc)
+    can_approve = manager() and state == "Pending Approval" and doc.has_permission("submit") and approval_allowed(doc)
     return dict(id=doc.name, modified=str(doc.modified), status=state,
                 erpStatus="Withdrawn" if state == "Cancelled" and not doc.docstatus else doc.status,
                 docstatus=doc.docstatus, request=source.name, company=doc.company,
@@ -748,7 +750,7 @@ def order_data(doc, source=None):
                 lineReasons=comparison.get("line_reasons", {}),
                 selectedQuote=comparison.get("selected"), quotes=quotes,
                 reason=doc.custom_bsp_reason or "", history=history(doc),
-                editable=editable, canApprove=can_approve,
+                editable=editable, canApprove=can_approve, approver=approver_details(),
                 canCancel=editable or (manager() and doc.docstatus==1 and doc.has_permission("cancel")),
                 items=[dict(sourceId=r.material_request_item, item_code=r.item_code,
                             description=r.item_name or r.description, qty=r.qty, uom=r.uom,
@@ -787,7 +789,7 @@ def request_data(doc):
     actions = []
     if get_workflow_name(MR):
         actions = [t.action for t in get_transitions(doc) if has_approval_access(frappe.session.user, doc, t)
-                   and (t.action not in ("Approve", "Reject") or independent(doc))]
+                   and (t.action not in ("Approve", "Reject") or approval_allowed(doc))]
     approval = "Cancelled" if doc.docstatus==2 else doc.workflow_state or "Draft"
     items = [dict(sourceId=r.name, item_code=r.item_code, description=r.item_name or r.description,
                   qty=r.qty, uom=r.uom, cost=r.rate, ordered=ordered.get(r.name, 0)/flt(r.conversion_factor or 1),
@@ -818,7 +820,7 @@ def request_data(doc):
                 handoverFiles=source.get("files", []),
                 handoverResources=len(source.get("costing", {}).get("resources", [])),
                 handoverCharges=len(source.get("costing", {}).get("additional_charges", [])),
-                approval=approval, purchasing=status, erpStatus=doc.status,
+                approval=approval, purchasing=status, erpStatus=doc.status, approver=approver_details(),
                 reason=doc.get("custom_bsp_reason") or "", items=items, orders=orders,
                 actions=actions, history=history(doc),
                 canPrepare=purchaser() and approval=="Approved" and doc.status not in ("Stopped","Cancelled")

@@ -12,7 +12,8 @@ RESULTS=[]
 COMPANY="Bits Secure IT Infrastructure LLC - AE"
 SALES="zztest-bsp-handover-sales@example.com"
 BUYER="zztest-bsp-handover-buyer@example.com"
-MANAGER="zztest-bsp-handover-manager@example.com"
+from bsgroup.procurement_controls import PROCUREMENT_APPROVER
+MANAGER=PROCUREMENT_APPROVER
 
 def check(label, value):
     assert value, label

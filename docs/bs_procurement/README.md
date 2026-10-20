@@ -1,6 +1,8 @@
 # BS Procurement — standard ERPNext documents
 
-Implemented on `rel1-test.local` on 20 October 2026. Build `20261020-standard-1`.
+Implemented on `rel1-test.local` on 20 October 2026. Current build `20261020-mohan-approval`.
+
+Current PR/PO approver: **Mohan Babu (`mohan@bitssecureit.com`)**, irrespective of creator, preparer or sender, including Mohan himself. This explicit policy supersedes the earlier PR/PO maker-checker rule described in the historical QC release below. Supplier invoice approvals retain their independent Accounts Manager rule.
 
 The BS Procurement screen now saves Purchase Requisitions as standard **Material Request** documents with purpose **Purchase**, and orders as standard **Purchase Order** documents. There are no replacement PR or PO DocTypes. Custom fields and scoped hooks add the BS approval, comparison and audit controls to those standard documents.
 
@@ -13,7 +15,7 @@ Route: `http://rel1-test.local:8001/desk/bs-group/bs-procurement`
 3. Select approved PR lines, quantities and a supplier. The standard Material Request-to-Purchase Order mapper creates a draft PO with native `material_request` and `material_request_item` links.
 4. Complete the PO and compare three distinct suppliers using actual private quotation attachments and prices. An explained quotation exception is allowed for manager review. Above-budget prices and deviations from the selected quote require a selection explanation.
 5. Request PO approval. Approval submits the standard Purchase Order; its standard ordered quantities update the Material Request. The approved PO is available to ERPNext's Purchase Receipt and Purchase Invoice processes, subject to their normal permissions.
-6. Open the approved PO PDF. The dedicated BS Procurement print format reads the saved standard PO and excludes internal comparison and approval history.
+6. Open the approved PO PDF. The existing September **Purchase Order Print Format** and **Order Letterhead** are selected unchanged.
 
 Each PR shows its own approval, purchasing status, progress tracker, line allocations, linked POs and history. Partial quantities and different suppliers can create multiple POs for one PR. A BS PO is restricted to one PR.
 
@@ -21,8 +23,8 @@ Draft, pending, rejected and submitted POs reserve quantities. A withdrawn draft
 
 ## Permissions and integrity
 
-- Buyers need Purchase User and the site's normal company/master permissions. Approvers need Purchase User plus Purchase Manager. No real user roles were changed.
-- The existing Material Request workflow is reused. Its Draft/Rejected → Send for Approval transitions now allow creators to request review. Actual approval self-approval restrictions remain; Administrator retains Frappe's built-in exception.
+- Buyers need Purchase User and the site's normal company/master permissions. Mohan is the sole BS PR/PO approver. His existing purchase roles are retained and the dedicated BS Procurement Approver routing role is added.
+- The existing Material Request workflow is reused with BS-only transitions. Mohan can approve or reject his own BS requests; ordinary Material Requests retain their prior rules. Server checks block substitution by another manager or Administrator.
 - Server checks protect both the BS screen and standard forms. Native submit, editable APIs, print, amendment and the existing Update Items override cannot bypass the applicable BS controls.
 - Saved pending/approved commercial data and quotation evidence are protected. Submitted snapshots retain earlier prices, supplier, terms and comparison values.
 - Parent Material Request locking and current allocation reads prevent simultaneous orders from over-allocating a line. A transaction conflict asks the second user to refresh.
@@ -30,9 +32,9 @@ Draft, pending, rejected and submitted POs reserve quantities. A withdrawn draft
 
 ## Setup and deployment
 
-`bsgroup.procurement_setup.execute` idempotently creates the standard-document custom fields and `BS Procurement Purchase Order` Print Format. It is also registered in `after_migrate`. The format is explicitly selected by the BS PDF action; it does not replace the global default Purchase Order print format.
+`bsgroup.procurement_setup.execute` idempotently creates the standard-document custom fields, approval routing and the legacy `BS Procurement Purchase Order` Print Format. It is also registered in `after_migrate`. The BS PDF action selects the existing September `Purchase Order Print Format`; the global default remains unchanged.
 
-The test site's `host_name` is `http://rel1-test.local:8001`, so the standard PDF renderer can resolve its assets. The imported default letterhead contained a missing image, so the BS format renders company details from the PO without that image.
+The test site's `host_name` is `http://rel1-test.local:8001`. Missing logo/stamp files in the imported September format remain missing; its layout and letterhead have not been modified.
 
 From `/home/bitssecureit/rel1-bench/sites`, run the page deployment helper after JavaScript edits:
 
@@ -139,7 +141,7 @@ Evidence: `qa_reports/payment_order_test.log`, `standard_after_payment_orders.lo
 The former preview is archived as `docs/bs_procurement/archive_qc4_screen.js`. Legacy preview tests are disabled under tests/bs_procurement/archive; sample-PDF endpoints were removed in the QC hardening release below.
 
 
-## QC hardening release � 20 October 2026
+## QC hardening release — 20 October 2026
 
 Build `20261020-standard-2` addresses report G-01 through G-25. This supersedes the old matching-activation and comparison-currency notes above. `procurement_setup.execute` now reapplies the required settings on migration; row-level BS controls remain effective even if global allowances are later relaxed.
 
@@ -156,7 +158,7 @@ Build `20261020-standard-2` addresses report G-01 through G-25. This supersedes 
 
 ### Verification and operation
 
-Run the standard-document, QC-gap, accounts-continuity and sales-handover Python suites sequentially from the bench sites directory. Their business transactions roll back. `test_concurrent_orders.py` requires independent committed transactions; it withdraws the winning PO, cancels the PR and disables a newly created test approver, retaining audit evidence. Never run these suites on production.
+Run the standard-document, QC-gap, accounts-continuity and sales-handover Python suites sequentially from the bench sites directory. Their business transactions roll back. `test_concurrent_orders.py` requires independent committed transactions; it withdraws the winning PO and cancels the PR, retaining audit evidence. It uses the designated approver and never disables Mohan. Never run these suites on production.
 
 For UI tests, run `npm ci --prefix tests/bs_procurement/ui` then `node tests/bs_procurement/test_ui.cjs` from the app repository. The exact dev dependency and lockfile are checked in. `test_deployment.py` checks setup idempotency and restores its temporary print customization. `test_pdf.py` generates a QC-only PDF from a rolled-back approval.
 
@@ -169,3 +171,15 @@ Current execution is restricted to `rel1-test.local`. Production deployment rema
 The release commit is the source checkpoint. A source revert alone does not reverse schema, settings, workflow changes, source history or accounting transactions. Restore a matched predeployment database/files backup for a full rollback, or use a separately reviewed forward correction. Preserve operational records and audit evidence.
 
 Foreign-currency PO creation and configured Box/UOM allocation are tested; cross-currency settlement, credit-note exceptions, landed costs and advance reconciliation are not newly certified by this release. Three quotations are attached evidence and comparison records, not separate Supplier Quotation documents.
+
+## Designated Mohan approval — 20 October 2026
+
+All BS Purchase Requisitions and Purchase Orders now require Mohan Babu (`mohan@bitssecureit.com`) for Approve and Reject. The initiator has no effect on routing; Mohan may decide his own PR/PO. Other Purchase Managers and Administrator cannot substitute through BS actions or native document saves/submission. Preparers and decision actors remain recorded for audit. The two detail screens display the approver's name and account.
+
+The shared Material Request workflow has separate BS decision transitions using the dedicated `BS Procurement Approver` role, assigned to Mohan. Open pending BS PR workflow actions are rerouted without rewriting completed decisions. Ordinary Material Request transitions and invoice maker-checker restrictions are preserved. PO decisions use the existing BS controls on standard Purchase Orders.
+
+`deploy_mohan_approval.py` applied this authorised change on **rel1-test.local** and enabled Mohan's previously disabled test-site account without a welcome email. No passwords or existing company permissions were changed. Routine migrations install routing and role membership but do not reactivate an intentionally disabled account. Fixed identity checks still reject another user if the dedicated role is accidentally granted to them.
+
+`test_mohan_approval.py` exercises buyer-, manager-, Administrator- and Mohan-initiated PR/PO creation, rejection, resubmission and approval; workflow routing; native bypass attempts; identity substitution; and invoice separation. Business transactions are rolled back. Existing regression suites now use the designated approver for purchase decisions. Evidence: `qa_reports/mohan_approval_test.log`, `mohan_deployment.log`, `mohan_regressions.log` and per-suite `mohan_*.log`.
+
+Verification: **302 checks passed** — 90 designated-approver scenarios/assertions, 43 standard purchasing, 67 accounting continuity, 34 sales handover, 43 adversarial controls, 19 UI and 6 deployment checks. Local Chrome also confirmed the displayed approver inside the saved PR and PO. Test business transactions were rolled back; completed historical approvals retain their original actors.

@@ -7,10 +7,11 @@ const clone=x=>JSON.parse(JSON.stringify(x));
 const tick=()=>new Promise(resolve=>setTimeout(resolve,5));
 const check=(name,value)=>{assert.ok(value,name);checks.push(name);console.log("PASS",name);};
 const summary={id:"PR-OLD",company:"QC Company",project:"",person:"buyer@example.com",
-  currency:"AED",approval:"Approved",purchasing:"Partially ordered",items:[{qty:4,cost:100}],orders:[]};
+  currency:"AED",approval:"Approved",purchasing:"Partially ordered",items:[{qty:4,cost:100}],orders:[],
+  approver:{name:"Mohan Babu",user:"mohan@bitssecureit.com"}};
 let po={id:"PO-OLD",request:"PR-OLD",company:"QC Company",supplier:"Supplier A",currency:"AED",
   companyCurrency:"AED",conversionRate:1,status:"Draft",erpStatus:"Draft",modified:"v1",docstatus:0,
-  editable:true,canApprove:false,canCancel:true,group:"Hardware",delivery:"2026-10-30",terms:"30 days",
+  editable:true,canApprove:false,canCancel:true,approver:summary.approver,group:"Hardware",delivery:"2026-10-30",terms:"30 days",
   net:180,grand:180,taxes:0,na:true,explanation:"Single source",selectionReason:"",selectedQuote:null,
   history:[],lineReasons:{},quotes:[{supplier:"Supplier A",file:"",rates:{ROW:90}},
   {supplier:"Supplier B",file:"",rates:{ROW:95}},{supplier:"Supplier C",file:"",rates:{ROW:100}}],
@@ -62,7 +63,8 @@ async function input(s,value){const el=find(s);if(el.tagName==="SELECT"){
   await click('[data-action="open-po"]');
   check("PO opens by fetching its source PR independently",calls.some(c=>c.method.endsWith("get_request")&&c.args.name==="PR-OLD"));
   check("PR and PO contain no invoice/payment detail panels",!document.body.textContent.includes("Matched receipts")&&!document.body.textContent.includes("Invoice allocation"));
-  check("Self-approval action absent",!document.querySelector('[data-value="Approve"]'));
+  check("Approval action absent for another initiator",!document.querySelector('[data-value="Approve"]'));
+  check("PO shows Mohan as designated approver",document.body.textContent.includes("Mohan Babu")&&document.body.textContent.includes("mohan@bitssecureit.com"));
   await input('[data-line-reason="ROW"]',"Freight applies to this specific purchase line.");
   await input('[data-key="uom"]',"Box");
   check("UOM change updates visible comparison budget",find('[data-comp-budget="0"]').textContent==="200.00");
@@ -82,6 +84,7 @@ async function input(s,value){const el=find(s);if(el.tagName==="SELECT"){
   failSave=null;
   await click('[data-action="back-pr"]');
   check("Each PR displays its own process rail",!!document.querySelector(".bsp-rail"));
+  check("PR shows Mohan as designated approver",document.body.textContent.includes("Mohan Babu")&&document.body.textContent.includes("mohan@bitssecureit.com"));
   await click('[data-action="list"]');
   await click('[data-action="new-pr"]');
   check("Manual PR cannot choose arbitrary quotation or DCS budget",!lastDialog.options.fields.some(f=>["quotation","dcs"].includes(f.fieldname)));

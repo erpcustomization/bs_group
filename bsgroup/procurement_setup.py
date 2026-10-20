@@ -62,9 +62,7 @@ def execute():
     }, update=True)
     frappe.clear_cache(doctype="Material Request")
     frappe.clear_cache(doctype="Purchase Order")
-    # Sending a managed PR does not need workflow self-approval permission:
-    # request_action uses the explicit scoped send operation below. Do not
-    # weaken the shared MR workflow during migration.
+    # Supplier invoices retain independent Accounts Manager approval.
     name = frappe.db.get_value("Workflow", {"document_type":"Purchase Invoice", "is_active":1})
     if name:
         workflow = frappe.get_doc("Workflow", name)
@@ -75,7 +73,9 @@ def execute():
                 changed = True
         if changed:
             workflow.save()
+    install_approver_role()
     scope_request_transitions()
+    route_pending_request_actions()
     name = "BS Procurement Purchase Order"
     template = Path(frappe.get_app_path("bsgroup", "templates", "bs_procurement_purchase_order.html")).read_text()
     fmt = frappe.get_doc("Print Format", name) if frappe.db.exists("Print Format", name) else frappe.new_doc("Print Format")
@@ -115,14 +115,17 @@ def enforce_policy():
 
 
 def scope_request_transitions():
-    """Install a conditional BS send transition once; preserve ordinary MR rules."""
+    """Scope BS sending and Mohan's decisions; preserve ordinary MR rules."""
+    from bsgroup.procurement_controls import APPROVER_ROLE
     name = frappe.db.get_value("Workflow", {"document_type": "Material Request", "is_active": 1})
     if not name:
         return
     workflow = frappe.get_doc("Workflow", name)
     changed = False
     for row in list(workflow.transitions):
-        if row.action != "Send for Approval" or row.next_state != "Pending Approval":
+        send = row.action == "Send for Approval" and row.next_state == "Pending Approval"
+        decision = row.action in ("Approve", "Reject") and row.state == "Pending Approval"
+        if not (send or decision):
             continue
         if "custom_bsp_managed" in (row.condition or ""):
             continue
@@ -130,11 +133,43 @@ def scope_request_transitions():
         copy = {k: row.get(k) for k in ("state", "action", "next_state", "allowed", "transition_tasks")}
         copy.update(allow_self_approval=1,
                     condition=f"({original}) and doc.custom_bsp_managed" if original else "doc.custom_bsp_managed")
+        if decision:
+            copy["allowed"] = APPROVER_ROLE
         workflow.append("transitions", copy)
         row.condition = f"({original}) and not doc.custom_bsp_managed" if original else "not doc.custom_bsp_managed"
         changed = True
     if changed:
         workflow.save()
+
+
+def install_approver_role():
+    """Assign the dedicated routing role without changing account activation."""
+    from bsgroup.procurement_controls import APPROVER_ROLE, PROCUREMENT_APPROVER
+    if not frappe.db.exists("Role", APPROVER_ROLE):
+        frappe.get_doc(dict(doctype="Role", role_name=APPROVER_ROLE, desk_access=1)).insert()
+    if frappe.db.exists("User", PROCUREMENT_APPROVER):
+        user = frappe.get_doc("User", PROCUREMENT_APPROVER)
+        if APPROVER_ROLE not in {r.role for r in user.roles}:
+            user.append("roles", dict(role=APPROVER_ROLE))
+            user.send_welcome_email = 0
+            user.save()
+
+
+def route_pending_request_actions():
+    """Reroute already-open BS PR reviews; preserve completed approval history."""
+    from bsgroup.procurement_controls import APPROVER_ROLE
+    names = frappe.db.sql("""
+        select a.name from `tabWorkflow Action` a
+        join `tabMaterial Request` r on r.name=a.reference_name
+        where a.reference_doctype='Material Request' and a.status='Open'
+          and a.workflow_state='Pending Approval'
+          and r.custom_bsp_managed=1 and r.workflow_state='Pending Approval' and r.docstatus=0
+    """, pluck=True)
+    for name in names:
+        action = frappe.get_doc("Workflow Action", name)
+        if {r.role for r in action.permitted_roles} != {APPROVER_ROLE}:
+            action.set("permitted_roles", [dict(role=APPROVER_ROLE)])
+            action.save(ignore_permissions=True)
 
 
 def install_payment_source_index():

@@ -3,11 +3,12 @@ import json
 import uuid
 import frappe
 from frappe.utils import add_days, nowdate
+from bsgroup.procurement_controls import PROCUREMENT_APPROVER
 
 SITE="rel1-test.local"
 COMPANY="Bits Secure IT Infrastructure LLC - AE"
 BUYER="zztest-bsp-buyer@example.com"
-MANAGER="zztest-bsp-manager@example.com"
+MANAGER=PROCUREMENT_APPROVER
 OTHER="zztest-bsp-noaccess@example.com"
 RESULTS=[]
 
@@ -158,6 +159,7 @@ def run():
     check("Two suppliers can purchase split quantity from one PR",fresh(p,r)["items"][0]["ordered"]==4)
     from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_receipt, make_purchase_invoice
     receipt=make_purchase_receipt(po2["id"])
+    frappe.set_user(BUYER)
     blocked("Invoice creation still requires accounting permissions",lambda:make_purchase_invoice(po2["id"]))
     frappe.set_user("Administrator")
     invoice=make_purchase_invoice(po2["id"])

@@ -13,7 +13,8 @@ OBSERVATIONS = {}
 ACCOUNTS_USER = "zztest-continuity-accounts@example.com"
 ACCOUNTS_MANAGER = "zztest-continuity-finance-manager@example.com"
 ROLE_CHECKED = False
-PURCHASE_MANAGER = "zztest-continuity-purchase-manager@example.com"
+from bsgroup.procurement_controls import PROCUREMENT_APPROVER
+PURCHASE_MANAGER = PROCUREMENT_APPROVER
 
 
 def action(p,r,a,reason=""):
