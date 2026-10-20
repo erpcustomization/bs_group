@@ -60,16 +60,19 @@ def _posted_invoice(doc):
             blocked("Accounts User cannot approve a supplier invoice",
                     lambda: accounts.invoice_action(doc.name, str(doc.modified), "Approve"))
             frappe.set_user(ACCOUNTS_MANAGER)
+            blocked("Accounts Manager cannot substitute for Mohan on Payment Order approval",
+                    lambda: accounts.invoice_action(doc.name, str(doc.modified), "Approve"), "Only Mohan")
+            frappe.set_user(PURCHASE_MANAGER)
             accounts.invoice_action(doc.name, str(doc.modified), "Approve")
             doc.reload()
         else:
             doc = apply_workflow(doc, "Send for Approval")
-            frappe.set_user(ACCOUNTS_MANAGER)
+            frappe.set_user(PURCHASE_MANAGER)
             doc = apply_workflow(doc, "Approve")
     else:
         doc = apply_workflow(doc, "Approve")
     if role_test:
-        check("Accounts Manager approves through the existing invoice workflow", doc.docstatus == 1)
+        check("Mohan approves through the standard invoice workflow", doc.docstatus == 1)
         ROLE_CHECKED = True
     frappe.set_user("Administrator")
     return doc.reload()
@@ -197,22 +200,23 @@ def run():
     check("Cancelled payments remain visibly cancelled in the register",
           any(d["id"] == payment2.name and d["docstatus"] == 2
               for d in settlement.get_payment_order(inv.name)["payments"]["records"]))
+    blocked("Payment Order cannot be cancelled while its supplier payment is active",
+            lambda: apply_workflow(inv.reload(), "Cancel"), "linked supplier payments")
+    payment1.reload().cancel()
     apply_workflow(inv.reload(), "Cancel")
     payment1.reload()
     OBSERVATIONS["invoice_cancellation_payment"] = dict(docstatus=payment1.docstatus,
         unallocated=payment1.unallocated_amount,
         references=[(r.reference_name, r.allocated_amount) for r in payment1.references])
-    check("Cancelled invoice releases its existing payment for reallocation",
-          payment1.docstatus == 1 and close(payment1.unallocated_amount, 400)
-          and not any(r.reference_name == inv.name and r.allocated_amount for r in payment1.references))
+    check("Cancelling a paid Payment Order first reverses its payment",
+          payment1.docstatus == 2)
     register = settlement.get_payment_order(inv.name)
     check("Cancelled invoice shows no payable balance",
           register["outstanding"] is None and not register["canPay"])
     blocked("Cancelled invoice cannot prepare another payment", lambda: settlement.prepare_payment(inv.name))
-    check("Released payment remains in history without a false live allocation",
-          any(d["id"] == payment1.name and d["historical"] and close(d["allocated"], 0)
+    check("Reversed payment remains visibly cancelled in Payment Order history",
+          any(d["id"] == payment1.name and d["docstatus"] == 2
               for d in register["payments"]["records"]))
-    payment1.cancel()
     check("Invoice cancellation restores PO unbilled balance",
           close(po.reload().per_billed, 0))
 

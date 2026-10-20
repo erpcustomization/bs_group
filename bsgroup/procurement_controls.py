@@ -18,17 +18,18 @@ def approver_details():
 
 
 def approval_allowed(doc, throw=False):
-    """BS PR/PO decisions belong to Mohan, including documents he prepared."""
-    if doc.doctype not in ("Material Request", "Purchase Order") or not doc.get("custom_bsp_managed"):
+    """BS purchasing decisions belong to Mohan, including documents he prepared."""
+    if doc.doctype not in ("Material Request", "Purchase Order", "Purchase Invoice") or not doc.get("custom_bsp_managed"):
         return independent(doc, throw=throw)
+    required = "Accounts Manager" if doc.doctype == "Purchase Invoice" else "Purchase Manager"
     allowed = (
         frappe.session.user == PROCUREMENT_APPROVER
         and bool(frappe.get_cached_value("User", PROCUREMENT_APPROVER, "enabled"))
-        and {APPROVER_ROLE, "Purchase Manager"}.issubset(frappe.get_roles())
+        and {APPROVER_ROLE, required}.issubset(frappe.get_roles())
     )
     if not allowed and throw:
         frappe.throw("Only Mohan Babu (mohan@bitssecureit.com) can approve or reject "
-                     "BS Purchase Requisitions and Purchase Orders.", frappe.PermissionError)
+                     "BS Purchase Requisitions, Purchase Orders and Payment Orders.", frappe.PermissionError)
     return bool(allowed)
 
 
@@ -132,6 +133,9 @@ def closed_stock_qty(row):
 
 class ProcurementOrderMixin:
     def update_status(self, status):
+        if not self.get("custom_bsp_managed") and self.status == "Closed" and status != "Closed":
+            frappe.throw("Create a new Purchase Order from an approved BS Purchase Requisition; "
+                         "historical orders without a BS PR cannot be reopened.")
         if self.get("custom_bsp_managed"):
             from bsgroup.procurement import allocation, lock_request
             request = lock_request(self.custom_bsp_material_request)

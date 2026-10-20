@@ -1,8 +1,8 @@
 # BS Procurement — standard ERPNext documents
 
-Implemented on `rel1-test.local` on 20 October 2026. Current build `20261020-pr-evidence`.
+Implemented on `rel1-test.local` on 20 October 2026. Current build `20261020-payment-policy`.
 
-Current PR/PO approver: **Mohan Babu (`mohan@bitssecureit.com`)**, irrespective of creator, preparer or sender, including Mohan himself. This explicit policy supersedes the earlier PR/PO maker-checker rule described in the historical QC release below. Supplier invoice approvals retain their independent Accounts Manager rule.
+Current BS PR, PO and Payment Order approver: **Mohan Babu (`mohan@bitssecureit.com`)**, irrespective of creator, preparer or sender, including Mohan himself. This explicit policy supersedes the earlier maker-checker and Accounts Manager approval rules described in the historical release notes below.
 
 The BS Procurement screen now saves Purchase Requisitions as standard **Material Request** documents with purpose **Purchase**, and orders as standard **Purchase Order** documents. There are no replacement PR or PO DocTypes. Custom fields and scoped hooks add the BS approval, comparison and audit controls to those standard documents.
 
@@ -28,7 +28,8 @@ Draft, pending, rejected and submitted POs reserve quantities. A withdrawn draft
 - Server checks protect both the BS screen and standard forms. Native submit, editable APIs, print, amendment and the existing Update Items override cannot bypass the applicable BS controls.
 - Saved pending/approved commercial data and quotation evidence are protected. Submitted snapshots retain earlier prices, supplier, terms and comparison values.
 - Parent Material Request locking and current allocation reads prevent simultaneous orders from over-allocating a line. A transaction conflict asks the second user to refresh.
-- Controls are scoped to BS-managed Material Requests and their linked Purchase Orders. Existing ordinary Purchase Orders retain their normal behavior.
+- Every new PO, including one made through standard ERPNext, requires an approved BS PR. Existing ordinary drafts cannot be saved/submitted around this route. Historical submitted orders retain their original approval history; they cannot be expanded or reopened. Create replacement purchasing scope through an approved BS PR.
+- Supplier exception flags for invoices without PO/receipt are locked off. All supplier outpayments require full allocation to submitted BS Payment Orders with recorded Mohan approval; native Payment Entry, supplier-debit Journal Entry and reconciliation paths enforce this rule. Historical invoice approval labels alone do not authorize new supplier payments.
 
 ## Setup and deployment
 
@@ -202,3 +203,22 @@ Setup: `bsgroup.procurement_setup.execute` creates the `custom_bsp_request_evide
 Focused verification: `test_pr_supporting.py` exercises missing/partial/duplicate quotations, explained exceptions, invoice copies, no-warehouse service requests, stale saves, permission checks, native workflow bypasses, file privacy/deletion protection and rejection/resubmission history. Transactions and temporary files are rolled back/removed. UI coverage uses the actual page with controlled API responses. Logs: `qa_reports/pr_evidence_test.log`, `pr_evidence_ui.log`, `pr_evidence_regressions.log`, and per-suite `pr_evidence_*.log`.
 
 Final verification: **347 checks passed** — 37 manual PR evidence, 27 UI, 90 Mohan approval, 43 standard purchasing, 67 accounting continuity, 34 sales handover, 43 adversarial controls and 6 deployment checks. Local Chrome verified the request-type selector, optional service warehouse and creation instructions. No new QC business records were retained.
+
+## Required purchasing and supplier-payment controls — 20 October 2026
+
+This policy supersedes the earlier Accounts Manager approval and payment-unlinking behavior:
+
+- Every new Purchase Order requires a submitted, approved BS PR and Mohan's PO approval. The standard form, mapper and existing ordinary drafts cannot bypass it. Historical submitted ordinary POs retain their history, but cannot be expanded or reopened; create new scope through a BS PR.
+- Payment Orders remain standard supplier Purchase Invoices. Their BS workflow routes Approve/Reject to Mohan only, including when he initiated the invoice. Other Accounts Managers, a user given the routing role, and Administrator cannot substitute. The Payment Order shows the designated approver and the recorded approval identity/time.
+- Both Supplier exceptions for invoices without PO/receipt are set to zero, read-only, and guarded on the server. The PR's separate three-quotation exception remains available with its mandatory explanation.
+- Supplier Payment Entries require full positive allocation to submitted BS Payment Orders bearing server-recorded Mohan approval. Supplier, company and payable account must match. Partial payments and payments covering several approved invoices remain supported; overpayment is blocked using a locked current invoice balance.
+- Supplier-debit Journal Entries follow the same rule. Inline cash payments and applying advances while preparing invoices are blocked; first approve the Payment Order, then record its payment.
+- Submitted edits and reconciliation cannot leave money unallocated or remove the approval requirement. Native Unreconcile Payment is blocked for active supplier payments because it removes links directly. Cancel/reverse the payment, then recreate it against the correct approved Payment Order. A Payment Order with an active linked payment cannot be cancelled first.
+
+Migration recovers existing BS invoice lineage and reroutes pending reviews; it does **not** invent historical Mohan approvals. Previously approved invoices without recorded Mohan approval cannot authorize new payments under this policy. Resolve them through the controlled cancellation/amendment and approval process, reversing linked payments first where required. Existing posted accounting and historical approval actors are not rewritten.
+
+Runtime: `bsgroup/procurement_payments.py`, standard document hooks, shared approval controls, and idempotent `procurement_setup.execute`. Explicit test-site installer: `tests/bs_procurement/install_payment_policy.py`. The September PO print format/letterhead remain selected unchanged.
+
+`test_payment_policy.py` covers four invoice initiators, rejection/resubmission, role/identity substitution, approval forgery, ordinary PO bypasses, supplier exceptions, advances, journal settlement, allocation changes, native unreconciliation and reversal. All test business records and ledger entries roll back. Credit-note netting and foreign-currency settlement have not been newly certified; no production rollout is included.
+
+Final verification: **453 checks passed** — 88 payment-policy, 43 standard purchasing, 90 designated-approver, 37 manual PR evidence, 69 accounting continuity, 34 quotation handover, 44 adversarial controls, 9 migration, 9 September print-format and 30 UI checks. Local Chrome confirmed Mohan's name/account inside the existing draft Payment Order and the absence of a payment action before approval. All 717 suppliers have both exception flags off. Logs: `qa_reports/payment_policy_test_*.log`, `payment_policy_ui.log`, `payment_policy_deploy_standard.log`.

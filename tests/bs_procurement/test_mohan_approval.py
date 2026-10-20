@@ -89,13 +89,13 @@ def run():
     managed = frappe.get_doc("Purchase Order", po["id"])
     blocked("Dedicated role alone does not allow another user to decide",
             lambda: approval_allowed(managed, throw=True), "Only Mohan")
-    # Invoice separation remains in force even for Mohan.
+    # Payment Orders now use the same designated approver.
     frappe.set_user(PROCUREMENT_APPROVER)
     invoice = frappe.new_doc("Purchase Invoice")
     invoice.owner = PROCUREMENT_APPROVER
     invoice.custom_bsp_managed = 1
-    blocked("Mohan cannot approve his own supplier invoice",
-            lambda: approval_allowed(invoice, throw=True), "different authorised")
+    check("Mohan remains the Payment Order approver even when he initiated it",
+          approval_allowed(invoice, throw=True))
     frappe.set_user(MANAGER2)
     plain = frappe.get_doc(dict(doctype="Material Request", name="QC-only-unsaved", owner=BUYER,
                                workflow_state="Pending Approval", custom_bsp_managed=0))

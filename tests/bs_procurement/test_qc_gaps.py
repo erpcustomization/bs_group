@@ -83,18 +83,21 @@ def run():
         owned.custom_bsp_managed=1
         blocked("G15 Administrator approval guard also covers "+doctype,
                 lambda:approval_allowed(owned,throw=True),
-                "Only Mohan" if doctype=="Purchase Order" else "different authorised")
-    # Supplier invoice maker-checker must also catch an editor who is not owner.
+                "Only Mohan")
+    # Neither invoice creator nor another Accounts Manager can substitute for Mohan.
     invoice=invoice_fields(a.prepare_payment_order("Purchase Order",po["id"]))
     frappe.set_user(ACCU);invoice.insert()
     frappe.set_user(ACCM1)
     invoice.reload();invoice.bill_no+="-prepared";invoice.save()
     invoice=apply_workflow(invoice,"Send for Approval")
     blocked("G03 Invoice preparer cannot approve another user's invoice",
-            lambda:a.invoice_action(invoice.name,str(invoice.modified),"Approve"),"different authorised")
+            lambda:a.invoice_action(invoice.name,str(invoice.modified),"Approve"),"Only Mohan")
     frappe.set_user(ACCM2)
+    blocked("G03 Another Accounts Manager cannot approve Payment Orders",
+            lambda:a.invoice_action(invoice.name,str(invoice.modified),"Approve"),"Only Mohan")
+    frappe.set_user(MANAGER)
     a.invoice_action(invoice.name,str(invoice.modified),"Approve")
-    check("G03 Independent accounts manager approves vendor invoice",invoice.reload().docstatus==1)
+    check("G03 Mohan approves vendor invoice",invoice.reload().docstatus==1)
     # Separate unbilled PO for cancellation, closed/reopen, UOM and FX probes.
     r2=approved_pr(p)
     po2=ready_po(p,r2)
@@ -164,9 +167,18 @@ def run():
         f=frappe.get_doc("File",files[0].name);f.is_private=0;f.save()
     blocked("G04 Making quotation public is rejected before moving it",publish,"procurement evidence")
     check("G04 Privacy rejection preserves original private file",path.exists() and hashlib.sha256(path.read_bytes()).hexdigest()==before)
-    plain_po=frappe.get_doc(dict(doctype="Purchase Order",company=COMPANY,supplier=suppliers[0],
-        schedule_date=add_days(nowdate(),7),items=[dict(item_code="ZZTEST-CLAUDE-DCS-ITEM-A",
-        qty=1,rate=10,warehouse="Stores - AE",schedule_date=add_days(nowdate(),7))])).insert()
+    # Seed a historical draft directly inside this rollback fixture: new
+    # ordinary POs are now forbidden. Never delete a real pre-existing PO/file.
+    plain_po=frappe.copy_doc(frappe.get_doc("Purchase Order",frappe.db.get_value("Purchase Order",
+        {"docstatus":0,"custom_bsp_managed":0,"company":COMPANY})))
+    plain_po.name="ZZTEST-LEGACY-PO-"+uuid.uuid4().hex
+    plain_po.docstatus=0
+    plain_po.custom_bsp_key=None
+    plain_po.db_insert()
+    for child in plain_po.get_all_children():
+        child.parent=plain_po.name
+        child.docstatus=0
+        child.db_insert()
     ordinary_file=make_file(plain_po.name,"Ordinary PO")
     frappe.delete_doc("Purchase Order",plain_po.name)
     check("G05 Ordinary draft PO with attachment can be deleted",not frappe.db.exists("Purchase Order",plain_po.name))

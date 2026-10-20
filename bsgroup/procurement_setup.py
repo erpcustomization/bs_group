@@ -47,6 +47,10 @@ def execute():
         ],
         "Purchase Invoice": [
             field("managed", "BS Procurement", "Check", read_only=1, default="0", print_hide=1),
+            field("approved_by", "Payment Order approved by", "Link", options="User",
+                  read_only=1, no_copy=1, print_hide=1),
+            field("approved_on", "Payment Order approved on", "Datetime",
+                  read_only=1, no_copy=1, print_hide=1),
             field("preparers", "BS preparation participants", "Long Text", read_only=1,
                   hidden=1, allow_on_submit=1, print_hide=1, no_copy=1),
         ],
@@ -64,20 +68,20 @@ def execute():
     }, update=True)
     frappe.clear_cache(doctype="Material Request")
     frappe.clear_cache(doctype="Purchase Order")
-    # Supplier invoices retain independent Accounts Manager approval.
-    name = frappe.db.get_value("Workflow", {"document_type":"Purchase Invoice", "is_active":1})
-    if name:
-        workflow = frappe.get_doc("Workflow", name)
-        changed = False
-        for transition in workflow.transitions:
-            if transition.action in ("Approve", "Reject") and transition.allow_self_approval:
-                transition.allow_self_approval = 0
-                changed = True
-        if changed:
-            workflow.save()
+    # Existing invoice views may predate the managed flag. Recover their real
+    # BS PO lineage without inventing or backdating approval evidence.
+    frappe.db.sql("""update `tabPurchase Invoice` p
+        join `tabPurchase Invoice Item` i on i.parent=p.name
+        join `tabPurchase Order` po on po.name=i.purchase_order
+        set p.custom_bsp_managed=1 where po.custom_bsp_managed=1
+          and coalesce(p.custom_bsp_managed,0)=0""")
+    frappe.clear_cache(doctype="Purchase Invoice")
     install_approver_role()
     scope_request_transitions()
+    scope_request_transitions("Purchase Invoice")
     route_pending_request_actions()
+    route_pending_request_actions("Purchase Invoice")
+    lock_supplier_exceptions()
     name = "BS Procurement Purchase Order"
     template = Path(frappe.get_app_path("bsgroup", "templates", "bs_procurement_purchase_order.html")).read_text()
     fmt = frappe.get_doc("Print Format", name) if frappe.db.exists("Print Format", name) else frappe.new_doc("Print Format")
@@ -116,10 +120,10 @@ def enforce_policy():
             doc.save()
 
 
-def scope_request_transitions():
+def scope_request_transitions(doctype="Material Request"):
     """Scope BS sending and Mohan's decisions; preserve ordinary MR rules."""
     from bsgroup.procurement_controls import APPROVER_ROLE
-    name = frappe.db.get_value("Workflow", {"document_type": "Material Request", "is_active": 1})
+    name = frappe.db.get_value("Workflow", {"document_type": doctype, "is_active": 1})
     if not name:
         return
     workflow = frappe.get_doc("Workflow", name)
@@ -157,21 +161,33 @@ def install_approver_role():
             user.save()
 
 
-def route_pending_request_actions():
+def route_pending_request_actions(doctype="Material Request"):
     """Reroute already-open BS PR reviews; preserve completed approval history."""
     from bsgroup.procurement_controls import APPROVER_ROLE
-    names = frappe.db.sql("""
+    if doctype not in ("Material Request", "Purchase Invoice"):
+        return
+    names = frappe.db.sql(f"""
         select a.name from `tabWorkflow Action` a
-        join `tabMaterial Request` r on r.name=a.reference_name
-        where a.reference_doctype='Material Request' and a.status='Open'
+        join `tab{doctype}` r on r.name=a.reference_name
+        where a.reference_doctype=%s and a.status='Open'
           and a.workflow_state='Pending Approval'
           and r.custom_bsp_managed=1 and r.workflow_state='Pending Approval' and r.docstatus=0
-    """, pluck=True)
+    """, (doctype,), pluck=True)
     for name in names:
         action = frappe.get_doc("Workflow Action", name)
         if {r.role for r in action.permitted_roles} != {APPROVER_ROLE}:
             action.set("permitted_roles", [dict(role=APPROVER_ROLE)])
             action.save(ignore_permissions=True)
+
+
+def lock_supplier_exceptions():
+    from frappe.custom.doctype.property_setter.property_setter import make_property_setter
+    from bsgroup.procurement_payments import SUPPLIER_EXCEPTIONS
+    for field in SUPPLIER_EXCEPTIONS:
+        frappe.db.sql(f"update `tabSupplier` set `{field}`=0 where coalesce(`{field}`,0)!=0")
+        make_property_setter("Supplier", field, "read_only", 1, "Check")
+        make_property_setter("Supplier", field, "default", "0", "Data")
+    frappe.clear_cache(doctype="Supplier")
 
 
 def install_payment_source_index():

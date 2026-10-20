@@ -28,10 +28,10 @@ try:
     served = get("bs-procurement")
     script = served.script
     subprocess.run(["node", "--check", "-"], input=script, text=True, check=True)
-    assert '20261020-pr-evidence' in script
+    assert '20261020-payment-policy' in script
     assert 'QA_REPORT' not in script
     print(json.dumps({"site":frappe.local.site,"page_modified":str(frappe.db.get_value("Page","bs-procurement","modified")),
-        "build":"20261020-pr-evidence","script_sha256":hashlib.sha256(script.encode()).hexdigest(),
+        "build":"20261020-payment-policy","script_sha256":hashlib.sha256(script.encode()).hexdigest(),
         "disk_js_sha256":hashlib.sha256((PAGE/"bs_procurement.js").read_bytes()).hexdigest(),
         "runtime_files":sorted(p.name for p in PAGE.iterdir())},indent=2))
 finally:

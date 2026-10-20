@@ -577,3 +577,23 @@ for _dt, _event, _method in (
     doc_events[_dt][_event] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.procurement_accounts." + _method]
 extend_doctype_class.setdefault("Purchase Order", []).append("bsgroup.procurement_controls.ProcurementOrderMixin")
 doctype_list_js["Purchase Order"] = "public/js/bs_procurement_purchase_order_list.js"
+
+# Supplier settlement policy applies in native forms, imports and reconciliation.
+for _dt, _event, _method in (
+    ("Supplier", "validate", "supplier_policy"),
+    ("Payment Entry", "validate", "validate_payment"),
+    ("Payment Entry", "before_submit", "validate_payment"),
+    ("Payment Entry", "before_update_after_submit", "validate_payment"),
+    ("Payment Entry", "before_cancel", "lock_payment_sources"),
+    ("Journal Entry", "validate", "validate_payment"),
+    ("Journal Entry", "before_submit", "validate_payment"),
+    ("Journal Entry", "before_update_after_submit", "validate_payment"),
+    ("Journal Entry", "before_cancel", "lock_payment_sources"),
+    ("Unreconcile Payment", "before_submit", "prevent_unreconcile"),
+    ("Purchase Invoice", "validate", "validate_inline_payment"),
+    ("Purchase Invoice", "before_update_after_submit", "validate_inline_payment"),
+    ("Purchase Invoice", "before_cancel", "before_invoice_cancel"),
+):
+    _prior = doc_events.setdefault(_dt, {}).get(_event, [])
+    doc_events[_dt][_event] = ([_prior] if isinstance(_prior, str) else list(_prior)) + [
+        "bsgroup.procurement_payments." + _method]

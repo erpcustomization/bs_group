@@ -18,6 +18,11 @@ let po={id:"PO-OLD",request:"PR-OLD",company:"QC Company",supplier:"Supplier A",
   items:[{sourceId:"ROW",item_code:"QC-ITEM",description:"QC scope",qty:2,rate:90,cost:100,
   uom:"Nos",conversionFactor:1,uoms:["Nos","Box"],uomFactors:{Nos:1,Box:2}}]};
 let failSave=null,lastDialog=null,uploads=[],saved=null,manual=null;
+const paymentOrder={id:"PI-QC",supplier:"Supplier A",company:"QC Company",bill:"BILL-QC",
+  date:"2026-10-20",due:"2026-11-20",approval:"Pending Approval",status:"Draft",docstatus:0,
+  currency:"AED",outstandingCurrency:"AED",total:90,net:90,taxes:0,outstanding:null,
+  orders:["PO-OLD"],requests:["PR-OLD"],items:[],receipts:{records:[],restricted:false},
+  payments:{records:[],restricted:false},actions:[],canPay:false,approver:summary.approver};
 const detail=()=>manual?clone(manual):({...clone(summary),history:[],actions:[],canPrepare:true,orders:[clone(po)],
   items:[{...po.items[0],qty:4,cost:100,available:2,reserved:2,ordered:0}]});
 const frappe={
@@ -30,7 +35,8 @@ const frappe={
   msgprint:s=>messages.push(s),confirm:(_s,yes)=>yes(),show_alert:()=>{},set_route:()=>{},
   call:async({method,args})=>{
     calls.push({method,args});let data;
-    if(method.endsWith("get_payment_orders"))data={invoices:[],has_more:false,user:"buyer@example.com",canReadRequests:true,canCreate:true};
+    if(method.endsWith("get_payment_orders"))data={invoices:[clone(paymentOrder)],has_more:false,user:"buyer@example.com",canReadRequests:true,canCreate:true};
+    else if(method.endsWith("get_payment_order"))data=clone(paymentOrder);
     else if(method.endsWith("get_requests"))data={requests:[clone(summary)],has_more:true,user:"buyer@example.com",canCreate:true};
     else if(method.endsWith("get_orders"))data={orders:[clone(po)],has_more:!args.start};
     else if(method.endsWith("get_request"))data=detail();
@@ -126,5 +132,15 @@ async function input(s,value){const el=find(s);if(el.tagName==="SELECT"){
     document.body.textContent.includes("Invoice copy")&&document.body.textContent.includes("Regulated electricity provider"));
   await click('[data-action="services"]');
   check("Payment Order remains third module section",document.body.textContent.includes("Supplier / vendor invoices, approvals and payments."));
+  await click('[data-action="settlement"]');
+  check("Payment Order displays Mohan and his approver account",
+    document.body.textContent.includes("Mohan Babu")&&document.body.textContent.includes("mohan@bitssecureit.com"));
+  check("Pending Payment Order hides payment and other-user approval actions",
+    !document.querySelector('[data-action="record-payment"]')&&!document.querySelector('[data-value="Approve"]'));
+  paymentOrder.docstatus=1;paymentOrder.approval="Approved";paymentOrder.canPay=true;
+  paymentOrder.approvedBy="mohan@bitssecureit.com";paymentOrder.approvedOn="2026-10-20 19:00:00";
+  await click('[data-action="settlement-list"]');await click('[data-action="settlement"]');
+  check("Approved Payment Order shows approval evidence and payment action",
+    document.body.textContent.includes("2026-10-20 19:00:00")&&!!document.querySelector('[data-action="record-payment"]'));
   console.log(JSON.stringify({passed:checks.length,tests:checks},null,2));
 })().catch(e=>{console.error(e);process.exitCode=1;});

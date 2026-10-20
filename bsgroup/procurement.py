@@ -391,7 +391,15 @@ def validate_order(doc, method=None):
     requests = managed_request_names(doc)
     was_managed = old and old.get("custom_bsp_managed")
     if not requests and not doc.get("custom_bsp_managed") and not was_managed:
-        return
+        # Historical posted orders remain readable and reversible. New orders
+        # and existing drafts must enter through an approved BS requisition.
+        if old and old.docstatus == 1 and doc.docstatus in (1, 2):
+            if doc.docstatus == 1 and encoded(po_values(old)) != encoded(po_values(doc)):
+                fail("Historical Purchase Orders without a BS PR cannot be expanded or revised. "
+                     "Create a new PO from an approved BS Purchase Requisition.")
+            return
+        fail("Every new Purchase Order must come from an approved BS Purchase Requisition. "
+             "Create the PO from the approved PR in BS Procurement.")
     require_purchaser()
     if old and not was_managed:
         fail("An existing ordinary Purchase Order cannot be converted into a BS order.")

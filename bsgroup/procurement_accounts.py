@@ -3,7 +3,7 @@ import json
 import frappe
 from frappe.utils import cint, flt
 from bsgroup.procurement import access, load, fail
-from bsgroup.procurement_controls import independent, track_preparers
+from bsgroup.procurement_controls import approval_allowed, approver_details, track_preparers
 
 
 def visible_documents(doctype, names, company):
@@ -96,10 +96,14 @@ def validate_invoice_approval(doc, method=None):
     managed = bool(bs_order_names(doc) or (old and old.get("custom_bsp_managed")))
     if not managed:
         doc.custom_bsp_managed = 0
+        from bsgroup.procurement_payments import protect_approval
+        protect_approval(doc, old)
         return
     doc.custom_bsp_managed = 1
     track_preparers(doc, old, doc.workflow_state or "Draft",
                     old.workflow_state if old else None)
+    from bsgroup.procurement_payments import protect_approval
+    protect_approval(doc, old)
 
 
 def quantity_used(doctype, field, value, exclude):
@@ -306,8 +310,12 @@ def get_payment_order(name):
     from frappe.model.workflow import get_transitions, has_approval_access
     result["actions"] = [t.action for t in get_transitions(invoice)
                          if has_approval_access(frappe.session.user, invoice, t)
-                         and (t.action not in ("Approve", "Reject") or independent(invoice))]
-    result["canPay"] = bool(invoice.docstatus == 1 and flt(invoice.outstanding_amount)>0
+                         and (t.action not in ("Approve", "Reject") or approval_allowed(invoice))]
+    from bsgroup.procurement_payments import is_approved
+    result["approver"] = approver_details()
+    result["approvedBy"] = invoice.get("custom_bsp_approved_by")
+    result["approvedOn"] = str(invoice.get("custom_bsp_approved_on") or "")
+    result["canPay"] = bool(is_approved(invoice) and flt(invoice.outstanding_amount)>0
                             and frappe.has_permission("Payment Entry", "create"))
     return result
 
@@ -318,6 +326,8 @@ def invoice_action(name, modified, action):
     invoice = load("Purchase Invoice", name, "write", modified)
     if not bs_order_names(invoice):
         fail("Select a BS Procurement supplier invoice.")
+    if action in ("Approve", "Reject"):
+        approval_allowed(invoice, throw=True)
     invoice = apply_workflow(invoice, action)
     return get_payment_order(invoice.name)
 
@@ -356,7 +366,8 @@ def prepare_payment_order(source_doctype, source_name):
 def prepare_payment(name):
     frappe.has_permission("Payment Entry", "create", throw=True)
     invoice = load("Purchase Invoice", name)
-    if not bs_order_names(invoice) or invoice.docstatus != 1 or flt(invoice.outstanding_amount)<=0:
-        fail("Select an approved supplier invoice with an outstanding amount.")
+    from bsgroup.procurement_payments import is_approved
+    if not bs_order_names(invoice) or not is_approved(invoice) or flt(invoice.outstanding_amount)<=0:
+        fail("Select a Payment Order approved by Mohan with an outstanding amount.")
     from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
     return get_payment_entry("Purchase Invoice", invoice.name)
