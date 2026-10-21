@@ -1135,6 +1135,8 @@ def order_data(doc, source=None):
                 terms=doc.terms or "", delivery=str(doc.schedule_date or ""),
                 net=doc.net_total, taxes=doc.total_taxes_and_charges, grand=doc.grand_total,
                 taxTemplate=doc.taxes_and_charges or "",
+                taxTemplates=frappe.get_all("Purchase Taxes and Charges Template",
+                    filters={"company": doc.company, "disabled": 0}, pluck="name", order_by="name asc"),
                 na=bool(comparison.get("exception")), explanation=comparison.get("explanation",""),
                 selectionReason=comparison.get("selection_reason",""),
                 lineReasons=comparison.get("line_reasons", {}),
