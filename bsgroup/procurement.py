@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from functools import wraps
 
 import frappe
-from frappe.utils import cint, flt, get_datetime, now_datetime, nowdate
+from frappe.utils import cint, flt, get_datetime, now_datetime, nowdate, strip_html
 from frappe.model.workflow import (
     apply_workflow, get_transitions, get_workflow_name, has_approval_access,
 )
@@ -874,7 +874,7 @@ def order_data(doc, source=None):
                 editable=editable, canApprove=can_approve, approver=approver_details(),
                 canCancel=editable or (manager() and doc.docstatus==1 and doc.has_permission("cancel")),
                 items=[dict(sourceId=order_line_key(r), additional=not bool(r.material_request_item), item_code=r.item_code,
-                            description=r.item_name or r.description, qty=r.qty, uom=r.uom,
+                            item_name=r.item_name, description=strip_html(r.description or r.item_name or ""), qty=r.qty, uom=r.uom,
                             rate=r.rate, conversionFactor=r.conversion_factor,
                             uoms=sorted({frappe.get_cached_doc("Item", r.item_code).stock_uom}
                                 | {u.uom for u in frappe.get_cached_doc("Item", r.item_code).uoms if flt(u.conversion_factor)>0}),
@@ -914,7 +914,8 @@ def request_data(doc):
         actions = [t.action for t in get_transitions(doc) if has_approval_access(frappe.session.user, doc, t)
                    and (t.action not in ("Approve", "Reject") or approval_allowed(doc))]
     approval = "Cancelled" if doc.docstatus==2 else doc.workflow_state or "Draft"
-    items = [dict(sourceId=r.name, item_code=r.item_code, description=r.item_name or r.description,
+    items = [dict(sourceId=r.name, item_code=r.item_code, item_name=r.item_name,
+                  description=strip_html(r.description or r.item_name or ""),
                   qty=r.qty, uom=r.uom, cost=r.rate, ordered=ordered.get(r.name, 0)/flt(r.conversion_factor or 1),
                   reserved=used.get(r.name,0)/flt(r.conversion_factor or 1),
                   available=max(0,(flt(r.stock_qty)-used.get(r.name,0))/flt(r.conversion_factor or 1)))
@@ -933,6 +934,11 @@ def request_data(doc):
             status="Sourcing / PO preparation"
         else:
             status="Ready for procurement"
+    prepare_reason = ("Mohan must approve this PR before a Purchase Order can be created."
+        if approval != "Approved" or doc.docstatus != 1 else
+        "This PR is stopped or cancelled." if doc.status in ("Stopped", "Cancelled") else
+        "Purchase User or Purchase Manager access and Purchase Order creation permission are required."
+        if not purchaser() or not frappe.has_permission(PO, "create") else "")
     return dict(id=doc.name, modified=str(doc.modified), person=doc.owner,
                 company=doc.company, currency=frappe.get_cached_value("Company",doc.company,"default_currency"),
                 project=doc.get("custom_project") or doc.title, customer=doc.get("custom_bsp_customer") or doc.customer or "",
@@ -950,8 +956,7 @@ def request_data(doc):
                 canEditSupporting=not source and not doc.docstatus
                     and (doc.workflow_state or "Draft") in ("Draft", "Rejected")
                     and purchaser() and doc.has_permission("write"),
-                canPrepare=purchaser() and approval=="Approved" and doc.status not in ("Stopped","Cancelled")
-                           and frappe.has_permission(PO,"create"))
+                canPrepare=not bool(prepare_reason), prepareReason=prepare_reason)
 
 
 @frappe.whitelist()

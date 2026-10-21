@@ -14,14 +14,14 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
   let poList=[],poMore=false,poLoaded=false,searchTimer=null,searchVersion=0;
   let requests=[],requestsLoaded=false,active=null,po=null,view="list",query="",canCreate=false,hasMore=false,user="",picks={},dirty=false,busy=false;
   let settlementOrders=[],settlement=null,settlementMore=false,settlementRestricted=false,canCreateInvoice=false,canReadRequests=true;
-  async function refreshSettlement(name,more=false){
+  async function refreshSettlement(name,more=false,draw=true){
     if(name)settlement=await accountApi("get_payment_order",{name});
     else{
       const data=await accountApi("get_payment_orders",{start:more?settlementOrders.length:0,page_length:50});
       settlementOrders=more?settlementOrders.concat(data.invoices):data.invoices;
       settlementMore=data.has_more;settlementRestricted=data.restricted;canCreateInvoice=data.canCreate;user=data.user;canReadRequests=data.canReadRequests;settlement=null;
     }
-    render();
+    if(draw)render();
   }
   async function refreshOrders(more=false){
     const version=++searchVersion,search=query;
@@ -108,8 +108,8 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
     return '<div class="bsp-rail">'+stages.map(([a,b,c],i)=>`<div class="bsp-stage ${c?"done":""}"><strong>${i+1} ${c?"✓":""} ${esc(a)}</strong><small>${esc(b)}</small></div>`).join("")+"</div>";
   }
   function detail(){
-    const r=req();if(!r)return "<p>Open a requisition.</p>";
-    return `<div class="bsp-heading"><div><h2>${esc(r.id)} ${badge(r.approval)}</h2><p class="muted">${esc(r.company)} · ${esc(r.project)}</p></div><div>${btn("All requisitions","list")}${btn("Open Material Request","standard-mr")}${actions(r)}</div></div><section class="bsp-card"><h3>PR status and approval</h3>${facts([["Approver",r.approver?.name], ["Approver account",r.approver?.user],["Approval status",r.approval],["Purchasing status",r.purchasing],["ERP status",r.erpStatus],["Latest decision reason",r.reason]])}${rail(r)}</section>${prSupporting(r)}<section class="bsp-card"><h3>Source documents</h3>${facts([["Requested by",r.person],["Customer",r.customer],["Customer PO",r.customerPO],["Quotation",r.quotation],["Deal Cost Sheet",r.dcs]])}<div>${r.quotation?btn("Open Quotation","source",`data-type="Quotation" data-name="${esc(r.quotation)}"`):""}${r.dcs?btn("Open Deal Cost Sheet","source",`data-type="Deal Cost Sheet" data-name="${esc(r.dcs)}"`):""}${fileLink(r.customerPOFile,r.customerPOFile?"Open Customer PO attachment":"")}</div><p class="muted">${r.handoverRevision?"Budget copied from awarded DCS revision "+esc(r.handoverRevision)+". Source quantities and budget are preserved.":"Budget rates come from this Material Request."}</p>${(r.handoverFiles||[]).map(f=>`<p>${fileLink(f.url,({quotation:"Awarded quotation",customer_po:"Customer PO",costing:"Awarded costing sheet"})[f.kind]||f.filename)}</p>`).join("")}${r.handoverResources||r.handoverCharges?`<p class="muted">${r.handoverResources} labour/resource rows and ${r.handoverCharges} additional charge rows remain in the costing evidence; purchasing lines contain the DCS Item rows.</p>`:""}</section><section class="bsp-card"><h3>PR line items and purchasing progress</h3><p class="muted">Draft and pending POs reserve quantities. Submitted POs count as ordered. Select PR items and quantities, or prepare a PO with additional items. Choose a supplier for each separate PO.</p><div class="bsp-tablewrap"><table><thead><tr><th>Select</th><th>Item</th><th>Requested</th><th>Ordered</th><th>Reserved, including ordered</th><th>Available</th><th>New PO qty</th><th>Budget rate (${esc(r.currency)})</th></tr></thead><tbody>${r.items.map(x=>`<tr><td><input type="checkbox" data-pick="${esc(x.sourceId)}" aria-label="Select ${esc(x.item_code)}" ${r.canPrepare&&x.available>0?"":"disabled"} ${picks[x.sourceId]!==undefined?"checked":""}></td><td>${esc(x.item_code)}<small style="display:block">${esc(x.description)}</small></td><td>${x.qty} ${esc(x.uom)}</td><td>${x.ordered}</td><td>${x.reserved}</td><td>${x.available}</td><td><input type="number" data-pick-qty="${esc(x.sourceId)}" aria-label="New PO quantity ${esc(x.item_code)}" value="${picks[x.sourceId]??x.available}" min="0" max="${x.available}" step="any" ${r.canPrepare?"":"disabled"}></td><td>${money(x.cost)}</td></tr>`).join("")}</tbody></table></div>${r.canPrepare?btn("Prepare Purchase Order","create-po","",true):'<p class="muted">An approved, open PR and Purchase Order creation permission are required.</p>'}</section><section class="bsp-card"><h3>Linked Purchase Orders</h3>${ordersTable(r.orders)}</section><section class="bsp-activity"><h3>PR approval history</h3>${history(r.history)}</section>`;
+    const r=req();if(!r||!Array.isArray(r.actions))return "<p>Loading requisition details…</p>";
+    return `<div class="bsp-heading"><div><h2>${esc(r.id)} ${badge(r.approval)}</h2><p class="muted">${esc(r.company)} · ${esc(r.project)}</p></div><div>${btn("All requisitions","list")}${btn("Open standard PR form","standard-mr")}${btn("Create Purchase Order","create-po",r.canPrepare?"":`disabled title="${esc(r.prepareReason)}"`,true)}${actions(r)}</div></div><p class="bsp-callout">This Purchase Requisition is the same ERPNext Material Request record. No separate handoff or duplicate request is needed.</p>${r.prepareReason?`<p class="muted">${esc(r.prepareReason)}</p>`:""}<section class="bsp-card"><h3>PR status and approval</h3>${facts([["Approver",r.approver?.name], ["Approver account",r.approver?.user],["Approval status",r.approval],["Purchasing status",r.purchasing],["ERP status",r.erpStatus],["Latest decision reason",r.reason]])}${rail(r)}</section>${prSupporting(r)}<section class="bsp-card"><h3>Source documents</h3>${facts([["Requested by",r.person],["Customer",r.customer],["Customer PO",r.customerPO],["Quotation",r.quotation],["Deal Cost Sheet",r.dcs]])}<div>${r.quotation?btn("Open Quotation","source",`data-type="Quotation" data-name="${esc(r.quotation)}"`):""}${r.dcs?btn("Open Deal Cost Sheet","source",`data-type="Deal Cost Sheet" data-name="${esc(r.dcs)}"`):""}${fileLink(r.customerPOFile,r.customerPOFile?"Open Customer PO attachment":"")}</div><p class="muted">${r.handoverRevision?"Budget copied from awarded DCS revision "+esc(r.handoverRevision)+". Source quantities and budget are preserved.":"Budget rates come from this Material Request."}</p>${(r.handoverFiles||[]).map(f=>`<p>${fileLink(f.url,({quotation:"Awarded quotation",customer_po:"Customer PO",costing:"Awarded costing sheet"})[f.kind]||f.filename)}</p>`).join("")}${r.handoverResources||r.handoverCharges?`<p class="muted">${r.handoverResources} labour/resource rows and ${r.handoverCharges} additional charge rows remain in the costing evidence; purchasing lines contain the DCS Item rows.</p>`:""}</section><section class="bsp-card"><h3>PR line items and purchasing progress</h3><p class="muted">Draft and pending POs reserve quantities. Submitted POs count as ordered. Select PR items and quantities, or prepare a PO with additional items. Choose a supplier for each separate PO.</p><div class="bsp-tablewrap"><table><thead><tr><th>Select</th><th>Item</th><th>Requested</th><th>Ordered</th><th>Reserved, including ordered</th><th>Available</th><th>New PO qty</th><th>Budget rate (${esc(r.currency)})</th></tr></thead><tbody>${r.items.map(x=>`<tr><td><input type="checkbox" data-pick="${esc(x.sourceId)}" aria-label="Select ${esc(x.item_code)}" ${r.canPrepare&&x.available>0?"":"disabled"} ${picks[x.sourceId]!==undefined?"checked":""}></td><td>${esc(x.item_name||x.item_code)}<small style="display:block;white-space:pre-wrap">${esc(x.description)}</small></td><td>${x.qty} ${esc(x.uom)}</td><td>${x.ordered}</td><td>${x.reserved}</td><td>${x.available}</td><td><input type="number" data-pick-qty="${esc(x.sourceId)}" aria-label="New PO quantity ${esc(x.item_code)}" value="${picks[x.sourceId]??x.available}" min="0" max="${x.available}" step="any" ${r.canPrepare?"":"disabled"}></td><td>${money(x.cost)}</td></tr>`).join("")}</tbody></table></div>${r.canPrepare?btn("Create Purchase Order","create-po","",true):`<p class="muted">${esc(r.prepareReason)}</p>`}</section><section class="bsp-card"><h3>Linked Purchase Orders</h3>${ordersTable(r.orders)}</section><section class="bsp-activity"><h3>PR approval history</h3>${history(r.history)}</section>`;
   }
   function ordersTable(orders){
     return `<div class="bsp-tablewrap"><table><thead><tr><th>Purchase Order</th><th>PR</th><th>Supplier</th><th>Approval</th><th>ERP status</th><th>Net total</th><th>Grand total</th></tr></thead><tbody>${orders.map(p=>`<tr data-search-text="${esc([p.id,p.request,p.supplier,p.status,p.erpStatus].join(" ").toLowerCase())}"><td>${btn(esc(p.id),"open-po",`data-id="${esc(p.id)}" data-request="${esc(p.request)}"`)}</td><td>${esc(p.request)}</td><td>${esc(p.supplier)}</td><td>${badge(p.status)}</td><td>${esc(p.erpStatus)}</td><td>${p.status==="Cancelled"?"—":esc(p.currency)+" "+money(p.net,p.currency)}</td><td>${p.status==="Cancelled"?"—":esc(p.currency)+" "+money(p.grand,p.currency)}</td></tr>`).join("")||'<tr><td colspan="7">No Purchase Orders yet.</td></tr>'}</tbody></table></div>`;
@@ -263,7 +263,7 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
     if(action==="new-pr"){await createPR();return;}
     if(action==="open-pr"){active=b.dataset.id;picks={};view="detail";await refresh(active);return;}
     if(action==="back-pr"){view="detail";picks={};await refresh(active);return;}
-    if(action==="open-po"){active=b.dataset.request;po=b.dataset.id;view="po";await refresh(active);return;}
+    if(action==="open-po"){frappe.set_route("Form","Purchase Order",b.dataset.id);return;}
     if(["standard-mr","standard-po","source"].includes(action)){
       frappe.set_route("Form",action==="standard-mr"?"Material Request":action==="standard-po"?"Purchase Order":b.dataset.type,action==="standard-mr"?r.id:action==="standard-po"?p.id:b.dataset.name);return;
     }
@@ -285,15 +285,18 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
       dirty=false;render();return;
     }
     if(action==="create-po"){
+      if(!r.canPrepare){frappe.msgprint(r.prepareReason);return;}
+      const selected=Object.keys(picks).length?picks:Object.fromEntries(r.items.filter(x=>x.available>0).map(x=>[x.sourceId,x.available]));
       const fields=[{fieldname:"supplier",label:"Supplier",fieldtype:"Link",options:"Supplier",reqd:1}];
-      if(!Object.keys(picks).length)fields.push({fieldname:"additional_items",label:"Additional items",fieldtype:"Table",
-        reqd:1,in_place_edit:true,fields:additionalItemFields(),
-        description:"Select items outside the PR list. To purchase a PR item, select its row on the requisition."});
-      const answer=await ask(fields,"Prepare Purchase Order","Create draft");
+      fields.push({fieldname:"additional_only",label:"Purchase only additional items outside the PR list",fieldtype:"Check",default:!Object.keys(selected).length});
+      fields.push({fieldname:"additional_items",label:"Additional items (optional)",fieldtype:"Table",
+        in_place_edit:true,fields:additionalItemFields(),
+        description:"Selected PR lines will be included. If none were selected, all available PR quantities are included. You can edit the draft in the standard Purchase Order form."});
+      const answer=await ask(fields,"Create Purchase Order","Create and open Purchase Order");
       if(!answer)return;
-      const newPO=await api("create_order",{request:r.id,modified:r.modified,supplier:answer.supplier,lines:JSON.stringify(picks),
+      const newPO=await api("create_order",{request:r.id,modified:r.modified,supplier:answer.supplier,lines:JSON.stringify(answer.additional_only?{}:selected),
         additional_items:JSON.stringify(answer.additional_items||[]),key:key()});
-      po=newPO.id;view="po";picks={};await refresh(r.id);return;
+      picks={};dirty=false;await frappe.set_route("Form","Purchase Order",newPO.id);return;
     }
     if(action==="save-po"){await save();await refresh(r.id);frappe.show_alert({message:"Purchase Order saved",indicator:"green"});return;}
     if(action==="save-pr-supporting"){await savePR();render();frappe.show_alert({message:"PR supporting documents saved",indicator:"green"});return;}
@@ -398,8 +401,11 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
   const incoming=()=>{
     const invoice=frappe.route_options?.bsp_invoice;
     if(invoice){delete frappe.route_options.bsp_invoice;view="services";return {invoice};}
+    const orderName=frappe.route_options?.bsp_order;
+    if(orderName){delete frappe.route_options.bsp_order;po=orderName;}
     const name=frappe.route_options?.bsp_request;
     if(name){delete frappe.route_options.bsp_request;active=name;view="detail";}
+    if(orderName)view="po";
     return {request:name};
   };
   wrapper.bsp_refresh=()=>{
@@ -412,9 +418,9 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
   };
   const initial=incoming();
   (async()=>{
-    await refreshSettlement();
+    await refreshSettlement(null,false,false);
     if(initial.invoice){view="services";await refreshSettlement(initial.invoice);}
-    else if(canReadRequests){await refresh();if(initial.request)await refresh(initial.request);}
+    else if(canReadRequests){await refresh(initial.request||null);}
     else{view="services";render();}
   })().catch(error=>{console.error(error);root.innerHTML="<p>Unable to load BS Procurement. Check your permissions and reload.</p>";});
 
