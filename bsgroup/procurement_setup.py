@@ -1,6 +1,7 @@
 """Add BS controls to standard ERPNext documents. Safe to rerun."""
 import frappe
 import hashlib
+import json
 from pathlib import Path
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
@@ -105,6 +106,7 @@ def execute():
     route_pending_request_actions()
     route_pending_request_actions("Purchase Invoice")
     lock_supplier_exceptions()
+    install_selected_po_print_format()
     name = "BS Procurement Purchase Order"
     template = Path(frappe.get_app_path("bsgroup", "templates", "bs_procurement_purchase_order.html")).read_text()
     fmt = frappe.get_doc("Print Format", name) if frappe.db.exists("Print Format", name) else frappe.new_doc("Print Format")
@@ -127,6 +129,19 @@ def execute():
     install_payment_source_index()
     from bsgroup.procurement_quantities import repair_closed_requests
     repair_closed_requests()
+
+
+def install_selected_po_print_format():
+    """Seed the selected 3 September format and letterhead on new sites only.
+
+    Existing site templates remain authoritative and are never overwritten.
+    The source is the original Purchase Order Print Format, including its
+    builder layout; it is not the later BS Procurement template.
+    """
+    path = Path(frappe.get_app_path("bsgroup", "templates", "september_purchase_order.json"))
+    for source in json.loads(path.read_text(encoding="utf-8")):
+        if not frappe.db.exists(source["doctype"], source["name"]):
+            frappe.get_doc(source).insert(ignore_permissions=True)
 
 
 def enforce_policy():
