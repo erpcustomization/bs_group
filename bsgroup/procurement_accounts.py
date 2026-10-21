@@ -260,7 +260,7 @@ def get_payment_orders(start=0, page_length=50):
         fields=["name","modified","supplier","company","bill_no","posting_date","due_date",
                 "workflow_state","status","docstatus","currency","rounded_total","grand_total",
                 "net_total","total_taxes_and_charges","outstanding_amount","party_account_currency"],
-        start=max(0, cint(start)), page_length=size+1, order_by="modified desc")
+        start=max(0, cint(start)), page_length=size+1, order_by="creation asc")
     from bsgroup.procurement_lists import visible_company_names
     names = visible_company_names("Purchase Invoice", [r.name for r in rows[:size]])
     lines = {}

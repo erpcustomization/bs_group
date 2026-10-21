@@ -38,7 +38,7 @@ def list_orders(start=0, page_length=50, search=""):
         conditions = None
     size = min(100, max(1, cint(page_length)))
     rows = frappe.get_list("Purchase Order", filters=filters, or_filters=conditions,
-        fields=ORDER_FIELDS, start=max(0, cint(start)), page_length=size+1, order_by="modified desc")
+        fields=ORDER_FIELDS, start=max(0, cint(start)), page_length=size+1, order_by="creation asc")
     allowed = set(visible_company_names("Purchase Order", [r.name for r in rows]))
     return dict(orders=[order_summary(r) for r in rows[:size] if r.name in allowed],
                 has_more=len(rows)>size)
@@ -50,7 +50,7 @@ def list_requests(start=0, page_length=50):
     rows = frappe.get_list("Material Request",
         filters={"custom_bsp_managed": 1, "material_request_type": "Purchase"},
         fields=["name", "modified", "owner", "company", "title", "custom_project", "workflow_state", "status", "docstatus"],
-        start=max(0, cint(start)), page_length=size+1, order_by="creation desc")
+        start=max(0, cint(start)), page_length=size+1, order_by="creation asc")
     names = visible_company_names("Material Request", [r.name for r in rows[:size]])
     if not names:
         return dict(requests=[], has_more=len(rows)>size, user=frappe.session.user,
