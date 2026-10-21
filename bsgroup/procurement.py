@@ -1004,6 +1004,110 @@ def order_action(name, modified, action, reason=""):
     return order_data(doc)
 
 
+def receipt_order(doc):
+    order_names = {row.purchase_order for row in doc.items if row.purchase_order}
+    if len(order_names) != 1:
+        fail("This Purchase Receipt must be linked to one BS Procurement Purchase Order.")
+    order = load(PO, next(iter(order_names)))
+    if not order.custom_bsp_managed:
+        fail("Select a Purchase Receipt linked to BS Procurement.")
+    return order
+
+
+def receipt_data(doc):
+    access(doc)
+    order = receipt_order(doc)
+    editable = purchaser() and doc.docstatus == 0 and doc.has_permission("write")
+    return dict(
+        id=doc.name, modified=str(doc.modified), order=order.name, company=doc.company,
+        supplier=doc.supplier, date=str(doc.posting_date or ""),
+        status="Submitted" if doc.docstatus == 1 else "Draft",
+        editable=editable, canSubmit=editable and doc.has_permission("submit"),
+        items=[dict(id=row.name, item=row.item_code,
+                    description=strip_html(row.description or row.item_name or ""),
+                    qty=row.qty, uom=row.uom, warehouse=row.warehouse or "")
+               for row in doc.items],
+    )
+
+
+@frappe.whitelist(methods=["POST"])
+@transaction_conflicts
+def create_receipt(order, modified):
+    """Create a standard ERPNext Purchase Receipt, presented inside BS Procurement."""
+    require_purchaser()
+    purchase_order = load(PO, order, "read", modified)
+    if (not purchase_order.custom_bsp_managed or purchase_order.docstatus != 1
+            or purchase_order.custom_bsp_approval_state != "Approved"):
+        fail("A submitted, Mohan-approved BS Purchase Order is required before receiving goods.")
+    frappe.has_permission("Purchase Receipt", "create", throw=True)
+    from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_receipt
+    receipt = make_purchase_receipt(purchase_order.name)
+    if not receipt.items:
+        fail("There are no outstanding quantities to receive on this Purchase Order.")
+    with operation("create receipt"):
+        receipt.insert()
+    return receipt_data(receipt)
+
+
+@frappe.whitelist(methods=["POST"])
+@transaction_conflicts
+def save_receipt(name, modified, payload):
+    require_purchaser()
+    doc = load("Purchase Receipt", name, "write", modified)
+    receipt_order(doc)
+    if doc.docstatus:
+        fail("Only a draft Purchase Receipt can be edited.")
+    incoming = {row.get("id"): row for row in parse(payload).get("items", []) if isinstance(row, dict)}
+    rows = []
+    for row in doc.items:
+        value = incoming.get(row.name)
+        if not value:
+            continue
+        qty = number(value.get("qty"), "Receipt quantity", zero=True)
+        if not qty:
+            continue
+        row.qty = row.received_qty = qty
+        warehouse = text(value.get("warehouse"), 140)
+        if warehouse:
+            access(frappe.get_doc("Warehouse", warehouse))
+            row.warehouse = warehouse
+        rows.append(row)
+    if not rows:
+        fail("Keep at least one receipt line with a positive quantity.")
+    doc.set("items", rows)
+    with operation("save receipt"):
+        doc.save()
+    return receipt_data(doc)
+
+
+@frappe.whitelist(methods=["POST"])
+@transaction_conflicts
+def submit_receipt(name, modified):
+    require_purchaser()
+    doc = load("Purchase Receipt", name, "submit", modified)
+    receipt_order(doc)
+    if doc.docstatus:
+        fail("This Purchase Receipt is already submitted.")
+    with operation("submit receipt"):
+        doc.submit()
+    return receipt_data(doc)
+
+
+@frappe.whitelist()
+def get_receipt(name):
+    return receipt_data(load("Purchase Receipt", name))
+
+
+@frappe.whitelist()
+def get_order_receipts(order):
+    purchase_order = load(PO, order)
+    if not purchase_order.custom_bsp_managed:
+        fail("Select a BS Procurement Purchase Order.")
+    names = frappe.get_all("Purchase Receipt Item", filters={"purchase_order": order},
+                           pluck="parent", distinct=True, order_by="modified desc")
+    return [receipt_data(load("Purchase Receipt", name)) for name in names]
+
+
 def order_data(doc, source=None):
     access(doc)
     source = source or access(frappe.get_doc(MR, doc.custom_bsp_material_request))
