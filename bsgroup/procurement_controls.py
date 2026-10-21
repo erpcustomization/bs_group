@@ -116,11 +116,12 @@ def meaningful_reason(value):
 
 
 def validate_supplier_details(doc):
-    if not doc.supplier_address or not doc.address_display:
-        frappe.throw("The selected supplier has no usable address on this PO. Add or select the supplier address, then send for approval.")
     if not doc.contact_person or not doc.contact_display:
         frappe.throw("The selected supplier has no usable contact on this PO. Add or select the supplier contact, then send for approval.")
-    for doctype, name in (("Address", doc.supplier_address), ("Contact", doc.contact_person)):
+    linked_records = [("Contact", doc.contact_person)]
+    if doc.supplier_address:
+        linked_records.append(("Address", doc.supplier_address))
+    for doctype, name in linked_records:
         if not frappe.db.exists("Dynamic Link", dict(parenttype=doctype, parent=name,
                                 link_doctype="Supplier", link_name=doc.supplier)):
             frappe.throw("The PO address and contact must belong to the selected supplier.")

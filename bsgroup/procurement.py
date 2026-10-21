@@ -867,13 +867,24 @@ def save_order(name, modified, payload):
 
 
 def populate_supplier_details(doc):
-    """Use the supplier's configured primary address and contact on a new BS PO."""
+    """Use the supplier's primary address, or another linked address, on a BS PO."""
     if not doc.supplier:
         return
     from frappe.contacts.doctype.address.address import get_default_address
     from frappe.contacts.doctype.contact.contact import get_default_contact, get_contact_details
     if not doc.supplier_address:
         doc.supplier_address = get_default_address("Supplier", doc.supplier)
+    if not doc.supplier_address:
+        linked_addresses = frappe.get_all(
+            "Dynamic Link",
+            filters={"parenttype": "Address", "link_doctype": "Supplier", "link_name": doc.supplier},
+            pluck="parent",
+            order_by="modified desc",
+        )
+        for address in linked_addresses:
+            if not frappe.db.get_value("Address", address, "disabled"):
+                doc.supplier_address = address
+                break
     if doc.supplier_address:
         doc.set_supplier_address()
     if not doc.contact_person:
