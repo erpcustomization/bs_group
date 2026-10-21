@@ -24,9 +24,11 @@ def authorised_position(sheet):
         return False
     revision = frappe.db.get_value("DCS Revision", sheet.custom_revision_reference,
         ["dcs", "approval_state", "decided_by"], as_dict=True)
-    from bsgroup.dcs.manager_approval import route_for
+    from bsgroup.dcs.manager_approval import route_for, FIXED_POLICY, FIXED_APPROVER
     route = route_for(sheet)
     if route.get("approval_policy") == "Immediate Manager" and (not route.get("approval_manager") or route.approval_manager != sheet.custom_approved_by or route.changed_by == sheet.custom_approved_by):
+        return False
+    if route.get("approval_policy") == FIXED_POLICY and (route.get("approval_manager") != FIXED_APPROVER or sheet.custom_approved_by != FIXED_APPROVER):
         return False
     return bool(revision and revision.dcs == sheet.name and revision.approval_state == "Approved"
                 and revision.decided_by == sheet.custom_approved_by

@@ -82,8 +82,6 @@ def po_file(quotation):
     return file
 
 def validate_won(doc, method=None):
-    if not doc.get("custom_deal_cost_sheet"):
-        return
     before = doc.get_doc_before_save()
     if before and (before.get("custom_purchase_request") or before.get("custom_bsp_material_request")):
         for field in ("custom_customer_po", "custom_customer_po_reference", "custom_pipeline_stage"):
@@ -96,6 +94,8 @@ def validate_won(doc, method=None):
     if not (doc.get("custom_customer_po_reference") or "").strip():
         frappe.throw(_("Customer PO Reference is required when the quotation is Won."))
     po_file(doc)
+    if not doc.get("custom_deal_cost_sheet"):
+        return
     sheet = frappe.get_doc("Deal Cost Sheet", doc.custom_deal_cost_sheet)
     validate_position(sheet, doc)
     if sheet.custom_quotation and sheet.custom_quotation != doc.name:

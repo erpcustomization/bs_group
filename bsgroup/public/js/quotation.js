@@ -302,6 +302,13 @@ frappe.ui.form.on(cur_frm ? cur_frm.doctype : 'Quotation', {
 // The quotation's sales handover creates a standard Material Request.
 frappe.ui.form.on("Quotation", {
     refresh(frm) {
+        const won = frm.doc.custom_pipeline_stage === "Won";
+        ["custom_customer_po", "custom_customer_po_reference"].forEach(
+            field => frm.toggle_reqd(field, won));
+        if (frm.doc.custom_deal_cost_sheet) {
+            frm.add_custom_button(__("View Deal Cost Sheet"), () =>
+                frappe.set_route("Form", "Deal Cost Sheet", frm.doc.custom_deal_cost_sheet));
+        }
         if (!frm.doc.custom_deal_cost_sheet) return;
         const request = frm.doc.custom_bsp_material_request;
         const sent = Boolean(request || frm.doc.custom_purchase_request);
@@ -371,8 +378,10 @@ frappe.ui.form.on("Quotation", {
         }
     },
     custom_pipeline_stage(frm) {
-        if (frm.doc.custom_deal_cost_sheet && frm.doc.custom_pipeline_stage === "Won"
-                && !frm.doc.custom_customer_po) {
+        const won = frm.doc.custom_pipeline_stage === "Won";
+        ["custom_customer_po", "custom_customer_po_reference"].forEach(
+            field => frm.toggle_reqd(field, won));
+        if (won && (!frm.doc.custom_customer_po || !(frm.doc.custom_customer_po_reference || "").trim())) {
             frappe.msgprint(__("Upload the Customer PO and enter its reference, then save to confirm Won."));
             frm.scroll_to_field("custom_customer_po_reference");
         }

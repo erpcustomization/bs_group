@@ -6,6 +6,7 @@
  "engine": "InnoDB",
  "field_order": [
   "dcs_addtional_item",
+  "dcs_approval_policy",
   "hr_module_tab",
   "select_leave_type",
   "attachment_required_after_days",
@@ -20,6 +21,14 @@
   "geocode_cache_ttl_days"
  ],
  "fields": [
+  {
+   "fieldname": "dcs_approval_policy",
+   "fieldtype": "Select",
+   "label": "DCS Approval Policy",
+   "options": "Immediate Manager\nMohan",
+   "default": "Immediate Manager",
+   "description": "Mohan routes commercial exceptions to mohan@bitssecureit.com, including revisions he initiates. Recorded decisions remain unchanged."
+  },
   {
    "fieldname": "dcs_addtional_item",
    "fieldtype": "Link",

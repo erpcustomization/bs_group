@@ -3214,8 +3214,9 @@ function dcs_render_negotiation(frm, s3) {
 function dcs_render_approval(frm, s4) {
 	var hist = s4.approval_history || [], why = s4.why || {}, prev = s4.previous_approved || {}, cur = s4.current || {}, d = s4.delta || {};
 	var body = '';
-    if (s4.manager_route && s4.manager_route.approval_policy === 'Immediate Manager') {
-        body += '<div class="dcs-decision"><div class="dcs-eyebrow">MANAGER APPROVAL</div><h3>' + dcs_esc(s4.manager_route.approval_manager_name || s4.manager_route.approval_manager || 'Manager not configured') + '</h3><p>' + dcs_esc(s4.manager_route.approval_routing_error || 'Routed from the current revision submitter’s Employee reporting line.') + '</p></div>';
+    if (s4.manager_route && ['Immediate Manager', 'Mohan'].includes(s4.manager_route.approval_policy)) {
+        const routeNote = s4.manager_route.approval_policy === 'Mohan' ? 'Mohan is the designated approver for this revision.' : 'Routed from the current revision submitter’s Employee reporting line.';
+        body += '<div class="dcs-decision"><div class="dcs-eyebrow">APPROVAL</div><h3>' + dcs_esc(s4.manager_route.approval_manager_name || s4.manager_route.approval_manager || 'Approver not configured') + '</h3><p>' + dcs_esc(s4.manager_route.approval_routing_error || routeNote) + '</p></div>';
     }
 	if (why.approval_reason || why.margin_gate_reason) {
 		body += '<div class="text-muted small" style="margin-bottom:10px">' + dcs_esc(why.approval_reason || '')

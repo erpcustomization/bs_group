@@ -9,10 +9,23 @@ ROUTE_FIELDS = ["approval_policy", "submitter_employee", "manager_employee",
 SHARED_ACCOUNT_MANAGERS = {"helpdesk@bitssecureit.com": "mohan@bitssecureit.com"}
 
 FINAL_STATES = ("Approved", "Rejected", "Returned for Rework", "Not Required")
+FIXED_POLICY = "Mohan"
+FIXED_APPROVER = "mohan@bitssecureit.com"
+
+
+def fixed_approval_enabled():
+    return frappe.db.get_single_value("BS Group Settings", "dcs_approval_policy") == FIXED_POLICY
 
 def resolve_manager(user):
     out = {"approval_policy": "Immediate Manager", "approval_manager": "",
            "submitter_employee": "", "manager_employee": "", "approval_routing_error": ""}
+    if fixed_approval_enabled():
+        out["approval_policy"] = FIXED_POLICY
+        if not frappe.db.get_value("User", FIXED_APPROVER, "enabled"):
+            out["approval_routing_error"] = "Mohan's user must be enabled before this approval can be routed."
+        else:
+            out["approval_manager"] = FIXED_APPROVER
+        return out
     if user in SHARED_ACCOUNT_MANAGERS:
         manager_user = SHARED_ACCOUNT_MANAGERS[user]
         managers = frappe.get_all("Employee", filters={"user_id": manager_user, "status": "Active"},
@@ -66,8 +79,10 @@ def is_assigned_manager(sheet, user=None):
     if user in ("Guest", "Administrator"):
         return False
     route = route_for(sheet)
-    return bool(route.get("approval_policy") == "Immediate Manager"
-        and route.get("approval_manager") == user and route.get("changed_by") != user
+    fixed = route.get("approval_policy") == FIXED_POLICY
+    valid_policy = (fixed and user == FIXED_APPROVER) or (
+        route.get("approval_policy") == "Immediate Manager" and route.get("changed_by") != user)
+    return bool(valid_policy and route.get("approval_manager") == user
         and not route.get("approval_routing_error")
         and frappe.db.get_value("User", user, "enabled"))
 
@@ -90,7 +105,7 @@ def queue_review(revision):
     if previous and previous != revision.name:
         old = frappe.db.get_value("DCS Revision", previous,
             ["approval_policy","approval_manager","manager_dcs_share"], as_dict=True)
-        if old and old.approval_policy == "Immediate Manager":
+        if old and old.approval_policy in ("Immediate Manager", FIXED_POLICY):
             close_review(previous)
             if old.manager_dcs_share and frappe.db.exists("DocShare", old.manager_dcs_share):
                 share = frappe.get_doc("DocShare", old.manager_dcs_share)
@@ -129,6 +144,41 @@ def queue_review(revision):
 
 from bsgroup.api.dcs._common import governed_endpoint
 
+
+def reroute_pending():
+    """A settings change reassigns open reviews, never recorded decisions."""
+    from bsgroup.dcs.governance import record_governance_event
+    for name in frappe.get_all("Deal Cost Sheet", filters={"docstatus": 1,
+            "custom_approval_required": ["in", ["Manager", "Blocked"]],
+            "custom_approval_state": ["not in", list(FINAL_STATES)]}, pluck="name"):
+        sheet = frappe.get_doc("Deal Cost Sheet", name, for_update=True)
+        route = route_for(sheet)
+        if not route or not route.get("changed_by"):
+            continue
+        rev = frappe.get_doc("DCS Revision", sheet.custom_revision_reference)
+        if rev.approval_state in FINAL_STATES:
+            continue
+        values = resolve_manager(route.changed_by)
+        if all(route.get(k) == v for k, v in values.items()):
+            continue
+        close_review(rev.name)
+        if route.get("manager_dcs_share") and frappe.db.exists("DocShare", route.manager_dcs_share):
+            share = frappe.get_doc("DocShare", route.manager_dcs_share)
+            if share.share_doctype == "Deal Cost Sheet" and share.share_name == sheet.name and share.user == route.get("approval_manager") and not (share.write or share.share or share.submit):
+                share.flags.ignore_share_permission = True
+                share.delete(ignore_permissions=True)
+        values["manager_dcs_share"] = ""
+        frappe.db.set_value("DCS Revision", rev.name, values)
+        rev.reload()
+        rev.approval_requirement = sheet.custom_approval_required
+        queue_review(rev)
+        record_governance_event(sheet.name, "DCS_APPROVAL_POLICY_CHANGED",
+            action_label="Route pending approval under configured policy", source_endpoint="bs_group_settings",
+            reason="DCS approval policy changed in BS Group Settings. No approval decision was made.",
+            revision_no=rev.revision_no, revision_reference=rev.name,
+            changes=[{"dt": "DCS Revision", "dn": rev.name, "field": k,
+                      "old": route.get(k), "new": v} for k, v in values.items()])
+
 @governed_endpoint("dcs_refresh_manager_route", ptype="write")
 def dcs_refresh_manager_route(args):
     sheet=frappe.get_doc("Deal Cost Sheet",args.get("dcs"),for_update=True)
@@ -136,11 +186,12 @@ def dcs_refresh_manager_route(args):
     route=route_for(sheet)
     if sheet.docstatus!=1 or sheet.custom_approval_state in ("Approved","Rejected","Returned for Rework") or sheet.custom_approval_required not in ("Manager","Blocked"):
         return {"ok":0,"error":"Only a pending manager approval may be routed."}
-    if route.get("changed_by")!=frappe.session.user:
+    if route.get("changed_by")!=frappe.session.user and not (fixed_approval_enabled() and frappe.session.user == FIXED_APPROVER):
         return {"ok":0,"error":"Only the submitter of the current revision may refresh a missing or disabled manager route."}
-    if route.get("approval_manager") and not route.get("approval_routing_error") and frappe.db.get_value("User",route.approval_manager,"enabled"):
+    desired_policy = FIXED_POLICY if fixed_approval_enabled() else "Immediate Manager"
+    if route.get("approval_policy") == desired_policy and route.get("approval_manager") and not route.get("approval_routing_error") and frappe.db.get_value("User",route.approval_manager,"enabled"):
         return {"ok":1,"no_change":1,"note":"The current revision already has a valid assigned manager."}
-    values=resolve_manager(frappe.session.user)
+    values=resolve_manager(route.get("changed_by"))
     if values["approval_routing_error"]:
         return {"ok":0,"error":values["approval_routing_error"]}
     close_review(sheet.custom_revision_reference)

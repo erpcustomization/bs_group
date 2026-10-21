@@ -91,7 +91,7 @@ def dcs_approval_decision(args):
 						 "custom_approved_total_cost": s.custom_working_total_cost,
 						 "custom_approved_total_selling": s.custom_working_total_selling,
 						 "custom_approved_margin_percent": s.custom_working_margin_percent, "custom_approved_by": me,
-						 "custom_approved_on": now, "custom_last_decision_reason": reason or "Approved by the assigned immediate manager."}
+						 "custom_approved_on": now, "custom_last_decision_reason": reason or "Approved by the assigned approver."}
 			elif action == "Return for Rework":
 				new_state = "Returned for Rework"
 				patch = {"custom_approval_state": new_state, "custom_last_decision_reason": reason}
@@ -194,7 +194,7 @@ def dcs_screen4(args):
 		s = frappe.get_doc("Deal Cost Sheet", dcs_name)
 		s.check_permission("read")
 
-		result["authority"] = "Immediate Manager" if is_approver == 1 else ("Commercial Controller" if is_cc == 1 else "Viewer")
+		result["authority"] = ("Mohan" if route_for(s).get("approval_policy") == "Mohan" else "Immediate Manager") if is_approver == 1 else ("Commercial Controller" if is_cc == 1 else "Viewer")
 
 		req = s.custom_approval_required
 		state = s.custom_approval_state
@@ -268,6 +268,10 @@ def dcs_screen4(args):
 			"margin_gate": s.custom_margin_gate, "margin_gate_reason": s.custom_margin_gate_reason,
 			"margin_gate_note": "Manager approval records an exception for this exact commercial position. The below-floor warning remains visible; delivery release conditions remain separate.",
 		}
+		if route.get("approval_policy") == "Mohan":
+			result["why"]["policy_basis"] = "Mohan is the sole approver for commercial exceptions, including revisions he initiates. Approval is required below 20% gross margin or when another approval trigger applies. Concession above 26% cannot be authorised. Recorded decisions remain unchanged."
+			result["why"]["approval_reason"] = (s.custom_approval_reason or "").replace("immediate manager", "Mohan")
+			result["why"]["margin_gate_reason"] = (s.custom_margin_gate_reason or "").replace("immediate-manager", "Mohan")
 
 		since = s.custom_approved_revision_no or 0
 		revs = frappe.get_all(

@@ -7,6 +7,8 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 
 def execute():
+    from bsgroup.patches.v0_1.quotation_won_requirements import ensure_schema
+    ensure_schema()
     from bsgroup.procurement_journals import CATEGORIES
     seed_account_categories = not frappe.db.exists("Custom Field", "Account-custom_bsp_cash_category")
     def field(name, label, kind="Data", **kw):
