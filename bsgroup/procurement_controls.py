@@ -116,15 +116,16 @@ def meaningful_reason(value):
 
 
 def validate_supplier_details(doc):
-    if not doc.contact_person or not doc.contact_display:
-        frappe.throw("The selected supplier has no usable contact on this PO. Add or select the supplier contact, then send for approval.")
-    linked_records = [("Contact", doc.contact_person)]
-    if doc.supplier_address:
-        linked_records.append(("Address", doc.supplier_address))
-    for doctype, name in linked_records:
-        if not frappe.db.exists("Dynamic Link", dict(parenttype=doctype, parent=name,
-                                link_doctype="Supplier", link_name=doc.supplier)):
-            frappe.throw("The PO address and contact must belong to the selected supplier.")
+    # Supplier contact and address are helpful operational details, but neither
+    # blocks an otherwise valid procurement approval.
+    if doc.supplier_address and not frappe.db.exists(
+            "Dynamic Link", dict(parenttype="Address", parent=doc.supplier_address,
+                                 link_doctype="Supplier", link_name=doc.supplier)):
+        frappe.throw("The selected PO address does not belong to this supplier.")
+    if doc.contact_person and not frappe.db.exists(
+            "Dynamic Link", dict(parenttype="Contact", parent=doc.contact_person,
+                                 link_doctype="Supplier", link_name=doc.supplier)):
+        frappe.throw("The selected PO contact does not belong to this supplier.")
     if not doc.taxes_and_charges:
         frappe.throw("Select an explicit purchase tax template, including the applicable zero-tax treatment.")
     template = frappe.get_doc("Purchase Taxes and Charges Template", doc.taxes_and_charges)
