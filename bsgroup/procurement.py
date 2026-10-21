@@ -539,7 +539,53 @@ def before_cancel(doc, method=None):
 
 def before_trash(doc, method=None):
     if doc.get("custom_bsp_managed"):
+        if manual_draft(doc):
+            require_purchaser()
+            lock_request(doc.name)
+            if not manual_draft(frappe.get_doc(MR, doc.name)):
+                fail("This PR is no longer a manual draft. Refresh before continuing.")
+            if frappe.db.exists(PO, {"custom_bsp_material_request": doc.name}):
+                fail("A PR with linked Purchase Orders cannot be deleted.")
+            return
         fail("Keep the audit trail: withdraw or cancel BS Procurement records instead of deleting them.")
+
+
+def manual_draft(doc):
+    return (doc.doctype == MR and doc.get("custom_bsp_managed") and doc.docstatus == 0
+            and (doc.get("workflow_state") or "Draft") == "Draft"
+            and not doc.get("custom_bsp_source_snapshot")
+            and not doc.get("custom_bsp_quotation") and not doc.get("custom_deal_cost_sheet"))
+
+
+@frappe.whitelist(methods=["POST"])
+@transaction_conflicts
+def delete_request(name, modified):
+    require_purchaser()
+    doc = load(MR, name, "delete", modified)
+    if not manual_draft(doc):
+        fail("Only a manual PR in Draft can be deleted.")
+    with operation("delete_draft"):
+        frappe.delete_doc(MR, doc.name)
+    return {"deleted": doc.name}
+
+
+@frappe.whitelist(methods=["POST"])
+@transaction_conflicts
+def clone_request(name, key):
+    require_purchaser()
+    source = load(MR, name)
+    if (not source.custom_bsp_managed or source.get("custom_bsp_source_snapshot")
+            or source.get("custom_bsp_quotation") or source.get("custom_deal_cost_sheet")):
+        fail("Only manual PRs can be cloned.")
+    # A new requisition needs its own evidence and approval, especially recurring bills.
+    result = create_request(dict(key=key, company=source.company, title=source.title,
+        schedule_date=max(str(source.schedule_date or nowdate()), nowdate()),
+        project=source.get("custom_project"), customer=source.get("custom_bsp_customer"),
+        customer_po=source.get("custom_bsp_customer_po"),
+        supporting={"kind": parse(source.get("custom_bsp_request_evidence")).get("kind", "purchase")},
+        items=[dict(item_code=r.item_code, description=r.description, qty=r.qty, rate=r.rate, uom=r.uom,
+                    warehouse=r.warehouse) for r in source.items]))
+    return result
 
 
 def before_print(doc, method=None, *args, **kwargs):
@@ -564,6 +610,8 @@ def protect_file(doc, method=None):
     if not frappe.db.get_value(target.attached_to_doctype, target.attached_to_name, "custom_bsp_managed"):
         return
     parent = frappe.get_doc(target.attached_to_doctype, target.attached_to_name)
+    if op() and op()[0] == "delete_draft" and manual_draft(parent):
+        return
     if target.attached_to_doctype == MR:
         from bsgroup.procurement_requests import file_references
         references = file_references(parse(parent.get("custom_bsp_request_evidence")))
@@ -642,7 +690,7 @@ def create_request(payload):
             fail("Select enabled purchasable items.")
         uom = row.get("uom") or item.stock_uom
         doc.append("items", dict(item_code=item.name, item_name=item.item_name,
-                   description=item.description or item.item_name,
+                   description=text(row.get("description") or item.description or item.item_name),
                    qty=number(row.get("qty"), "Requested quantity"),
                    rate=number(row.get("rate", 0), "Budget rate", zero=True),
                    uom=uom, stock_uom=item.stock_uom, conversion_factor=uom_factor(item.name, uom),
@@ -953,6 +1001,9 @@ def request_data(doc):
                 reason=doc.get("custom_bsp_reason") or "", items=items, orders=orders,
                 actions=actions, history=history(doc),
                 supporting=support_data(doc), manual=not bool(source),
+                canEdit=doc.docstatus == 0 and approval == "Draft" and purchaser() and doc.has_permission("write"),
+                canClone=not bool(source) and purchaser() and frappe.has_permission(MR, "create"),
+                canDelete=manual_draft(doc) and purchaser() and doc.has_permission("delete"),
                 canEditSupporting=not source and not doc.docstatus
                     and (doc.workflow_state or "Draft") in ("Draft", "Rejected")
                     and purchaser() and doc.has_permission("write"),
