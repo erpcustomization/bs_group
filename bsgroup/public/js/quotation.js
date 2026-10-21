@@ -64,7 +64,7 @@ frappe.ui.form.on('Quotation Item', {
 });
 
 function set_lead_name(frm) {
-    // Submitted quotation identity must remain frozen while recording Won / PO.
+    // Submitted quotation identity remains frozen while recording Won / PO.
     if (frm.doc.docstatus !== 0 || !frm.doc.party_name) return;
 
     if (frm.doc.quotation_to === "Lead") {
@@ -298,32 +298,83 @@ frappe.ui.form.on(cur_frm ? cur_frm.doctype : 'Quotation', {
     if (document.documentElement.classList.contains('lite-theme')) colorize();
   }, 1500);
 })();
-// Customer purchase order and sales-to-procurement handoff.
-frappe.ui.form.on('Quotation', {
+
+// The quotation's sales handover creates a standard Material Request.
+frappe.ui.form.on("Quotation", {
     refresh(frm) {
         if (!frm.doc.custom_deal_cost_sheet) return;
-        const sent = Boolean(frm.doc.custom_purchase_request);
-        ['custom_customer_po', 'custom_customer_po_reference'].forEach(field => frm.set_df_property(field, 'read_only', sent));
-        if (sent) {
-            frm.add_custom_button(__('View Purchase Request'), () => frappe.set_route('Form', 'DCS Purchase Request', frm.doc.custom_purchase_request));
-            frm.set_intro(__('Sent to Procurement: {0}', [frappe.utils.escape_html(frm.doc.custom_purchase_request)]), 'green');
-        } else if (frm.doc.docstatus === 1 && frm.doc.custom_pipeline_stage === 'Won' && !frm.is_dirty()
-                && frappe.user.has_role(['Sales Manager','Commercial Controller','Managing Director'])) {
-            frm.add_custom_button(__('Send to Procurement'), () => {
-                if (frm.is_dirty()) { frappe.msgprint(__('Save the quotation before sending to procurement.')); return; }
-                frappe.call({method:'bsgroup.dcs.procurement.send_to_procurement', args:{quotation:frm.doc.name}, freeze:true,
-                    freeze_message:__('Preparing procurement documents…'), callback(r) {
-                        if (!r.message) return;
-                        frm.reload_doc();
-                        frappe.set_route('Form','DCS Purchase Request',r.message.name);
-                    }});
+        const request = frm.doc.custom_bsp_material_request;
+        const sent = Boolean(request || frm.doc.custom_purchase_request);
+        ["custom_customer_po", "custom_customer_po_reference"].forEach(
+            field => frm.set_df_property(field, "read_only", sent));
+        const open = name => {
+            frappe.route_options = {bsp_request: name};
+            frappe.set_route("bs-procurement");
+        };
+        if (request) {
+            frm.add_custom_button(__("View Purchase Requisition"), () => open(request));
+            frm.set_intro(__("Sent to Procurement: {0}", [frappe.utils.escape_html(request)]), "green");
+        } else if (frm.doc.docstatus === 1 && frm.doc.custom_pipeline_stage === "Won"
+                && !frm.is_dirty() && (frappe.session.user === "Administrator"
+                || frappe.user.has_role(["Sales Manager", "Commercial Controller", "Managing Director"]))) {
+            frm.add_custom_button(__("Send to Procurement"), async () => {
+                if (frm.is_dirty()) {
+                    frappe.msgprint(__("Save the quotation before sending to procurement."));
+                    return;
+                }
+                const response = await frappe.call({
+                    method:"bsgroup.dcs.procurement.handover_context",
+                    args:{quotation:frm.doc.name}, freeze:true
+                });
+                const data = response.message;
+                if (!data) return;
+                if (data.existing) { open(data.existing); return; }
+                const esc = frappe.utils.escape_html;
+                const rows = data.items.map(row => `<tr><td>${esc(row.item_code)}</td>
+                    <td>${row.qty} ${esc(row.uom)}</td><td>${format_currency(row.rate,data.currency)}</td></tr>`).join("");
+                const additional = data.resources || data.additional_charges
+                    ? `<p>${data.resources} labour/resource rows and ${data.additional_charges} additional charge rows
+                       remain in the attached costing evidence. Only the Item lines below become purchasing lines.</p>` : "";
+                const dialog = new frappe.ui.Dialog({
+                    title:__("Send to Procurement"),
+                    fields:[
+                        {fieldname:"summary",fieldtype:"HTML",options:
+                            `<p>Create a draft Purchase Requisition from ${esc(data.dcs)} · ${esc(data.revision)}.
+                            Procurement will review and request PR approval before creating Purchase Orders.</p>
+                            <p>Customer PO: ${esc(data.customer_po)}</p>
+                            <table class="table table-bordered"><thead><tr><th>Item</th><th>Quantity</th><th>Budget rate</th></tr></thead>
+                            <tbody>${rows}</tbody></table>${additional}
+                            <p>The awarded quotation, customer PO and costing sheet are attached privately.</p>`},
+                        {fieldname:"schedule_date",label:__("Required By"),fieldtype:"Date",reqd:1,default:data.required_by},
+                        {fieldname:"warehouse",label:__("Target Warehouse"),fieldtype:"Select",options:["",...data.warehouses],
+                         reqd:data.items.some(row=>row.is_stock_item)?1:0,
+                         default:data.warehouses.length===1?data.warehouses[0]:""}
+                    ],
+                    primary_action_label:__("Create Purchase Requisition"),
+                    async primary_action(values) {
+                        dialog.disable_primary_action();
+                        try {
+                            const result = await frappe.call({
+                                method:"bsgroup.dcs.procurement.send_to_procurement",
+                                args:{quotation:frm.doc.name,...values},freeze:true,
+                                freeze_message:__("Creating requisition and preserving sales documents…")
+                            });
+                            if (!result.message) return;
+                            dialog.hide();
+                            await frm.reload_doc();
+                            open(result.message.name);
+                        } finally { dialog.enable_primary_action(); }
+                    }
+                });
+                dialog.show();
             });
         }
     },
     custom_pipeline_stage(frm) {
-        if (frm.doc.custom_deal_cost_sheet && frm.doc.custom_pipeline_stage === 'Won' && !frm.doc.custom_customer_po) {
-            frappe.msgprint(__('Upload the Customer PO and enter its reference, then save to confirm Won.'));
-            frm.scroll_to_field('custom_customer_po_reference');
+        if (frm.doc.custom_deal_cost_sheet && frm.doc.custom_pipeline_stage === "Won"
+                && !frm.doc.custom_customer_po) {
+            frappe.msgprint(__("Upload the Customer PO and enter its reference, then save to confirm Won."));
+            frm.scroll_to_field("custom_customer_po_reference");
         }
     }
 });

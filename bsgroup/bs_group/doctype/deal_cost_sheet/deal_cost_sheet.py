@@ -9,6 +9,13 @@ from bsgroup.utils.party import apply_party_model, require_customer, slug
 
 
 class DealCostSheet(Document):
+	def get_permlevel_access(self, permission_type="write"):
+		levels = super().get_permlevel_access(permission_type)
+		from bsgroup.dcs.obligation import delivery_reader
+		if permission_type == "read" and delivery_reader() and 1 not in levels:
+			levels.append(1)
+		return levels
+
 	def _cancel(self):
 		self.flags.ignore_links = False
 		from bsgroup.dcs.presales_lineage import atomic_lifecycle
@@ -33,6 +40,8 @@ class DealCostSheet(Document):
 	def before_insert(self):
 		# Every insertion is a new commercial record, including Duplicate and API copies.
 		# Decisions and revision references belong to the original sheet's history.
+		from bsgroup.dcs.obligation import guard_amendment
+		guard_amendment(self)
 		reset_commercial_state(self)
 		dcs_company_default_insert(self)
 		dcs_one_active_guard_insert(self)
@@ -50,6 +59,8 @@ class DealCostSheet(Document):
 				self.set(f, fresh.get(f))
 
 	def before_save(self):
+		from bsgroup.dcs.obligation import guard_currency
+		guard_currency(self)
 		calculate_deal_financials(self)
 		dcs_governed_field_guard(self)
 		dcs_record_authority_guard(self)

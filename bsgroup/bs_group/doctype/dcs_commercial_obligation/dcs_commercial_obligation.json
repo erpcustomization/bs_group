@@ -1,0 +1,223 @@
+{
+ "doctype": "DocType",
+ "name": "DCS Commercial Obligation",
+ "module": "BS Group",
+ "autoname": "hash",
+ "engine": "InnoDB",
+ "track_changes": 0,
+ "allow_rename": 0,
+ "allow_copy": 0,
+ "index_web_pages_for_search": 0,
+ "show_name_in_global_search": 0,
+ "field_order": [
+  "dcs",
+  "currency",
+  "obligation_type",
+  "payee",
+  "agreement_reference",
+  "calculation_method",
+  "fixed_amount",
+  "percentage",
+  "payment_conditions",
+  "reason",
+  "revision",
+  "requested_by",
+  "status",
+  "approved_amount",
+  "approved_snapshot",
+  "finance_by",
+  "finance_on",
+  "md_by",
+  "md_on",
+  "decision_basis",
+  "accrued_amount",
+  "paid_amount",
+  "settlement_reference"
+ ],
+ "fields": [
+  {
+   "fieldname": "dcs",
+   "label": "Dcs",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "Deal Cost Sheet",
+   "reqd": 1
+  },
+  {
+   "fieldname": "currency",
+   "label": "Currency",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "Currency"
+  },
+  {
+   "fieldname": "obligation_type",
+   "label": "Obligation Type",
+   "fieldtype": "Select",
+   "read_only": 1,
+   "options": "Consulting\nPartner Fee\nOther"
+  },
+  {
+   "fieldname": "payee",
+   "label": "Payee",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "agreement_reference",
+   "label": "Agreement Reference",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "calculation_method",
+   "label": "Calculation Method",
+   "fieldtype": "Select",
+   "read_only": 1,
+   "options": "Fixed amount\nPercentage of customer selling"
+  },
+  {
+   "fieldname": "fixed_amount",
+   "label": "Fixed Amount",
+   "fieldtype": "Currency",
+   "read_only": 1,
+   "options": "currency",
+   "precision": "3"
+  },
+  {
+   "fieldname": "percentage",
+   "label": "Percentage",
+   "fieldtype": "Percent",
+   "read_only": 1,
+   "precision": "6"
+  },
+  {
+   "fieldname": "payment_conditions",
+   "label": "Payment Conditions",
+   "fieldtype": "Small Text",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reason",
+   "label": "Reason",
+   "fieldtype": "Small Text",
+   "read_only": 1
+  },
+  {
+   "fieldname": "revision",
+   "label": "Revision",
+   "fieldtype": "Int",
+   "read_only": 1
+  },
+  {
+   "fieldname": "requested_by",
+   "label": "Requested By",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "User"
+  },
+  {
+   "fieldname": "status",
+   "label": "Status",
+   "fieldtype": "Select",
+   "read_only": 1,
+   "options": "Draft\nPending Finance\nPending MD\nApproved\nRejected"
+  },
+  {
+   "fieldname": "approved_amount",
+   "label": "Approved Amount",
+   "fieldtype": "Currency",
+   "read_only": 1,
+   "options": "currency",
+   "precision": "3"
+  },
+  {
+   "fieldname": "approved_snapshot",
+   "label": "Approved Snapshot",
+   "fieldtype": "Code",
+   "read_only": 1,
+   "options": "JSON"
+  },
+  {
+   "fieldname": "finance_by",
+   "label": "Finance By",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "User"
+  },
+  {
+   "fieldname": "finance_on",
+   "label": "Finance On",
+   "fieldtype": "Datetime",
+   "read_only": 1
+  },
+  {
+   "fieldname": "md_by",
+   "label": "Md By",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "User"
+  },
+  {
+   "fieldname": "md_on",
+   "label": "Md On",
+   "fieldtype": "Datetime",
+   "read_only": 1
+  },
+  {
+   "fieldname": "decision_basis",
+   "label": "Decision Basis",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "accrued_amount",
+   "label": "Accrued Amount",
+   "fieldtype": "Currency",
+   "read_only": 1,
+   "options": "currency",
+   "precision": "3"
+  },
+  {
+   "fieldname": "paid_amount",
+   "label": "Paid Amount",
+   "fieldtype": "Currency",
+   "read_only": 1,
+   "options": "currency",
+   "precision": "3"
+  },
+  {
+   "fieldname": "settlement_reference",
+   "label": "Settlement Reference",
+   "fieldtype": "Data",
+   "read_only": 1
+  }
+ ],
+ "permissions": [
+  {
+   "role": "Sales User",
+   "read": 1,
+   "select": 1
+  },
+  {
+   "role": "Sales Manager",
+   "read": 1,
+   "select": 1
+  },
+  {
+   "role": "Commercial Controller",
+   "read": 1,
+   "select": 1
+  },
+  {
+   "role": "Managing Director",
+   "read": 1,
+   "select": 1
+  },
+  {
+   "role": "System Manager",
+   "read": 1,
+   "select": 1
+  }
+ ]
+}

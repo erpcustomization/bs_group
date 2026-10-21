@@ -169,19 +169,69 @@ def get_active_baseline(project):
 # duplicating that logic.
 # ---------------------------------------------------------------------------
 
+def purchase_row_commitment(row, billed_amt=None):
+	"""Open scope, or accepted scope on a closed BS PO, less billed value."""
+	cap = 1.0
+	if row.status == "Closed":
+		if not row.custom_bsp_managed:
+			return 0.0
+		cap = min(1, max(0, flt(row.received_qty) / flt(row.qty))) if row.qty else 0.0
+	billed = flt(row.billed_amt if billed_amt is None else billed_amt)
+	fraction = min(1, max(0, billed / flt(row.amount))) if row.amount else 0.0
+	return flt(row.base_net_amount) * max(0, cap - fraction)
+
+
 def get_purchase_committed_cost(project):
-	"""Committed purchase cost: submitted Purchase Orders not yet fully billed.
-	Actual purchase cost (billed/received) is already rolled up by ERPNext core
-	onto `Project.total_purchase_cost` - see get_actual_purchase_cost below."""
+	"""Unbilled PO net cost in company currency, matching Project actual cost.
+
+	Closed BS POs retain accepted-but-unbilled cost; only their unused scope is
+	released. Use each row's billed amount to release cost as invoices post.
+	Header grand totals include VAT and would double-count already billed POs.
+	"""
 	result = frappe.db.sql(
 		"""
-		SELECT COALESCE(SUM(po.base_grand_total), 0)
-		FROM `tabPurchase Order` po
-		WHERE po.project = %(project)s AND po.docstatus = 1 AND po.status != "Closed"
+		SELECT COALESCE(SUM(i.base_net_amount * GREATEST(0,
+			CASE WHEN po.status='Closed'
+				THEN LEAST(1, GREATEST(0, COALESCE(i.received_qty / NULLIF(i.qty, 0), 0)))
+				ELSE 1 END
+			- LEAST(1, GREATEST(0, COALESCE(i.billed_amt / NULLIF(i.amount, 0), 0))))), 0)
+		FROM `tabPurchase Order Item` i
+		JOIN `tabPurchase Order` po ON po.name=i.parent
+		WHERE COALESCE(NULLIF(i.project, ''), po.project) = %(project)s
+		  AND po.docstatus = 1 AND (po.status != 'Closed' OR po.custom_bsp_managed=1)
 		""",
 		{"project": project},
 	)
 	return flt(result[0][0]) if result else 0
+
+
+def purchase_submission_exposure(doc, project):
+	"""Net change in committed + actual cost before the current DB write."""
+	rows = [r for r in doc.items if (r.project or doc.project) == project]
+	amount = sum(flt(r.base_net_amount) for r in rows)
+	if doc.doctype == "Purchase Order":
+		return amount
+
+	# A PO-backed invoice replaces commitment. Only a price difference or an
+	# uncommitted invoice adds exposure; a credit note can restore commitment.
+	increments = {}
+	for row in rows:
+		if row.po_detail:
+			increments[row.po_detail] = increments.get(row.po_detail, 0) + flt(row.base_amount)
+	for name in sorted(increments):
+		found = frappe.db.sql("""
+			SELECT i.amount, i.billed_amt, i.base_net_amount, i.qty, i.received_qty,
+				po.conversion_rate, po.status, po.custom_bsp_managed
+			FROM `tabPurchase Order Item` i JOIN `tabPurchase Order` po ON po.name=i.parent
+			WHERE i.name=%s AND po.docstatus=1
+			  AND COALESCE(NULLIF(i.project,''),po.project)=%s FOR UPDATE
+		""", (name, project), as_dict=True)
+		if not found or not flt(found[0].amount):
+			continue
+		po = found[0]
+		new_billed = flt(po.billed_amt) + increments[name] / flt(po.conversion_rate or 1)
+		amount -= purchase_row_commitment(po) - purchase_row_commitment(po, new_billed)
+	return amount
 
 
 def get_actual_purchase_cost(project):
@@ -298,7 +348,7 @@ def get_project_cost_summary(project):
 # change independently of this module.
 # ---------------------------------------------------------------------------
 
-def check_cost_overrun_for_project(project, raise_from=None, extra_exposure=0):
+def check_cost_overrun_for_project(project, raise_from=None, extra_exposure=0, force_block=False):
 	"""Core, doctype-agnostic overrun check. Refreshes the active baseline's
 	`remaining_amount` and, if committed+actual exposure now exceeds it,
 	warns/blocks per `BS Group Settings.cost_overrun_policy`. A Project with
@@ -323,7 +373,7 @@ def check_cost_overrun_for_project(project, raise_from=None, extra_exposure=0):
 	if baseline_amount is None or exposure <= baseline_amount:
 		return
 
-	policy = frappe.db.get_single_value("BS Group Settings", "cost_overrun_policy") or "Warn"
+	policy = "Block" if force_block else frappe.db.get_single_value("BS Group Settings", "cost_overrun_policy") or "Warn"
 	if policy == "None":
 		return
 
@@ -357,17 +407,36 @@ def check_transaction_cost_overrun(doc, method=None):
 	business objective - not only after the fact via Project's own on_update
 	(which core ERPNext doesn't even trigger for a Purchase Order, since PO
 	submission never touches the Project document)."""
-	if not getattr(doc, "project", None):
+	# Rejecting an unchanged pending PO creates no commitment and must remain
+	# possible if another transaction has since put the project over budget.
+	if doc.doctype == "Purchase Order" and doc.get("custom_bsp_managed") and doc.docstatus == 0:
+		from bsgroup.procurement import op, po_values, encoded
+		old = doc.get_doc_before_save()
+		if (op() and op()[0] == "Reject" and old and old.docstatus == 0
+				and old.custom_bsp_approval_state == "Pending Approval"
+				and doc.custom_bsp_approval_state == "Rejected"
+				and encoded(po_values(old)) == encoded(po_values(doc))):
+			return  # Remaining hooks still enforce Mohan, the reason and the state transition.
+	projects = {getattr(doc, "project", None)}
+	if doc.doctype in ("Purchase Order", "Purchase Invoice"):
+		projects.update(row.project for row in doc.items)
+	projects.discard(None)
+	projects.discard("")
+	if not projects:
 		return
 
 	# Only count this document's own amount once it is actually being
 	# submitted (doc._action == "submit") - a plain draft save is not yet a
 	# commitment and shouldn't count toward exposure.
-	extra_exposure = 0
-	if getattr(doc, "_action", None) == "submit":
-		extra_exposure = flt(getattr(doc, "base_grand_total", None) or getattr(doc, "grand_total", 0))
-
-	check_cost_overrun_for_project(doc.project, raise_from=f"{doc.doctype} {doc.name}", extra_exposure=extra_exposure)
+	for project in sorted(projects):
+		extra_exposure = 0
+		if getattr(doc, "_action", None) == "submit":
+			if doc.doctype in ("Purchase Order", "Purchase Invoice"):
+				extra_exposure = purchase_submission_exposure(doc, project)
+			else:
+				extra_exposure = flt(getattr(doc, "base_grand_total", None) or getattr(doc, "grand_total", 0))
+		check_cost_overrun_for_project(project, raise_from=f"{doc.doctype} {doc.name}",
+			extra_exposure=extra_exposure, force_block=bool(doc.get("custom_bsp_managed")))
 
 
 def recalculate_project_baseline(doc, method=None):
@@ -378,10 +447,11 @@ def recalculate_project_baseline(doc, method=None):
 	later transaction happened to save and recompute it. Recalculates only;
 	deliberately no overrun message here since a cancel can only reduce
 	exposure, never create a new overrun."""
-	project = getattr(doc, "project", None)
-	if not project:
-		return
-	refresh_remaining_amount(project)
+	projects = {getattr(doc, "project", None)}
+	if doc.doctype in ("Purchase Order", "Purchase Invoice"):
+		projects.update(row.project for row in doc.items)
+	for project in sorted(p for p in projects if p):
+		refresh_remaining_amount(project)
 
 
 def recalculate_labor_preapproval_baseline(doc, method=None):

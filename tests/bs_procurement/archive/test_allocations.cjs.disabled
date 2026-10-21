@@ -1,0 +1,43 @@
+const {test}=require("node:test");
+const assert=require("node:assert/strict");
+const rules=require("../../bsgroup/bs_group/page/bs_procurement/bs_procurement.js");
+const req=()=>({status:"On Process",items:[{sourceId:"L1",qty:2,cost:1000,uom:"Nos"},{sourceId:"L2",qty:3,cost:400,uom:"Box"}],orders:[]});
+const po=(id,sourceId,qty,status="Draft")=>({id,status,items:[{sourceId,qty,cost:sourceId==="L1"?1000:400,uom:sourceId==="L1"?"Nos":"Box"}]});
+test("one PR splits into independent supplier orders with allocated DCS budgets",()=>{
+ const r=req(),a=po("PO-1","L1",2),b=po("PO-2","L2",3);r.orders.push(a,b);
+ assert.deepEqual(rules.allocationErrors(r,a),[]);assert.deepEqual(rules.allocationErrors(r,b),[]);
+ assert.equal(rules.scopeBudget(a),2000);assert.equal(rules.scopeBudget(b),1200);
+ assert.equal(rules.remaining(r,"L1"),0);assert.equal(rules.remaining(r,"L2"),0);
+});
+test("draft and pending quantities block duplicate ordering; edits exclude their own reservation",()=>{
+ const r=req(),a=po("PO-1","L1",1,"Pending Approval");r.orders.push(a);
+ assert.equal(rules.remaining(r,"L1"),1);assert.equal(rules.remaining(r,"L1",a.id),2);
+ assert.ok(rules.allocationErrors(r,po("PO-2","L1",2)).length);
+ assert.deepEqual(rules.allocationErrors(r,po("PO-2","L1",1)),[]);
+});
+test("only approved orders advance purchasing status, independently of PR approval",()=>{
+ const r=req();assert.equal(rules.approval(r),"Approved");assert.equal(rules.status(r),"Ready for procurement");
+ const a=po("PO-1","L1",2);r.orders.push(a);assert.equal(rules.status(r),"Sourcing / PO preparation");
+ a.status="Pending Approval";assert.equal(rules.status(r),"Awaiting PO approval");
+ a.status="Approved";assert.equal(rules.status(r),"Partially ordered");
+ r.orders.push(po("PO-2","L2",3,"Approved"));assert.equal(rules.status(r),"Fully ordered");
+ assert.equal(rules.approval(r),"Approved");
+});
+test("cancelled drafts release quantities while rejected drafts reserve them for revision",()=>{
+ const r=req(),a=po("PO-1","L1",2,"Rejected");r.orders.push(a);assert.equal(rules.remaining(r,"L1"),0);
+ a.status="Cancelled";assert.equal(rules.remaining(r,"L1"),2);assert.equal(rules.status(r),"Ready for procurement");
+});
+test("unknown, duplicate and invalid quantity lines cannot be allocated",()=>{
+ const r=req();for(const qty of [0,-1,NaN,Infinity,3])assert.ok(rules.allocationErrors(r,po("bad","L1",qty)).length);
+ assert.ok(rules.allocationErrors(r,po("bad","missing",1)).length);
+ const a=po("bad","L1",1);a.items.push({...a.items[0]});assert.ok(rules.allocationErrors(r,a).length);
+});
+test("approved DCS unit costs and units cannot be silently changed",()=>{
+ const r=req(),a=po("PO-1","L1",1);a.items[0].cost=1;assert.ok(rules.allocationErrors(r,a).length);
+ a.items[0].cost=1000;a.items[0].uom="Box";assert.ok(rules.allocationErrors(r,a).length);
+});
+test("allocations stay within their own PR and partial quantities can be split",()=>{
+ const a=req(),b=req();a.orders.push(po("PO-1","L1",.5,"Approved"));
+ assert.equal(rules.remaining(a,"L1"),1.5);assert.equal(rules.remaining(b,"L1"),2);
+ assert.equal(rules.approvedQty(a,"L1"),.5);assert.equal(rules.approvedQty(b,"L1"),0);
+});

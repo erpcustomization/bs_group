@@ -92,6 +92,8 @@ def dcs_record_award(args):
 			result["retry_required"] = 1
 			return result
 		s = frappe.get_doc("Deal Cost Sheet", dcs_name, for_update=True)
+		from bsgroup.dcs.obligation import assert_clearance
+		assert_clearance(s)
 		req = s.custom_approval_required
 		appr = s.custom_approval_state
 		from bsgroup.dcs.commercial_authority import authorised_position

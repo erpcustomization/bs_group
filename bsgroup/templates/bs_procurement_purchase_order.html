@@ -1,0 +1,62 @@
+<style>
+.print-format { font-family: Arial, sans-serif; font-size: 10px; color: #243449; padding: 12mm; }
+.bsp-po-head { border-bottom: 3px solid #218570; padding-bottom: 16px; margin-bottom: 18px; }
+.bsp-po-head h1 { color: #163c57; font-size: 24px; margin: 0 0 8px; }
+.bsp-po-head h2 { font-size: 13px; font-weight: 600; margin: 0; }
+.bsp-po-meta { width: 100%; margin-bottom: 18px; }
+.bsp-po-meta td { width: 50%; vertical-align: top; padding: 5px 8px 5px 0; }
+.bsp-po-label { color: #627487; font-size: 9px; text-transform: uppercase; letter-spacing: .4px; }
+.bsp-po-lines { width: 100%; border-collapse: collapse; margin: 16px 0; table-layout: fixed; }
+.bsp-po-lines th { background: #eef5f3; padding: 9px 7px; text-align: left; color: #244638; }
+.bsp-po-lines td { padding: 10px 7px; border-bottom: 1px solid #dfe7e8; vertical-align: top; overflow-wrap: break-word; }
+.bsp-po-lines thead { display: table-header-group; }
+.bsp-po-lines tr { page-break-inside: avoid; }
+.bsp-po-num { text-align: right !important; }
+.bsp-po-summary { margin-left: auto; width: 49%; border-collapse: collapse; }
+.bsp-po-summary td { padding: 5px; }
+.bsp-po-grand td { border-top: 2px solid #218570; font-size: 13px; font-weight: bold; padding-top: 10px; }
+.bsp-po-block { margin-top: 18px; page-break-inside: avoid; }
+.bsp-po-terms { white-space: pre-wrap; margin-top: 5px; line-height: 1.5; }
+.bsp-po-footer { border-top: 1px solid #dfe7e8; margin-top: 22px; padding-top: 8px; font-size: 9px; color: #627487; }
+</style>
+<div class="bsp-po-head">
+  {% set audit = json.loads(doc.custom_bsp_history or "[]") %}
+  {% set approvals = audit | selectattr("action", "equalto", "Approved") | list %}
+  {% set submissions = audit | selectattr("action", "equalto", "Pending Approval") | list %}
+  {% set submission = submissions[-1].get("snapshot", {}) if submissions else {} %}
+  <h1>Purchase Order</h1>
+  <h2>{{ doc.company | e }}</h2>
+  <div style="margin-top:10px"><strong>{{ doc.name | e }}</strong> · Approved</div>
+</div>
+<table class="bsp-po-meta">
+  <tr><td><div class="bsp-po-label">Supplier</div><strong>{{ (doc.supplier_name or doc.supplier) | e }}</strong></td>
+      <td><div class="bsp-po-label">Order date / required by</div>{{ doc.get_formatted("transaction_date") | e }} / {{ doc.get_formatted("schedule_date") | e }}</td></tr>
+  <tr><td><div class="bsp-po-label">Supplier address</div>{{ (doc.address_display or "Not specified") | replace("<br>", ", ") | striptags | e }}</td>
+      <td><div class="bsp-po-label">Purchase requisition</div>{{ (doc.custom_bsp_material_request or "") | e }}</td></tr>
+  <tr><td><div class="bsp-po-label">Contact</div>{{ (doc.contact_display or "") | striptags | e }}<br>{{ (doc.contact_email or "") | e }} {{ (doc.contact_mobile or "") | e }}</td>
+      <td><div class="bsp-po-label">Currency / material group</div>{{ doc.currency | e }} / {{ (doc.custom_bsp_group or "") | e }}</td></tr>
+  <tr><td><div class="bsp-po-label">Supplier tax registration</div>{{ (submission.get("supplier_tax_id") or doc.get("tax_id") or "Not recorded / not registered") | e }}</td>
+      <td><div class="bsp-po-label">Company tax registration</div>{{ (submission.get("company_tax_id") or "Not recorded") | e }}</td></tr>
+  <tr><td><div class="bsp-po-label">Tax treatment</div>{{ (doc.taxes_and_charges or "Legacy approval — tax treatment not recorded") | e }}</td>
+      <td><div class="bsp-po-label">Approved by / date</div>{% if approvals %}{{ approvals[-1].actor | e }}<br>{{ approvals[-1].at | e }}{% else %}Legacy approval — see audit history{% endif %}</td></tr>
+  {% if doc.billing_address_display %}
+  <tr><td colspan="2"><div class="bsp-po-label">Company billing address</div>{{ doc.billing_address_display | replace("<br>", ", ") | striptags | e }}</td></tr>
+  {% endif %}
+</table>
+<table class="bsp-po-lines">
+  <thead><tr><th style="width:6%">#</th><th style="width:42%">Item / description</th><th class="bsp-po-num" style="width:9%">Qty</th><th style="width:9%">UOM</th><th class="bsp-po-num" style="width:17%">Unit price</th><th class="bsp-po-num" style="width:17%">Amount</th></tr></thead>
+  <tbody>{% for row in doc.items %}
+  <tr><td>{{ row.idx }}</td><td><strong>{{ row.item_code | e }}</strong><br>{{ (row.description or row.item_name or "") | striptags | e }}</td>
+    <td class="bsp-po-num">{{ frappe.format(row.qty, {"fieldtype":"Float"}) | e }}</td><td>{{ row.uom | e }}</td>
+    <td class="bsp-po-num">{{ frappe.format(row.rate, {"fieldtype":"Currency", "options":doc.currency}) | e }}</td>
+    <td class="bsp-po-num">{{ frappe.format(row.amount, {"fieldtype":"Currency", "options":doc.currency}) | e }}</td></tr>
+  {% endfor %}</tbody>
+</table>
+<table class="bsp-po-summary">
+  <tr><td>Net total</td><td class="bsp-po-num">{{ doc.get_formatted("net_total") | e }}</td></tr>
+  <tr><td>Taxes and charges</td><td class="bsp-po-num">{{ doc.get_formatted("total_taxes_and_charges") | e }}</td></tr>
+  {% if doc.discount_amount %}<tr><td>Additional discount</td><td class="bsp-po-num">{{ doc.get_formatted("discount_amount") | e }}</td></tr>{% endif %}
+  <tr class="bsp-po-grand"><td>Grand total ({{ doc.currency | e }})</td><td class="bsp-po-num">{{ doc.get_formatted("grand_total") | e }}</td></tr>
+</table>
+<div class="bsp-po-block"><div class="bsp-po-label">Payment terms and conditions</div><div class="bsp-po-terms">{{ (doc.terms or "") | replace("<br>", "\n") | striptags | e }}</div></div>
+<div class="bsp-po-footer">Purchase Order {{ doc.name | e }} · Purchase Requisition {{ (doc.custom_bsp_material_request or "") | e }}</div>

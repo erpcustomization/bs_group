@@ -2721,12 +2721,13 @@ function render_summary_dashboard(frm) {
         ['custom_negotiation_html','custom_approval_html','custom_award_history_html','custom_handover_html'].forEach(function(name) {
             dcs_set_html(frm,name,'<div class="dcs-quiet">Available after the sheet is submitted.</div>');
         });
-        dcs_render_draft_summary(frm, field); return;
+        dcs_render_draft_summary(frm, field); dcs_obligation_render(frm); return;
     }
     if (frm.__dcs_docname && frm.__dcs_docname !== frm.doc.name) frm.__dcs = {};
     var state=frm.__dcs || {}, s2=state.s2 || {}, s5=state.s5 || {};
     if (s2.ok !== 1 || s2.projection !== 'commercial') {
         field.$wrapper.html('<div class="dcs-panel dcs-quiet">' + dcs_esc(s2.error || 'Commercial evaluation is not available in this view.') + '</div>');
+        dcs_obligation_render(frm);
         return;
     }
     var d=frm.doc, bridge=s2.margin_bridge, p=dcs_effective_position(frm,s5);
@@ -2774,6 +2775,7 @@ function render_summary_dashboard(frm) {
         + '<p class="dcs-quiet">Commercial approval and delivery release are separate decisions.</p></div></aside></div>'
         + '<div class="dcs-next"><span class="dcs-eyebrow">NEXT ACTION</span><div><strong>'+esc(next.label)+'</strong><p>'+esc(next.note)+'</p></div></div></div>';
     field.$wrapper.html(html);
+    dcs_obligation_render(frm);
 }
 
 // Presentation only; server services remain the authority for every mutation.
@@ -3129,6 +3131,10 @@ function dcs_load(frm) {
 function dcs_headline(frm, s5) {
     dcs_visual_styles(frm);
     if (!s5.living || s5.ok !== 1) {
+        if (((frm.__dcs || {}).s2 || {}).ok === 1) {
+            frm.dashboard.set_headline('<div class="dcs-compact">Delivery financial position · Commercial actions require the assigned approver.</div>');
+            return;
+        }
         var routing=((frm.__dcs || {}).s4 || {});
         if (routing.projection === 'approval-routing') {
             var route=routing.manager_route || {}, deal=routing.deal || {};
@@ -3333,6 +3339,7 @@ function dcs_dialog(frm, title, fields, primary_label, handler) {
 }
 
 function dcs_buttons(frm, s3, s4, s5) {
+    dcs_obligation_buttons(frm);
 	// Cancelled sheets are commercially dead - suppress all mutating actions.
 	if (frm.doc.docstatus === 2) { return; }
 	var cap = s3.capability || {}, auth = s5.authority || {}, st = s5.states || {}, lv = s5.living || {};
@@ -3723,3 +3730,131 @@ frappe.ui.form.on('Deal Cost Sheet', {
     refresh:dcs_company_identity,
     company:dcs_company_identity
 });
+
+// Phase C. Server projection controls whether these controls exist at all.
+function dcs_obligation_call(method, args) {
+    return frappe.call({method:'bsgroup.dcs.obligation.'+method,args:args}).then(function(r){return r.message;});
+}
+function dcs_obligation_render(frm) {
+    var s=frm.__obligation;
+    if(!s || !s.financials) return;
+    var field=frm.fields_dict.custom_deal_summary_dashboard;
+    // Locate the existing Overview panel without adding a DocField or permanent tab.
+    var parent=$(frm.wrapper).find('.dcs-overview').first();
+    $(frm.wrapper).find('.dcs-confidential').remove();
+    if(!field) return;
+    if(!parent.length) parent=field.$wrapper;
+    var f=s.financials, esc=dcs_esc, money=function(v){return esc(f.currency)+' '+format_number(v,null,f.currency==='OMR'?3:2);};
+    var rows=[['Customer selling',f.selling],['Delivery buying cost',f.delivery_cost],
+        ['Delivery contribution',f.delivery_contribution],['Forecast obligations',f.forecast_obligations],
+        ['Approved commitments',f.approved_commitments],['Approved net contribution',f.approved_net_contribution],['Forecast net contribution',f.forecast_net_contribution]];
+    var html='<section class="dcs-confidential" style="border-top:1px solid var(--border-color);margin-top:24px;padding-top:20px">'
+      +'<div class="dcs-eyebrow">RESTRICTED · FINANCE &amp; COMMERCIAL GOVERNANCE</div><h3>Commercial obligations</h3>'
+      +'<p>Review status: '+(s.obligations || []).map(function(o){return esc(o.status==='Approved'&&!o.current?'Review required':o.status);}).join(' · ')+'</p>'
+      +'<p class="text-muted small">Saved commercial position. Forecast is not an approved payment commitment.</p>'
+      +'<table class="table table-bordered"><tbody>'+rows.map(function(r){return '<tr><th>'+r[0]+'</th><td class="text-right">'+money(r[1])+'</td></tr>';}).join('')
+      +'<tr><th>Forecast net margin</th><td class="text-right">'+(f.forecast_net_margin===null?'Not priced':f.forecast_net_margin.toFixed(2)+'%')+'</td></tr></tbody></table>'
+      +'<button type="button" class="btn btn-default btn-sm">View Commercial Obligation</button></section>';
+    var section=$(html);section.find('button').on('click',function(){dcs_obligation_list(frm);});parent.append(section);
+}
+function dcs_obligation_refresh(frm) {
+    frm.__obligation=null;
+    $(frm.wrapper).find('.dcs-confidential').remove();
+    if(frm.is_new()) return Promise.resolve();
+    var name=frm.doc.name, token={};frm.__obligation_request=token;
+    return dcs_obligation_call('overview',{dcs:name}).then(function(s){
+        if(frm.doc.name!==name || frm.__obligation_request!==token) return;
+        frm.__obligation=s;dcs_obligation_render(frm);dcs_obligation_buttons(frm);
+    });
+}
+function dcs_obligation_buttons(frm) {
+    if(!frm.__obligation || !frm.__obligation.can_record) return;
+    frm.add_custom_button(__('Record Commercial Obligation'),function(){dcs_obligation_edit(frm);},__('Actions'));
+    if((frm.__obligation.obligations || []).length) {
+        frm.add_custom_button(__('View Commercial Obligation'),function(){dcs_obligation_list(frm);},__('Actions'));
+    }
+}
+function dcs_obligation_edit(frm, doc) {
+    doc=doc || {};
+    var fields=[
+        {fieldname:'obligation_type',fieldtype:'Select',label:'Obligation type',options:'Consulting\nPartner Fee\nOther',reqd:1,default:doc.obligation_type || 'Consulting'},
+        {fieldname:'payee',fieldtype:'Data',label:'Payee',reqd:1,default:doc.payee},
+        {fieldname:'agreement_reference',fieldtype:'Data',label:'Agreement reference',reqd:1,default:doc.agreement_reference},
+        {fieldname:'calculation_method',fieldtype:'Select',label:'Calculation method',options:'Fixed amount\nPercentage of customer selling',default:doc.calculation_method || 'Fixed amount',reqd:1},
+        {fieldname:'fixed_amount',fieldtype:'Currency',label:'Fixed amount ('+frm.doc.currency+')',precision:dcs_money_precision(frm),default:doc.fixed_amount},
+        {fieldname:'percentage',fieldtype:'Float',label:'Percentage of customer selling',precision:6,default:doc.percentage},
+        {fieldname:'payment_conditions',fieldtype:'Small Text',label:'Payment conditions',default:doc.payment_conditions},
+        {fieldname:'reason',fieldtype:'Small Text',label:'Reason for this revision',reqd:1}
+    ];
+    var d=new frappe.ui.Dialog({title:doc.name?'Revise commercial obligation':'Record commercial obligation',
+        fields:fields,primary_action_label:'Save forecast draft',primary_action:function(v){
+            d.disable_primary_action();
+            dcs_obligation_call('save_proposal',{dcs:frm.doc.name,name:doc.name,expected_revision:doc.revision,values:JSON.stringify(v)})
+            .then(function(r){d.hide();return dcs_obligation_refresh(frm).then(function(){dcs_obligation_detail(frm,r.name);});})
+            .finally(function(){d.enable_primary_action();});
+        }});
+    d.show();
+}
+function dcs_obligation_list(frm) {
+    dcs_obligation_refresh(frm).then(function(){
+        var rows=(frm.__obligation || {}).obligations || [], esc=dcs_esc;
+        if(!rows.length) return;
+        var d=new frappe.ui.Dialog({title:'Commercial obligations · Restricted',fields:[{fieldname:'list',fieldtype:'HTML'}]});
+        var box=d.fields_dict.list.$wrapper;
+        box.html('<table class="table"><thead><tr><th>Payee</th><th>Status</th><th>Forecast</th><th>Approved</th><th></th></tr></thead><tbody>'
+            +rows.map(function(r,i){return '<tr><td>'+esc(r.payee)+'</td><td>'+esc(r.status)+(r.status==='Approved'&&!r.current?' · Review required':'')
+            +'</td><td>'+dcs_money(frm,r.amount)+'</td><td>'+dcs_money(frm,r.approved_amount)+'</td><td><button class="btn btn-default btn-xs" data-index="'+i+'">Open</button></td></tr>';}).join('')+'</tbody></table>');
+        box.find('button').on('click',function(){var row=rows[Number($(this).attr('data-index'))];d.hide();dcs_obligation_detail(frm,row.name);});
+        d.show();
+    });
+}
+function dcs_obligation_detail(frm, name) {
+    dcs_obligation_call('detail',{name:name}).then(function(r){
+        var o=r.obligation, esc=dcs_esc, f=r.financials;
+        var d=new frappe.ui.Dialog({title:'Commercial obligation · '+o.status,size:'large',fields:[
+            {fieldname:'details',fieldtype:'HTML'},{fieldname:'history',fieldtype:'HTML'}]});
+        d.fields_dict.details.$wrapper.html('<p><b>'+esc(o.payee)+'</b> · '+esc(o.obligation_type)+' · '+esc(o.agreement_reference)+'</p>'
+          +'<p>'+esc(o.payment_conditions || '')+'</p><p>Forecast net contribution: <b>'+dcs_money(frm,f.forecast_net_contribution)+'</b> · Net margin: '
+          +(f.forecast_net_margin===null?'Not priced':f.forecast_net_margin.toFixed(2)+'%')+'</p>'
+          +'<p>Approved commitment: '+dcs_money(frm,o.approved_amount)+' · Revision '+o.revision+'</p>'
+          +(o.approved_snapshot?'<details><summary>Approved terms</summary><pre>'+esc(JSON.stringify(JSON.parse(o.approved_snapshot),null,2))+'</pre></details>':'')
+          +(o.status==='Approved'&&!r.current?'<p class="text-danger">Commercial position changed. A new approval is required.</p>':''));
+        d.fields_dict.history.$wrapper.html('<h4>Private approval history</h4><table class="table"><tbody>'
+          +r.history.map(function(e){return '<tr><td>R'+e.revision+'</td><td>'+esc(e.action)+'</td><td>'+esc(e.actor)+'</td><td>'+esc(e.reason)+'</td><td>'+esc(e.occurred_on)+'</td></tr>';}).join('')+'</tbody></table>');
+        $('<p>').text('Recorded accrued: '+dcs_money(frm,o.accrued_amount || 0)+' · Recorded paid: '+dcs_money(frm,o.paid_amount || 0)+' · Balance: '+dcs_money(frm,(o.approved_amount || 0)-(o.paid_amount || 0))).appendTo(d.fields_dict.details.$wrapper);
+        if(r.can_settle && o.status==='Approved' && r.current) {
+            d.add_custom_action('Record settlement evidence',function(){
+                frappe.prompt([{fieldname:'accrued_amount',fieldtype:'Currency',label:'Cumulative accrued',default:o.accrued_amount,reqd:1},
+                  {fieldname:'paid_amount',fieldtype:'Currency',label:'Cumulative paid',default:o.paid_amount || 0,reqd:1},
+                  {fieldname:'reference',fieldtype:'Data',label:'Evidence reference',reqd:1}],function(v){
+                    dcs_obligation_call('record_settlement',Object.assign({name:name,expected_revision:o.revision},v)).then(function(){d.hide();dcs_obligation_detail(frm,name);});
+                },'Record settlement evidence · Does not execute payment','Record');
+            });
+        }
+        var act=function(action){frappe.prompt([{fieldname:'reason',fieldtype:'Small Text',label:'Decision reason',reqd:1}],function(v){
+            dcs_obligation_call('transition',{name:name,action:action,expected_revision:o.revision,reason:v.reason})
+            .then(function(){d.hide();dcs_obligation_refresh(frm);dcs_obligation_detail(frm,name);});
+        },action,action);};
+        d.add_custom_action('Revise proposal',function(){d.hide();dcs_obligation_edit(frm,o);});
+        if(o.status==='Draft') d.set_primary_action('Submit for approval',function(){act('Submit');});
+        if(o.status==='Pending Finance'&&r.can_finance) d.set_primary_action('Finance approve',function(){act('Finance Approve');});
+        if(o.status==='Pending MD'&&r.can_md) d.set_primary_action('MD approve',function(){act('MD Approve');});
+        if((o.status==='Pending Finance'&&r.can_finance)||(o.status==='Pending MD'&&r.can_md)) {
+            d.add_custom_action('Reject',function(){act('Reject');});
+        }
+        var files=r.files || [];
+        var filebox=$('<div>').appendTo(d.fields_dict.details.$wrapper);
+        files.forEach(function(file){$('<p>').append($('<a target="_blank" rel="noopener">').attr('href',file.file_url).text(file.file_name+' · Private')).appendTo(filebox);});
+        var upload=$('<input type="file" aria-label="Private supporting document">').appendTo(filebox);
+        upload.on('change',function(){
+            var file=this.files[0];if(!file) return;
+            if(file.size>10000000) {frappe.msgprint('Choose a supporting file up to 10 MB.');return;}
+            var reader=new FileReader();reader.onload=function(){
+                dcs_obligation_call('upload_support',{name:name,filename:file.name,content:String(reader.result).split(',')[1]})
+                .then(function(){d.hide();dcs_obligation_detail(frm,name);});
+            };reader.readAsDataURL(file);
+        });
+        d.show();
+    });
+}
+frappe.ui.form.on('Deal Cost Sheet',{refresh:function(frm){dcs_obligation_refresh(frm);}});

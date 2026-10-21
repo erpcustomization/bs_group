@@ -6,7 +6,10 @@ from frappe.utils import flt
 def validate_quotation(doc, method=None):
     if doc.docstatus == 2 or not doc.get("custom_deal_cost_sheet"):
         return
-    sheet = frappe.get_doc("Deal Cost Sheet", doc.custom_deal_cost_sheet)
+    sheet = frappe.get_doc("Deal Cost Sheet", doc.custom_deal_cost_sheet, for_update=doc.docstatus == 1)
+    if doc.docstatus == 1:
+        from bsgroup.dcs.obligation import assert_clearance
+        assert_clearance(sheet)
     validate_position(sheet, doc)
     if doc.docstatus == 0:
         doc.custom_dcs_revision_reference = sheet.custom_revision_reference
@@ -49,6 +52,8 @@ def validate_sales_order(doc, method=None):
         if not quotation.get("custom_deal_cost_sheet"):
             continue
         sheet = frappe.get_doc("Deal Cost Sheet", quotation.custom_deal_cost_sheet, for_update=True)
+        from bsgroup.dcs.obligation import assert_clearance
+        assert_clearance(sheet)
         validate_position(sheet, quotation)
         from bsgroup.dcs.commercial_authority import authorised_position
         if not authorised_position(sheet):
@@ -71,6 +76,8 @@ def make_sales_order(source_name, target_doc=None, args=None):
     quotation.check_permission("read")
     if quotation.get("custom_deal_cost_sheet"):
         sheet = frappe.get_doc("Deal Cost Sheet", quotation.custom_deal_cost_sheet, for_update=True)
+        from bsgroup.dcs.obligation import assert_clearance
+        assert_clearance(sheet)
         validate_position(sheet, quotation)
         from bsgroup.dcs.commercial_authority import authorised_position
         if not authorised_position(sheet):
@@ -97,6 +104,9 @@ def guard_lineage(doc, method=None):
 
 @frappe.whitelist()
 def update_child_qty_rate(parent_doctype, trans_items, parent_doctype_name, child_docname="items"):
+    if parent_doctype == "Purchase Order":
+        from bsgroup.procurement import guard_item_update
+        guard_item_update(parent_doctype_name)
     # Core updates child rows directly before saving the parent; a document hook
     # alone cannot compare the original prices or protect them atomically.
     if parent_doctype == "Quotation":
