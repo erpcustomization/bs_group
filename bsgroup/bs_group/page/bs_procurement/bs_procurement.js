@@ -278,7 +278,10 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
     }
     if(action==="open-pr"){active=b.dataset.id;picks={};view="detail";await refresh(active);return;}
     if(action==="back-pr"){view="detail";picks={};await refresh(active);return;}
-    if(action==="open-po"){frappe.set_route("Form","Purchase Order",b.dataset.id);return;}
+    if(action==="open-po"){
+      active=b.dataset.request;po=b.dataset.id;view="po";dirty=false;
+      await refresh(active);return;
+    }
     if(["standard-mr","standard-po","source"].includes(action)){
       frappe.set_route("Form",action==="standard-mr"?"Material Request":action==="standard-po"?"Purchase Order":b.dataset.type,action==="standard-mr"?r.id:action==="standard-po"?p.id:b.dataset.name);return;
     }
