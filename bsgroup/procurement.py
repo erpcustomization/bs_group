@@ -885,6 +885,50 @@ def populate_supplier_details(doc):
 
 @frappe.whitelist(methods=["POST"])
 @transaction_conflicts
+def set_order_supplier_address(name, modified, supplier_address="", address=""):
+    """Select an existing supplier address or create one from the BS PO screen."""
+    require_purchaser()
+    doc = load(PO, name, "write", modified)
+    if not doc.custom_bsp_managed or doc.custom_bsp_approval_state not in ("Draft", "Rejected") or doc.docstatus:
+        fail("Only draft or rejected BS orders can be edited.")
+
+    values = parse(address, {})
+    if values.get("mode") == "new":
+        required = {"address_line1": "Address line 1", "city": "City", "country": "Country"}
+        missing = [label for field, label in required.items() if not text(values.get(field))]
+        if missing:
+            fail("Enter " + ", ".join(missing) + " to add the supplier address.")
+        created = frappe.get_doc({
+            "doctype": "Address", "address_title": doc.supplier, "address_type": "Billing",
+            "address_line1": text(values.get("address_line1")),
+            "address_line2": text(values.get("address_line2")), "city": text(values.get("city")),
+            "state": text(values.get("state")), "country": text(values.get("country")),
+            "pincode": text(values.get("pincode")), "phone": text(values.get("phone")),
+            "email_id": text(values.get("email")), "is_primary_address": 1,
+            "links": [{"link_doctype": "Supplier", "link_name": doc.supplier}],
+        })
+        created.insert()
+        supplier_address = created.name
+    else:
+        supplier_address = text(supplier_address)
+        if not supplier_address:
+            fail("Select a supplier address or add a new one.")
+        linked = frappe.db.exists("Dynamic Link", {
+            "parenttype": "Address", "parent": supplier_address,
+            "link_doctype": "Supplier", "link_name": doc.supplier,
+        })
+        if not linked:
+            fail("The selected address does not belong to this supplier.")
+
+    doc.supplier_address = supplier_address
+    doc.set_supplier_address()
+    with operation("set supplier address"):
+        doc.save()
+    return order_data(doc)
+
+
+@frappe.whitelist(methods=["POST"])
+@transaction_conflicts
 def order_action(name, modified, action, reason=""):
     require_purchaser()
     doc = load(PO, name, "write", modified)
@@ -932,7 +976,7 @@ def order_data(doc, source=None):
                 docstatus=doc.docstatus, request=source.name, company=doc.company,
                 currency=doc.currency, conversionRate=doc.conversion_rate,
                 companyCurrency=frappe.get_cached_value("Company", doc.company, "default_currency"),
-                supplier=doc.supplier, group=doc.custom_bsp_group or "",
+                supplier=doc.supplier, supplierAddress=doc.supplier_address or "", group=doc.custom_bsp_group or "",
                 contact=doc.contact_display or "", email=doc.contact_email or "",
                 phone=doc.contact_mobile or "", address=doc.address_display or "",
                 terms=doc.terms or "", delivery=str(doc.schedule_date or ""),
