@@ -592,9 +592,9 @@ doc_events["Account"]["validate"] = ([_prior] if isinstance(_prior, str) else li
     "bsgroup.procurement_journals.validate_account_category"]
 for _dt, _event, _method in (
     ("Supplier", "validate", "supplier_policy"),
-    ("Payment Entry", "validate", "validate_payment"),
-    ("Payment Entry", "before_submit", "validate_payment"),
-    ("Payment Entry", "before_update_after_submit", "validate_payment"),
+    # TEMP DISABLED (re-enable later): ("Payment Entry", "validate", "validate_payment"),
+    # TEMP DISABLED (re-enable later): ("Payment Entry", "before_submit", "validate_payment"),
+    # TEMP DISABLED (re-enable later): ("Payment Entry", "before_update_after_submit", "validate_payment"),
     ("Payment Entry", "before_cancel", "lock_payment_sources"),
     ("Journal Entry", "validate", "validate_payment"),
     ("Journal Entry", "before_submit", "validate_payment"),
