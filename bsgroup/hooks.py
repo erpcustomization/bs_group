@@ -584,6 +584,8 @@ for _dt, _event, _method in (
     _prior = doc_events.setdefault(_dt, {}).get(_event, [])
     doc_events[_dt][_event] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.procurement_accounts." + _method]
 extend_doctype_class.setdefault("Purchase Order", []).append("bsgroup.procurement_controls.ProcurementOrderMixin")
+extend_doctype_class.setdefault("Purchase Invoice", []).append("bsgroup.procurement_gl.PaymentOrderAccountingMixin")
+after_migrate.append("bsgroup.procurement_gl.ensure_schema")
 doctype_list_js["Purchase Order"] = "public/js/bs_procurement_purchase_order_list.js"
 
 # Supplier settlement policy applies in native forms, imports and reconciliation.

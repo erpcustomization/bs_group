@@ -332,6 +332,8 @@ def get_payment_order(name):
     result["approvedOn"] = str(invoice.get("custom_bsp_approved_on") or "")
     result["canPay"] = bool(is_approved(invoice) and flt(invoice.outstanding_amount)>0
                             and frappe.has_permission("Payment Entry", "create"))
+    from bsgroup.procurement_gl import accounting_data
+    result["accounting"] = accounting_data(invoice)
     return result
 
 
