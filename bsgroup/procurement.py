@@ -538,16 +538,25 @@ def before_cancel(doc, method=None):
 
 
 def before_trash(doc, method=None):
-    if doc.get("custom_bsp_managed"):
-        if manual_draft(doc):
-            require_purchaser()
-            lock_request(doc.name)
-            if not manual_draft(frappe.get_doc(MR, doc.name)):
-                fail("This PR is no longer a manual draft. Refresh before continuing.")
-            if frappe.db.exists(PO, {"custom_bsp_material_request": doc.name}):
-                fail("A PR with linked Purchase Orders cannot be deleted.")
-            return
-        fail("Keep the audit trail: withdraw or cancel BS Procurement records instead of deleting them.")
+    if not doc.get("custom_bsp_managed"):
+        return
+    if doc.doctype == MR and manual_draft(doc):
+        require_mohan(doc)
+        lock_request(doc.name)
+        if not manual_draft(frappe.get_doc(MR, doc.name)):
+            fail("This PR is no longer a manual draft. Refresh before continuing.")
+        if frappe.db.exists(PO, {"custom_bsp_material_request": doc.name}):
+            fail("A PR with linked Purchase Orders cannot be deleted.")
+        return
+    if doc.doctype == PO and draft_order(doc):
+        require_mohan(doc)
+        return
+    fail("Only Mohan can delete a draft BS Procurement PR or PO. Keep all reviewed records as audit history.")
+
+
+def require_mohan(doc):
+    if not approval_allowed(doc):
+        fail("Only Mohan Babu can delete BS Procurement draft records.", frappe.PermissionError)
 
 
 def manual_draft(doc):
@@ -557,15 +566,32 @@ def manual_draft(doc):
             and not doc.get("custom_bsp_quotation") and not doc.get("custom_deal_cost_sheet"))
 
 
+def draft_order(doc):
+    return (doc.doctype == PO and doc.get("custom_bsp_managed") and doc.docstatus == 0
+            and (doc.get("custom_bsp_approval_state") or "Draft") == "Draft")
+
+
 @frappe.whitelist(methods=["POST"])
 @transaction_conflicts
 def delete_request(name, modified):
-    require_purchaser()
     doc = load(MR, name, "delete", modified)
+    require_mohan(doc)
     if not manual_draft(doc):
         fail("Only a manual PR in Draft can be deleted.")
     with operation("delete_draft"):
         frappe.delete_doc(MR, doc.name)
+    return {"deleted": doc.name}
+
+
+@frappe.whitelist(methods=["POST"])
+@transaction_conflicts
+def delete_order(name, modified):
+    doc = load(PO, name, "delete", modified)
+    require_mohan(doc)
+    if not draft_order(doc):
+        fail("Only a BS Purchase Order in Draft can be deleted.")
+    with operation("delete_draft"):
+        frappe.delete_doc(PO, doc.name)
     return {"deleted": doc.name}
 
 
@@ -610,7 +636,7 @@ def protect_file(doc, method=None):
     if not frappe.db.get_value(target.attached_to_doctype, target.attached_to_name, "custom_bsp_managed"):
         return
     parent = frappe.get_doc(target.attached_to_doctype, target.attached_to_name)
-    if op() and op()[0] == "delete_draft" and manual_draft(parent):
+    if op() and op()[0] == "delete_draft" and (manual_draft(parent) or draft_order(parent)):
         return
     if target.attached_to_doctype == MR:
         from bsgroup.procurement_requests import file_references
@@ -999,6 +1025,7 @@ def order_data(doc, source=None):
                 reason=doc.custom_bsp_reason or "", history=history(doc),
                 editable=editable, canApprove=can_approve, approver=approver_details(),
                 canCancel=editable or (manager() and doc.docstatus==1 and doc.has_permission("cancel")),
+                canDelete=draft_order(doc) and approval_allowed(doc) and doc.has_permission("delete"),
                 items=[dict(sourceId=order_line_key(r), additional=not bool(r.material_request_item), item_code=r.item_code,
                             item_name=r.item_name, description=strip_html(r.description or r.item_name or ""), qty=r.qty, uom=r.uom,
                             rate=r.rate, conversionFactor=r.conversion_factor,
@@ -1081,7 +1108,7 @@ def request_data(doc):
                 supporting=support_data(doc), manual=not bool(source),
                 canEdit=doc.docstatus == 0 and approval == "Draft" and purchaser() and doc.has_permission("write"),
                 canClone=not bool(source) and purchaser() and frappe.has_permission(MR, "create"),
-                canDelete=manual_draft(doc) and purchaser() and doc.has_permission("delete"),
+                canDelete=manual_draft(doc) and approval_allowed(doc) and doc.has_permission("delete"),
                 canEditSupporting=not source and not doc.docstatus
                     and (doc.workflow_state or "Draft") in ("Draft", "Rejected")
                     and purchaser() and doc.has_permission("write"),
