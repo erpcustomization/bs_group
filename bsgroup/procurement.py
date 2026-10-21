@@ -574,24 +574,24 @@ def draft_order(doc):
 @frappe.whitelist(methods=["POST"])
 @transaction_conflicts
 def delete_request(name, modified):
-    doc = load(MR, name, "delete", modified)
+    doc = load(MR, name, "read", modified)
     require_mohan(doc)
     if not manual_draft(doc):
         fail("Only a manual PR in Draft can be deleted.")
     with operation("delete_draft"):
-        frappe.delete_doc(MR, doc.name)
+        frappe.delete_doc(MR, doc.name, ignore_permissions=True)
     return {"deleted": doc.name}
 
 
 @frappe.whitelist(methods=["POST"])
 @transaction_conflicts
 def delete_order(name, modified):
-    doc = load(PO, name, "delete", modified)
+    doc = load(PO, name, "read", modified)
     require_mohan(doc)
     if not draft_order(doc):
         fail("Only a BS Purchase Order in Draft can be deleted.")
     with operation("delete_draft"):
-        frappe.delete_doc(PO, doc.name)
+        frappe.delete_doc(PO, doc.name, ignore_permissions=True)
     return {"deleted": doc.name}
 
 
@@ -871,6 +871,18 @@ def save_order(name, modified, payload):
     doc.schedule_date = data.get("delivery") or doc.schedule_date
     doc.custom_bsp_group = data.get("group")
     doc.custom_bsp_comparison = encoded(normalize_comparison(data.get("comparison")))
+    if "taxTemplate" in data:
+        tax_template = text(data.get("taxTemplate"), 140)
+        if tax_template:
+            template = access(frappe.get_doc("Purchase Taxes and Charges Template", tax_template))
+            if template.disabled or template.company != doc.company:
+                fail("Select an enabled purchase tax template for this company.")
+            doc.taxes_and_charges = tax_template
+            doc.set("taxes", [])
+            doc.append_taxes_from_master("Purchase Taxes and Charges Template")
+        else:
+            doc.taxes_and_charges = None
+            doc.set("taxes", [])
     if data.get("currency"):
         access(frappe.get_doc("Currency", data["currency"]))
         doc.currency = data["currency"]
@@ -1018,6 +1030,7 @@ def order_data(doc, source=None):
                 phone=doc.contact_mobile or "", address=doc.address_display or "",
                 terms=doc.terms or "", delivery=str(doc.schedule_date or ""),
                 net=doc.net_total, taxes=doc.total_taxes_and_charges, grand=doc.grand_total,
+                taxTemplate=doc.taxes_and_charges or "",
                 na=bool(comparison.get("exception")), explanation=comparison.get("explanation",""),
                 selectionReason=comparison.get("selection_reason",""),
                 lineReasons=comparison.get("line_reasons", {}),
@@ -1025,7 +1038,7 @@ def order_data(doc, source=None):
                 reason=doc.custom_bsp_reason or "", history=history(doc),
                 editable=editable, canApprove=can_approve, approver=approver_details(),
                 canCancel=editable or (manager() and doc.docstatus==1 and doc.has_permission("cancel")),
-                canDelete=draft_order(doc) and approval_allowed(doc) and doc.has_permission("delete"),
+                canDelete=draft_order(doc) and approval_allowed(doc),
                 items=[dict(sourceId=order_line_key(r), additional=not bool(r.material_request_item), item_code=r.item_code,
                             item_name=r.item_name, description=strip_html(r.description or r.item_name or ""), qty=r.qty, uom=r.uom,
                             rate=r.rate, conversionFactor=r.conversion_factor,
@@ -1108,7 +1121,7 @@ def request_data(doc):
                 supporting=support_data(doc), manual=not bool(source),
                 canEdit=doc.docstatus == 0 and approval == "Draft" and purchaser() and doc.has_permission("write"),
                 canClone=not bool(source) and purchaser() and frappe.has_permission(MR, "create"),
-                canDelete=manual_draft(doc) and approval_allowed(doc) and doc.has_permission("delete"),
+                canDelete=manual_draft(doc) and approval_allowed(doc),
                 canEditSupporting=not source and not doc.docstatus
                     and (doc.workflow_state or "Draft") in ("Draft", "Rejected")
                     and purchaser() and doc.has_permission("write"),
