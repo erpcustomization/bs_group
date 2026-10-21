@@ -184,7 +184,7 @@ def po_values(doc):
                                   for r in doc.payment_schedule],
                 discount_amount=doc.discount_amount,
                 additional_discount_percentage=doc.additional_discount_percentage,
-                items=[{k:r.get(k) for k in ("item_code", "material_request",
+                items=[{k:r.get(k) for k in ("name", "item_code", "material_request",
                        "material_request_item", "qty", "uom", "conversion_factor",
                        "rate", "warehouse", "project", "cost_center", "expense_account", "schedule_date")}
                        for r in doc.items],
@@ -295,6 +295,25 @@ def lock_request(name):
     return frappe.get_doc(MR, name)
 
 
+def order_line_key(row):
+    return row.material_request_item or "additional:" + row.name
+
+
+def append_additional_item(doc, request, values):
+    item = access(frappe.get_doc("Item", values.get("item_code")))
+    if item.disabled or not item.is_purchase_item:
+        fail("Select an enabled purchasable Item.")
+    uom = values.get("uom") or item.stock_uom
+    warehouse = values.get("warehouse") or doc.get("set_warehouse")
+    doc.append("items", dict(item_code=item.name, item_name=item.item_name,
+        description=item.description or item.item_name,
+        qty=number(values.get("qty"), "Additional item quantity"),
+        rate=number(values.get("rate", 0), "Additional item rate", zero=True),
+        uom=uom, stock_uom=item.stock_uom, conversion_factor=uom_factor(item.name, uom),
+        warehouse=warehouse, project=request.get("custom_project"),
+        schedule_date=doc.schedule_date or nowdate()))
+
+
 def allocation(doc, request):
     """Serialize against the MR and use current reads, including draft reservations."""
     if request.docstatus != 1 or request.workflow_state != "Approved" or request.status in ("Stopped", "Cancelled"):
@@ -317,6 +336,28 @@ def allocation(doc, request):
             closed_stock_qty(row) if row.status == "Closed" else flt(row.stock_qty))
     seen = set()
     for row in doc.items:
+        if not row.material_request_item:
+            # Additional items belong to this PO's header PR, but do not consume
+            # or rewrite any of the approved PR's original item quantities.
+            if row.material_request:
+                fail("Additional items must not carry an unrelated Material Request link.")
+            if row.item_code in {r.item_code for r in request.items}:
+                fail("Select the matching PR line for an item already on this requisition.")
+            item = frappe.get_cached_doc("Item", row.item_code)
+            if item.disabled or not item.is_purchase_item:
+                fail("Select an enabled purchasable Item.")
+            number(row.qty, "Additional item quantity")
+            if abs(flt(row.conversion_factor) - uom_factor(row.item_code, row.uom)) > 1e-9:
+                fail("Select a configured purchase UOM for the additional item.")
+            if (row.project or "") != (request.get("custom_project") or ""):
+                fail("Additional items must use the purchase requisition's project.")
+            if item.is_stock_item and not row.warehouse:
+                fail("Select a receiving warehouse for the additional stock item.")
+            if row.warehouse:
+                warehouse = frappe.get_cached_doc("Warehouse", row.warehouse)
+                if warehouse.company != request.company or warehouse.disabled or warehouse.is_group:
+                    fail("Select an enabled receiving warehouse for the PR company.")
+            continue
         ref = source.get(row.material_request_item)
         if not ref or row.material_request != request.name or ref.name in seen:
             fail("Every PO line must reference a different line of this purchase requisition.")
@@ -329,8 +370,8 @@ def allocation(doc, request):
         if quantity > available + 1e-6:
             fail(f"Quantity for {ref.item_code} exceeds the unallocated PR quantity. "
                  f"Available: {max(0, available / flt(ref.conversion_factor))}.")
-    if not seen:
-        fail("Select at least one requisition line.")
+    if not doc.items:
+        fail("Select a PR line or add an additional item.")
 
 
 def validate_comparison(doc, request):
@@ -372,7 +413,7 @@ def validate_comparison(doc, request):
                 fail("Three quotations must contain three different documents; duplicate content is not allowed.")
             hashes.add(digest)
             for row in doc.items:
-                number(quote.get("rates", {}).get(row.material_request_item), "Quotation line rate")
+                number(quote.get("rates", {}).get(order_line_key(row)), "Quotation line rate")
         chosen = data.get("selected")
         if type(chosen) is not int or chosen not in range(3):
             fail("Choose one of the three supplier quotations.")
@@ -384,11 +425,13 @@ def validate_comparison(doc, request):
     if doc.currency == company_currency and flt(doc.conversion_rate) != 1:
         fail("The company-currency exchange rate must be 1.")
     for row in doc.items:
-        above = flt(row.rate)*flt(doc.conversion_rate)/flt(row.conversion_factor or 1) > baseline[row.material_request_item] + 1e-6
+        key = order_line_key(row)
+        additional = not row.material_request_item
+        above = flt(row.rate)*flt(doc.conversion_rate)/flt(row.conversion_factor or 1) > baseline.get(row.material_request_item, 0) + 1e-6
         changed = not data.get("exception") and abs(flt(row.rate) - flt(
-            data["quotes"][data["selected"]]["rates"][row.material_request_item])) > 1e-6
-        if (above or changed) and len(text(data.get("line_reasons", {}).get(row.material_request_item))) < 15:
-            fail(f"Explain each price variance: {row.item_code} needs its own reason of at least 15 characters.")
+            data["quotes"][data["selected"]]["rates"][key])) > 1e-6
+        if (additional or above or changed) and len(text(data.get("line_reasons", {}).get(key))) < 15:
+            fail(f"Explain each additional item or price variance: {row.item_code} needs its own reason of at least 15 characters.")
 
 
 def validate_order(doc, method=None):
@@ -646,7 +689,7 @@ def request_action(name, modified, action, reason=""):
 
 @frappe.whitelist(methods=["POST"])
 @transaction_conflicts
-def create_order(request, modified, supplier, lines, key):
+def create_order(request, modified, supplier, lines, key, additional_items=None):
     require_purchaser()
     key = creation_key(key)
     existing = frappe.db.get_value(PO, {"custom_bsp_key": key})
@@ -660,15 +703,22 @@ def create_order(request, modified, supplier, lines, key):
     if supplier_doc.disabled:
         fail("Select an enabled supplier.")
     quantities = parse(lines)
-    if not isinstance(quantities, dict) or not quantities or len(quantities) > 100:
-        fail("Select one or more requisition lines.")
+    additional = parse(additional_items, [])
+    if (not isinstance(quantities, dict) or not isinstance(additional, list)
+            or not quantities and not additional or len(quantities) + len(additional) > 100):
+        fail("Select PR lines or add additional items, up to 100 lines per PO.")
     for row, qty in quantities.items():
         number(qty, "PO quantity")
         if row not in {i.name for i in source.items}:
             fail("Invalid requisition line.")
     from erpnext.stock.doctype.material_request.material_request import make_purchase_order
-    doc = make_purchase_order(source.name, args=dict(
-        supplier=supplier, filtered_children=list(quantities), requested_qty=quantities))
+    if quantities:
+        doc = make_purchase_order(source.name, args=dict(
+            supplier=supplier, filtered_children=list(quantities), requested_qty=quantities))
+    else:
+        doc = frappe.new_doc(PO)
+        doc.update(dict(company=source.company, supplier=supplier,
+                        transaction_date=nowdate(), project=source.get("custom_project")))
     if {row.material_request_item for row in doc.items} != set(quantities):
         fail("One or more selected lines have no unallocated PR quantity. Refresh the requisition.")
     doc.custom_bsp_managed = 1
@@ -682,12 +732,36 @@ def create_order(request, modified, supplier, lines, key):
     for row in doc.items:
         row.schedule_date = max(str(row.schedule_date or nowdate()), nowdate())
     doc.schedule_date = max(str(doc.schedule_date), nowdate())
+    for values in additional:
+        if not isinstance(values, dict):
+            fail("Invalid additional item.")
+        append_additional_item(doc, source, values)
+    if additional:
+        doc.set_missing_values()
     # Check under the MR lock before ERPNext consumes a naming-series number.
     # A competing request then gets a useful allocation error, not a series race.
     allocation(doc, source)
     with operation("create"):
         doc.insert()
     return order_data(doc)
+
+
+@frappe.whitelist(methods=["POST"])
+@transaction_conflicts
+def add_order_item(name, modified, item_code, qty, rate=0, uom=None, warehouse=None):
+    require_purchaser()
+    doc = load(PO, name, "write", modified)
+    if not doc.custom_bsp_managed or doc.custom_bsp_approval_state not in ("Draft", "Rejected") or doc.docstatus:
+        fail("Additional items can only be added to draft or rejected BS Purchase Orders.")
+    source = access(lock_request(doc.custom_bsp_material_request))
+    if len(doc.items) >= 100:
+        fail("A PO can contain at most 100 lines.")
+    append_additional_item(doc, source, dict(item_code=item_code, qty=qty,
+                                           rate=rate, uom=uom, warehouse=warehouse))
+    doc.set_missing_values()
+    with operation("add item"):
+        doc.save()
+    return order_data(doc, source)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -699,7 +773,7 @@ def save_order(name, modified, payload):
         fail("Only draft or rejected BS orders can be edited.")
     data = parse(payload)
     incoming = data.get("items", [])
-    current = {r.material_request_item: r for r in doc.items}
+    current = {order_line_key(r): r for r in doc.items}
     if not incoming or len(incoming) > 100:
         fail("Keep at least one PO line.")
     seen = set()
@@ -799,16 +873,17 @@ def order_data(doc, source=None):
                 reason=doc.custom_bsp_reason or "", history=history(doc),
                 editable=editable, canApprove=can_approve, approver=approver_details(),
                 canCancel=editable or (manager() and doc.docstatus==1 and doc.has_permission("cancel")),
-                items=[dict(sourceId=r.material_request_item, item_code=r.item_code,
+                items=[dict(sourceId=order_line_key(r), additional=not bool(r.material_request_item), item_code=r.item_code,
                             description=r.item_name or r.description, qty=r.qty, uom=r.uom,
                             rate=r.rate, conversionFactor=r.conversion_factor,
                             uoms=sorted({frappe.get_cached_doc("Item", r.item_code).stock_uom}
                                 | {u.uom for u in frappe.get_cached_doc("Item", r.item_code).uoms if flt(u.conversion_factor)>0}),
                             uomFactors={frappe.get_cached_doc("Item", r.item_code).stock_uom: 1,
                                 **{u.uom: flt(u.conversion_factor) for u in frappe.get_cached_doc("Item", r.item_code).uoms if flt(u.conversion_factor)>0}},
-                            cost=flt(baseline[r.material_request_item].rate)
+                            cost=(flt(baseline[r.material_request_item].rate)
                                  / flt(baseline[r.material_request_item].conversion_factor or 1)
                                  * flt(r.conversion_factor or 1) / flt(doc.conversion_rate or 1))
+                                 if r.material_request_item in baseline else 0)
                        for r in doc.items])
 
 
