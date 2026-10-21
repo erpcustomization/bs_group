@@ -777,6 +777,7 @@ def create_order(request, modified, supplier, lines, key, additional_items=None)
     doc.currency = frappe.get_cached_value("Company", source.company, "default_currency")
     doc.conversion_rate = 1
     doc.schedule_date = source.schedule_date or nowdate()
+    populate_supplier_details(doc)
     for row in doc.items:
         row.schedule_date = max(str(row.schedule_date or nowdate()), nowdate())
     doc.schedule_date = max(str(doc.schedule_date), nowdate())
@@ -786,6 +787,7 @@ def create_order(request, modified, supplier, lines, key, additional_items=None)
         append_additional_item(doc, source, values)
     if additional:
         doc.set_missing_values()
+        populate_supplier_details(doc)
     # Check under the MR lock before ERPNext consumes a naming-series number.
     # A competing request then gets a useful allocation error, not a series race.
     allocation(doc, source)
@@ -858,9 +860,27 @@ def save_order(name, modified, payload):
         doc.contact_email = None
         doc.contact_mobile = None
         doc.run_method("set_missing_values")
+        populate_supplier_details(doc)
     with operation("save"):
         doc.save()
     return order_data(doc)
+
+
+def populate_supplier_details(doc):
+    """Use the supplier's configured primary address and contact on a new BS PO."""
+    if not doc.supplier:
+        return
+    from frappe.contacts.doctype.address.address import get_default_address
+    from frappe.contacts.doctype.contact.contact import get_default_contact, get_contact_details
+    if not doc.supplier_address:
+        doc.supplier_address = get_default_address("Supplier", doc.supplier)
+    if doc.supplier_address:
+        doc.set_supplier_address()
+    if not doc.contact_person:
+        doc.contact_person = get_default_contact("Supplier", doc.supplier)
+    if doc.contact_person:
+        for field, value in get_contact_details(doc.contact_person).items():
+            doc.set(field, value)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -880,6 +900,9 @@ def order_action(name, modified, action, reason=""):
         if action == "Cancel" and doc.docstatus == 1:
             doc.cancel()
         else:
+            # Repair older draft POs as well as newly created ones before validation.
+            if action == "Send for Approval":
+                populate_supplier_details(doc)
             doc.custom_bsp_approval_state = states[action]
             if action == "Approve":
                 doc.submit()

@@ -117,9 +117,9 @@ def meaningful_reason(value):
 
 def validate_supplier_details(doc):
     if not doc.supplier_address or not doc.address_display:
-        frappe.throw("Select the supplier address before sending the PO for approval.")
+        frappe.throw("The selected supplier has no usable address on this PO. Add or select the supplier address, then send for approval.")
     if not doc.contact_person or not doc.contact_display:
-        frappe.throw("Select the supplier contact before sending the PO for approval.")
+        frappe.throw("The selected supplier has no usable contact on this PO. Add or select the supplier contact, then send for approval.")
     for doctype, name in (("Address", doc.supplier_address), ("Contact", doc.contact_person)):
         if not frappe.db.exists("Dynamic Link", dict(parenttype=doctype, parent=name,
                                 link_doctype="Supplier", link_name=doc.supplier)):

@@ -104,9 +104,14 @@ def run():
     check("PR approval submits the standard Material Request",frappe.get_doc("Material Request",r["id"]).docstatus==1)
     check("Real manager identity remains in PR history",r["history"][-1]["actor"]==MANAGER)
     frappe.set_user(BUYER)
+    from qc_fixtures import supplier_details
+    supplier_fixture=frappe.new_doc("Purchase Order")
+    supplier_fixture.supplier="A plus typing"
+    supplier_details(supplier_fixture)
     po=new_order(p,r)
     standard=frappe.get_doc("Purchase Order",po["id"])
     check("PO uses standard source MR and MR-item links",standard.items[0].material_request==r["id"] and standard.items[0].material_request_item==r["items"][0]["sourceId"])
+    check("New PO fills the selected supplier address and contact", bool(standard.supplier_address and standard.address_display and standard.contact_person and standard.contact_display))
     check("Draft PO reserves quantity persistently",fresh(p,r)["items"][0]["available"]==2)
     blocked("Other PO cannot overallocate a reserved line",lambda:new_order(p,r,3),"unallocated")
     blocked("PO approval requires full commercial data",lambda:po_action(p,po,"Send for Approval"))
