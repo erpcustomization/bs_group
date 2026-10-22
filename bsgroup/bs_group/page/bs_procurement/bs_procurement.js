@@ -146,7 +146,7 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
     const amount=(value,currency)=>value===null?"—":esc(currency)+" "+money(value,currency);
     if(!settlement)return `<div class="bsp-heading"><div><h2>Payment Order</h2><p class="muted">Supplier / vendor invoices, approvals and payments.</p></div><div>${canCreateInvoice?btn("New Payment Order","new-payment-order","",true):""}<input data-search type="search" aria-label="Search payment orders" placeholder="Search invoice, supplier, PO or status"></div></div>${settlementRestricted?'<p class="bsp-callout">Purchase Invoice read permission is required to view payment orders.</p>':""}<div class="bsp-tablewrap"><table><thead><tr><th>No.</th><th>Payment Order / invoice</th><th>Supplier</th><th>Vendor invoice no.</th><th>Due date</th><th>Approval / payment status</th><th>Invoice total</th><th>Outstanding</th></tr></thead><tbody>${settlementOrders.map((o,i)=>`<tr data-search-text="${esc([o.id,o.supplier,o.bill,o.approval,o.status,...o.orders].join(" ").toLowerCase())}"><td data-serial>${i+1}</td><td>${btn(esc(o.id),"settlement",`data-id="${esc(o.id)}"`)}<small style="display:block">${esc(o.company)}</small></td><td>${esc(o.supplier)}</td><td>${esc(o.bill||"—")}</td><td>${esc(o.due||"—")}</td><td>${badge(o.approval||o.status)}<small style="display:block">${esc(o.status)}</small></td><td>${amount(o.total,o.currency)}</td><td>${amount(o.outstanding,o.outstandingCurrency)}</td></tr>`).join("")||'<tr><td colspan="8">No supplier invoices linked to BS Procurement yet.</td></tr>'}</tbody></table></div>${settlementMore?btn("Load more payment orders","settlement-more"):""}`;
     const s=settlement;
-    const link=(type,id)=>btn(esc(id),"source",`data-type="${esc(type)}" data-name="${esc(id)}"`);
+    const link=(type,id)=>type==="Purchase Receipt"?btn(esc(id),"open-receipt",`data-name="${esc(id)}"`):btn(esc(id),"source",`data-type="${esc(type)}" data-name="${esc(id)}"`);
     const notice=section=>section.restricted?'<p class="bsp-callout">Some linked records are restricted by your permissions.</p>':"";
     return `<div class="bsp-heading"><div><small>Payment Order · supplier invoice</small><h2>${esc(s.id)} ${badge(s.approval||s.status)}</h2><p class="muted">${esc(s.supplier)} · ${esc(s.company)}</p></div><div>${btn("All payment orders","settlement-list")}${btn("Open supplier invoice","source",`data-type="Purchase Invoice" data-name="${esc(s.id)}"`)}${s.actions.map(a=>btn(esc(a),"invoice-action",`data-value="${esc(a)}"`,a==="Approve")).join("")}${s.canPay?btn("Record payment","record-payment","",true):""}</div></div>
       <section class="bsp-card"><h3>Vendor invoice and approval</h3>${facts([["Approver",s.approver?.name],["Approver account",s.approver?.user],["Approved by",s.approvedBy],["Approved on",s.approvedOn],["Vendor invoice no.",s.bill],["Invoice date",s.date],["Due date",s.due],["Approval",s.approval],["Payment status",s.status],["Net amount",s.currency+" "+money(s.net,s.currency)],["Taxes and charges",s.currency+" "+money(s.taxes,s.currency)],["Invoice total",s.currency+" "+money(s.total,s.currency)],["Outstanding",s.outstanding===null?"—":s.outstandingCurrency+" "+money(s.outstanding,s.outstandingCurrency)]])}<p class="muted">This payment order uses the supplier invoice shown above. Supplier payments require this Payment Order to be approved by Mohan. Draft and cancelled invoices cannot be paid.</p></section>
@@ -305,9 +305,7 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
       if(dirty)receipt=await api("save_receipt",{name:receipt.id,modified:receipt.modified,payload:JSON.stringify({items:receipt.items})});
       receipt=await api("submit_receipt",{name:receipt.id,modified:receipt.modified});dirty=false;render();frappe.show_alert({message:"Purchase Receipt submitted",indicator:"green"});return;
     }
-    if(action==="source"&&b.dataset.type==="Purchase Receipt"){
-      receipt=await api("get_receipt",{name:b.dataset.name});view="receipt";dirty=false;render();return;
-    }
+    if(action==="open-receipt"||(action==="source"&&b.dataset.type==="Purchase Receipt")){`n      receipt=await api("get_receipt",{name:b.dataset.name});view="receipt";dirty=false;render();return;`n    }
     if(["standard-mr","standard-po","source"].includes(action)){
       frappe.set_route("Form",action==="standard-mr"?"Material Request":action==="standard-po"?"Purchase Order":b.dataset.type,action==="standard-mr"?r.id:action==="standard-po"?p.id:b.dataset.name);return;
     }
@@ -461,7 +459,7 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
   });
   root.addEventListener("click",async e=>{
     const b=e.target.closest("[data-action]");if(!b||b.disabled||busy)return;
-    const navigate=["list","orders","services","refresh","open-pr","back-pr","back-po","open-po","standard-mr","standard-po","source"].includes(b.dataset.action);
+    const navigate=["list","orders","services","refresh","open-pr","back-pr","back-po","open-po","open-receipt","standard-mr","standard-po","source"].includes(b.dataset.action);
     if(dirty&&navigate){frappe.confirm("Discard unsaved changes?",()=>{dirty=false;execute(b);});return;}
     await execute(b);
   });
