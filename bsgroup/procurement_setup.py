@@ -56,10 +56,10 @@ def execute():
                  read_only=1, allow_on_submit=1, print_hide=1, no_copy=1),
         ],
         "Purchase Receipt": [
-            field("delivery_note_file", "Supplier delivery note", "Attach", no_copy=1),
-            field("supplier_invoice_file", "Supplier invoice copy", "Attach", no_copy=1),
-            field("supplier_invoice_no", "Supplier invoice number", no_copy=1),
-            field("supplier_invoice_date", "Supplier invoice date", "Date", no_copy=1),
+            field("delivery_note_file", "Supplier delivery note", "Attach", no_copy=1, allow_on_submit=1),
+            field("supplier_invoice_file", "Supplier invoice copy", "Attach", no_copy=1, allow_on_submit=1),
+            field("supplier_invoice_no", "Supplier invoice number", no_copy=1, allow_on_submit=1),
+            field("supplier_invoice_date", "Supplier invoice date", "Date", no_copy=1, allow_on_submit=1),
         ],
         "Journal Entry": [
             field("cash_category", "Non-procurement cash category", "Select",

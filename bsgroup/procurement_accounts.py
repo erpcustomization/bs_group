@@ -423,20 +423,20 @@ def get_payment_order_sources():
         join `tabPurchase Receipt Item` pri on pri.parent=pr.name
         join `tabPurchase Order` po on po.name=pri.purchase_order
         where pr.docstatus=1 and pr.is_return=0 and po.custom_bsp_managed=1
-          and coalesce(pr.custom_bsp_delivery_note_file,'')!=''
-          and coalesce(pr.custom_bsp_supplier_invoice_file,'')!=''
-          and coalesce(pr.custom_bsp_supplier_invoice_no,'')!=''
-          and pr.custom_bsp_supplier_invoice_date is not null
           and not exists (select 1 from `tabPurchase Invoice Item` pii
               join `tabPurchase Invoice` pi on pi.name=pii.parent
               where pii.purchase_receipt=pr.name and pi.docstatus<2)""", pluck=True)
     if receipt_names and frappe.has_permission("Purchase Receipt", "read"):
         for receipt in frappe.get_list("Purchase Receipt",
                 filters={"name": ["in", receipt_names]},
-                fields=["name", "posting_date", "supplier", "custom_bsp_supplier_invoice_no",
-                        "custom_bsp_supplier_invoice_date", "custom_bsp_supplier_invoice_file"],
+                fields=["name", "posting_date", "supplier", "custom_bsp_delivery_note_file",
+                        "custom_bsp_supplier_invoice_no", "custom_bsp_supplier_invoice_date",
+                        "custom_bsp_supplier_invoice_file"],
                 limit_page_length=100, order_by="posting_date desc, creation desc"):
-            sources.append(dict(doctype="Purchase Receipt", name=receipt.name,
+            ready = bool(receipt.custom_bsp_delivery_note_file and
+                receipt.custom_bsp_supplier_invoice_file and receipt.custom_bsp_supplier_invoice_no and
+                receipt.custom_bsp_supplier_invoice_date)
+            sources.append(dict(doctype="Purchase Receipt", name=receipt.name, ready=ready,
                 label=f"Receipt {receipt.name} · {receipt.supplier} · {receipt.posting_date}",
                 bill=receipt.custom_bsp_supplier_invoice_no or "",
                 billDate=str(receipt.custom_bsp_supplier_invoice_date or ""),
@@ -453,7 +453,7 @@ def get_payment_order_sources():
             if any(not any(frappe.get_cached_value(
                     "Item", row.item_code, ["is_stock_item", "is_fixed_asset"]))
                     for row in doc.items):
-                sources.append(dict(doctype="Purchase Order", name=doc.name,
+                sources.append(dict(doctype="Purchase Order", name=doc.name, ready=True,
                     label=f"Service PO {doc.name} · {doc.supplier} · {doc.transaction_date}",
                     bill="", billDate="", invoiceFile=""))
 

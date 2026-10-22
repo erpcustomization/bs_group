@@ -1038,6 +1038,11 @@ def receipt_data(doc):
     access(doc)
     order = receipt_order(doc)
     editable = purchaser() and doc.docstatus == 0 and doc.has_permission("write")
+    evidence_missing = not all((doc.get("custom_bsp_delivery_note_file"),
+        doc.get("custom_bsp_supplier_invoice_file"), doc.get("custom_bsp_supplier_invoice_no"),
+        doc.get("custom_bsp_supplier_invoice_date")))
+    evidence_editable = bool(editable or (purchaser() and doc.docstatus == 1 and
+        evidence_missing and doc.has_permission("write")))
     def attached(url):
         if not url:
             return dict(file="", filename="", url="")
@@ -1050,6 +1055,7 @@ def receipt_data(doc):
         supplier=doc.supplier, date=str(doc.posting_date or ""),
         status="Submitted" if doc.docstatus == 1 else "Draft",
         editable=editable, canSubmit=editable and doc.has_permission("submit"),
+        evidenceEditable=evidence_editable, evidenceMissing=evidence_missing,
         deliveryNoteNo=doc.supplier_delivery_note or "",
         deliveryNote=attached(doc.get("custom_bsp_delivery_note_file")),
         supplierInvoiceNo=doc.get("custom_bsp_supplier_invoice_no") or "",
@@ -1091,30 +1097,36 @@ def save_receipt(name, modified, payload):
     require_purchaser()
     doc = load("Purchase Receipt", name, "write", modified)
     receipt_order(doc)
-    if doc.docstatus:
-        fail("Only a draft Purchase Receipt can be edited.")
+    if doc.docstatus not in (0, 1):
+        fail("Only a draft or submitted Purchase Receipt can receive evidence.")
     values = parse(payload)
-    incoming = {row.get("id"): row for row in values.get("items", []) if isinstance(row, dict)}
-    rows = []
-    for row in doc.items:
-        value = incoming.get(row.name)
-        if not value:
-            continue
-        qty = number(value.get("qty"), "Receipt quantity", zero=True)
-        if not qty:
-            continue
-        row.qty = row.received_qty = qty
-        warehouse = text(value.get("warehouse"), 140)
-        if warehouse:
-            access(frappe.get_doc("Warehouse", warehouse))
-            row.warehouse = warehouse
-        rows.append(row)
-    if not rows:
-        fail("Keep at least one receipt line with a positive quantity.")
-    doc.set("items", rows)
-    doc.supplier_delivery_note = text(values.get("deliveryNoteNo"), 140)
-    doc.custom_bsp_supplier_invoice_no = text(values.get("supplierInvoiceNo"), 140)
-    doc.custom_bsp_supplier_invoice_date = values.get("supplierInvoiceDate") or None
+    if doc.docstatus == 0:
+        incoming = {row.get("id"): row for row in values.get("items", []) if isinstance(row, dict)}
+        rows = []
+        for row in doc.items:
+            value = incoming.get(row.name)
+            if not value:
+                continue
+            qty = number(value.get("qty"), "Receipt quantity", zero=True)
+            if not qty:
+                continue
+            row.qty = row.received_qty = qty
+            warehouse = text(value.get("warehouse"), 140)
+            if warehouse:
+                access(frappe.get_doc("Warehouse", warehouse))
+                row.warehouse = warehouse
+            rows.append(row)
+        if not rows:
+            fail("Keep at least one receipt line with a positive quantity.")
+        doc.set("items", rows)
+        doc.supplier_delivery_note = text(values.get("deliveryNoteNo"), 140)
+    for fieldname, value in (
+        ("custom_bsp_supplier_invoice_no", text(values.get("supplierInvoiceNo"), 140)),
+        ("custom_bsp_supplier_invoice_date", values.get("supplierInvoiceDate") or None),
+    ):
+        if doc.docstatus == 1 and doc.get(fieldname) and str(doc.get(fieldname)) != str(value or ""):
+            fail("Submitted receipt evidence cannot be replaced. Cancel and amend the receipt to correct it.")
+        doc.set(fieldname, value)
     for key, label, fieldname in (
         ("deliveryNoteFile", "supplier delivery note", "custom_bsp_delivery_note_file"),
         ("supplierInvoiceFile", "supplier invoice", "custom_bsp_supplier_invoice_file"),
@@ -1125,6 +1137,8 @@ def save_receipt(name, modified, payload):
                 "attached_to_name": doc.name}, ["name", "is_private"], as_dict=True)
             if not file or not file.is_private:
                 fail(f"Upload the {label} privately against this Purchase Receipt.")
+        if doc.docstatus == 1 and doc.get(fieldname) and doc.get(fieldname) != url:
+            fail("Submitted receipt evidence cannot be replaced. Cancel and amend the receipt to correct it.")
         doc.set(fieldname, url or None)
     with operation("save receipt"):
         doc.save()
