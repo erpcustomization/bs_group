@@ -1040,6 +1040,10 @@ def create_receipt(order, modified):
             or purchase_order.custom_bsp_approval_state != "Approved"):
         fail("A submitted, Mohan-approved BS Purchase Order is required before receiving goods.")
     frappe.has_permission("Purchase Receipt", "create", throw=True)
+    existing = [row for row in get_order_receipts(purchase_order.name)
+                if row.get("status") == "Draft"]
+    if existing:
+        return existing[0]
     from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_receipt
     receipt = make_purchase_receipt(purchase_order.name)
     if not receipt.items:
@@ -1124,6 +1128,17 @@ def order_data(doc, source=None):
     state = "Cancelled" if doc.docstatus == 2 else doc.custom_bsp_approval_state or "Draft"
     editable = purchaser() and doc.has_permission("write") and state in ("Draft", "Rejected") and not doc.docstatus
     can_approve = manager() and state == "Pending Approval" and doc.has_permission("submit") and approval_allowed(doc)
+    receipts = []
+    if frappe.has_permission("Purchase Receipt", "read"):
+        receipt_names = frappe.get_all("Purchase Receipt Item", filters={"purchase_order": doc.name},
+                                       pluck="parent", distinct=True, order_by="modified desc")
+        for name in receipt_names:
+            receipt = load("Purchase Receipt", name)
+            receipts.append(dict(id=receipt.name,
+                                 status="Cancelled" if receipt.docstatus == 2 else
+                                        "Submitted" if receipt.docstatus == 1 else "Draft",
+                                 date=str(receipt.posting_date or "")))
+    draft_receipt = next((row["id"] for row in receipts if row["status"] == "Draft"), "")
     return dict(id=doc.name, modified=str(doc.modified), status=state,
                 erpStatus="Withdrawn" if state == "Cancelled" and not doc.docstatus else doc.status,
                 docstatus=doc.docstatus, request=source.name, company=doc.company,
@@ -1142,6 +1157,7 @@ def order_data(doc, source=None):
                 lineReasons=comparison.get("line_reasons", {}),
                 selectedQuote=comparison.get("selected"), quotes=quotes,
                 reason=doc.custom_bsp_reason or "", history=history(doc),
+                receipts=receipts, draftReceipt=draft_receipt,
                 editable=editable, canApprove=can_approve, approver=approver_details(),
                 canCancel=editable or (manager() and doc.docstatus==1 and doc.has_permission("cancel")),
                 canDelete=draft_order(doc) and approval_allowed(doc),
