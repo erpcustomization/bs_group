@@ -305,7 +305,9 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
       if(dirty)receipt=await api("save_receipt",{name:receipt.id,modified:receipt.modified,payload:JSON.stringify({items:receipt.items})});
       receipt=await api("submit_receipt",{name:receipt.id,modified:receipt.modified});dirty=false;render();frappe.show_alert({message:"Purchase Receipt submitted",indicator:"green"});return;
     }
-    if(action==="open-receipt"||(action==="source"&&b.dataset.type==="Purchase Receipt")){`n      receipt=await api("get_receipt",{name:b.dataset.name});view="receipt";dirty=false;render();return;`n    }
+    if(action==="open-receipt"||(action==="source"&&b.dataset.type==="Purchase Receipt")){
+      receipt=await api("get_receipt",{name:b.dataset.name});view="receipt";dirty=false;render();return;
+    }
     if(["standard-mr","standard-po","source"].includes(action)){
       frappe.set_route("Form",action==="standard-mr"?"Material Request":action==="standard-po"?"Purchase Order":b.dataset.type,action==="standard-mr"?r.id:action==="standard-po"?p.id:b.dataset.name);return;
     }
