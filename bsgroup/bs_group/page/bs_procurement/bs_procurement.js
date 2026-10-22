@@ -238,13 +238,19 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
       settlement.ledger=await glApi("get_ledger",{name:settlement.id});render();return;
     }
     if(b.dataset.action==="new-payment-order"){
+      const sources=await accountApi("get_payment_order_sources");
+      if(!sources.length){
+        frappe.msgprint("No eligible submitted receipt or approved service PO is available. For goods, open the approved Purchase Order in BS Procurement, use Receive goods, and submit the receipt first.");return;
+      }
+      const labels=sources.map(x=>x.label);
       const values=await ask([
-        {fieldname:"source_doctype",label:"Create from",fieldtype:"Select",options:"Purchase Receipt\nPurchase Order",default:"Purchase Receipt",reqd:1,
-         description:"Use a submitted receipt for goods or assets. Purchase Order is for non-stock services."},
-        {fieldname:"source_name",label:"Source document",fieldtype:"Dynamic Link",options:"source_doctype",reqd:1}
+        {fieldname:"source",label:"Create from",fieldtype:"Select",options:labels.join("\n"),default:labels[0],reqd:1,
+         description:"Submitted receipts and approved non-stock service POs only. New receipts are created from Purchase Order > Receive goods inside BS Procurement."}
       ],"New Payment Order","Prepare supplier invoice");
       if(!values)return;
-      const doc=await accountApi("prepare_payment_order",values);
+      const selected=sources.find(x=>x.label===values.source);
+      if(!selected){frappe.msgprint("Select an available BS Procurement source.");return;}
+      const doc=await accountApi("prepare_payment_order",{source_doctype:selected.doctype,source_name:selected.name});
       const synced=frappe.model.sync(doc);frappe.set_route("Form","Purchase Invoice",synced[0].name);return;
     }
     if(b.dataset.action==="record-payment"){

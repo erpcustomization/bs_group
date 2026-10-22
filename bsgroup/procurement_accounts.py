@@ -350,6 +350,42 @@ def invoice_action(name, modified, action):
 
 
 @frappe.whitelist()
+def get_payment_order_sources():
+    """Return selectable BS sources without exposing ERPNext's create-new links."""
+    frappe.has_permission("Purchase Invoice", "create", throw=True)
+    sources = []
+
+    receipt_names = frappe.db.sql("""select distinct pr.name
+        from `tabPurchase Receipt` pr
+        join `tabPurchase Receipt Item` pri on pri.parent=pr.name
+        join `tabPurchase Order` po on po.name=pri.purchase_order
+        where pr.docstatus=1 and pr.is_return=0 and po.custom_bsp_managed=1""", pluck=True)
+    if receipt_names and frappe.has_permission("Purchase Receipt", "read"):
+        for receipt in frappe.get_list("Purchase Receipt",
+                filters={"name": ["in", receipt_names]},
+                fields=["name", "posting_date", "supplier"],
+                limit_page_length=100, order_by="posting_date desc, creation desc"):
+            sources.append(dict(doctype="Purchase Receipt", name=receipt.name,
+                label=f"Receipt {receipt.name} · {receipt.supplier} · {receipt.posting_date}"))
+
+    if frappe.has_permission("Purchase Order", "read"):
+        orders = frappe.get_list("Purchase Order",
+            filters={"docstatus": 1, "custom_bsp_managed": 1,
+                     "custom_bsp_approval_state": "Approved"},
+            fields=["name", "transaction_date", "supplier"],
+            limit_page_length=100, order_by="transaction_date desc, creation desc")
+        for order in orders:
+            doc = access(frappe.get_doc("Purchase Order", order.name))
+            if any(not any(frappe.get_cached_value(
+                    "Item", row.item_code, ["is_stock_item", "is_fixed_asset"]))
+                    for row in doc.items):
+                sources.append(dict(doctype="Purchase Order", name=doc.name,
+                    label=f"Service PO {doc.name} · {doc.supplier} · {doc.transaction_date}"))
+
+    return sources
+
+
+@frappe.whitelist()
 def prepare_payment_order(source_doctype, source_name):
     frappe.has_permission("Purchase Invoice", "create", throw=True)
     if source_doctype not in ("Purchase Order", "Purchase Receipt"):
