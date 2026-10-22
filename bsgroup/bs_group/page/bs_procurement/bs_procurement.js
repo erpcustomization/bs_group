@@ -13,12 +13,13 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
   const key=()=>Array.from(crypto.getRandomValues(new Uint8Array(16)),n=>n.toString(16).padStart(2,"0")).join("");
   let poList=[],poMore=false,poLoaded=false,searchTimer=null,searchVersion=0;
   let requests=[],requestsLoaded=false,active=null,po=null,receipt=null,view="list",query="",canCreate=false,hasMore=false,user="",picks={},dirty=false,busy=false;
-  let settlementOrders=[],settlement=null,settlementMore=false,settlementRestricted=false,canCreateInvoice=false,canReadRequests=true;
+  let settlementOrders=[],paymentSources=[],settlement=null,settlementMore=false,settlementRestricted=false,canCreateInvoice=false,canReadRequests=true;
   async function refreshSettlement(name,more=false,draw=true){
     if(name)settlement=await accountApi("get_payment_order",{name});
     else{
       const data=await accountApi("get_payment_orders",{start:more?settlementOrders.length:0,page_length:50});
       settlementOrders=more?settlementOrders.concat(data.invoices):data.invoices;
+      if(!more)paymentSources=data.sources||[];
       settlementMore=data.has_more;settlementRestricted=data.restricted;canCreateInvoice=data.canCreate;user=data.user;canReadRequests=data.canReadRequests;settlement=null;
     }
     if(draw)render();
@@ -131,14 +132,14 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
   function receiptForm(){
     if(!receipt)return "<p>Loading Purchase Receipt…</p>";
     const x=receipt,disabled=x.editable?"":"disabled";
-    return `<div class="bsp-heading"><div><small>Against ${esc(x.order)}</small><h2>${esc(x.id)} ${badge(x.status)}</h2><p class="muted">Standard Purchase Receipt · managed within BS Procurement</p></div><div>${btn("Back to PO","back-po")}${x.editable?btn("Save draft receipt","save-receipt")+btn("Submit receipt","submit-receipt","",true):""}</div></div><p class="bsp-save-status muted">${dirty?"Unsaved changes":"Saved in ERPNext"}</p><section class="bsp-card"><h3>Receipt</h3>${facts([["Company",x.company],["Supplier",x.supplier],["Receipt date",x.date],["ERP status",x.status]])}<p class="muted">Record accepted delivered quantities. Submitting this standard ERPNext receipt updates stock and makes the received goods available for the Payment Order.</p></section><section class="bsp-card"><h3>Received items</h3><div class="bsp-tablewrap"><table><thead><tr><th>Item</th><th>Quantity received</th><th>UOM</th><th>Receiving warehouse</th></tr></thead><tbody>${x.items.map((r,i)=>`<tr><td>${esc(r.item)}<small style="display:block">${esc(r.description)}</small></td><td><input data-receipt-qty="${i}" type="number" min="0" step="any" value="${esc(r.qty)}" ${disabled}></td><td>${esc(r.uom)}</td><td><input data-receipt-warehouse="${i}" value="${esc(r.warehouse)}" ${disabled}></td></tr>`).join("")}</tbody></table></div><p class="muted">Choose an existing warehouse for every stock item before submitting.</p></section>`;
+    return `<div class="bsp-heading"><div><small>Against ${esc(x.order)}</small><h2>${esc(x.id)} ${badge(x.status)}</h2><p class="muted">Standard Purchase Receipt · managed within BS Procurement</p></div><div>${btn("Back to PO","back-po")}${x.editable?btn("Save draft receipt","save-receipt")+btn("Submit receipt","submit-receipt","",true):""}</div></div><p class="bsp-save-status muted">${dirty?"Unsaved changes":"Saved in ERPNext"}</p><section class="bsp-card"><h3>Receipt</h3>${facts([["Company",x.company],["Supplier",x.supplier],["Receipt date",x.date],["ERP status",x.status]])}<p class="muted">Record accepted delivered quantities. Submitting this standard ERPNext receipt updates stock and makes the received goods available for the Payment Order.</p></section><section class="bsp-card"><h3>Supplier delivery and invoice evidence</h3><div class="bsp-grid"><label>Delivery note reference<input data-receipt-field="deliveryNoteNo" value="${esc(x.deliveryNoteNo)}" ${disabled}></label><label>Supplier invoice number *<input data-receipt-field="supplierInvoiceNo" value="${esc(x.supplierInvoiceNo)}" ${disabled}></label><label>Supplier invoice date *<input type="date" data-receipt-field="supplierInvoiceDate" value="${esc(x.supplierInvoiceDate)}" ${disabled}></label></div><p>Delivery note: ${fileLink(x.deliveryNote?.url,x.deliveryNote?.filename)}</p><p>Supplier invoice: ${fileLink(x.supplierInvoice?.url,x.supplierInvoice?.filename)}</p>${x.editable?btn("Attach delivery note","upload-receipt-delivery")+btn("Attach supplier invoice","upload-receipt-invoice"):""}<p class="muted">Both private attachments and the supplier invoice details are required before this receipt can be submitted.</p></section><section class="bsp-card"><h3>Received items</h3><div class="bsp-tablewrap"><table><thead><tr><th>Item</th><th>Quantity received</th><th>UOM</th><th>Receiving warehouse</th></tr></thead><tbody>${x.items.map((r,i)=>`<tr><td>${esc(r.item)}<small style="display:block">${esc(r.description)}</small></td><td><input data-receipt-qty="${i}" type="number" min="0" step="any" value="${esc(r.qty)}" ${disabled}></td><td>${esc(r.uom)}</td><td><input data-receipt-warehouse="${i}" value="${esc(r.warehouse)}" ${disabled}></td></tr>`).join("")}</tbody></table></div><p class="muted">Choose an existing warehouse for every stock item before submitting.</p></section>`;
   }
   function accountingView(s){
     const a=s.accounting;
     if(!a?.ready)return "";
     const ledger=s.ledger;
-    return `<section class="bsp-card"><h3>Accounting codes</h3>${facts([["Journal code",a.journalCode||"Not specified"],["Supplier payable account",a.payable]])}
-      <p class="muted">Journal code classifies this invoice and its accounting entries. Accounts are posted when Mohan approves the Payment Order.</p>
+    return `<section class="bsp-card"><h3>Accounting codes</h3>${facts([["Journal code",a.journalCode||"Not specified"],["GL coding confirmed",a.confirmed?"Yes":"No"],["Supplier payable account",a.payable]])}
+      <p class="muted">Enter the journal code and confirm each GL account manually. The codes are locked when the Payment Order is sent to Mohan and reach the accounts ledger on approval.</p>
       <div class="bsp-tablewrap"><table><thead><tr><th>Item</th><th>GL code / account</th><th>Cost centre</th><th>Account selection</th></tr></thead><tbody>${a.lines.map(r=>`<tr><td>${esc(r.item)}</td><td>${esc(r.label||"Not set")}</td><td>${esc(r.costCenter||"—")}</td><td>${r.editable?"Invoice expense account":"From receipt / asset accounting"}</td></tr>`).join("")}</tbody></table></div>
       ${a.editable?btn("Edit accounting codes","edit-accounting","",true):'<p class="muted">Accounting codes are locked for approval. Corrections require a return for correction or amendment.</p>'}
       ${a.canViewLedger?btn(ledger?"Refresh accounting entries":"View accounting entries","view-accounting"):""}
@@ -146,15 +147,15 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
   }
   function settlementView(){
     const amount=(value,currency)=>value===null?"—":esc(currency)+" "+money(value,currency);
-    if(!settlement)return `<div class="bsp-heading"><div><h2>Payment Order</h2><p class="muted">Supplier / vendor invoices, approvals and payments.</p></div><div>${canCreateInvoice?btn("New Payment Order","new-payment-order","",true):""}<input data-search type="search" aria-label="Search payment orders" placeholder="Search invoice, supplier, PO or status"></div></div>${settlementRestricted?'<p class="bsp-callout">Purchase Invoice read permission is required to view payment orders.</p>':""}<div class="bsp-tablewrap"><table><thead><tr><th>No.</th><th>Payment Order / invoice</th><th>Supplier</th><th>Vendor invoice no.</th><th>Due date</th><th>Approval / payment status</th><th>Invoice total</th><th>Outstanding</th></tr></thead><tbody>${settlementOrders.map((o,i)=>`<tr data-search-text="${esc([o.id,o.supplier,o.bill,o.approval,o.status,...o.orders].join(" ").toLowerCase())}"><td data-serial>${i+1}</td><td>${btn(esc(o.id),"settlement",`data-id="${esc(o.id)}"`)}<small style="display:block">${esc(o.company)}</small></td><td>${esc(o.supplier)}</td><td>${esc(o.bill||"—")}</td><td>${esc(o.due||"—")}</td><td>${badge(o.approval||o.status)}<small style="display:block">${esc(o.status)}</small></td><td>${amount(o.total,o.currency)}</td><td>${amount(o.outstanding,o.outstandingCurrency)}</td></tr>`).join("")||'<tr><td colspan="8">No supplier invoices linked to BS Procurement yet.</td></tr>'}</tbody></table></div>${settlementMore?btn("Load more payment orders","settlement-more"):""}`;
+    if(!settlement)return `<div class="bsp-heading"><div><h2>Payment Order</h2><p class="muted">Supplier / vendor invoices, approvals and payments.</p></div><div>${canCreateInvoice?btn("New Payment Order","new-payment-order","",true):""}<input data-search type="search" aria-label="Search payment orders" placeholder="Search invoice, supplier, PO or status"></div></div>${settlementRestricted?'<p class="bsp-callout">Purchase Invoice read permission is required to view payment orders.</p>':""}<section class="bsp-card"><h3>Submitted receipts ready for Payment Order</h3><div class="bsp-tablewrap"><table><thead><tr><th>Source</th><th>Supplier invoice</th><th></th></tr></thead><tbody>${paymentSources.map(s=>`<tr><td>${esc(s.label)}</td><td>${esc(s.bill||"Enter when creating")}</td><td>${btn("Create Payment Order","create-from-source",`data-type="${esc(s.doctype)}" data-name="${esc(s.name)}"`)}</td></tr>`).join("")||'<tr><td colspan="3">No submitted receipt or approved service PO is ready.</td></tr>'}</tbody></table></div></section><div class="bsp-tablewrap"><table><thead><tr><th>No.</th><th>Payment Order / invoice</th><th>Supplier</th><th>Vendor invoice no.</th><th>Due date</th><th>Approval / payment status</th><th>Invoice total</th><th>Outstanding</th></tr></thead><tbody>${settlementOrders.map((o,i)=>`<tr data-search-text="${esc([o.id,o.supplier,o.bill,o.approval,o.status,...o.orders].join(" ").toLowerCase())}"><td data-serial>${i+1}</td><td>${btn(esc(o.id),"settlement",`data-id="${esc(o.id)}"`)}<small style="display:block">${esc(o.company)}</small></td><td>${esc(o.supplier)}</td><td>${esc(o.bill||"—")}</td><td>${esc(o.due||"—")}</td><td>${badge(o.approval||o.status)}<small style="display:block">${esc(o.status)}</small></td><td>${amount(o.total,o.currency)}</td><td>${amount(o.outstanding,o.outstandingCurrency)}</td></tr>`).join("")||'<tr><td colspan="8">No supplier invoices linked to BS Procurement yet.</td></tr>'}</tbody></table></div>${settlementMore?btn("Load more payment orders","settlement-more"):""}`;
     const s=settlement;
     const link=(type,id)=>type==="Purchase Receipt"?btn(esc(id),"open-receipt",`data-name="${esc(id)}"`):btn(esc(id),"source",`data-type="${esc(type)}" data-name="${esc(id)}"`);
     const notice=section=>section.restricted?'<p class="bsp-callout">Some linked records are restricted by your permissions.</p>':"";
-    return `<div class="bsp-heading"><div><small>Payment Order · supplier invoice</small><h2>${esc(s.id)} ${badge(s.approval||s.status)}</h2><p class="muted">${esc(s.supplier)} · ${esc(s.company)}</p></div><div>${btn("All payment orders","settlement-list")}${btn("Open supplier invoice","source",`data-type="Purchase Invoice" data-name="${esc(s.id)}"`)}${s.actions.map(a=>btn(esc(a),"invoice-action",`data-value="${esc(a)}"`,a==="Approve")).join("")}${s.canPay?btn("Record payment","record-payment","",true):""}</div></div>
-      <section class="bsp-card"><h3>Vendor invoice and approval</h3>${facts([["Approver",s.approver?.name],["Approver account",s.approver?.user],["Approved by",s.approvedBy],["Approved on",s.approvedOn],["Vendor invoice no.",s.bill],["Invoice date",s.date],["Due date",s.due],["Approval",s.approval],["Payment status",s.status],["Net amount",s.currency+" "+money(s.net,s.currency)],["Taxes and charges",s.currency+" "+money(s.taxes,s.currency)],["Invoice total",s.currency+" "+money(s.total,s.currency)],["Outstanding",s.outstanding===null?"—":s.outstandingCurrency+" "+money(s.outstanding,s.outstandingCurrency)]])}<p class="muted">This payment order uses the supplier invoice shown above. Supplier payments require this Payment Order to be approved by Mohan. Draft and cancelled invoices cannot be paid.</p></section>
+    return `<div class="bsp-heading"><div><small>Payment Order · supplier invoice</small><h2>${esc(s.id)} ${badge(s.approval||s.status)}</h2><p class="muted">${esc(s.supplier)} · ${esc(s.company)}</p></div><div>${btn("All payment orders","settlement-list")}${s.editableDetails?btn("Edit invoice details","edit-payment-order-details")+btn("Attach supplier invoice","upload-payment-invoice"):""}${s.actions.map(a=>btn(esc(a),"invoice-action",`data-value="${esc(a)}"`,a==="Approve")).join("")}${s.canPay?btn("Record payment","record-payment","",true):""}</div></div>
+      <section class="bsp-card"><h3>Vendor invoice and approval</h3>${facts([["Approver",s.approver?.name],["Approver account",s.approver?.user],["Approved by",s.approvedBy],["Approved on",s.approvedOn],["Vendor invoice no.",s.bill],["Invoice date",s.billDate||s.date],["Due date",s.due],["Approval",s.approval],["Payment status",s.status],["Net amount",s.currency+" "+money(s.net,s.currency)],["Taxes and charges",s.currency+" "+money(s.taxes,s.currency)],["Invoice total",s.currency+" "+money(s.total,s.currency)],["Outstanding",s.outstanding===null?"—":s.outstandingCurrency+" "+money(s.outstanding,s.outstandingCurrency)]])}<p>Supplier invoice: ${fileLink(s.invoiceFile,"Open supplier invoice")}</p><p class="muted">This payment order uses the supplier invoice shown above. Enter and confirm its journal and GL accounts, then send it to Mohan for approval. Draft and cancelled invoices cannot be paid.</p></section>
       ${accountingView(s)}
       <section class="bsp-card"><h3>Purchase references and invoiced items</h3><div>${s.orders.map(id=>link("Purchase Order",id)).join("")}</div><div class="bsp-tablewrap"><table><thead><tr><th>Item</th><th>Quantity</th><th>Rate (${esc(s.currency)})</th><th>Amount (${esc(s.currency)})</th><th>Purchase Order</th><th>Receipt</th><th>Project</th></tr></thead><tbody>${s.items.map(r=>`<tr><td>${esc(r.item)}<small style="display:block">${esc(r.description)}</small></td><td>${esc(r.qty)} ${esc(r.uom)}</td><td>${money(r.rate,s.currency)}</td><td>${money(r.amount,s.currency)}</td><td>${esc(r.order)}</td><td>${esc(r.receipt||"—")}</td><td>${esc(r.project||"—")}</td></tr>`).join("")}</tbody></table></div></section>
-      <section class="bsp-card"><h3>Matched receipts</h3>${notice(s.receipts)}<div class="bsp-tablewrap"><table><thead><tr><th>Receipt</th><th>Date</th><th>Status</th><th>Matched items</th></tr></thead><tbody>${s.receipts.records.map(d=>`<tr><td>${link("Purchase Receipt",d.id)}</td><td>${esc(d.date)}</td><td>${badge(d.status)}</td><td>${d.lines.map(r=>`${esc(r.item)}: ${esc(r.qty)} ${esc(r.uom)}${r.rejected?` · rejected ${esc(r.rejected)}`:""}`).join("<br>")}</td></tr>`).join("")||'<tr><td colspan="4">No receipts linked to this invoice. Non-stock services can be invoiced against their approved PO.</td></tr>'}</tbody></table></div></section>
+      <section class="bsp-card"><h3>Matched receipts</h3>${notice(s.receipts)}<div class="bsp-tablewrap"><table><thead><tr><th>Receipt</th><th>Date</th><th>Status</th><th>Delivery note</th><th>Supplier invoice</th><th>Matched items</th></tr></thead><tbody>${s.receipts.records.map(d=>`<tr><td>${link("Purchase Receipt",d.id)}</td><td>${esc(d.date)}</td><td>${badge(d.status)}</td><td>${fileLink(d.deliveryNote,"Open delivery note")}</td><td>${esc(d.invoiceNo||"—")}<br>${fileLink(d.invoiceFile,"Open invoice")}</td><td>${d.lines.map(r=>`${esc(r.item)}: ${esc(r.qty)} ${esc(r.uom)}${r.rejected?` · rejected ${esc(r.rejected)}`:""}`).join("<br>")}</td></tr>`).join("")||'<tr><td colspan="6">No receipts linked to this invoice. Non-stock services can be invoiced against their approved PO.</td></tr>'}</tbody></table></div></section>
       <section class="bsp-card"><h3>Payments</h3>${notice(s.payments)}<p class="muted">Amounts apply to this invoice only. Draft, cancelled and released allocations do not count as paid. Credits and other settlements are included in the invoice outstanding balance.</p><div class="bsp-tablewrap"><table><thead><tr><th>Payment Entry</th><th>Date</th><th>Status</th><th>Type</th><th>Invoice allocation</th></tr></thead><tbody>${s.payments.records.map(d=>`<tr><td>${link("Payment Entry",d.id)}${d.shared?'<small style="display:block">Payment also covers other documents</small>':""}</td><td>${esc(d.date)}</td><td>${badge(d.status)}${d.historical?'<small style="display:block">Previous allocation released</small>':""}</td><td>${esc(d.type)}</td><td>${d.historical?"—":amount(d.allocated,d.currency)}</td></tr>`).join("")||'<tr><td colspan="5">No payment allocations linked to this invoice.</td></tr>'}</tbody></table></div></section>`;
   }
   function comparison(p){
@@ -223,8 +224,8 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
     if(b.dataset.action==="edit-accounting"){
       const s=settlement;
       const rows=s.accounting.lines.filter(r=>r.editable);
-      const fields=[{fieldname:"journal_code",label:"Journal code",fieldtype:"Data",default:s.accounting.journalCode,
-        description:"Optional accounts-team classification, up to 40 letters, numbers, dots, hyphens, slashes or underscores."}];
+      const fields=[{fieldname:"journal_code",label:"Journal code",fieldtype:"Data",reqd:1,default:s.accounting.journalCode,
+        description:"Required manual accounts classification, up to 40 letters, numbers, dots, hyphens, slashes or underscores."}];
       if(rows.length)fields.push({fieldname:"lines",label:"GL accounts by invoice item",fieldtype:"Table",in_place_edit:true,
         cannot_add_rows:true,cannot_delete_rows:true,data:rows.map(r=>({id:r.id,item:r.item,account:r.account})),
         fields:[{fieldname:"id",fieldtype:"Data",hidden:1},{fieldname:"item",label:"Item",fieldtype:"Data",read_only:1,in_list_view:1},
@@ -239,6 +240,44 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
     if(b.dataset.action==="view-accounting"){
       settlement.ledger=await glApi("get_ledger",{name:settlement.id});render();return;
     }
+    if(b.dataset.action==="edit-payment-order-details"){
+      const s=settlement;
+      const values=await ask([
+        {fieldname:"bill_no",label:"Supplier invoice number",fieldtype:"Data",reqd:1,default:s.bill},
+        {fieldname:"bill_date",label:"Supplier invoice date",fieldtype:"Date",reqd:1,default:s.billDate||s.date},
+        {fieldname:"due_date",label:"Payment due date",fieldtype:"Date",reqd:1,default:s.due}
+      ],"Payment Order invoice details","Save invoice details");
+      if(!values)return;
+      settlement=await accountApi("save_payment_order_details",{name:s.id,modified:s.modified,bill_no:values.bill_no,
+        bill_date:values.bill_date,due_date:values.due_date,invoice_file:s.invoiceFile||""});render();return;
+    }
+    if(b.dataset.action==="upload-payment-invoice"){
+      const s=settlement;
+      new frappe.ui.FileUploader({doctype:"Purchase Invoice",docname:s.id,make_attachments_public:false,
+        allow_toggle_private:false,allow_web_link:false,allow_multiple:false,on_success:async file=>{
+          if(settlement?.id!==s.id)return;
+          settlement=await accountApi("save_payment_order_details",{name:s.id,modified:s.modified,bill_no:s.bill,
+            bill_date:s.billDate||s.date,due_date:s.due,invoice_file:file.file_url});render();
+          frappe.show_alert({message:"Supplier invoice attached to the Payment Order",indicator:"green"});
+        }});return;
+    }
+    const createPaymentOrder=async selected=>{
+      const base=selected.billDate||frappe.datetime.get_today();
+      const values=await ask([
+        {fieldname:"bill_no",label:"Supplier invoice number",fieldtype:"Data",reqd:1,default:selected.bill||""},
+        {fieldname:"bill_date",label:"Supplier invoice date",fieldtype:"Date",reqd:1,default:base},
+        {fieldname:"due_date",label:"Payment due date",fieldtype:"Date",reqd:1,default:frappe.datetime.add_days(base,30)},
+        {fieldname:"evidence",fieldtype:"HTML",options:selected.invoiceFile?"<p>The supplier invoice attached to the submitted receipt will be carried into this Payment Order.</p>":"<p>After creating the draft, attach the supplier invoice and enter the manual journal and GL accounts before approval.</p>"}
+      ],"Create Payment Order","Create draft Payment Order");
+      if(!values)return;
+      settlement=await accountApi("create_payment_order",{source_doctype:selected.doctype,source_name:selected.name,
+        bill_no:values.bill_no,bill_date:values.bill_date,due_date:values.due_date});view="services";render();
+    };
+    if(b.dataset.action==="create-from-source"){
+      const selected=paymentSources.find(x=>x.doctype===b.dataset.type&&x.name===b.dataset.name);
+      if(!selected){frappe.msgprint("Refresh Payment Order and select an available receipt.");return;}
+      await createPaymentOrder(selected);return;
+    }
     if(b.dataset.action==="new-payment-order"){
       const sources=await accountApi("get_payment_order_sources");
       if(!sources.length){
@@ -252,8 +291,7 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
       if(!values)return;
       const selected=sources.find(x=>x.label===values.source);
       if(!selected){frappe.msgprint("Select an available BS Procurement source.");return;}
-      const doc=await accountApi("prepare_payment_order",{source_doctype:selected.doctype,source_name:selected.name});
-      const synced=frappe.model.sync(doc);frappe.set_route("Form","Purchase Invoice",synced[0].name);return;
+      await createPaymentOrder(selected);return;
     }
     if(b.dataset.action==="record-payment"){
       const doc=await accountApi("prepare_payment",{name:settlement.id});
@@ -307,11 +345,25 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
     }
     if(action==="back-po"){view="po";receipt=null;dirty=false;await refresh(active);return;}
     if(action==="save-receipt"){
-      receipt=await api("save_receipt",{name:receipt.id,modified:receipt.modified,payload:JSON.stringify({items:receipt.items})});dirty=false;render();frappe.show_alert({message:"Purchase Receipt saved",indicator:"green"});return;
+      receipt=await api("save_receipt",{name:receipt.id,modified:receipt.modified,payload:JSON.stringify({items:receipt.items,
+        deliveryNoteNo:receipt.deliveryNoteNo,deliveryNoteFile:receipt.deliveryNote?.url,supplierInvoiceNo:receipt.supplierInvoiceNo,
+        supplierInvoiceDate:receipt.supplierInvoiceDate,supplierInvoiceFile:receipt.supplierInvoice?.url})});dirty=false;render();frappe.show_alert({message:"Purchase Receipt saved",indicator:"green"});return;
     }
     if(action==="submit-receipt"){
-      if(dirty)receipt=await api("save_receipt",{name:receipt.id,modified:receipt.modified,payload:JSON.stringify({items:receipt.items})});
+      if(dirty)receipt=await api("save_receipt",{name:receipt.id,modified:receipt.modified,payload:JSON.stringify({items:receipt.items,
+        deliveryNoteNo:receipt.deliveryNoteNo,deliveryNoteFile:receipt.deliveryNote?.url,supplierInvoiceNo:receipt.supplierInvoiceNo,
+        supplierInvoiceDate:receipt.supplierInvoiceDate,supplierInvoiceFile:receipt.supplierInvoice?.url})});
       receipt=await api("submit_receipt",{name:receipt.id,modified:receipt.modified});dirty=false;render();frappe.show_alert({message:"Purchase Receipt submitted",indicator:"green"});return;
+    }
+    if(action==="upload-receipt-delivery"||action==="upload-receipt-invoice"){
+      const target=receipt;
+      new frappe.ui.FileUploader({doctype:"Purchase Receipt",docname:target.id,make_attachments_public:false,
+        allow_toggle_private:false,allow_web_link:false,allow_multiple:false,on_success:file=>{
+          if(receipt?.id!==target.id)return;
+          const value={file:file.name,filename:file.file_name,url:file.file_url};
+          if(action==="upload-receipt-delivery")receipt.deliveryNote=value;else receipt.supplierInvoice=value;
+          dirty=true;render();frappe.show_alert({message:"Evidence uploaded. Save the receipt to keep it.",indicator:"green"});
+        }});return;
     }
     if(action==="open-receipt"||(action==="source"&&b.dataset.type==="Purchase Receipt")){
       receipt=await api("get_receipt",{name:b.dataset.name});view="receipt";dirty=false;render();return;
@@ -447,6 +499,7 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
     const t=e.target;
     if(view==="receipt"&&receipt&&t.dataset.receiptQty!==undefined){receipt.items[+t.dataset.receiptQty].qty=Number(t.value)||0;dirty=true;root.querySelector(".bsp-save-status").textContent="Unsaved changes";return;}
     if(view==="receipt"&&receipt&&t.dataset.receiptWarehouse!==undefined){receipt.items[+t.dataset.receiptWarehouse].warehouse=t.value;dirty=true;root.querySelector(".bsp-save-status").textContent="Unsaved changes";return;}
+    if(view==="receipt"&&receipt&&t.dataset.receiptField){receipt[t.dataset.receiptField]=t.value;dirty=true;root.querySelector(".bsp-save-status").textContent="Unsaved changes";return;}
     if(t.hasAttribute("data-search")){query=t.value;if(view==="orders"){clearTimeout(searchTimer);searchTimer=setTimeout(()=>refreshOrders().catch(console.error),300);}else filter();return;}
     if(t.dataset.pick!==undefined){if(t.checked)picks[t.dataset.pick]=Number(root.querySelector(`[data-pick-qty="${t.dataset.pick}"]`).value);else delete picks[t.dataset.pick];return;}
     if(t.dataset.pickQty!==undefined){if(picks[t.dataset.pickQty]!==undefined)picks[t.dataset.pickQty]=Number(t.value);return;}

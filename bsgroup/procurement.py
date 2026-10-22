@@ -631,11 +631,31 @@ def protect_file(doc, method=None):
     """Once submitted for review, preserve the original quotation evidence."""
     before = doc.get_doc_before_save()
     target = before or doc
-    if target.attached_to_doctype not in (MR, PO) or not target.attached_to_name:
-        return
-    if not frappe.db.get_value(target.attached_to_doctype, target.attached_to_name, "custom_bsp_managed"):
+    if target.attached_to_doctype not in (MR, PO, "Purchase Receipt", "Purchase Invoice") or not target.attached_to_name:
         return
     parent = frappe.get_doc(target.attached_to_doctype, target.attached_to_name)
+    if target.attached_to_doctype == "Purchase Receipt":
+        if not any(r.purchase_order and frappe.db.get_value(PO, r.purchase_order, "custom_bsp_managed")
+                   for r in parent.items):
+            return
+        references = {parent.get("custom_bsp_delivery_note_file"),
+                      parent.get("custom_bsp_supplier_invoice_file")}
+        if (doc.name in references or doc.file_url in references) and (method == "on_trash" or
+                any(doc.has_value_changed(k) for k in ("file_url", "file_name", "content_hash", "file_size",
+                    "is_private", "attached_to_name", "attached_to_doctype")) or doc.get("content")):
+            fail("This file is submitted receipt evidence and must remain available for audit.")
+        return
+    if target.attached_to_doctype == "Purchase Invoice":
+        if not parent.get("custom_bsp_managed"):
+            return
+        references = {parent.get("custom_bsp_supplier_invoice_file")}
+        if (doc.name in references or doc.file_url in references) and (method == "on_trash" or
+                any(doc.has_value_changed(k) for k in ("file_url", "file_name", "content_hash", "file_size",
+                    "is_private", "attached_to_name", "attached_to_doctype")) or doc.get("content")):
+            fail("This file is Payment Order evidence and must remain available for audit.")
+        return
+    if not parent.get("custom_bsp_managed"):
+        return
     if op() and op()[0] == "delete_draft" and (manual_draft(parent) or draft_order(parent)):
         return
     if target.attached_to_doctype == MR:
@@ -1018,11 +1038,23 @@ def receipt_data(doc):
     access(doc)
     order = receipt_order(doc)
     editable = purchaser() and doc.docstatus == 0 and doc.has_permission("write")
+    def attached(url):
+        if not url:
+            return dict(file="", filename="", url="")
+        row = frappe.db.get_value("File", {"file_url": url},
+                                  ["name", "file_name", "file_url"], as_dict=True)
+        return dict(file=row.name, filename=row.file_name, url=row.file_url) if row else \
+            dict(file="", filename=url.rsplit("/", 1)[-1], url=url)
     return dict(
         id=doc.name, modified=str(doc.modified), order=order.name, company=doc.company,
         supplier=doc.supplier, date=str(doc.posting_date or ""),
         status="Submitted" if doc.docstatus == 1 else "Draft",
         editable=editable, canSubmit=editable and doc.has_permission("submit"),
+        deliveryNoteNo=doc.supplier_delivery_note or "",
+        deliveryNote=attached(doc.get("custom_bsp_delivery_note_file")),
+        supplierInvoiceNo=doc.get("custom_bsp_supplier_invoice_no") or "",
+        supplierInvoiceDate=str(doc.get("custom_bsp_supplier_invoice_date") or ""),
+        supplierInvoice=attached(doc.get("custom_bsp_supplier_invoice_file")),
         items=[dict(id=row.name, item=row.item_code,
                     description=strip_html(row.description or row.item_name or ""),
                     qty=row.qty, uom=row.uom, warehouse=row.warehouse or "")
@@ -1061,7 +1093,8 @@ def save_receipt(name, modified, payload):
     receipt_order(doc)
     if doc.docstatus:
         fail("Only a draft Purchase Receipt can be edited.")
-    incoming = {row.get("id"): row for row in parse(payload).get("items", []) if isinstance(row, dict)}
+    values = parse(payload)
+    incoming = {row.get("id"): row for row in values.get("items", []) if isinstance(row, dict)}
     rows = []
     for row in doc.items:
         value = incoming.get(row.name)
@@ -1079,6 +1112,20 @@ def save_receipt(name, modified, payload):
     if not rows:
         fail("Keep at least one receipt line with a positive quantity.")
     doc.set("items", rows)
+    doc.supplier_delivery_note = text(values.get("deliveryNoteNo"), 140)
+    doc.custom_bsp_supplier_invoice_no = text(values.get("supplierInvoiceNo"), 140)
+    doc.custom_bsp_supplier_invoice_date = values.get("supplierInvoiceDate") or None
+    for key, label, fieldname in (
+        ("deliveryNoteFile", "supplier delivery note", "custom_bsp_delivery_note_file"),
+        ("supplierInvoiceFile", "supplier invoice", "custom_bsp_supplier_invoice_file"),
+    ):
+        url = text(values.get(key), 500)
+        if url:
+            file = frappe.db.get_value("File", {"file_url": url, "attached_to_doctype": "Purchase Receipt",
+                "attached_to_name": doc.name}, ["name", "is_private"], as_dict=True)
+            if not file or not file.is_private:
+                fail(f"Upload the {label} privately against this Purchase Receipt.")
+        doc.set(fieldname, url or None)
     with operation("save receipt"):
         doc.save()
     return receipt_data(doc)
@@ -1092,9 +1139,34 @@ def submit_receipt(name, modified):
     receipt_order(doc)
     if doc.docstatus:
         fail("This Purchase Receipt is already submitted.")
+    validate_receipt_evidence(doc)
     with operation("submit receipt"):
         doc.submit()
     return receipt_data(doc)
+
+
+def validate_receipt_evidence(doc, method=None):
+    """Require auditable delivery and invoice evidence on submitted BS receipts."""
+    if not any(r.purchase_order and frappe.db.get_value(
+            PO, r.purchase_order, "custom_bsp_managed") for r in doc.items):
+        return
+    missing = []
+    for fieldname, label in (
+        ("custom_bsp_delivery_note_file", "supplier delivery note"),
+        ("custom_bsp_supplier_invoice_file", "supplier invoice copy"),
+    ):
+        url = doc.get(fieldname)
+        file = frappe.db.get_value("File", {"file_url": url,
+            "attached_to_doctype": "Purchase Receipt", "attached_to_name": doc.name},
+            ["name", "is_private"], as_dict=True) if url else None
+        if not file or not file.is_private:
+            missing.append(label)
+    if not text(doc.get("custom_bsp_supplier_invoice_no"), 140):
+        missing.append("supplier invoice number")
+    if not doc.get("custom_bsp_supplier_invoice_date"):
+        missing.append("supplier invoice date")
+    if missing:
+        fail("Complete the receipt evidence before submission: " + ", ".join(missing) + ".")
 
 
 @frappe.whitelist()

@@ -573,6 +573,10 @@ for _dt, _event, _method in (
     _prior = doc_events.setdefault(_dt, {}).get(_event, [])
     doc_events[_dt][_event] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.procurement_accounts." + _method]
 
+_prior = doc_events["Purchase Receipt"].get("before_submit", [])
+doc_events["Purchase Receipt"]["before_submit"] = ([_prior] if isinstance(_prior, str) else list(_prior)) + [
+    "bsgroup.procurement.validate_receipt_evidence"]
+
 # BS Procurement QC gap controls v2
 for _dt, _event, _method in (
     ("Purchase Invoice", "validate", "validate_invoice_approval"),

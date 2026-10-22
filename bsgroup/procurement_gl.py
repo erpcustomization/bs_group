@@ -13,7 +13,7 @@ def ensure_schema():
         "Purchase Invoice": [dict(fieldname=JOURNAL, label="Journal code", fieldtype="Data",
             insert_after="credit_to", length=40, in_standard_filter=1,
             depends_on="eval:doc.custom_bsp_managed", description=
-            "Optional journal classification for this Payment Order and its ledger entries. "
+            "Required manual journal classification for this Payment Order and its ledger entries. "
             "This is not an existing Journal Entry number.")],
         "GL Entry": [dict(fieldname=JOURNAL, label="Journal code", fieldtype="Data",
             insert_after="voucher_no", length=40, read_only=1, in_standard_filter=1,
@@ -41,6 +41,7 @@ def editable_line(row):
 
 def accounting_values(doc):
     return (doc.get(JOURNAL) or "", doc.credit_to,
+            bool(doc.get("custom_bsp_accounting_confirmed")),
             {r.name: (r.expense_account, r.cost_center, r.project, r.get("deferred_expense_account"))
              for r in doc.items})
 
@@ -62,6 +63,10 @@ class PaymentOrderAccountingMixin:
         if not (managed(self) or (old and managed(old))):
             return
         self.set(JOURNAL, normalized_code(self.get(JOURNAL)))
+        if old and bool(self.get("custom_bsp_accounting_confirmed")) != bool(
+                old.get("custom_bsp_accounting_confirmed")) and not getattr(
+                    frappe.flags, "bsp_save_accounting", False):
+            frappe.throw("Confirm Payment Order accounting through the BS Procurement accounting screen.")
         if old and (old.docstatus == 1 or old.get("workflow_state") == "Pending Approval"):
             if accounting_values(self) != accounting_values(old):
                 frappe.throw("Payment Order accounting is locked after sending for approval. "
@@ -92,6 +97,7 @@ def account_label(name):
 def accounting_data(doc):
     ready = doc.meta.has_field(JOURNAL) and frappe.get_meta("GL Entry").has_field(JOURNAL)
     return dict(ready=ready, journalCode=doc.get(JOURNAL) or "",
+        confirmed=bool(doc.get("custom_bsp_accounting_confirmed")),
         payable=account_label(doc.credit_to),
         editable=bool(ready and doc.docstatus == 0 and (doc.workflow_state or "Draft") in ("Draft", "Rejected")
                       and frappe.has_permission("Purchase Invoice", "write", doc=doc)),
@@ -111,7 +117,11 @@ def save_accounting(name, modified, journal_code="", lines=None):
     updates = frappe.parse_json(lines) if isinstance(lines, str) else lines
     if not isinstance(updates, list):
         frappe.throw("Provide the invoice lines and their GL accounts.")
+    journal_code = normalized_code(journal_code)
+    if not journal_code:
+        frappe.throw("Enter the journal code before saving Payment Order accounting.")
     rows = {r.name: r for r in doc.items}
+    editable_ids = {r.name for r in doc.items if editable_line(r)}
     seen = set()
     selected = {}
     for value in updates:
@@ -127,8 +137,18 @@ def save_accounting(name, modified, journal_code="", lines=None):
             validate_selected_account(account, doc.company)
             row.expense_account = account
             selected[row.name] = account
-    doc.set(JOURNAL, normalized_code(journal_code))
-    doc.save()
+        elif editable_line(row) and not account:
+            frappe.throw("Select a GL account for every service or expense line.")
+    if seen & editable_ids != editable_ids:
+        frappe.throw("Select and confirm a GL account for every service or expense line.")
+    doc.set(JOURNAL, journal_code)
+    doc.custom_bsp_accounting_confirmed = 1
+    previous_flag = getattr(frappe.flags, "bsp_save_accounting", False)
+    frappe.flags.bsp_save_accounting = True
+    try:
+        doc.save()
+    finally:
+        frappe.flags.bsp_save_accounting = previous_flag
     # Never silently report a chosen account if native accounting substituted it.
     if any(r.expense_account != selected[r.name] for r in doc.items if r.name in selected):
         frappe.throw("The selected GL conflicts with this invoice's accounting treatment. Review the supplier invoice.")

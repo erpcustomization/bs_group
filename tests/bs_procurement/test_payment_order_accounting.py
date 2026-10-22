@@ -10,9 +10,17 @@ from frappe.model.workflow import apply_workflow
 
 sys.path.insert(0, str(Path(__file__).parent))
 from test_standard_documents import check, blocked, RESULTS, new_request, action, payload, po_action, BUYER, MANAGER, COMPANY
-from qc_fixtures import cleanup_files
+from qc_fixtures import cleanup_files, FILES, pdf_content
 
 ACCOUNTS = "zztest-bsp-gl-accounts@example.com"
+
+
+def evidence(doc, label):
+    file = frappe.get_doc(dict(doctype="File", file_name="ZZTEST-PAYMENT-" +
+        uuid.uuid4().hex + ".pdf", content=pdf_content(label), is_private=1,
+        attached_to_doctype=doc.doctype, attached_to_name=doc.name)).insert()
+    FILES.append(file.get_full_path())
+    return file.file_url
 
 
 def run():
@@ -53,14 +61,21 @@ def run():
     receipt = make_purchase_receipt(po["id"])
     receipt.posting_date = nowdate()
     receipt.insert()
+    receipt.custom_bsp_delivery_note_file = evidence(receipt, "delivery note")
+    receipt.custom_bsp_supplier_invoice_file = evidence(receipt, "supplier invoice")
+    receipt.custom_bsp_supplier_invoice_no = "ZZTEST RECEIPT " + tag
+    receipt.custom_bsp_supplier_invoice_date = nowdate()
+    receipt.save()
     receipt.submit()
     invoice = a.prepare_payment_order("Purchase Receipt", receipt.name)
     frappe.set_user(ACCOUNTS)
     invoice.bill_no = "ZZTEST GL " + tag
     invoice.bill_date = invoice.posting_date = invoice.due_date = nowdate()
     invoice.insert()
+    invoice.custom_bsp_supplier_invoice_file = evidence(invoice, "payment order invoice")
+    invoice.save()
     view = a.get_payment_order(invoice.name)
-    check("Draft exposes GL accounts and optional journal code", view["accounting"]["editable"] and not view["accounting"]["journalCode"])
+    check("Draft exposes manual GL and journal coding", view["accounting"]["editable"] and not view["accounting"]["journalCode"])
     service_rows = [r for r in invoice.items if r.item_code != stock]
     stock_row = next(r for r in invoice.items if r.item_code == stock)
     lines = [dict(id=r.name, account=account) for r, account in zip(service_rows, accounts)]
@@ -85,6 +100,7 @@ def run():
     frappe.clear_document_cache("Account", accounts[0])
     blocked("Stock receipt accounting cannot be overridden", lambda: save(values=[dict(id=stock_row.name, account=accounts[0])]), "Stock")
     blocked("Invalid journal code is refused", lambda: save(code="<script>"), "Journal code")
+    blocked("Blank journal code is refused", lambda: save(code=""), "journal code")
     view = save(code=" util-qc ")
     invoice.reload()
     check("Journal code is stored in a consistent format", invoice.get(gl.JOURNAL) == "UTIL-QC")
@@ -92,9 +108,7 @@ def run():
     check("Displayed accounts include code and name", all("QC" + tag in r["label"] for r in view["accounting"]["lines"][:2]))
     check("Stock account and receipt linkage are preserved", invoice.items[2].expense_account == stock_row.expense_account and invoice.items[2].purchase_receipt == receipt.name)
     check("Draft coding creates no ledger postings", not frappe.db.count("GL Entry", {"voucher_type": "Purchase Invoice", "voucher_no": invoice.name}))
-    view = save(code="")
-    check("Journal classification remains optional", not view["accounting"]["journalCode"])
-    save()
+    check("Manual accounting confirmation is recorded", view["accounting"]["confirmed"])
     invoice = apply_workflow(invoice.reload(), "Send for Approval")
     blocked("Pending codes cannot be changed through BS screen", lambda: save(), "draft or rejected")
 

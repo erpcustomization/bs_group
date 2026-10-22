@@ -1,7 +1,7 @@
 """Supplier invoice based Payment Orders and matching for BS Procurement."""
 import json
 import frappe
-from frappe.utils import cint, flt
+from frappe.utils import cint, flt, getdate
 from bsgroup.procurement import access, load, fail
 from bsgroup.procurement_controls import approval_allowed, approver_details, track_preparers
 
@@ -102,6 +102,9 @@ def validate_invoice_approval(doc, method=None):
     doc.custom_bsp_managed = 1
     track_preparers(doc, old, doc.workflow_state or "Draft",
                     old.workflow_state if old else None)
+    if (doc.workflow_state == "Pending Approval" and
+            (not old or old.workflow_state != "Pending Approval")):
+        validate_payment_order_ready(doc)
     from bsgroup.procurement_payments import protect_approval
     protect_approval(doc, old)
 
@@ -234,6 +237,7 @@ def bs_order_names(invoice):
 def invoice_header(doc):
     return dict(id=doc.name, modified=str(doc.modified), supplier=doc.supplier,
         company=doc.company, bill=doc.bill_no or "", date=str(doc.posting_date),
+        billDate=str(doc.bill_date or ""), invoiceFile=doc.get("custom_bsp_supplier_invoice_file") or "",
         due=str(doc.due_date or ""), approval=doc.get("workflow_state") or "",
         status=document_state(doc), docstatus=doc.docstatus, currency=doc.currency,
         total=doc.rounded_total or doc.grand_total, net=doc.net_total,
@@ -257,9 +261,10 @@ def get_payment_orders(start=0, page_length=50):
         join `tabPurchase Order` po on po.name=i.purchase_order where po.custom_bsp_managed=1""", pluck=True)
     size = min(100, max(1, cint(page_length)))
     rows = frappe.get_list("Purchase Invoice", filters={"name": ["in", candidates or [""]]},
-        fields=["name","modified","supplier","company","bill_no","posting_date","due_date",
+        fields=["name","modified","supplier","company","bill_no","bill_date","posting_date","due_date",
                 "workflow_state","status","docstatus","currency","rounded_total","grand_total",
-                "net_total","total_taxes_and_charges","outstanding_amount","party_account_currency"],
+                "net_total","total_taxes_and_charges","outstanding_amount","party_account_currency",
+                "custom_bsp_supplier_invoice_file"],
         start=max(0, cint(start)), page_length=size+1, order_by="creation asc")
     from bsgroup.procurement_lists import visible_company_names
     names = visible_company_names("Purchase Invoice", [r.name for r in rows[:size]])
@@ -273,7 +278,9 @@ def get_payment_orders(start=0, page_length=50):
         if row.name in names:
             row["items"] = lines.get(row.name, [])
             invoices.append(invoice_header(row))
-    return dict(invoices=invoices, restricted=False, canCreate=can_create, has_more=len(rows)>size, **navigation)
+    sources = get_payment_order_sources() if can_create else []
+    return dict(invoices=invoices, sources=sources, restricted=False, canCreate=can_create,
+                has_more=len(rows)>size, **navigation)
 
 
 @frappe.whitelist()
@@ -283,10 +290,16 @@ def get_payment_order(name):
     if not bs_order_names(invoice):
         fail("Select a supplier invoice linked to BS Procurement.")
     result = invoice_header(invoice)
+    result["editableDetails"] = bool(invoice.docstatus == 0 and
+        (invoice.workflow_state or "Draft") in ("Draft", "Rejected") and
+        frappe.has_permission("Purchase Invoice", "write", doc=invoice))
     receipt_names = {r.purchase_receipt for r in invoice.items if r.purchase_receipt}
     receipts, restricted = visible_documents("Purchase Receipt", receipt_names, invoice.company)
     result["receipts"] = dict(restricted=restricted, records=[
         dict(id=d.name, date=str(d.posting_date), status=document_state(d), docstatus=d.docstatus,
+             deliveryNote=d.get("custom_bsp_delivery_note_file") or "",
+             invoiceNo=d.get("custom_bsp_supplier_invoice_no") or "",
+             invoiceFile=d.get("custom_bsp_supplier_invoice_file") or "",
              lines=[dict(item=r.item_code, qty=r.qty, uom=r.uom, rejected=r.rejected_qty)
                     for r in d.items if any(i.pr_detail == r.name for i in invoice.items)])
         for d in receipts])
@@ -345,7 +358,57 @@ def invoice_action(name, modified, action):
         fail("Select a BS Procurement supplier invoice.")
     if action in ("Approve", "Reject"):
         approval_allowed(invoice, throw=True)
+    if action == "Send for Approval":
+        validate_payment_order_ready(invoice)
     invoice = apply_workflow(invoice, action)
+    return get_payment_order(invoice.name)
+
+
+def validate_payment_order_ready(invoice):
+    missing = []
+    if not (invoice.bill_no or "").strip():
+        missing.append("supplier invoice number")
+    if not invoice.bill_date:
+        missing.append("supplier invoice date")
+    invoice_file = invoice.get("custom_bsp_supplier_invoice_file")
+    source_receipt = invoice.get("custom_bsp_source_receipt")
+    attached = frappe.db.get_value("File", {"file_url": invoice_file},
+        ["is_private", "attached_to_doctype", "attached_to_name"], as_dict=True) if invoice_file else None
+    valid_attachment = bool(attached and attached.is_private and (
+        (attached.attached_to_doctype == "Purchase Invoice" and attached.attached_to_name == invoice.name) or
+        (source_receipt and attached.attached_to_doctype == "Purchase Receipt" and
+         attached.attached_to_name == source_receipt)))
+    if not valid_attachment:
+        missing.append("supplier invoice attachment")
+    if not invoice.get("custom_bsp_journal_code"):
+        missing.append("journal code")
+    if not invoice.get("custom_bsp_accounting_confirmed"):
+        missing.append("confirmed GL accounts")
+    if missing:
+        fail("Complete the Payment Order before approval: " + ", ".join(missing) + ".")
+
+
+@frappe.whitelist(methods=["POST"])
+def save_payment_order_details(name, modified, bill_no, bill_date, due_date, invoice_file=""):
+    invoice = load("Purchase Invoice", name, "write", modified)
+    if not bs_order_names(invoice) or invoice.docstatus != 0 or \
+            (invoice.workflow_state or "Draft") not in ("Draft", "Rejected"):
+        fail("Supplier invoice details can only be edited on a draft or rejected Payment Order.")
+    bill_no = (bill_no or "").strip()
+    if not bill_no or not bill_date or not due_date:
+        fail("Enter the supplier invoice number, invoice date and due date.")
+    file_url = (invoice_file or "").strip()
+    if file_url and file_url != invoice.get("custom_bsp_supplier_invoice_file"):
+        file = frappe.db.get_value("File", {"file_url": file_url,
+            "attached_to_doctype": "Purchase Invoice", "attached_to_name": invoice.name},
+            ["name", "is_private"], as_dict=True)
+        if not file or not file.is_private:
+            fail("Upload the supplier invoice privately against this Payment Order.")
+    invoice.bill_no = bill_no
+    invoice.bill_date = getdate(bill_date)
+    invoice.due_date = getdate(due_date)
+    invoice.custom_bsp_supplier_invoice_file = file_url or None
+    invoice.save()
     return get_payment_order(invoice.name)
 
 
@@ -359,14 +422,25 @@ def get_payment_order_sources():
         from `tabPurchase Receipt` pr
         join `tabPurchase Receipt Item` pri on pri.parent=pr.name
         join `tabPurchase Order` po on po.name=pri.purchase_order
-        where pr.docstatus=1 and pr.is_return=0 and po.custom_bsp_managed=1""", pluck=True)
+        where pr.docstatus=1 and pr.is_return=0 and po.custom_bsp_managed=1
+          and coalesce(pr.custom_bsp_delivery_note_file,'')!=''
+          and coalesce(pr.custom_bsp_supplier_invoice_file,'')!=''
+          and coalesce(pr.custom_bsp_supplier_invoice_no,'')!=''
+          and pr.custom_bsp_supplier_invoice_date is not null
+          and not exists (select 1 from `tabPurchase Invoice Item` pii
+              join `tabPurchase Invoice` pi on pi.name=pii.parent
+              where pii.purchase_receipt=pr.name and pi.docstatus<2)""", pluck=True)
     if receipt_names and frappe.has_permission("Purchase Receipt", "read"):
         for receipt in frappe.get_list("Purchase Receipt",
                 filters={"name": ["in", receipt_names]},
-                fields=["name", "posting_date", "supplier"],
+                fields=["name", "posting_date", "supplier", "custom_bsp_supplier_invoice_no",
+                        "custom_bsp_supplier_invoice_date", "custom_bsp_supplier_invoice_file"],
                 limit_page_length=100, order_by="posting_date desc, creation desc"):
             sources.append(dict(doctype="Purchase Receipt", name=receipt.name,
-                label=f"Receipt {receipt.name} · {receipt.supplier} · {receipt.posting_date}"))
+                label=f"Receipt {receipt.name} · {receipt.supplier} · {receipt.posting_date}",
+                bill=receipt.custom_bsp_supplier_invoice_no or "",
+                billDate=str(receipt.custom_bsp_supplier_invoice_date or ""),
+                invoiceFile=receipt.custom_bsp_supplier_invoice_file or ""))
 
     if frappe.has_permission("Purchase Order", "read"):
         orders = frappe.get_list("Purchase Order",
@@ -380,7 +454,8 @@ def get_payment_order_sources():
                     "Item", row.item_code, ["is_stock_item", "is_fixed_asset"]))
                     for row in doc.items):
                 sources.append(dict(doctype="Purchase Order", name=doc.name,
-                    label=f"Service PO {doc.name} · {doc.supplier} · {doc.transaction_date}"))
+                    label=f"Service PO {doc.name} · {doc.supplier} · {doc.transaction_date}",
+                    bill="", billDate="", invoiceFile=""))
 
     return sources
 
@@ -428,6 +503,30 @@ def prepare_payment_order(source_doctype, source_name):
     if not invoice.items:
         fail("There are no unbilled items for this source.")
     return invoice
+
+
+@frappe.whitelist(methods=["POST"])
+def create_payment_order(source_doctype, source_name, bill_no="", bill_date="", due_date=""):
+    """Create the standard Purchase Invoice and return it in the BS Payment Order view."""
+    invoice = prepare_payment_order(source_doctype, source_name)
+    source = load(source_doctype, source_name)
+    invoice_file = ""
+    if source_doctype == "Purchase Receipt":
+        bill_no = source.get("custom_bsp_supplier_invoice_no") or bill_no
+        bill_date = source.get("custom_bsp_supplier_invoice_date") or bill_date
+        invoice_file = source.get("custom_bsp_supplier_invoice_file") or ""
+        if not source.get("custom_bsp_delivery_note_file") or not invoice_file:
+            fail("The submitted receipt must include its delivery note and supplier invoice attachments.")
+        invoice.custom_bsp_source_receipt = source.name
+    if not (bill_no or "").strip() or not bill_date or not due_date:
+        fail("Enter the supplier invoice number, invoice date and due date.")
+    invoice.bill_no = bill_no.strip()
+    invoice.bill_date = getdate(bill_date)
+    invoice.due_date = getdate(due_date)
+    invoice.custom_bsp_managed = 1
+    invoice.custom_bsp_supplier_invoice_file = invoice_file or None
+    invoice.insert()
+    return get_payment_order(invoice.name)
 
 
 @frappe.whitelist()

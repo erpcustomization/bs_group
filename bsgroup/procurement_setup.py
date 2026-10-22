@@ -55,6 +55,12 @@ def execute():
                  fieldtype="Long Text", insert_after="amended_from", hidden=1,
                  read_only=1, allow_on_submit=1, print_hide=1, no_copy=1),
         ],
+        "Purchase Receipt": [
+            field("delivery_note_file", "Supplier delivery note", "Attach", no_copy=1),
+            field("supplier_invoice_file", "Supplier invoice copy", "Attach", no_copy=1),
+            field("supplier_invoice_no", "Supplier invoice number", no_copy=1),
+            field("supplier_invoice_date", "Supplier invoice date", "Date", no_copy=1),
+        ],
         "Journal Entry": [
             field("cash_category", "Non-procurement cash category", "Select",
                   options="\n" + "\n".join(CATEGORIES), no_copy=1,
@@ -68,6 +74,11 @@ def execute():
         ],
         "Purchase Invoice": [
             field("managed", "BS Procurement", "Check", read_only=1, default="0", print_hide=1),
+            field("source_receipt", "BS Purchase Receipt", "Link", options="Purchase Receipt",
+                  read_only=1, no_copy=1),
+            field("supplier_invoice_file", "Supplier invoice copy", "Attach", no_copy=1),
+            field("accounting_confirmed", "BS accounting codes confirmed", "Check",
+                  read_only=1, hidden=1, no_copy=1, default="0"),
             field("approved_by", "Payment Order approved by", "Link", options="User",
                   read_only=1, no_copy=1, print_hide=1),
             field("approved_on", "Payment Order approved on", "Datetime",
@@ -94,6 +105,7 @@ def execute():
     frappe.clear_cache(doctype="Account")
     frappe.clear_cache(doctype="Material Request")
     frappe.clear_cache(doctype="Purchase Order")
+    frappe.clear_cache(doctype="Purchase Receipt")
     # Existing invoice views may predate the managed flag. Recover their real
     # BS PO lineage without inventing or backdating approval evidence.
     frappe.db.sql("""update `tabPurchase Invoice` p
