@@ -1,7 +1,7 @@
 /* Standard ERPNext Material Requests and Purchase Orders. No simulated records. */
 frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
   const page=frappe.ui.make_app_page({parent:wrapper,title:"BS Procurement",single_column:true});
-  const root=document.createElement("div");root.className="bsp";root.dataset.build="20261023-optional-receipt-files";page.main.append(root);
+  const root=document.createElement("div");root.className="bsp";root.dataset.build="20261023-sidebar";page.main.append(root);
   const esc=v=>frappe.utils.escape_html(String(v??""));
   const money=(v,currency)=>{const digits=(currency||order()?.currency||req()?.currency)==="OMR"?3:2;return new Intl.NumberFormat("en-AE",{minimumFractionDigits:digits,maximumFractionDigits:digits}).format(Number(v)||0);};
   const api=async(method,args={})=>(await frappe.call({method:"bsgroup.procurement."+method,args,freeze:true})).message;
@@ -534,6 +534,12 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
   root.innerHTML="<p>Loading BS Procurement…</p>";
   let firstShow=true;
   const incoming=()=>{
+    const section=frappe.route_options?.bsp_view;
+    if(["list","orders","services"].includes(section)){
+      delete frappe.route_options.bsp_view;
+      view=section;active=null;po=null;receipt=null;settlement=null;query="";picks={};
+      return {section};
+    }
     const invoice=frappe.route_options?.bsp_invoice;
     if(invoice){delete frappe.route_options.bsp_invoice;view="services";return {invoice};}
     const orderName=frappe.route_options?.bsp_order;
@@ -545,8 +551,8 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
   };
   wrapper.bsp_refresh=()=>{
     if(firstShow){firstShow=false;return;}
-    const target=incoming();
     if(dirty||busy)return;
+    const target=incoming();
     if(view==="orders"&&!target.invoice&&!target.request){refreshOrders();return;}
     if(target.invoice||view==="services"){refreshSettlement(target.invoice||settlement?.id);return;}
     refresh(target.request||(active&&["detail","po","receipt"].includes(view)?active:null));
@@ -555,6 +561,8 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
   (async()=>{
     await refreshSettlement(null,false,false);
     if(initial.invoice){view="services";await refreshSettlement(initial.invoice);}
+    else if(initial.section==="orders"){await refreshOrders();}
+    else if(initial.section==="services"){render();}
     else if(canReadRequests){await refresh(initial.request||null);}
     else{view="services";render();}
   })().catch(error=>{console.error(error);root.innerHTML="<p>Unable to load BS Procurement. Check your permissions and reload.</p>";});
