@@ -23,6 +23,7 @@ def ensure_sidebar():
     end = next((i for i in range(section + 1, len(sidebar.items))
                 if sidebar.items[i].type == "Section Break"), len(sidebar.items))
     for label, view, icon in (
+        ("Dashboard", "dashboard", "chart-no-axes-combined"),
         ("Purchase Requisition", "list", "file-text"),
         ("Purchase Order", "orders", "shopping-cart"),
         ("Payment Order", "services", "credit-card"),
@@ -36,7 +37,7 @@ def ensure_sidebar():
         if row is None:
             row = sidebar.append("items", {})
             sidebar.items.remove(row)
-            sidebar.items.insert(end, row)
+            sidebar.items.insert(section + 1 if view == "dashboard" else end, row)
             end += 1
             changed = True
         # Distinct filters preserve all three destinations in native sidebar deduplication.
