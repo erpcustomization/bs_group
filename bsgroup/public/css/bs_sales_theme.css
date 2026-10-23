@@ -1,0 +1,114 @@
+/* BS Group sales screens share BS Procurement's existing palette.
+   Screen-only: print formats, documents and accounting behaviour are untouched. */
+@media screen {
+    .bs-sales-ui {
+        --bs-sales-theme-version: "20261024";
+        --bs-navy: #102d59;
+        --bs-blue: #1d5fc4;
+        --bs-ink: #172b4d;
+        --bs-muted: #60718b;
+        --bs-line: #dfe7f2;
+        --bs-canvas: #f4f7fc;
+    }
+    .bs-sales-ui .page-container { color: var(--bs-ink); background: var(--bs-canvas); }
+    .bs-sales-ui .page-head { background: #fff; border-bottom: 1px solid var(--bs-line); }
+    .bs-sales-ui .page-title .title-text { color: var(--bs-navy); font-weight: 650; }
+    .bs-sales-ui .page-title .es-breadcrumbs__label { color: var(--bs-navy); }
+    .bs-sales-ui .page-container .es-button { border-radius: 7px; }
+    .bs-sales-ui .page-container .es-button.primary-action {
+        background: var(--bs-blue); border-color: var(--bs-blue); color: #fff;
+    }
+    .bs-sales-ui .page-container .es-button.primary-action:hover:not(:disabled) { background: var(--bs-navy); }
+    .bs-sales-ui .page-container .layout-main-section {
+        background: #fff; border: 1px solid var(--bs-line); border-radius: 10px;
+        box-shadow: 0 2px 8px rgb(16 45 89 / 3%);
+    }
+    .bs-sales-ui .page-container .btn { border-radius: 7px; font-weight: 550; }
+    .bs-sales-ui .page-container .btn-primary {
+        background: var(--bs-blue); border-color: var(--bs-blue); color: #fff;
+        box-shadow: 0 2px 4px rgb(29 95 196 / 12%);
+    }
+    .bs-sales-ui .page-container .btn-primary:hover:not(:disabled) { background: var(--bs-navy); border-color: var(--bs-navy); }
+    .bs-sales-ui .page-container .btn-default { background: #fff; border: 1px solid var(--bs-line); color: var(--bs-navy); }
+    .bs-sales-ui .page-container .btn-default:hover:not(:disabled) { background: #edf3fc; }
+    .bs-sales-ui .page-container :is(button, a, input, select, textarea):focus-visible {
+        outline: 2px solid var(--bs-blue); outline-offset: 2px;
+    }
+    .bs-sales-ui .page-container .form-control {
+        border: 1px solid var(--bs-line); border-radius: 7px; background-color: #fff; color: var(--bs-ink);
+    }
+    .bs-sales-ui .page-container .form-control:focus { border-color: var(--bs-blue); box-shadow: 0 0 0 2px rgb(29 95 196 / 10%); }
+    .bs-sales-ui .page-container .form-control:disabled,
+    .bs-sales-ui .page-container .form-control[readonly] { background-color: var(--bs-canvas); }
+    .bs-sales-ui .page-container .control-label { color: var(--bs-muted); font-size: 12px; }
+    .bs-sales-ui .page-container .form-section { border-color: var(--bs-line); }
+    .bs-sales-ui .page-container .section-head { color: var(--bs-navy); font-weight: 650; font-size: 14px; }
+    .bs-sales-ui .page-container .form-tabs-list { background: #fff; border-bottom-color: var(--bs-line); }
+    .bs-sales-ui .page-container .form-tabs .nav-link { color: var(--bs-muted); }
+    .bs-sales-ui .page-container .form-tabs .nav-link.active { color: var(--bs-blue); border-bottom-color: var(--bs-blue); }
+    .bs-sales-ui .page-container :is(.list-row-head, .grid-heading-row, .dt-row-header .dt-cell) {
+        background: #edf3fc; color: var(--bs-navy); border-color: var(--bs-line); font-size: 12px;
+    }
+    .bs-sales-ui .page-container .list-row-container { border-bottom-color: var(--bs-line); }
+    .bs-sales-ui .page-container .list-row-container:hover { background: #f7faff; }
+    .bs-sales-ui .page-container .list-row .level-item a { color: var(--bs-blue); }
+    .bs-sales-ui .page-container :is(.frappe-list, .form-grid, .datatable) { border-color: var(--bs-line); }
+    .bs-sales-ui .page-container .filter-section { padding-top: 10px; padding-bottom: 10px; }
+    .bs-sales-ui .page-container .report-summary { background: var(--bs-canvas); border-radius: 8px; }
+    .bs-sales-ui .page-container .summary-value { color: var(--bs-navy); }
+
+    /* Custom dashboard shells; preserve all metrics, filters and status colours. */
+    .bs-sales-ui :is(.smd-wrap, .psd-wrap, .mspe-root) {
+        background: var(--bs-canvas); color: var(--bs-ink); padding: 16px;
+        font-family: inherit; min-height: 0;
+        --ps-primary: #1d5fc4; --ps-primary2: #1d5fc4; --ps-accent: #1d5fc4;
+        --ps-line: #dfe7f2; --ps-bg: #f4f7fc; --ps-text: #172b4d; --ps-muted: #60718b;
+        --ps-shadow: 0 2px 8px rgb(16 45 89 / 3%); --ps-radius: 10px;
+    }
+    .bs-sales-ui :is(.smd-header, .psd-hero) {
+        background: #fff; color: var(--bs-ink); border: 1px solid var(--bs-line);
+        border-radius: 10px; padding: 18px; margin-bottom: 16px; box-shadow: none;
+    }
+    .bs-sales-ui :is(.smd-header h1, .psd-hero h1, .mspe-title) {
+        font-size: 22px; line-height: 1.3; font-weight: 650; color: var(--bs-navy); margin: 0 0 8px;
+    }
+    .bs-sales-ui :is(.smd-header .sub, .psd-hero p, .mspe-sub) { color: var(--bs-muted); font-size: 12px; opacity: 1; }
+    .bs-sales-ui :is(.smd-header .filter-btn, .smd-header .refresh-btn, .psd-btn) {
+        background: #fff; color: var(--bs-navy); border: 1px solid var(--bs-line);
+        border-radius: 7px; padding: 7px 12px; font-size: 12px;
+    }
+    .bs-sales-ui :is(.smd-header .filter-btn, .smd-header .refresh-btn, .psd-btn):hover,
+    .bs-sales-ui :is(.smd-header .filter-btn.active, .psd-btn.active, .psd-btn.filter-active) {
+        background: #edf3fc; color: var(--bs-blue); border-color: #bdcfee;
+    }
+    .bs-sales-ui :is(.smd-card, .psd-panel, .psd-kpi-card, .mspe-card, .mspe-filters, .mspe-gridwrap) {
+        background: #fff; border: 1px solid var(--bs-line); border-radius: 10px;
+        padding: 16px; box-shadow: 0 2px 8px rgb(16 45 89 / 3%);
+    }
+    .bs-sales-ui .mspe-gridwrap { padding: 0; }
+    .bs-sales-ui :is(.smd-grid4 .smd-card, .psd-kpi-card, .mspe-card) { border-top: 3px solid var(--bs-blue); }
+    .bs-sales-ui .psd-kpi-card::after { content: none; }
+    .bs-sales-ui .psd-meta-card { background: var(--bs-canvas); border: 1px solid var(--bs-line); border-radius: 8px; padding: 12px; }
+    .bs-sales-ui :is(.psd-meta-value, .mspe-card .val) { color: var(--bs-navy); }
+    .bs-sales-ui :is(.smd-metric-value, .psd-kpi-value) { font-size: 28px; font-weight: 650; }
+    .bs-sales-ui :is(.smd-metric-label, .smd-metric-note, .smd-update-meta, .psd-meta-label, .mspe-card .lbl, .mspe-card .cur) { color: var(--bs-muted); }
+    .bs-sales-ui :is(.smd-sec-title h2, .psd-sec-title h2) { color: var(--bs-navy); font-size: 15px; font-weight: 650; }
+    .bs-sales-ui :is(.smd-link, .smd-opp-link, .psd-link) { color: var(--bs-blue); }
+    .bs-sales-ui :is(.smd-bar-fill, .psd-bar-fill, .mspe-prog span) { background: var(--bs-blue); }
+    .bs-sales-ui :is(.smd-bar-track, .psd-bar-track) { background: #e8effb; }
+    .bs-sales-ui :is(.smd-table, .psd-table) th {
+        background: #edf3fc; color: var(--bs-navy); font-size: 11px; letter-spacing: .02em;
+    }
+    .bs-sales-ui :is(.smd-table, .psd-table) :is(th, td) { padding: 9px 8px; border-bottom-color: var(--bs-line); }
+    .bs-sales-ui :is(.smd-update-item, .smd-dropdown, .psd-dropdown) { border-color: var(--bs-line); border-radius: 8px; }
+    .bs-sales-ui .psd-dd-item.selected { background: #edf3fc; color: var(--bs-blue); }
+    .bs-sales-ui .mspe-filters { gap: 18px; }
+    .bs-sales-ui .mspe-tbl thead tr.grp th { background: var(--bs-navy); }
+    .bs-sales-ui .mspe-tbl thead tr.cols th { background: #edf3fc; color: var(--bs-navy); }
+    .bs-sales-ui .mspe-select { border-color: var(--bs-line); border-radius: 7px; }
+    @media (max-width: 767px) {
+        .bs-sales-ui :is(.smd-wrap, .psd-wrap, .mspe-root) { padding: 10px; }
+        .bs-sales-ui .psd-hero { grid-template-columns: 1fr; }
+        .bs-sales-ui :is(.smd-header, .psd-hero) { padding: 14px; }
+    }
+}

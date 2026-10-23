@@ -254,11 +254,13 @@ app_license = "mit"
 app_include_js = [
     "bsgroup.bundle.js",
     "navbar_custom.bundle.js",
+    "bs_sales_theme.bundle.js",
     # "/assets/bsgroup/js/bs_welcome_banner.js",
 ]
 app_include_css = [
     "/assets/bsgroup/css/sidebar.css",
     "/assets/bsgroup/css/labor_preapproval.css",
+    "/assets/bsgroup/css/bs_sales_theme.css",
     # "/assets/bsgroup/css/bs_welcome_banner.css",
 ]
 
