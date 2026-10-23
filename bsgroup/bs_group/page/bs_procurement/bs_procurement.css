@@ -226,3 +226,6 @@
   .bsp {display:block;}
   .bsp .bsp-side {display:none;}
 }
+
+.bsp .bsp-select-cell {width:38px;text-align:center;}
+.bsp .bsp-select-cell input[type="checkbox"] {width:16px;min-width:16px;height:16px;min-height:16px;padding:0;margin:0 auto;cursor:pointer;}

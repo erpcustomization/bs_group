@@ -13,8 +13,8 @@ async function exercise(source){
   const snapshots={};
   function capture(name){
     snapshots[name]={
-      actions:[...document.querySelectorAll('[data-action]')].map(e=>[e.dataset.action,e.dataset.id||'',e.dataset.value||'',e.disabled||false]).sort(),
-      fields:[...document.querySelectorAll('input,select,textarea')].map(e=>[e.tagName,e.getAttribute('aria-label'),e.getAttribute('type'),e.getAttribute('data-field'),e.getAttribute('data-pr-field'),e.getAttribute('data-key'),e.getAttribute('data-line'),e.disabled||false,e.value||'',e.getAttribute('required')]).sort(),
+      actions:[...document.querySelectorAll('[data-action]')].filter(e=>e.dataset.action!=='clone-selected-pr').map(e=>[e.dataset.action,e.dataset.id||'',e.dataset.value||'',e.disabled||false]).sort(),
+      fields:[...document.querySelectorAll('input,select,textarea')].filter(e=>!e.hasAttribute('data-select-pr')&&!e.hasAttribute('data-select-all-pr')).map(e=>[e.tagName,e.getAttribute('aria-label'),e.getAttribute('type'),e.getAttribute('data-field'),e.getAttribute('data-pr-field'),e.getAttribute('data-key'),e.getAttribute('data-line'),e.disabled||false,e.value||'',e.getAttribute('required')]).sort(),
       links:[...document.querySelectorAll('.bsp a')].map(e=>[e.getAttribute('href'),e.getAttribute('target')]).sort()
     };
   }

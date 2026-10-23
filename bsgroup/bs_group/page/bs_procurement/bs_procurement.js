@@ -1,7 +1,7 @@
 /* Standard ERPNext Material Requests and Purchase Orders. No simulated records. */
 frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
   const page=frappe.ui.make_app_page({parent:wrapper,title:"BS Procurement",single_column:true});
-  const root=document.createElement("div");root.className="bsp";root.dataset.build="20261023-shared-navigation";page.main.append(root);
+  const root=document.createElement("div");root.className="bsp";root.dataset.build="20261023-list-clone";page.main.append(root);
   const esc=v=>frappe.utils.escape_html(String(v??""));
   const money=(v,currency)=>{const digits=(currency||order()?.currency||req()?.currency)==="OMR"?3:2;return new Intl.NumberFormat("en-AE",{minimumFractionDigits:digits,maximumFractionDigits:digits}).format(Number(v)||0);};
   const api=async(method,args={})=>(await frappe.call({method:"bsgroup.procurement."+method,args,freeze:true})).message;
@@ -70,6 +70,7 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
     }
   }
   const key=()=>Array.from(crypto.getRandomValues(new Uint8Array(16)),n=>n.toString(16).padStart(2,"0")).join("");
+  const selectedPRs=new Set(),cloneKeys=new Map();
   let poList=[],poMore=false,poLoaded=false,searchTimer=null,searchVersion=0;
   let requests=[],requestsLoaded=false,active=null,po=null,receipt=null,view="dashboard",query="",canCreate=false,hasMore=false,user="",picks={},dirty=false,busy=false;
   let dashboard=null,dashboardCompany="",dashboardSelection="";
@@ -206,9 +207,25 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
       el.hidden=!el.dataset.searchText.includes(query.toLowerCase());
       const cell=el.querySelector("[data-serial]");if(cell&&!el.hidden)cell.textContent=++serial;
     });
+    updatePRSelection();
+  }
+  function updatePRSelection(){
+    if(view!=="list")return;
+    const eligible=new Set(requests.filter(row=>row.canClone).map(row=>row.id));
+    for(const id of selectedPRs)if(!eligible.has(id))selectedPRs.delete(id);
+    const boxes=Array.from(root.querySelectorAll("[data-select-pr]"));
+    boxes.forEach(box=>{
+      if(box.disabled||box.closest("tr").hidden)selectedPRs.delete(box.dataset.selectPr);
+      box.checked=selectedPRs.has(box.dataset.selectPr);
+    });
+    const visible=boxes.filter(box=>!box.disabled&&!box.closest("tr").hidden);
+    const all=root.querySelector("[data-select-all-pr]");
+    if(all){all.disabled=!visible.length;all.checked=!!visible.length&&visible.every(box=>box.checked);all.indeterminate=visible.some(box=>box.checked)&&!all.checked;}
+    const action=root.querySelector('[data-action="clone-selected-pr"]');
+    if(action){action.disabled=busy||!selectedPRs.size;action.textContent=selectedPRs.size?`Clone selected (${selectedPRs.size})`:"Clone selected";}
   }
   function list(){
-    return `<div class="bsp-heading"><div><h2>Purchase Requisition <small>${requests.length} loaded</small></h2><p class="muted">Each requisition has its own approval, cost comparison and purchasing progress.</p></div><div>${canCreate?btn("New Purchase Requisition","new-pr","",true):""}<input data-search type="search" aria-label="Search requisitions" placeholder="Search requisitions"></div></div><div class="bsp-tablewrap"><table><thead><tr><th>No.</th><th>Purchase requisition</th><th>Company / project</th><th>Requested by</th><th>PR approval</th><th>Purchasing status</th><th>Budget</th></tr></thead><tbody>${requests.map((r,i)=>`<tr data-search-text="${esc([r.id,r.company,r.project,r.person,r.approval,r.purchasing].join(" ").toLowerCase())}"><td data-serial>${i+1}</td><td>${btn(esc(r.id),"open-pr",`data-id="${esc(r.id)}"`)}</td><td>${esc(r.company)}<small style="display:block">${esc(r.project)}</small></td><td>${esc(r.person)}</td><td>${badge(r.approval)}</td><td>${badge(r.purchasing)}</td><td>${esc(r.currency)} ${money(r.items.reduce((s,x)=>s+x.qty*x.cost,0),r.currency)}</td></tr>`).join("")||'<tr><td colspan="7">No purchase requisitions.</td></tr>'}</tbody></table></div>${hasMore?btn("Load more requisitions","more"):""}`;
+    return `<div class="bsp-heading"><div><h2>Purchase Requisition <small>${requests.length} loaded</small></h2><p class="muted">Each requisition has its own approval, cost comparison and purchasing progress.</p></div><div>${canCreate?btn("New Purchase Requisition","new-pr","",true):""}${btn("Clone selected","clone-selected-pr","disabled")}<input data-search type="search" aria-label="Search requisitions" placeholder="Search requisitions"></div></div><div class="bsp-tablewrap"><table><thead><tr><th class="bsp-select-cell"><input type="checkbox" data-select-all-pr aria-label="Select all eligible visible PRs"></th><th>No.</th><th>Purchase requisition</th><th>Company / project</th><th>Requested by</th><th>PR approval</th><th>Purchasing status</th><th>Budget</th></tr></thead><tbody>${requests.map((r,i)=>`<tr data-search-text="${esc([r.id,r.company,r.project,r.person,r.approval,r.purchasing].join(" ").toLowerCase())}"><td class="bsp-select-cell"><input type="checkbox" data-select-pr="${esc(r.id)}" aria-label="Select ${esc(r.id)}" ${r.canClone?"":'disabled title="Only eligible manual PRs can be cloned"'}></td><td data-serial>${i+1}</td><td>${btn(esc(r.id),"open-pr",`data-id="${esc(r.id)}"`)}</td><td>${esc(r.company)}<small style="display:block">${esc(r.project)}</small></td><td>${esc(r.person)}</td><td>${badge(r.approval)}</td><td>${badge(r.purchasing)}</td><td>${esc(r.currency)} ${money(r.items.reduce((s,x)=>s+x.qty*x.cost,0),r.currency)}</td></tr>`).join("")||'<tr><td colspan="8">No purchase requisitions.</td></tr>'}</tbody></table></div>${hasMore?btn("Load more requisitions","more"):""}`;
   }
   function rail(r){
     const submitted=r.history.some(e=>e.action==="Pending Approval"),orders=r.orders.filter(p=>p.status!=="Cancelled"),approved=orders.filter(p=>p.status==="Approved");
@@ -426,6 +443,22 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
     if(action==="refresh"){await refresh(active&&["detail","po"].includes(view)?active:null);return;}
     if(action==="more"){const result=await api("get_requests",{start:requests.length,page_length:50});result.requests.forEach(replace);hasMore=result.has_more;render();return;}
     if(action==="new-pr"){await createPR();return;}
+    if(action==="clone-selected-pr"){
+      const selected=requests.filter(row=>selectedPRs.has(row.id)&&row.canClone);
+      let created=0;
+      try{
+        for(const source of selected){
+          if(!cloneKeys.has(source.id))cloneKeys.set(source.id,key());
+          const copied=await api("clone_request",{name:source.id,key:cloneKeys.get(source.id)});
+          replace(copied);selectedPRs.delete(source.id);cloneKeys.delete(source.id);created++;
+        }
+      }finally{
+        if(created)query="";
+        render();
+        if(created)frappe.msgprint(`${created} draft PR${created===1?"":"s"} created. Review the copies and attach fresh supporting documents before approval.`);
+      }
+      return;
+    }
     if(action==="clone-pr"){
       const copied=await api("clone_request",{name:r.id,key:key()});
       replace(copied);active=copied.id;view="detail";dirty=false;picks={};render();
@@ -607,6 +640,12 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
   }
   root.addEventListener("input",e=>{
     const t=e.target;
+    if(view==="list"&&(t.hasAttribute("data-select-pr")||t.hasAttribute("data-select-all-pr"))){
+      if(busy){updatePRSelection();return;}
+      const boxes=t.hasAttribute("data-select-all-pr")?Array.from(root.querySelectorAll("[data-select-pr]")).filter(box=>!box.disabled&&!box.closest("tr").hidden):[t];
+      boxes.forEach(box=>{if(box.disabled)return;if(t.checked)selectedPRs.add(box.dataset.selectPr);else selectedPRs.delete(box.dataset.selectPr);});
+      updatePRSelection();return;
+    }
     if(view==="receipt"&&receipt&&t.dataset.receiptQty!==undefined){receipt.items[+t.dataset.receiptQty].qty=Number(t.value)||0;dirty=true;root.querySelector(".bsp-save-status").textContent="Unsaved changes";return;}
     if(view==="receipt"&&receipt&&t.dataset.receiptWarehouse!==undefined){receipt.items[+t.dataset.receiptWarehouse].warehouse=t.value;dirty=true;root.querySelector(".bsp-save-status").textContent="Unsaved changes";return;}
     if(view==="receipt"&&receipt&&t.dataset.receiptField){receipt[t.dataset.receiptField]=t.value;dirty=true;root.querySelector(".bsp-save-status").textContent="Unsaved changes";return;}
@@ -644,7 +683,7 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
   async function execute(b){
     busy=true;b.disabled=true;
     try{await run(b);}catch(error){console.error(error);if(!(error._server_messages||error.responseJSON?._server_messages||error.responseJSON?.exc_type))frappe.msgprint("The action could not be completed. "+esc(error.message||"Check the server message and try again."));}
-    finally{busy=false;b.disabled=false;}
+    finally{busy=false;b.disabled=false;updatePRSelection();}
   }
   root.innerHTML="<p>Loading BS Procurement…</p>";
   let firstShow=true;
