@@ -188,3 +188,7 @@
 .bsp .bsp-dashboard-empty{padding:22px 12px;background:#f5f8fd;border-radius:8px;color:#60718b;line-height:1.7}
 @media(max-width:1100px){.bsp .bsp-dashboard-stages{grid-template-columns:1fr}.bsp .bsp-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.bsp .bsp-dashboard-hero{align-items:flex-start;flex-direction:column;padding:22px}.bsp .bsp-dashboard-hero label{width:100%;max-width:none}.bsp .bsp-dashboard-hero h2{font-size:23px}.bsp .bsp-dashboard-values{grid-template-columns:1fr}}
+.bsp .bsp-metric-link {font:inherit;text-align:left;color:inherit;cursor:pointer;width:100%;transition:box-shadow .15s,transform .15s;}
+.bsp .bsp-metric-link:hover:not(:disabled) {box-shadow:0 5px 18px #175acb22;transform:translateY(-2px);}
+.bsp .bsp-metric-link:focus-visible {outline:3px solid #1d63d8;outline-offset:3px;}
+.bsp .bsp-metric-link:disabled {cursor:default;}

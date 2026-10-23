@@ -60,15 +60,21 @@ class DashboardTests(unittest.TestCase):
             self.assertEqual(result["unpaidValue"], {"OMR": 30})
             self.assertEqual((result["pending"], result["awaitingReceipt"], result["overduePayments"]), (1, 1, 1))
             self.assertEqual(result["attention"][0]["id"], "INV1")
+            for metric, names in {"pending": ["PR1"], "awaitingReceipt": ["PO1"],
+                                  "unpaidCount": ["INV1"], "overduePayments": ["INV1"]}.items():
+                self.assertEqual([r["id"] for r in result["records"][metric]], names)
+                self.assertEqual(len(result["records"][metric]), result[metric])
             scoped = dashboard.get_dashboard("Dubai")
             self.assertEqual(scoped["poValue"], {"AED": 400})
             self.assertEqual(scoped["stages"]["requests"]["total"], 0)
+            self.assertTrue(all(not rows for rows in scoped["records"].values()))
 
     def test_restricted_sections_are_not_reported_as_empty(self):
         with patch.object(dashboard, "visible_rows", return_value=None):
             result = dashboard.get_dashboard()
             self.assertIsNone(result["stages"]["payments"])
             self.assertIn("Payment Order", result["restricted"])
+            self.assertTrue(all(not rows for rows in result["records"].values()))
 
 
 if __name__ == "__main__":

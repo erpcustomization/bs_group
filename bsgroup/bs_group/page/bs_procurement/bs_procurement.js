@@ -1,7 +1,7 @@
 /* Standard ERPNext Material Requests and Purchase Orders. No simulated records. */
 frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
   const page=frappe.ui.make_app_page({parent:wrapper,title:"BS Procurement",single_column:true});
-  const root=document.createElement("div");root.className="bsp";root.dataset.build="20261023-dashboard";page.main.append(root);
+  const root=document.createElement("div");root.className="bsp";root.dataset.build="20261023-dashboard-links";page.main.append(root);
   const esc=v=>frappe.utils.escape_html(String(v??""));
   const money=(v,currency)=>{const digits=(currency||order()?.currency||req()?.currency)==="OMR"?3:2;return new Intl.NumberFormat("en-AE",{minimumFractionDigits:digits,maximumFractionDigits:digits}).format(Number(v)||0);};
   const api=async(method,args={})=>(await frappe.call({method:"bsgroup.procurement."+method,args,freeze:true})).message;
@@ -13,7 +13,8 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
   const key=()=>Array.from(crypto.getRandomValues(new Uint8Array(16)),n=>n.toString(16).padStart(2,"0")).join("");
   let poList=[],poMore=false,poLoaded=false,searchTimer=null,searchVersion=0;
   let requests=[],requestsLoaded=false,active=null,po=null,receipt=null,view="dashboard",query="",canCreate=false,hasMore=false,user="",picks={},dirty=false,busy=false;
-  let dashboard=null,dashboardCompany="";
+  let dashboard=null,dashboardCompany="",dashboardSelection="";
+  const dashboardLabels={pending:"Pending approvals",awaitingReceipt:"Awaiting receipt",unpaidCount:"Unpaid payment orders",overduePayments:"Overdue payments"};
   async function refreshDashboard(){
     dashboard=(await frappe.call({method:"bsgroup.procurement_dashboard.get_dashboard",args:{company:dashboardCompany},freeze:true})).message;
     user=dashboard.user;render();
@@ -22,13 +23,17 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
     if(!dashboard)return '<p>Loading dashboard…</p>';
     const d=dashboard;
     const recordLink=r=>r.kind==="requests"?btn(esc(r.id),"open-pr",`data-id="${esc(r.id)}"`):r.kind==="orders"?btn(esc(r.id),"open-po",`data-id="${esc(r.id)}" data-request="${esc(r.request)}"`):btn(esc(r.id),"settlement",`data-id="${esc(r.id)}"`);
+    if(dashboardSelection){
+      const rows=d.records?.[dashboardSelection]||[];
+      return `${btn("← Back to dashboard","dashboard")}<h2>${esc(dashboardLabels[dashboardSelection])}</h2><p class="muted">${rows.length} matching records · ${esc(d.company||"All permitted companies")}</p><section class="bsp-card">${rows.length?`<div class="bsp-tablewrap"><table><thead><tr><th>Record</th><th>Supplier / description</th><th>Company</th><th>Approval</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${recordLink(r)}<small class="bsp-dashboard-meta">${esc(r.label)}</small></td><td>${esc(r.description)}</td><td>${esc(r.company)}</td><td>${badge(r.state)}</td></tr>`).join("")}</tbody></table></div>`:'<p class="bsp-dashboard-empty">No matching records.</p>'}</section>`;
+    }
     const amounts=values=>Object.entries(values).map(([c,v])=>`<strong>${esc(c)} ${money(v,c)}</strong>`).join("")||'<strong>—</strong>';
-    const metric=(label,value,note)=>`<div class="bsp-metric"><small>${label}</small><strong>${value??"—"}</strong><span>${note}</span></div>`;
+    const metric=(label,value,note,key)=>`<button type="button" class="bsp-metric bsp-metric-link" data-action="dashboard-records" data-metric="${key}" aria-label="${label}: ${value??"Access restricted"}" ${value==null?"disabled":""}><small>${label}</small><strong>${value??"—"}</strong><span>${note}</span></button>`;
     const stage=(kind,label,action)=>{const s=d.stages[kind];return `<section class="bsp-card bsp-stage-card"><div class="bsp-dashboard-title"><h3>${label}</h3>${s?btn("View all",action):""}</div>${s?`<strong class="bsp-stage-total">${s.total}</strong><span class="muted"> total records</span><div class="bsp-status-list">${Object.entries(s.states).map(([name,n])=>`<div><span>${badge(name)}</span><strong>${n}</strong><div class="bsp-status-track"><i style="width:${s.total?n/s.total*100:0}%"></i></div></div>`).join("")||'<p class="muted">No records yet.</p>'}</div>`:'<p class="muted">Access restricted.</p>'}</section>`;};
     return `<div class="bsp-dashboard-hero"><div><small>BS PROCUREMENT</small><h2>Procurement overview</h2><p>From purchase request to approved payment.</p></div><label>Company<select data-dashboard-company aria-label="Dashboard company"><option value="">All permitted companies</option>${d.companies.map(c=>`<option value="${esc(c)}" ${c===dashboardCompany?"selected":""}>${esc(c)}</option>`).join("")}</select></label></div>
       <p class="muted bsp-dashboard-updated">Updated ${esc(d.updated)} · All-time records within your access</p>
       ${d.restricted.length?`<p class="bsp-callout">Access restricted: ${d.restricted.map(esc).join(", ")}. Summary figures cover the records you can view.</p>`:""}
-      <div class="bsp-metrics">${metric("Pending approvals",d.pending,"Across PR, PO and Payment Order")}${metric("Awaiting receipt",d.stages.orders?d.awaitingReceipt:null,"Approved POs not fully received")}${metric("Unpaid payment orders",d.stages.payments?d.unpaidCount:null,"Approved with a balance remaining")}${metric("Overdue payments",d.stages.payments?d.overduePayments:null,"Approved and past their due date")}</div>
+      <div class="bsp-metrics">${metric("Pending approvals",d.pending,"Across PR, PO and Payment Order","pending")}${metric("Awaiting receipt",d.stages.orders?d.awaitingReceipt:null,"Approved POs not fully received","awaitingReceipt")}${metric("Unpaid payment orders",d.stages.payments?d.unpaidCount:null,"Approved with a balance remaining","unpaidCount")}${metric("Overdue payments",d.stages.payments?d.overduePayments:null,"Approved and past their due date","overduePayments")}</div>
       <div class="bsp-dashboard-stages">${stage("requests","Purchase Requisitions","list")}${stage("orders","Purchase Orders","orders")}${stage("payments","Payment Orders","services")}</div>
       <div class="bsp-dashboard-values"><section class="bsp-card"><h3>Approved PO value</h3>${amounts(d.poValue)}<small>Includes closed orders; excludes cancellations.</small></section><section class="bsp-card"><h3>Outstanding payments</h3>${amounts(d.unpaidValue)}<small>Approved payment orders, in each payable currency.</small></section></div>
       <section class="bsp-card"><div class="bsp-dashboard-title"><h3>Needs attention</h3><span class="bsp-badge">${d.attentionCount}</span></div>${d.attention.length?`<div class="bsp-tablewrap"><table><thead><tr><th>Record</th><th>Supplier / description</th><th>Action needed</th></tr></thead><tbody>${d.attention.map(r=>`<tr><td>${recordLink(r)}<small class="bsp-dashboard-meta">${esc(r.label)}</small></td><td>${esc(r.description)}<small class="bsp-dashboard-meta">${esc(r.company)}</small></td><td>${esc(r.reason)}</td></tr>`).join("")}</tbody></table></div>${d.attentionCount>12?'<p class="muted">Showing the first 12. Open the relevant list to view all records.</p>':""}`:'<p class="bsp-dashboard-empty">No pending approvals or overdue deliveries and payments in the records you can view.</p>'}</section>
@@ -325,7 +330,8 @@ frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
     }
 
     const action=b.dataset.action,r=req(),p=order();
-    if(action==="dashboard"||(action==="refresh"&&view==="dashboard")){view="dashboard";query="";await refreshDashboard();return;}
+    if(action==="dashboard-records"){dashboardSelection=b.dataset.metric;view="dashboard";await refreshDashboard();return;}
+    if(action==="dashboard"||(action==="refresh"&&view==="dashboard")){if(action==="dashboard")dashboardSelection="";view="dashboard";query="";await refreshDashboard();return;}
     if(action==="services"||action==="settlement-list"){view="services";query="";await refreshSettlement();return;}
     if(action==="settlement"){view="services";await refreshSettlement(b.dataset.id);return;}
     if(action==="settlement-more"){await refreshSettlement(null,true);return;}

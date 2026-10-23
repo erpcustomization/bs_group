@@ -43,6 +43,7 @@ def get_dashboard(company=""):
     stages, attention, recent = {}, [], []
     po_value, unpaid_value = defaultdict(float), defaultdict(float)
     pending = awaiting_receipt = overdue_payments = unpaid_count = 0
+    records = {key: [] for key in ("pending", "awaitingReceipt", "unpaidCount", "overduePayments")}
     labels = {"requests": "Purchase Requisition", "orders": "Purchase Order", "payments": "Payment Order"}
     for kind, rows in data.items():
         if rows is None:
@@ -61,20 +62,24 @@ def get_dashboard(company=""):
             recent.append(record)
             if state == "Pending Approval":
                 pending += 1
+                records["pending"].append(record)
                 attention.append(dict(record, reason="Awaiting approval", priority=1))
             if kind == "orders" and row.docstatus == 1 and state == "Approved":
                 po_value[row.currency] += flt(row.grand_total)
                 if row.status not in ("Closed", "Cancelled") and flt(row.per_received) < 100:
                     awaiting_receipt += 1
+                    records["awaitingReceipt"].append(record)
                     if row.schedule_date and str(row.schedule_date) < today:
                         attention.append(dict(record, reason="Delivery overdue", priority=2))
             if kind == "payments" and row.docstatus == 1 and state == "Approved" and not row.is_return:
                 outstanding = flt(row.outstanding_amount)
                 if outstanding > 0:
                     unpaid_count += 1
+                    records["unpaidCount"].append(record)
                     unpaid_value[row.party_account_currency or row.currency] += outstanding
                     if row.due_date and str(row.due_date) < today:
                         overdue_payments += 1
+                        records["overduePayments"].append(record)
                         attention.append(dict(record, reason="Payment overdue", priority=0))
         stages[kind] = dict(total=len(rows), states=dict(states))
     attention.sort(key=lambda r: (r["priority"], r["modified"], r["id"]))
@@ -82,6 +87,6 @@ def get_dashboard(company=""):
     return dict(companies=companies, company=selected, stages=stages,
                 pending=pending, awaitingReceipt=awaiting_receipt, overduePayments=overdue_payments,
                 unpaidCount=unpaid_count, poValue=dict(po_value), unpaidValue=dict(unpaid_value),
-                attention=attention[:12], attentionCount=len(attention), recent=recent[:8],
+                records=records, attention=attention[:12], attentionCount=len(attention), recent=recent[:8],
                 updated=str(now_datetime()), user=frappe.session.user,
                 restricted=[labels[k] for k, value in stages.items() if value is None])
