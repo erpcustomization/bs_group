@@ -212,11 +212,11 @@ frappe.pages["sales-management-das"].on_page_load = function (wrapper) {
 				</div>
 				<div class="smd-header-actions">
 					<div style="position:relative">
-						<button class="filter-btn" id="smd-user-btn">&#128100; All Users</button>
+						<button class="filter-btn" id="smd-user-btn">All Users</button>
 						<div class="smd-dropdown" id="smd-user-dropdown" style="display:none"></div>
 					</div>
-					<button class="filter-btn" id="smd-date-btn">&#128197; This Month</button>
-					<button class="refresh-btn" id="smd-refresh">&#8635; Refresh</button>
+					<button class="filter-btn" id="smd-date-btn">This Month</button>
+					<button class="refresh-btn" id="smd-refresh">Refresh</button>
 				</div>
 			</div>
 			<div id="smd-body">
@@ -260,7 +260,7 @@ frappe.pages["sales-management-das"].on_page_load = function (wrapper) {
 		const label = $(this).text().trim();
 		_state.selected_user = user;
 		_state.user_label    = label;
-		$("#smd-user-btn").text("👤 " + label).toggleClass("active", !!user);
+		$("#smd-user-btn").text(label).toggleClass("active", !!user);
 		$("#smd-user-dropdown").hide();
 		load_dashboard();
 	});
@@ -278,7 +278,7 @@ frappe.pages["sales-management-das"].on_page_load = function (wrapper) {
 				_state.from_date = vals.from_date;
 				_state.to_date   = vals.to_date;
 				const label = frappe.datetime.str_to_user(vals.from_date) + " → " + frappe.datetime.str_to_user(vals.to_date);
-				$("#smd-date-btn").text("📅 " + label).addClass("active");
+				$("#smd-date-btn").text(label).addClass("active");
 				load_dashboard();
 			},
 			"Select Date Range",
@@ -394,7 +394,7 @@ function load_dashboard() {
 			to_date:       _state.to_date        || null,
 		},
 		callback: function (r) {
-			$("#smd-refresh").prop("disabled", false).text("⟳ Refresh");
+			$("#smd-refresh").prop("disabled", false).text("Refresh");
 			if (r.exc || !r.message) {
 				$("#smd-body").html(
 					`<div class="smd-loading" style="color:#dc2626">Failed to load data. Check console for errors.</div>`

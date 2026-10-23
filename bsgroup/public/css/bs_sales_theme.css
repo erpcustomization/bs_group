@@ -2,7 +2,7 @@
    Screen-only: print formats, documents and accounting behaviour are untouched. */
 @media screen {
     .bs-sales-ui {
-        --bs-sales-theme-version: "20261024";
+        --bs-sales-theme-version: "20261024-refined";
         --bs-navy: #102d59;
         --bs-blue: #1d5fc4;
         --bs-ink: #172b4d;
@@ -103,12 +103,103 @@
     .bs-sales-ui :is(.smd-update-item, .smd-dropdown, .psd-dropdown) { border-color: var(--bs-line); border-radius: 8px; }
     .bs-sales-ui .psd-dd-item.selected { background: #edf3fc; color: var(--bs-blue); }
     .bs-sales-ui .mspe-filters { gap: 18px; }
-    .bs-sales-ui .mspe-tbl thead tr.grp th { background: var(--bs-navy); }
-    .bs-sales-ui .mspe-tbl thead tr.cols th { background: #edf3fc; color: var(--bs-navy); }
+    .bs-sales-ui .mspe-table tr.grp th { background: #eef3fb; color: #294b77; }
+    .bs-sales-ui .mspe-table tr.grp th:is(.inv, .bkd) { color: #294b77; border-bottom-color: #cfdbec; }
+    .bs-sales-ui .mspe-table tr.cols th { background: #eef3fb; color: #4c6486; }
     .bs-sales-ui .mspe-select { border-color: var(--bs-line); border-radius: 7px; }
     @media (max-width: 767px) {
         .bs-sales-ui :is(.smd-wrap, .psd-wrap, .mspe-root) { padding: 10px; }
         .bs-sales-ui .psd-hero { grid-template-columns: 1fr; }
         .bs-sales-ui :is(.smd-header, .psd-hero) { padding: 14px; }
+    }
+}
+
+/* Match the measured Procurement type scale and component geometry, not Desk's
+   default InterVariable/14px controls. Keep this scoped and out of print. */
+@media screen {
+    .bs-sales-ui .page-container {
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 13px; font-weight: 400; line-height: 1.5;
+        font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased;
+        --text-color: #172b4d; --text-muted: #60718b;
+        --heading-color: #12335f; --border-color: #dfe7f2;
+        --control-bg: #fff;
+    }
+    .bs-sales-ui .page-container :is(button, input, select, textarea, .control-value) { font-family: inherit; }
+    .bs-sales-ui .page-container :is(.btn, .es-button) {
+        font-size: 12px; font-weight: 550; line-height: 1.4;
+        min-height: 34px; padding: 7px 10px;
+        transition: background .16s, border-color .16s, box-shadow .16s;
+    }
+    .bs-sales-ui .page-container .es-button:not([data-variant="solid"]) {
+        background: #fff; color: #31527e; border: 1px solid #cfdbec;
+    }
+    .bs-sales-ui .page-container :is(.btn-primary, .es-button.primary-action):hover:not(:disabled) { background: #164fa7; border-color: #164fa7; }
+    .bs-sales-ui .page-container .es-button:disabled { opacity: .45; }
+    .bs-sales-ui .page-container .page-head { padding: 8px 0; }
+    .bs-sales-ui .page-container .page-head .es-breadcrumbs__label { font-size: 13px; font-weight: 550; }
+    .bs-sales-ui[data-route^="List/"] .page-head .es-breadcrumbs__label {
+        color: #12335f; font-size: 22px; letter-spacing: -.55px; line-height: 1.3; font-weight: 650;
+    }
+    .bs-sales-ui[data-route^="List/"] .layout-main-section {
+        background: var(--bs-canvas); padding: 16px 22px 20px;
+        border-radius: 12px; box-shadow: 0 4px 20px #1638670a;
+    }
+    .bs-sales-ui[data-route^="List/"] .list-page-form { background: transparent; padding: 0 0 12px; border: 0; }
+    .bs-sales-ui[data-route^="List/"] .frappe-list .result-container {
+        background: #fff; border: 1px solid var(--bs-line); border-radius: 8px;
+    }
+    .bs-sales-ui .page-container :is(.list-row, .list-row-container) { font-size: 12px; color: #172b4d; }
+    .bs-sales-ui .page-container .list-row { min-height: 48px; }
+    .bs-sales-ui .page-container .list-row .level-item a { color: #1b5ab4; font-size: 12px; font-weight: 600; }
+    .bs-sales-ui .page-container .list-row-head {
+        background: #eef3fb; color: #4c6486; font-size: 11px; font-weight: 600;
+        min-height: 38px; border-radius: 7px 7px 0 0;
+    }
+    .bs-sales-ui .page-container .list-row-head :is(span, .list-count) { font-size: 11px; }
+    .bs-sales-ui .page-container .list-paging-area { background: transparent; border-top: 0; padding-top: 12px; }
+    .bs-sales-ui .page-container :is(.indicator-pill, .es-badge) { font-family: inherit; font-size: 10px; font-weight: 600; border-radius: 5px; padding: 2px 7px; line-height: 1.6; }
+    .bs-sales-ui .page-container .indicator-pill.green { background: #eaf6f2; color: #226c53; border: 1px solid #cde8dd; }
+    .bs-sales-ui .page-container .indicator-pill.blue { background: #e9f1ff; color: #2359a8; border: 1px solid #d6e4fa; }
+    .bs-sales-ui .page-container .indicator-pill.red { background: #fff0f1; color: #a03c4b; border: 1px solid #f1d3d8; }
+    .bs-sales-ui .page-container .indicator-pill.orange { background: #fff7e7; color: #8a5d16; border: 1px solid #efdfbd; }
+    .bs-sales-ui .page-container .form-control { font-size: 12px; color: #172b4d; border-color: #cdd9e9; }
+    .bs-sales-ui .page-container .form-control::placeholder { color: #6b7e98; }
+    .bs-sales-ui .page-container .form-section .control-label { font-size: 11px; font-weight: 400; color: #687b96; }
+    .bs-sales-ui .page-container .section-head { font-size: 13px; color: #294b77; letter-spacing: -.1px; font-weight: 600; }
+    .bs-sales-ui .page-container .form-tabs .nav-link { font-size: 12px; font-weight: 600; padding: 12px 2px; }
+    .bs-sales-ui .page-container .form-tabs { gap: 22px; }
+    .bs-sales-ui .page-container .form-layout { background: var(--bs-canvas); padding: 16px; }
+    .bs-sales-ui .page-container .form-layout .form-section {
+        background: #fff; border: 1px solid var(--bs-line); border-radius: 10px;
+        margin-bottom: 14px; box-shadow: 0 2px 8px #16386704;
+    }
+    .bs-sales-ui :is(.smd-wrap, .psd-wrap, .mspe-root) { padding: 18px 22px; }
+    .bs-sales-ui :is(.smd-header, .psd-hero) { border: 0; background: transparent; padding: 0; box-shadow: none; gap: 12px; }
+    .bs-sales-ui :is(.smd-header h1, .psd-hero h1, .mspe-title) { color: #12335f; font-size: 23px; letter-spacing: -.55px; line-height: 1.3; margin: 0 0 6px; }
+    .bs-sales-ui :is(.smd-header .sub, .psd-hero>div>p) { display: none; }
+    .bs-sales-ui .psd-hero { display: flex; flex-wrap: wrap; align-items: flex-start; }
+    .bs-sales-ui .psd-hero>div:first-child { flex: 1 1 100%; }
+    .bs-sales-ui .psd-hero-actions { margin-top: 12px; }
+    .bs-sales-ui .psd-hero-meta { display: flex; flex-wrap: wrap; gap: 16px; width: 100%; }
+    .bs-sales-ui .psd-meta-card { background: transparent; border: 0; border-radius: 0; padding: 0 16px 0 0; border-right: 1px solid var(--bs-line); }
+    .bs-sales-ui .psd-meta-card:last-child { border-right: 0; }
+    .bs-sales-ui .psd-meta-label { font-size: 10px; letter-spacing: .02em; margin-bottom: 2px; }
+    .bs-sales-ui .psd-meta-value { font-size: 12px; font-weight: 550; line-height: 1.5; }
+    .bs-sales-ui :is(.smd-card, .psd-panel, .psd-kpi-card, .mspe-card) { padding: 20px; box-shadow: 0 2px 8px #16386704; }
+    .bs-sales-ui :is(.smd-metric-label, .psd-kpi-label, .mspe-card .lbl) { font-size: 12px; font-weight: 400; }
+    .bs-sales-ui :is(.smd-metric-value, .psd-kpi-value, .mspe-card .val) { font-size: 28px; letter-spacing: -.5px; font-weight: 650; line-height: 1.3; }
+    .bs-sales-ui :is(.smd-sec-title h2, .psd-sec-title h2) { font-size: 13px; font-weight: 600; color: #294b77; }
+    .bs-sales-ui :is(.smd-table, .psd-table, .mspe-table) { font-size: 12px; }
+    .bs-sales-ui :is(.smd-table, .psd-table, .mspe-table) th { background: #eef3fb; color: #4c6486; font-size: 11px; font-weight: 600; text-transform: none; letter-spacing: 0; }
+    .bs-sales-ui :is(.smd-table, .psd-table, .mspe-table) td { padding: 11px 12px; font-size: 12px; line-height: 1.55; }
+    .bs-sales-ui :is(.smd-badge, .psd-badge) { border-radius: 5px; font-size: 10px; font-weight: 600; padding: 2px 7px; }
+    @media(max-width: 767px) {
+        .bs-sales-ui[data-route^="List/"] .layout-main-section,
+        .bs-sales-ui :is(.smd-wrap, .psd-wrap, .mspe-root) { padding: 12px; }
+        .bs-sales-ui .page-container .page-head .es-breadcrumbs__label { font-size: 13px; }
+    }
+    @media(prefers-reduced-motion: reduce) {
+        .bs-sales-ui .page-container :is(.btn, .es-button) { transition: none; }
     }
 }

@@ -298,19 +298,19 @@ frappe.pages["presales-request-das"].on_page_load = function (wrapper) {
 		<div class="psd-wrap">
 			<div class="psd-hero">
 				<div>
-					<h1>🎯 Presales Dashboard</h1>
+					<h1>Presales Dashboard</h1>
 					<p id="psd-subtitle">BS Group · ERPNext CRM · Loading…</p>
 					<div class="psd-hero-actions">
 
 						<!-- User filter -->
 						<div style="position:relative">
-							<button class="psd-btn" id="psd-user-btn">👤 All Users</button>
+							<button class="psd-btn" id="psd-user-btn">All Users</button>
 							<div class="psd-dropdown" id="psd-user-dd" style="display:none"></div>
 						</div>
 
 						<!-- Status filter -->
 						<div style="position:relative">
-							<button class="psd-btn" id="psd-status-btn">📋 All Statuses</button>
+							<button class="psd-btn" id="psd-status-btn">All Statuses</button>
 							<div class="psd-dropdown" id="psd-status-dd" style="display:none">
 								<div class="psd-dd-header">Filter by Status</div>
 								<div class="psd-dd-item selected" data-val="">All Statuses</div>
@@ -334,7 +334,7 @@ frappe.pages["presales-request-das"].on_page_load = function (wrapper) {
 
 						<!-- Priority filter -->
 						<div style="position:relative">
-							<button class="psd-btn" id="psd-priority-btn">🚦 All Priorities</button>
+							<button class="psd-btn" id="psd-priority-btn">All Priorities</button>
 							<div class="psd-dropdown" id="psd-priority-dd" style="display:none">
 								<div class="psd-dd-header">Filter by Priority</div>
 								<div class="psd-dd-item selected" data-val="">All Priorities</div>
@@ -347,10 +347,10 @@ frappe.pages["presales-request-das"].on_page_load = function (wrapper) {
 						</div>
 
 						<!-- Date range -->
-						<button class="psd-btn" id="psd-date-btn">📅 This Month</button>
+						<button class="psd-btn" id="psd-date-btn">This Month</button>
 
 						<!-- Refresh -->
-						<button class="psd-btn" id="psd-refresh">⟳ Refresh</button>
+						<button class="psd-btn" id="psd-refresh">Refresh</button>
 					</div>
 				</div>
 				<div class="psd-hero-meta" id="psd-hero-meta">
@@ -411,7 +411,7 @@ frappe.pages["presales-request-das"].on_page_load = function (wrapper) {
 	$(document).on("click", "#psd-user-dd .psd-dd-item", function () {
 		_ps.selected_user = $(this).data("user") || null;
 		_ps.user_label    = $(this).text().trim();
-		$("#psd-user-btn").text("👤 " + _ps.user_label).toggleClass("filter-active", !!_ps.selected_user);
+		$("#psd-user-btn").text(_ps.user_label).toggleClass("filter-active", !!_ps.selected_user);
 		$("#hm-user").text(_ps.user_label);
 		$("#psd-user-dd").hide();
 		load_dashboard();
@@ -429,7 +429,7 @@ frappe.pages["presales-request-das"].on_page_load = function (wrapper) {
 		_ps.status_label    = $(this).text().trim();
 		$("#psd-status-dd .psd-dd-item").removeClass("selected");
 		$(this).addClass("selected");
-		$("#psd-status-btn").text("📋 " + _ps.status_label).toggleClass("filter-active", !!_ps.selected_status);
+		$("#psd-status-btn").text(_ps.status_label).toggleClass("filter-active", !!_ps.selected_status);
 		$("#psd-status-dd").hide();
 		load_dashboard();
 	});
@@ -446,7 +446,7 @@ frappe.pages["presales-request-das"].on_page_load = function (wrapper) {
 		_ps.priority_label    = $(this).text().trim();
 		$("#psd-priority-dd .psd-dd-item").removeClass("selected");
 		$(this).addClass("selected");
-		$("#psd-priority-btn").text("🚦 " + _ps.priority_label).toggleClass("filter-active", !!_ps.selected_priority);
+		$("#psd-priority-btn").text(_ps.priority_label).toggleClass("filter-active", !!_ps.selected_priority);
 		$("#psd-priority-dd").hide();
 		load_dashboard();
 	});
@@ -464,7 +464,7 @@ frappe.pages["presales-request-das"].on_page_load = function (wrapper) {
 				_ps.from_date = vals.from_date;
 				_ps.to_date   = vals.to_date;
 				const label = frappe.datetime.str_to_user(vals.from_date) + " → " + frappe.datetime.str_to_user(vals.to_date);
-				$("#psd-date-btn").text("📅 " + label).addClass("filter-active");
+				$("#psd-date-btn").text(label).addClass("filter-active");
 				load_dashboard();
 			},
 			"Select Date Range",
@@ -602,7 +602,7 @@ function load_dashboard() {
 			selected_priority: _ps.selected_priority || null,
 		},
 		callback: function (r) {
-			$("#psd-refresh").prop("disabled", false).text("⟳ Refresh");
+			$("#psd-refresh").prop("disabled", false).text("Refresh");
 			if (r.exc || !r.message) {
 				$("#psd-body").html(
 					`<div class="psd-loading" style="color:var(--ps-danger)">Failed to load data. Check console for errors.</div>`
@@ -763,7 +763,7 @@ function render_dashboard(d) {
 		</div>
 		<div class="psd-panel">
 			<div class="psd-sec-title">
-				<h2>📅 ${due_label}</h2>
+				<h2>${due_label}</h2>
 				<a class="psd-link" href="/app/presales-request" target="_blank">View all</a>
 			</div>
 			<table class="psd-table">
@@ -808,7 +808,7 @@ function render_dashboard(d) {
 	const bottom_html = `
 	<div class="psd-panel" style="margin-bottom:16px">
 		<div class="psd-sec-title">
-			<h2>💎 High-Value Presales Requests</h2>
+			<h2>High-Value Presales Requests</h2>
 			<a class="psd-link" href="/app/presales-request" target="_blank">View all</a>
 		</div>
 		<table class="psd-table">
@@ -818,7 +818,7 @@ function render_dashboard(d) {
 	</div>
 	<div class="psd-panel">
 		<div class="psd-sec-title">
-			<h2>⏱️ Hours Efficiency by Owner</h2>
+			<h2>Hours Efficiency by Owner</h2>
 			<span style="font-size:13px;color:var(--ps-muted)">Actual vs Estimated (higher = better utilization)</span>
 		</div>
 		${hours_html}
