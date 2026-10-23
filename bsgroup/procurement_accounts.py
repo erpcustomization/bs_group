@@ -370,16 +370,6 @@ def validate_payment_order_ready(invoice):
         missing.append("supplier invoice number")
     if not invoice.bill_date:
         missing.append("supplier invoice date")
-    invoice_file = invoice.get("custom_bsp_supplier_invoice_file")
-    source_receipt = invoice.get("custom_bsp_source_receipt")
-    attached = frappe.db.get_value("File", {"file_url": invoice_file},
-        ["is_private", "attached_to_doctype", "attached_to_name"], as_dict=True) if invoice_file else None
-    valid_attachment = bool(attached and attached.is_private and (
-        (attached.attached_to_doctype == "Purchase Invoice" and attached.attached_to_name == invoice.name) or
-        (source_receipt and attached.attached_to_doctype == "Purchase Receipt" and
-         attached.attached_to_name == source_receipt)))
-    if not valid_attachment:
-        missing.append("supplier invoice attachment")
     if not invoice.get("custom_bsp_journal_code"):
         missing.append("journal code")
     if not invoice.get("custom_bsp_accounting_confirmed"):
@@ -433,8 +423,7 @@ def get_payment_order_sources():
                         "custom_bsp_supplier_invoice_no", "custom_bsp_supplier_invoice_date",
                         "custom_bsp_supplier_invoice_file"],
                 limit_page_length=100, order_by="posting_date desc, creation desc"):
-            ready = bool(receipt.custom_bsp_delivery_note_file and
-                receipt.custom_bsp_supplier_invoice_file and receipt.custom_bsp_supplier_invoice_no and
+            ready = bool(receipt.custom_bsp_supplier_invoice_no and
                 receipt.custom_bsp_supplier_invoice_date)
             sources.append(dict(doctype="Purchase Receipt", name=receipt.name, ready=ready,
                 label=f"Receipt {receipt.name} · {receipt.supplier} · {receipt.posting_date}",
@@ -515,8 +504,6 @@ def create_payment_order(source_doctype, source_name, bill_no="", bill_date="", 
         bill_no = source.get("custom_bsp_supplier_invoice_no") or bill_no
         bill_date = source.get("custom_bsp_supplier_invoice_date") or bill_date
         invoice_file = source.get("custom_bsp_supplier_invoice_file") or ""
-        if not source.get("custom_bsp_delivery_note_file") or not invoice_file:
-            fail("The submitted receipt must include its delivery note and supplier invoice attachments.")
         invoice.custom_bsp_source_receipt = source.name
     if not (bill_no or "").strip() or not bill_date or not due_date:
         fail("Enter the supplier invoice number, invoice date and due date.")

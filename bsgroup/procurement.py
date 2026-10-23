@@ -1038,11 +1038,12 @@ def receipt_data(doc):
     access(doc)
     order = receipt_order(doc)
     editable = purchaser() and doc.docstatus == 0 and doc.has_permission("write")
-    evidence_missing = not all((doc.get("custom_bsp_delivery_note_file"),
-        doc.get("custom_bsp_supplier_invoice_file"), doc.get("custom_bsp_supplier_invoice_no"),
+    evidence_missing = not all((doc.get("custom_bsp_supplier_invoice_no"),
         doc.get("custom_bsp_supplier_invoice_date")))
+    attachment_missing = not all((doc.get("custom_bsp_delivery_note_file"),
+        doc.get("custom_bsp_supplier_invoice_file")))
     evidence_editable = bool(editable or (purchaser() and doc.docstatus == 1 and
-        evidence_missing and doc.has_permission("write")))
+        (evidence_missing or attachment_missing) and doc.has_permission("write")))
     def attached(url):
         if not url:
             return dict(file="", filename="", url="")
@@ -1165,16 +1166,6 @@ def validate_receipt_evidence(doc, method=None):
             PO, r.purchase_order, "custom_bsp_managed") for r in doc.items):
         return
     missing = []
-    for fieldname, label in (
-        ("custom_bsp_delivery_note_file", "supplier delivery note"),
-        ("custom_bsp_supplier_invoice_file", "supplier invoice copy"),
-    ):
-        url = doc.get(fieldname)
-        file = frappe.db.get_value("File", {"file_url": url,
-            "attached_to_doctype": "Purchase Receipt", "attached_to_name": doc.name},
-            ["name", "is_private"], as_dict=True) if url else None
-        if not file or not file.is_private:
-            missing.append(label)
     if not text(doc.get("custom_bsp_supplier_invoice_no"), 140):
         missing.append("supplier invoice number")
     if not doc.get("custom_bsp_supplier_invoice_date"):
