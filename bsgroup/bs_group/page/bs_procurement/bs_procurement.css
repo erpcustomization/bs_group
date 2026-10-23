@@ -229,3 +229,10 @@
 
 .bsp .bsp-select-cell {width:38px;text-align:center;}
 .bsp .bsp-select-cell input[type="checkbox"] {width:16px;min-width:16px;height:16px;min-height:16px;padding:0;margin:0 auto;cursor:pointer;}
+
+/* Compact PR list: reserve only the space needed for selection and serial number. */
+.bsp .bsp-pr-list {table-layout:fixed;width:100%;}
+.bsp .bsp-view>.bsp-tablewrap .bsp-pr-list th,
+.bsp .bsp-view>.bsp-tablewrap .bsp-pr-list td {min-width:0;padding:10px 7px;white-space:normal;overflow-wrap:anywhere;}
+.bsp .bsp-pr-list .bsp-button[data-id] {min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;}
+.bsp .bsp-pr-list .bsp-badge {max-width:100%;white-space:normal;overflow-wrap:anywhere;}
