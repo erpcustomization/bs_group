@@ -7,11 +7,16 @@ def validate_quotation(doc, method=None):
     if doc.docstatus == 2 or not doc.get("custom_deal_cost_sheet"):
         return
     sheet = frappe.get_doc("Deal Cost Sheet", doc.custom_deal_cost_sheet)
-    validate_position(sheet, doc)
+    from bsgroup.dcs import quote_alignment
     if doc.docstatus == 0:
-        doc.custom_dcs_revision_reference = sheet.custom_revision_reference
+        # A draft is prepared, not issued: commercial differences are recorded, not refused.
+        quote_alignment.validate_draft(sheet, doc)
+        return
+    validate_position(sheet, doc)
+    quote_alignment.assert_issue_authority(sheet)
 
 def validate_position(sheet, quotation):
+    """Strict issue check: submit, Sales Order and conversion. Drafts use quote_alignment.validate_draft."""
     from bsgroup.dcs.input_validation import validate_position as validate_commercial_inputs
     validate_commercial_inputs(sheet)
     from bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet import quotation_deal_identity
@@ -27,6 +32,13 @@ def validate_position(sheet, quotation):
     reference = quotation.get("custom_dcs_revision_reference")
     if quotation.docstatus == 1 and reference and reference != sheet.custom_revision_reference:
         frappe.throw("Quotation is stale: its DCS revision has changed. Review a replacement quotation.")
+    from bsgroup.dcs import quote_alignment
+    if not legacy_issued(quotation):
+        result = quote_alignment.analyse(sheet, quotation)
+        if not result["issuable"]:
+            frappe.throw(quote_alignment.issue_message(result), title="Quotation differs from the current DCS position")
+        return
+    # Submitted before row mapping existed: unchanged legacy rule, so existing records stay valid.
     selling = sheet.custom_working_total_selling if sheet.custom_dcs_revision_no else sheet.total_selling
     if abs(flt(quotation.total) - flt(selling)) > money_tolerance(currency):
         frappe.throw("Quotation selling total differs from the current DCS position.")
@@ -39,6 +51,11 @@ def validate_position(sheet, quotation):
     actual = sorted((r.item_code, flt(r.qty), money_round(r.rate, currency)) for r in quotation.items)
     if expected != actual:
         frappe.throw("Quotation scope or selling rates differ from the current DCS BOQ.")
+
+def legacy_issued(quotation):
+    """An already-submitted quotation from before row mapping, not one being submitted now."""
+    return (quotation.docstatus == 1 and getattr(quotation, "_action", None) != "submit"
+            and not any(r.get("custom_dcs_source_rows") for r in quotation.items or []))
 
 def validate_sales_order(doc, method=None):
     if doc.docstatus == 2:

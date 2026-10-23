@@ -63,10 +63,10 @@ class IntegrationTestDCSCurrency(IntegrationTestCase):
         if currency == "OMR":
             with patch.object(frappe.db,"get_default",side_effect=lambda key,*a,**kw: 2 if key=="currency_precision" else default_reader(key,*a,**kw)):
                 with self.assertRaisesRegex(frappe.ValidationError,"three-decimal currency precision"):
-                    make_quotation(doc.name)
+                    make_quotation(doc.name, payment_terms="ZZTEST 100% on delivery")
         # Model the Oman site's three-decimal setting without changing any site defaults.
         with patch.object(frappe.db,"get_default",side_effect=lambda key,*a,**kw: (3 if currency=="OMR" else 2) if key=="currency_precision" else default_reader(key,*a,**kw)):
-            quote=frappe.get_doc("Quotation",make_quotation(doc.name))
+            quote=frappe.get_doc("Quotation",make_quotation(doc.name, payment_terms="ZZTEST 100% on delivery"))
         self.assertEqual(quote.currency,currency)
         self.assertAlmostEqual(quote.items[0].rate,selling,6)
         from bsgroup.dcs.quotation_control import validate_position

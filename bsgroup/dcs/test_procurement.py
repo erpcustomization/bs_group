@@ -29,7 +29,7 @@ class ProcurementTests(unittest.TestCase):
         frappe.db.savepoint('procurement_test')
         self.dcs=make_dcs(suffix='PR-'+frappe.generate_hash(length=8),submit=True,deal_owner=self.manager)
         frappe.set_user(self.manager)
-        self.q=frappe.get_doc('Quotation',make_quotation(self.dcs.name))
+        self.q=frappe.get_doc('Quotation',make_quotation(self.dcs.name,payment_terms='ZZTEST 100% on delivery'))
         self.q.flags.ignore_mandatory=True
         self.q.flags.ignore_links=True
         self.q.custom_pipeline_stage='Sent'

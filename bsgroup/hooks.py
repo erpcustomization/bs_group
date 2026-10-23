@@ -497,3 +497,12 @@ for _event in ("validate", "before_insert", "on_trash"):
 
 extend_doctype_class.setdefault("File", []).append("bsgroup.dcs.procurement.ProcurementFileMixin")
 doc_events["Quotation"]["before_cancel"] = "bsgroup.dcs.procurement.before_cancel"
+
+# DCS quotations: drafts are prepared, only an aligned and authorised quotation is issued.
+for _event, _method in (
+    ("validate", "guard_issue_stage"),
+    ("before_print", "before_print"),
+    ("on_change", "sync_quote_status"),
+):
+    _prior = doc_events["Quotation"].get(_event, [])
+    doc_events["Quotation"][_event] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.dcs.quote_alignment." + _method]

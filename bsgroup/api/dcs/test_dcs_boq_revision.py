@@ -309,7 +309,9 @@ class IntegrationTestDCSBOQRevision(IntegrationTestCase):
         self.assertEqual(q.total, 3000)
         self.assertEqual(len(q.items), 3)
         self.assertEqual(q.custom_deal_cost_sheet, doc.name)
-        self.assertEqual(doc.custom_deal_status, "Quoted")
+        # The synced quotation is still a draft: prepared, not issued.
+        self.assertEqual(doc.custom_deal_status, "Submitted to Sales")
+        self.assertEqual([r.custom_dcs_source_rows for r in q.items], [r.get("source_key") or r.name for r in doc.items])
         self.assertEqual(frappe.call(AWARD, dcs=doc.name, award_reference="ZZTEST-BOQ-PO", evidence_type="Customer PO")["ok"], 1)
         reconciliation = frappe.call("bsgroup.api.dcs.award.dcs_po_reconcile", dcs=doc.name,
             po_reference="ZZTEST-BOQ-PO", po_value=3000, po_scope_revision=result["revision"],

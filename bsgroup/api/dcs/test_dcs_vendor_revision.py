@@ -400,7 +400,7 @@ class IntegrationTestDCSAmendmentFlow(IntegrationTestCase):
 		frappe.set_user("Administrator")
 		governance.reset_correlation_id()
 
-	def test_cost_only_amendment_flow_keeps_quoted_and_repoints_the_draft_quotation(self):
+	def test_cost_only_amendment_flow_repoints_the_draft_quotation_without_claiming_quoted(self):
 		# base sheet: fixture scaffolding (Customer / Opportunity rows), then a real, flag-free submit
 		dcs = make_dcs(suffix="FLOW-" + frappe.generate_hash(length=5), submit=False)
 		dcs.submit()
@@ -415,11 +415,14 @@ class IntegrationTestDCSAmendmentFlow(IntegrationTestCase):
 		self.assertEqual(q.docstatus, 0)
 		self.assertEqual(float(q.total), float(dcs.total_selling))
 		self.assertEqual(q.custom_deal_cost_sheet, dcs.name)
-		# the two-way link and the Quoted status come from the retained "Quotation - Link Back to DCS"
-		# Server Script (After Save on Quotation) exactly as in production; no direct write here
+		# the two-way link comes from the retained "Quotation - Link Back to DCS" Server Script (After
+		# Save on Quotation) exactly as in production; no direct write here. That script also writes
+		# "Quoted"; the app's on_change hook returns a sheet with only a draft to "Submitted to Sales":
+		# a saved draft is prepared, not issued.
 		dcs.reload()
-		if dcs.custom_quotation != q.name or dcs.custom_deal_status != "Quoted":
+		if dcs.custom_quotation != q.name:
 			self.skipTest("this site did not run the Quotation After-Save link-back script (server scripts disabled or script absent); the production flow cannot be reproduced without it")
+		self.assertEqual(dcs.custom_deal_status, "Submitted to Sales")
 		self.assertTrue(quotation_relationship_intact(dcs))
 		m0 = frappe.db.get_value("Quotation", q.name, "modified")
 
@@ -431,7 +434,7 @@ class IntegrationTestDCSAmendmentFlow(IntegrationTestCase):
 		new.items[0].cost_rate = float(dcs.items[0].cost_rate) + 795  # the report's cost-only change
 		new.insert()
 		self.assertEqual(new.name, dcs.name + "-1")
-		self.assertEqual(new.custom_deal_status, "Quoted")
+		self.assertEqual(new.custom_deal_status, "Submitted to Sales")
 		self.assertEqual(new.custom_quotation, q.name)
 		new.submit()
 		new.reload()
@@ -439,7 +442,7 @@ class IntegrationTestDCSAmendmentFlow(IntegrationTestCase):
 		self.assertEqual(new.docstatus, 1)
 		self.assertEqual(float(new.total_cost), float(dcs.total_cost) + 795)
 		self.assertEqual(float(new.total_selling), float(dcs.total_selling))
-		self.assertEqual(new.custom_deal_status, "Quoted")
+		self.assertEqual(new.custom_deal_status, "Submitted to Sales")  # only a draft exists: prepared
 		self.assertEqual(frappe.db.get_value("Quotation", q.name, "custom_deal_cost_sheet"), new.name)
 		self.assertEqual(frappe.db.get_value("Quotation", q.name, "docstatus"), 0)
 		self.assertGreater(frappe.db.get_value("Quotation", q.name, "modified"), m0)

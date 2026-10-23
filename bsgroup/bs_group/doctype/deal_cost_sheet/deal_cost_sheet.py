@@ -99,6 +99,7 @@ class DealCostSheet(Document):
 
 	def validate(self):
 		apply_party_model(self)
+		assign_source_keys(self)
 		from bsgroup.dcs.input_validation import validate_inputs
 		validate_inputs(self)
 		# D3: a Project (and therefore a Project Cost Baseline) may only hang off a
@@ -116,13 +117,82 @@ class DealCostSheet(Document):
 				)
 
 
+def assign_source_keys(doc):
+	"""Stable identity for quotable rows, so quotation lines can name their source.
+
+	A new row keeps its own row name. An amendment's copied rows inherit the key of
+	the predecessor row at the same position when it is the same item; legacy rows
+	without a key are identified by row name (``quote_alignment.row_token``).
+	"""
+	previous = {}
+	if doc.amended_from and frappe.db.exists("Deal Cost Sheet", doc.amended_from):
+		before = frappe.get_doc("Deal Cost Sheet", doc.amended_from)
+		previous = {(table, r.idx): r for table in ("items", "addtional_charges") for r in before.get(table) or []}
+	seen = set()
+	for table in ("items", "addtional_charges"):
+		for row in doc.get(table) or []:
+			if not row.meta.has_field("source_key"):
+				continue
+			if row.get("source_key") in seen:
+				row.source_key = None  # a copied row is a new row, never a second presentation of one
+			if row.get("source_key"):
+				seen.add(row.source_key)
+				continue
+			old = previous.get((table, row.idx))
+			if old and (table != "items" or old.item_code == row.item_code) and (old.get("source_key") or old.name) not in seen:
+				row.source_key = old.get("source_key") or old.name
+			elif row.name:
+				row.source_key = row.name
+			if row.get("source_key"):
+				seen.add(row.source_key)
+
+
+def quotation_payment_defaults(source, quotation_to=None, party_name=None):
+	"""Existing applicable defaults only (the party's Payment Terms Template); nothing is composed."""
+	template = None
+	if quotation_to == "Customer" and party_name:
+		from erpnext.accounts.party import get_payment_terms_template
+		template = get_payment_terms_template(party_name, "Customer", source.company)
+	return {"payment_terms_template": template, "payment_terms": template or ""}
+
+
+def quotation_party_display(quotation_to, party_name):
+	"""The values the Quotation form derives on load, set at generation so a new draft opens clean."""
+	values = {}
+	if quotation_to == "Lead" and party_name:
+		lead = frappe.db.get_value("Lead", party_name, ["lead_name", "company_name"], as_dict=True) or {}
+		values = {"custom_contact_person_name": lead.get("lead_name"), "custom_organization_name": lead.get("company_name") or ""}
+	elif quotation_to == "Customer" and party_name:
+		customer = frappe.db.get_value("Customer", party_name, ["customer_name", "customer_primary_contact"], as_dict=True) or {}
+		contact = ""
+		if customer.get("customer_primary_contact"):
+			c = frappe.db.get_value("Contact", customer.customer_primary_contact, ["first_name", "middle_name", "last_name"], as_dict=True) or {}
+			contact = " ".join(p for p in (c.get("first_name"), c.get("middle_name"), c.get("last_name")) if p)
+		values = {"customer_name": customer.get("customer_name"), "custom_organization_name": customer.get("customer_name") or "",
+			"custom_contact_person_name": contact}
+	employee = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, ["designation", "cell_number"], as_dict=True)
+	if employee and employee.designation:
+		values.update({"custom_designation": employee.designation, "custom_phone__no": employee.cell_number})
+	return values
+
+
 @frappe.whitelist()
-def make_quotation(source_name):
+def quotation_generation_defaults(source_name):
+	frappe.has_permission("Deal Cost Sheet", "read", source_name, throw=True)
+	source = frappe.get_doc("Deal Cost Sheet", source_name)
+	opp = frappe.db.get_value("Opportunity", source.opportunity, ["opportunity_from", "party_name"], as_dict=True) or {}
+	quotation_to = "Customer" if opp.get("opportunity_from") == "Customer" else "Lead"
+	return quotation_payment_defaults(source, quotation_to, opp.get("party_name"))
+
+
+@frappe.whitelist()
+def make_quotation(source_name, payment_terms=None, payment_terms_template=None):
 	# A-12: the caller must be allowed to read this sheet and to create a Quotation.
 	frappe.has_permission("Deal Cost Sheet", "read", source_name, throw=True)
 	frappe.has_permission("Quotation", "create", throw=True)
 	source = frappe.get_doc("Deal Cost Sheet", source_name)
 	refuse_stale_quotation_source(source)
+	from bsgroup.dcs.quote_alignment import row_token
 
 	opp = frappe.db.get_value(
 		"Opportunity",
@@ -160,6 +230,21 @@ def make_quotation(source_name):
 	quotation.party_name = opp.get("party_name")
 	quotation.custom_contact_person_name = opp.get("custom_contact_person_name") or opp.get("party_name")
 	quotation.custom_organization_name = opp.get("custom_organization_name") or ""
+	quotation.update(quotation_party_display(quotation.quotation_to, quotation.party_name))
+
+	# Payment Terms are mandatory on the Quotation: the user's entry, else the party's existing
+	# default. Generation is refused rather than saving a draft that cannot be saved again.
+	defaults = quotation_payment_defaults(source, quotation.quotation_to, quotation.party_name)
+	template = payment_terms_template or defaults["payment_terms_template"]
+	if template and not frappe.db.exists("Payment Terms Template", template):
+		frappe.throw("The selected Payment Terms Template does not exist.")
+	terms = (payment_terms or "").strip() or defaults["payment_terms"]
+	if not terms:
+		frappe.throw("Enter the Payment Terms agreed for this offer before generating the quotation.",
+			title="Payment Terms required")
+	quotation.custom_payment_terms = terms
+	if template:
+		quotation.payment_terms_template = template
 
 	quotation.custom_subject = source.subject
 	quotation.custom_customer_notes = source.customer_notes
@@ -201,6 +286,7 @@ def make_quotation(source_name):
 				"discount_percentage": 0,
 				"rate": selling_rate,
 				"amount": qty * selling_rate,
+				"custom_dcs_source_rows": row_token(row),
 			})
 
 	additional_charges_total = sum(frappe.utils.flt(c.get("selling_amount")) for c in source.addtional_charges or [])
@@ -227,6 +313,8 @@ def make_quotation(source_name):
 			"discount_percentage": 0,
 			"rate": additional_charges_total,
 			"amount": additional_charges_total,
+			# Cost-only internal expenses carry no selling and are never presented.
+			"custom_dcs_source_rows": ",".join(row_token(c) for c in source.addtional_charges if frappe.utils.flt(c.get("selling_amount")) > 0),
 		})
 
 	if quotation.currency == "OMR" and (quotation.precision("grand_total") < 3 or any(row.precision("rate") < 3 or row.precision("amount") < 3 for row in quotation.items)):

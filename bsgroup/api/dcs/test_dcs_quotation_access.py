@@ -34,7 +34,7 @@ class IntegrationTestDCSQuotationAccess(IntegrationTestCase):
         self.assertTrue(frappe.has_permission("Account", "select", doc=account))
         self.assertFalse(frappe.has_permission("Account", "read", doc=account))
         self.assertFalse(frappe.has_permission("Account", "write", doc=account))
-        q = frappe.get_doc("Quotation", make_quotation(d.name))
+        q = frappe.get_doc("Quotation", make_quotation(d.name, payment_terms="ZZTEST 100% on delivery"))
         self.assertEqual(q.total, 1650)
         self.assertEqual(q.items[-1].amount, 150)
         self.assertEqual(q.custom_dcs_revision_reference, d.custom_revision_reference)

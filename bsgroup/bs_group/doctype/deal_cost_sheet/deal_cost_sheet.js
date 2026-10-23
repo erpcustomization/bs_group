@@ -503,14 +503,40 @@ function recalc_parent(frm) {
 }
 
 function create_quotation(frm) {
+	// Payment Terms are mandatory on the Quotation. They are confirmed here, pre-filled only from the
+	// party's existing default, so the generated draft is complete and opens unchanged.
 	frappe.call({
-		method: "bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet.make_quotation",
+		method: "bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet.quotation_generation_defaults",
 		args: { source_name: frm.doc.name },
-		freeze: true,
 		callback(r) {
-			if (r.message) {
-				frappe.set_route("Form", "Quotation", r.message);
-			}
+			const defaults = r.message || {};
+			const d = new frappe.ui.Dialog({
+				title: __("Generate Quotation"),
+				fields: [
+					{ fieldtype: "Link", fieldname: "payment_terms_template", label: __("Payment Terms Template"), options: "Payment Terms Template", default: defaults.payment_terms_template },
+					{ fieldtype: "Small Text", fieldname: "payment_terms", label: __("Payment Terms (customer-facing)"), reqd: 1, default: defaults.payment_terms,
+						description: __("As agreed for this offer. Nothing is filled in unless the party already has a default.") }
+				],
+				primary_action_label: __("Generate Draft Quotation"),
+				primary_action(values) {
+					d.hide();
+					frappe.call({
+						method: "bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet.make_quotation",
+						args: { source_name: frm.doc.name, payment_terms: values.payment_terms, payment_terms_template: values.payment_terms_template || null },
+						freeze: true,
+						callback(res) {
+							if (res.message) {
+								frappe.set_route("Form", "Quotation", res.message);
+							}
+						}
+					});
+				}
+			});
+			d.fields_dict.payment_terms_template.df.onchange = () => {
+				const t = d.get_value("payment_terms_template");
+				if (t && !d.get_value("payment_terms")) d.set_value("payment_terms", t);
+			};
+			d.show();
 		}
 	});
 }
