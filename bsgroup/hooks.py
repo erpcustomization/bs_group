@@ -306,6 +306,7 @@ doctype_js = {
     "Leave Application": "public/js/leave_application.js",
     "Material Request": "public/js/material_request.js",
     "Purchase Order": "public/js/bs_procurement_purchase_order.js",
+    "Purchase Invoice": "public/js/bs_procurement_purchase_invoice.js",
     "HD Ticket": ["public/js/hd_ticket_service_report.js", "public/js/hd_ticket.js"],
     "Tech Task Scheduler": "public/js/tech_task_scheduler.js",
 }

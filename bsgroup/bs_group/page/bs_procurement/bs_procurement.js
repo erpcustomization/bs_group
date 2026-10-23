@@ -1,7 +1,7 @@
 /* Standard ERPNext Material Requests and Purchase Orders. No simulated records. */
 frappe.pages["bs-procurement"].on_page_load = function (wrapper) {
   const page=frappe.ui.make_app_page({parent:wrapper,title:"BS Procurement",single_column:true});
-  const root=document.createElement("div");root.className="bsp";root.dataset.build="20261020-payment-policy";page.main.append(root);
+  const root=document.createElement("div");root.className="bsp";root.dataset.build="20261023-payment-order-inline";page.main.append(root);
   const esc=v=>frappe.utils.escape_html(String(v??""));
   const money=(v,currency)=>{const digits=(currency||order()?.currency||req()?.currency)==="OMR"?3:2;return new Intl.NumberFormat("en-AE",{minimumFractionDigits:digits,maximumFractionDigits:digits}).format(Number(v)||0);};
   const api=async(method,args={})=>(await frappe.call({method:"bsgroup.procurement."+method,args,freeze:true})).message;
