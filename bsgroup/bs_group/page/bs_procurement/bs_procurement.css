@@ -220,3 +220,9 @@
 @media(prefers-reduced-motion:reduce) {
   .bsp * {transition:none!important;animation:none!important;scroll-behavior:auto!important;}
 }
+
+/* Use the shared ERP workspace navigation; keep procurement content full width. */
+@media screen {
+  .bsp {display:block;}
+  .bsp .bsp-side {display:none;}
+}
