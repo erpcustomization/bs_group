@@ -236,3 +236,15 @@
 .bsp .bsp-view>.bsp-tablewrap .bsp-pr-list td {min-width:0;padding:10px 7px;white-space:normal;overflow-wrap:anywhere;}
 .bsp .bsp-pr-list .bsp-button[data-id] {min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;}
 .bsp .bsp-pr-list .bsp-badge {max-width:100%;white-space:normal;overflow-wrap:anywhere;}
+
+@media screen {
+  .bsp .bsp-top {min-height:42px;padding-top:5px;padding-bottom:5px;}
+  .bsp .bsp-top .bsp-button {min-height:28px;padding-top:4px;padding-bottom:4px;}
+  .bsp .bsp-body {padding-top:14px;}
+  .bsp .bsp-list-heading {align-items:center;gap:10px;margin-bottom:12px;}
+  .bsp .bsp-list-heading>div:first-child {flex:0 1 auto;}
+  .bsp .bsp-list-heading h2 {font-size:20px;line-height:1.35;margin:0;}
+  .bsp .bsp-list-heading>div:last-child:not(:first-child) {flex:1 1 420px;gap:6px;}
+  .bsp .bsp-list-heading [data-search] {flex:0 1 190px;width:190px;min-height:34px;margin:0;}
+  .bsp .bsp-list-heading .bsp-button {min-height:34px;margin:0;padding:7px 10px;}
+}
