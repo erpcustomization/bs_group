@@ -251,7 +251,7 @@ class IntegrationTestDCSAuditControls(IntegrationTestCase):
         frappe.db.set_single_value("BS Group Settings", "dcs_addtional_item",d.items[0].item_code)
         # This test isolates selling reconciliation; site Account permission is separate.
         frappe.set_user("Administrator")
-        name = make_quotation(d.name)
+        name = make_quotation(d.name, payment_terms="ZZTEST 100% on delivery")
         q = frappe.get_doc("Quotation",name)
         self.assertEqual(q.total,d.total_selling)
         self.assertEqual(q.total,1650)

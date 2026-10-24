@@ -328,7 +328,9 @@ def dcs_award_reversal(args):
 					},
 					update_modified=True,
 				)
-				reopened = "Quoted" if s.custom_quotation else "Submitted to Sales"
+				from bsgroup.dcs.quote_alignment import issued_quotation
+				# A linked draft is only prepared; the deal is Quoted only by an issued quotation.
+				reopened = "Quoted" if issued_quotation(dcs_name) else "Submitted to Sales"
 				opportunity_state = "Quotation" if s.custom_quotation else "Open"
 				frappe.db.set_value("Deal Cost Sheet", dcs_name, {
 					"custom_deal_status": reopened, "custom_outcome_date": None,

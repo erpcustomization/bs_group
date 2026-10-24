@@ -192,6 +192,7 @@ def _sync_quotation(sheet, requested):
     # Do not call make_quotation: that legacy endpoint inserts and commits a
     # new document. This action updates only the already locked draft and must
     # remain atomic with the BOQ and audit history.
+    from bsgroup.dcs.quote_alignment import row_token
     items = []
     for row in sheet.items:
         item = frappe.db.get_value("Item", row.item_code, ["item_name", "stock_uom", "brand"], as_dict=True)
@@ -202,8 +203,11 @@ def _sync_quotation(sheet, requested):
             "custom_exclude_item_name_and_brand": row.exclude_item_name_and_brand,
             "qty": row.qty, "custom_cost_rate": row.cost_rate,
             "custom_selling_rate": row.selling_rate, "price_list_rate": row.selling_rate,
-            "discount_percentage": 0, "rate": row.selling_rate})
+            "discount_percentage": 0, "rate": row.selling_rate,
+            "custom_dcs_source_rows": row_token(row)})
     q.set("items", items)
+    # The user chose to update this draft from the revised BOQ: an explicit review of the revision.
+    q.custom_dcs_revision_reference = sheet.custom_revision_reference
     # The draft was created by make_quotation with ignore_mandatory; quotation
     # mandatory fields (e.g. payment terms) are enforced when it is submitted,
     # not when the governed BOQ sync refreshes its lines.

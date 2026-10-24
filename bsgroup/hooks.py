@@ -497,3 +497,20 @@ for _event in ("validate", "before_insert", "on_trash"):
 
 extend_doctype_class.setdefault("File", []).append("bsgroup.dcs.procurement.ProcurementFileMixin")
 doc_events["Quotation"]["before_cancel"] = "bsgroup.dcs.procurement.before_cancel"
+
+# DCS quotations: drafts are prepared, only an aligned and authorised quotation is issued.
+for _event, _method in (
+    ("validate", "guard_issue_stage"),
+    ("before_update_after_submit", "guard_issue_stage"),
+    ("before_print", "before_print"),
+    ("on_change", "sync_quote_status"),
+):
+    _prior = doc_events["Quotation"].get(_event, [])
+    doc_events["Quotation"][_event] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.dcs.quote_alignment." + _method]
+# Customer output: every non-beta print path ends in pdf_body_html (wraps Frappe / Print Designer,
+# which must stay installed before bsgroup); beta formats are gated by print permission and on_print_pdf;
+# email is refused before any Communication exists.
+pdf_body_html = "bsgroup.dcs.quote_alignment.pdf_body_html"
+on_print_pdf = "bsgroup.dcs.quote_alignment.on_print_pdf"
+has_permission["Quotation"] = "bsgroup.dcs.quote_alignment.has_print_permission"
+override_whitelisted_methods["frappe.core.doctype.communication.email.make"] = "bsgroup.dcs.quote_alignment.make_communication"
