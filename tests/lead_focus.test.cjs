@@ -1,0 +1,32 @@
+const fs = require('fs'), vm = require('vm'), assert = require('node:assert/strict');
+const {parseHTML} = require('./bs_procurement/ui/node_modules/linkedom');
+const {document, window} = parseHTML('<html><body><main><button role="tab" data-fieldname="activities_tab"></button><button role="tab" data-fieldname="notes_tab"></button><div class="tab-pane"><div class="form-section"><div id="identity"></div><div id="contact"></div><div id="responsibility"></div></div><div class="form-section" data-fieldname="organization_section"></div><div class="form-section" data-fieldname="contact_info_tab"></div></div></main></body></html>');
+const root = document.querySelector('main'), fields_dict = {};
+for (const [name, parent] of [['first_name','identity'],['company_name','contact'],['status','responsibility'],['gender','identity'],['annual_revenue','identity'],['email_id','identity'],['mobile_no','identity'],['phone','identity']]) {
+  const node = document.createElement('div'); node.className='frappe-control';
+  node.dataset.fieldname=name; const input=document.createElement('input'); input.value=name; node.appendChild(input);
+  document.getElementById(parent).appendChild(node);
+  fields_dict[name]={df:{fieldname:name,reqd:name==='status'?1:0},$wrapper:[node]};
+}
+const before = fields_dict.gender.$wrapper[0], status = fields_dict.status.$wrapper[0];
+let changed=0, follow=0; before.firstChild.addEventListener('change',()=>changed++);
+root.querySelector('[data-fieldname="activities_tab"]').addEventListener('click',()=>follow++);
+let collapsed=[];
+const frm={wrapper:root,fields_dict,doc:{name:'LEAD1',status:'Open'},is_new:()=>false,layout:{sections:[{df:{fieldname:'address_section'},fields_list:[],collapse:v=>collapsed.push(v)}]}};
+const ctx={document,frappe:{ui:{form:{on(){}}}}}; vm.createContext(ctx);
+vm.runInContext(fs.readFileSync(__dirname+'/../bsgroup/public/js/Lead.js','utf8')+'\nthis.focus=bsi_lead_focus;',ctx);
+ctx.focus.refresh(frm); ctx.focus.refresh(frm);
+assert.equal(root.querySelectorAll('.bsi-additional-details').length,1);
+assert.equal(root.querySelector('.bsi-additional-details').hasAttribute('open'),false);
+assert.equal(root.querySelector('.bsi-extra-fields [data-fieldname=gender]'),before);
+before.firstChild.dispatchEvent(new window.Event('change')); assert.equal(changed,1);
+assert.equal(fields_dict.status.$wrapper[0],status); assert.equal(status.parentElement.id,'responsibility');
+assert.equal(frm.doc.status,'Open'); assert.equal(fields_dict.email_id.$wrapper[0].parentElement.id,'contact');
+root.querySelector('.bsi-follow-up button').click(); assert.equal(follow,1);
+assert.deepEqual(collapsed,[true]);
+fields_dict.gender.df.reqd=1; ctx.focus.refresh(frm);
+assert.equal(before.parentElement.id,'identity');
+assert.equal(fields_dict.gender.df.reqd,1);
+fields_dict.annual_revenue.df.mandatory_depends_on='eval:doc.status'; ctx.focus.refresh(frm);
+assert.equal(fields_dict.annual_revenue.$wrapper[0].parentElement.id,'identity');
+console.log('PASS: original controls/handlers, status, idempotency, native follow-up tabs, required-field restoration, conditional requirements.');

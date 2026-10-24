@@ -38,9 +38,9 @@ const sale={name:'LI-SALES',converted_lead:'LEAD1',ai_status:'Completed',ai_conf
  check(!JSON.stringify(calls).includes('raw_payload_json'),'No raw payload/credentials requested');
  check(calls[1].args.fields.length===8&&!calls[1].args.fields.includes('transcript')&&!calls[1].args.fields.includes('bsli_ai_result'),'Recent history reads metadata only');
  check(calls[0].args.fields.includes('transcript')&&calls[0].args.fields.includes('bsli_ai_result'),'Creating enquiry retains full message and analysis');
- check(boxes.details.includes('Requirement at a glance'),'Overview highlights customer requirement');
- check(boxes.details.indexOf('Next action')<boxes.details.indexOf('Products, urgency and extracted details'),'Next action precedes secondary extraction details');
- check(boxes.details.includes('Quotation request')&&!boxes.details.includes('>rfq<'),'Business-friendly intent label');
+ check(boxes.details.includes('<strong>Requirement</strong>'),'Overview highlights original customer requirement');
+ check(boxes.details.indexOf('original requirement')<boxes.details.indexOf('Enquiry details'),'Original message precedes source metadata');
+ check(boxes.ai.includes('Quotation request')&&!boxes.ai.includes('>rfq<'),'Business-friendly intent label retained in AI tab');
  check(!boxes.details.includes(' open><summary'),'Overview secondary sections collapsed');
  check(boxes.ai.includes(' open><summary'),'AI diagnostics expanded on AI tab');
  check(boxes.details.includes('grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr))'),'Grid can shrink to mobile container width');
