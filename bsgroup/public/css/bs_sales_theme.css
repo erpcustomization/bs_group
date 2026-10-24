@@ -2,7 +2,7 @@
    Screen-only: print formats, documents and accounting behaviour are untouched. */
 @media screen {
     .bs-sales-ui {
-        --bs-sales-theme-version: "20261024-refined";
+        --bs-sales-theme-version: "20261024-list-shell";
         --bs-navy: #102d59;
         --bs-blue: #1d5fc4;
         --bs-ink: #172b4d;
@@ -201,5 +201,37 @@
     }
     @media(prefers-reduced-motion: reduce) {
         .bs-sales-ui .page-container :is(.btn, .es-button) { transition: none; }
+    }
+}
+
+/* Native Frappe lists, arranged in the same header/canvas/table pattern as BSP.
+   No custom list renderer: filtering, selection, pagination and views stay native. */
+@media screen {
+    .bs-sales-ui .bs-list-shell .page-head { padding: 0; min-height: 42px; }
+    .bs-sales-ui .bs-list-shell .page-head .es-breadcrumbs__label { font-size: 13px; font-weight: 500; letter-spacing: 0; }
+    .bs-sales-ui .bs-list-shell .layout-main-section {
+        background: #f4f7fc; padding: 16px 24px 20px;
+        min-height: calc(100vh - 100px); border: 1px solid #dfe7f2;
+        border-radius: 12px; box-shadow: 0 4px 20px #1638670a;
+    }
+    .bs-sales-ui .bs-list-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 0 0 14px; }
+    .bs-sales-ui .bs-list-heading h1 { flex: 1 1 200px; margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -.55px; line-height: 1.3; color: #12335f; }
+    .bs-sales-ui .bs-list-heading .page-actions { flex: 0 1 auto; width: auto; padding: 0; gap: 6px; min-width: 0; flex-wrap: wrap; }
+    .bs-sales-ui .bs-list-shell .list-page-form { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 8px 12px; padding: 0 0 14px; margin: 0; background: transparent; }
+    .bs-sales-ui .bs-list-shell .standard-filter-section { flex: 1 1 480px; flex-wrap: wrap; gap: 8px; padding: 0; }
+    .bs-sales-ui .bs-list-shell .standard-filter-section .form-group { margin: 0; }
+    .bs-sales-ui .bs-list-shell .standard-filter-section .input-with-feedback { font-size: 12px; }
+    .bs-sales-ui .bs-list-shell .filter-section { flex: 0 1 auto; padding: 0; margin: 0; gap: 6px; }
+    .bs-sales-ui .bs-list-shell .frappe-list { padding: 0; background: transparent; }
+    .bs-sales-ui .bs-list-shell .result-container { background: #fff; border: 1px solid #dfe7f2; border-radius: 8px; }
+    .bs-sales-ui .bs-list-shell .frappe-list .list-row-head { background: #eef3fb; color: #4c6486 !important; font-size: 11px; font-weight: 600; border-radius: 7px 7px 0 0; min-height: 38px; }
+    .bs-sales-ui .bs-list-shell .list-row { min-height: 50px; padding-top: 10px; padding-bottom: 10px; line-height: 1.55; }
+    .bs-sales-ui .bs-list-shell .list-row-container { background: #fff; border-bottom-color: #e6e9ee; }
+    .bs-sales-ui .bs-list-shell .list-row-container:hover { background: #f6f9ff; }
+    .bs-sales-ui .bs-list-shell .list-paging-area { background: transparent; margin-top: 10px; padding: 0; }
+    @media(max-width: 767px) {
+        .bs-sales-ui .bs-list-shell .layout-main-section { padding: 14px 12px; }
+        .bs-sales-ui .bs-list-heading .page-actions { flex: 1 1 100%; justify-content: flex-start !important; }
+        .bs-sales-ui .bs-list-shell .standard-filter-section { flex-basis: 100%; }
     }
 }
