@@ -314,6 +314,7 @@ doctype_js = {
 }
 
 doctype_list_js = {
+    "Lead": "public/js/lead_list_compact.js",
     "Project": "public/js/project_list.js",
     "Presales Request": "public/js/presales_request_list.js",
     "PPM Management": "public/js/ppm_management_list.js",
