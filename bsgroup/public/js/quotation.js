@@ -318,6 +318,9 @@ function dcs_alignment_banner(frm) {
             if (!r.message) return;
             frm.__dcs_alignment = r.message;
             frm.dashboard.set_headline_alert(dcs_alignment_html(r.message));
+            if (frm.doc.docstatus === 0 && (r.message.actions || []).includes('review_revision')) {
+                frm.add_custom_button(__('Review DCS Revision'), () => dcs_review_revision(frm, r.message), __('DCS'));
+            }
         }
     });
 }
@@ -325,7 +328,8 @@ function dcs_alignment_banner(frm) {
 const DCS_ACTIONS = {
     map_rows: 'Map each line to its DCS rows (DCS > Map DCS Rows).',
     request_revision: 'Prices or totals differ: record an approved commercial revision on the Deal Cost Sheet, then align this draft.',
-    regenerate: 'The DCS has moved on: align this draft to the current revision or generate a new quotation.',
+    regenerate: 'The DCS has moved on: generate a replacement quotation for the current revision.',
+    review_revision: 'The DCS was revised after this draft was prepared: review the revision (DCS > Review DCS Revision), then align the draft.',
     obtain_approval: 'Obtain the recorded commercial approval on the current DCS revision.'
 };
 
@@ -347,6 +351,19 @@ function dcs_alignment_html(s) {
         h += (s.actions || []).map(a => '<div>&rarr; ' + esc(__(DCS_ACTIONS[a] || a)) + '</div>').join('');
     }
     return h + '</div>';
+}
+
+function dcs_review_revision(frm, s) {
+    if (frm.is_dirty()) { frappe.msgprint(__('Save the quotation before reviewing the DCS revision.')); return; }
+    const esc = frappe.utils.escape_html;
+    frappe.confirm(esc(__('This draft was prepared against DCS revision {0}; the current revision is {1}. Review the revised DCS, then confirm to re-check this draft against it.', [s.quote_revision || '-', s.dcs_revision || '-'])), () => {
+        frappe.call({
+            method: 'bsgroup.dcs.quote_alignment.review_revision',
+            args: {quotation: frm.doc.name},
+            freeze: true,
+            callback() { frm.reload_doc(); }
+        });
+    });
 }
 
 function dcs_map_rows_dialog(frm) {
@@ -384,9 +401,9 @@ function dcs_map_rows_dialog(frm) {
 
 function dcs_mapping_html(items, data) {
     const esc = frappe.utils.escape_html;
-    const label = r => esc((r.kind === 'charge' ? __('Charge') + ': ' : '') + (r.label || r.item_code || '') + ' x ' + r.qty
-        + (r.selling_amount !== undefined ? ' = ' + r.selling_amount : ''));
-    let h = '<p>' + esc(__('Select the DCS rows each line presents. Several rows on one line form a bundle; every row must be presented exactly once. Suggestions are only offered when unambiguous and still need your confirmation.')) + '</p>';
+    // The server label carries the DCS row number, customer description, quantity and unit.
+    const label = r => esc((r.label || r.item_code || r.token) + (r.selling_amount !== undefined ? ' = ' + r.selling_amount : ''));
+    let h = '<p>' + esc(__('Select the DCS rows each line presents. Several rows on one line form a bundle, which is quoted as quantity 1; every row must be presented exactly once. Suggestions are only offered when unambiguous and still need your confirmation.')) + '</p>';
     h += '<table class="table table-bordered"><thead><tr><th>#</th><th>' + esc(__('Quotation line')) + '</th><th>' + esc(__('DCS source rows')) + '</th></tr></thead><tbody>';
     items.forEach(it => {
         const current = String(it.custom_dcs_source_rows || data.suggestions[it.idx] || '').split(',').map(t => t.trim()).filter(Boolean);

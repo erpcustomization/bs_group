@@ -503,22 +503,29 @@ function recalc_parent(frm) {
 }
 
 function create_quotation(frm) {
-	// Payment Terms are mandatory on the Quotation. They are confirmed here, pre-filled only from the
-	// party's existing default, so the generated draft is complete and opens unchanged.
+	// Payment Terms are contract wording: the user states and confirms them. A Payment Terms
+	// Template (the party's default or another one) only drives the schedule; its actual rows
+	// produce a suggested wording, never its name.
 	frappe.call({
 		method: "bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet.quotation_generation_defaults",
 		args: { source_name: frm.doc.name },
 		callback(r) {
 			const defaults = r.message || {};
+			let suggested = defaults.suggested_terms || "";
 			const d = new frappe.ui.Dialog({
 				title: __("Generate Quotation"),
 				fields: [
-					{ fieldtype: "Link", fieldname: "payment_terms_template", label: __("Payment Terms Template"), options: "Payment Terms Template", default: defaults.payment_terms_template },
-					{ fieldtype: "Small Text", fieldname: "payment_terms", label: __("Payment Terms (customer-facing)"), reqd: 1, default: defaults.payment_terms,
-						description: __("As agreed for this offer. Nothing is filled in unless the party already has a default.") }
+					{ fieldtype: "Link", fieldname: "payment_terms_template", label: __("Payment Terms Template (schedule)"), options: "Payment Terms Template", default: defaults.payment_terms_template },
+					{ fieldtype: "Small Text", fieldname: "payment_terms", label: __("Payment Terms (customer-facing wording)"), reqd: 1, default: suggested,
+						description: __("Suggested from the template's terms when one applies. Edit to the wording agreed for this offer.") },
+					{ fieldtype: "Check", fieldname: "confirm_terms", label: __("I confirm this is the payment wording agreed for this offer"), reqd: 1 }
 				],
 				primary_action_label: __("Generate Draft Quotation"),
 				primary_action(values) {
+					if (!values.confirm_terms) {
+						frappe.msgprint(__("Confirm the payment wording before generating the quotation."));
+						return;
+					}
 					d.hide();
 					frappe.call({
 						method: "bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet.make_quotation",
@@ -533,8 +540,18 @@ function create_quotation(frm) {
 				}
 			});
 			d.fields_dict.payment_terms_template.df.onchange = () => {
-				const t = d.get_value("payment_terms_template");
-				if (t && !d.get_value("payment_terms")) d.set_value("payment_terms", t);
+				const template = d.get_value("payment_terms_template");
+				const edited = (d.get_value("payment_terms") || "") !== suggested;
+				if (!template) return;
+				frappe.call({
+					method: "bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet.describe_payment_terms",
+					args: { template },
+					callback(res) {
+						suggested = res.message || "";
+						if (!edited) d.set_value("payment_terms", suggested);
+						d.set_value("confirm_terms", 0);
+					}
+				});
 			};
 			d.show();
 		}

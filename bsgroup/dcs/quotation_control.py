@@ -33,12 +33,13 @@ def validate_position(sheet, quotation):
     if quotation.docstatus == 1 and reference and reference != sheet.custom_revision_reference:
         frappe.throw("Quotation is stale: its DCS revision has changed. Review a replacement quotation.")
     from bsgroup.dcs import quote_alignment
-    if not legacy_issued(quotation):
+    if not quote_alignment.legacy_evidence(quotation):
         result = quote_alignment.analyse(sheet, quotation)
         if not result["issuable"]:
             frappe.throw(quote_alignment.issue_message(result), title="Quotation differs from the current DCS position")
         return
-    # Submitted before row mapping existed: unchanged legacy rule, so existing records stay valid.
+    # Recorded by the migration as submitted before row mapping existed (server-owned evidence,
+    # never inferred from an empty mapping): the unchanged legacy rule keeps that record valid.
     selling = sheet.custom_working_total_selling if sheet.custom_dcs_revision_no else sheet.total_selling
     if abs(flt(quotation.total) - flt(selling)) > money_tolerance(currency):
         frappe.throw("Quotation selling total differs from the current DCS position.")
@@ -51,11 +52,6 @@ def validate_position(sheet, quotation):
     actual = sorted((r.item_code, flt(r.qty), money_round(r.rate, currency)) for r in quotation.items)
     if expected != actual:
         frappe.throw("Quotation scope or selling rates differ from the current DCS BOQ.")
-
-def legacy_issued(quotation):
-    """An already-submitted quotation from before row mapping, not one being submitted now."""
-    return (quotation.docstatus == 1 and getattr(quotation, "_action", None) != "submit"
-            and not any(r.get("custom_dcs_source_rows") for r in quotation.items or []))
 
 def validate_sales_order(doc, method=None):
     if doc.docstatus == 2:
@@ -108,7 +104,7 @@ def guard_lineage(doc, method=None):
         after = [tuple(r.get(f) for f in fields) for r in doc.items]
         if before != after or any(doc.get(f) != previous.get(f) for f in ("currency", "conversion_rate", "total", "grand_total", "discount_amount", "additional_discount_percentage")):
             frappe.throw("Submitted DCS quotation prices and scope are frozen. Create a replacement quotation.")
-    for field in ("custom_dcs_revision_reference", "custom_dcs_superseded_revision"):
+    for field in ("custom_dcs_revision_reference", "custom_dcs_superseded_revision", "custom_dcs_legacy_basis"):
         if str(doc.get(field) or "") != str(previous.get(field) or ""):
             frappe.throw("Submitted quotation lineage is governed by the DCS service and cannot be edited.")
 

@@ -86,4 +86,22 @@ refresh(form({name: 'Q-3', docstatus: 0}));
 assert.equal(calls.length, before, 'no server call for unsaved or unlinked quotations');
 checks++;
 
+// Review action: offered only on drafts whose DCS revision moved, from the server's actions.
+f = form({name: 'Q-4', docstatus: 0, custom_deal_cost_sheet: 'DCS-1'});
+refresh(f);
+calls.at(-1).callback({message: {issuable: false, actions: ['review_revision'], labels: ['Stale'], problems: []}});
+assert.deepEqual(f.buttons, ['Map DCS Rows', 'Review DCS Revision']);
+f = form({name: 'Q-5', docstatus: 0, custom_deal_cost_sheet: 'DCS-1'});
+refresh(f);
+calls.at(-1).callback({message: {issuable: false, actions: ['map_rows'], labels: ['Scope changed'], problems: []}});
+assert.deepEqual(f.buttons, ['Map DCS Rows']);
+checks++;
+
+// Labels come from the server (row number, description, quantity, unit); Generic rows stay distinguishable.
+const labelled = context.dcs_mapping_html([{idx: 1, name: 'a', item_code: 'Generic', qty: 1, amount: 1}], {suggestions: {},
+    rows: [{token: 'L1', label: 'Row 1: Business laptop - 2 Nos'}, {token: 'I1', label: 'Row 2: Installation - 1 Nos'}]});
+assert.match(labelled, /Row 1: Business laptop - 2 Nos/);
+assert.match(labelled, /Row 2: Installation - 1 Nos/);
+checks++;
+
 console.log(checks + ' quotation DCS alignment UI checks passed');

@@ -229,11 +229,12 @@ class ChargesAndPrecision(unittest.TestCase):
 		lines = [*generated(), line(3, 1, 120, "C1,C2", item="ADDL")]
 		self.assertFalse(core.analyse(sheet(self.rows()), quote(lines))["issuable"])
 
-	def test_legacy_unmapped_quotation_follows_previous_rule(self):
+	def test_legacy_evidence_follows_previous_rule(self):
 		lines = [line(1, 1, 2000), line(2, 2, 4000), line(3, 1, 150, item="ADDL")]
-		self.assertTrue(core.analyse(sheet(self.rows()), quote(lines))["issuable"])
+		self.assertTrue(core.analyse(sheet(self.rows()), quote(lines, legacy_evidence=True))["issuable"])
+		self.assertFalse(core.analyse(sheet(self.rows()), quote(lines))["issuable"], "no evidence, no grandfathering")
 		lines = [line(1, 1, 1000), line(2, 2, 4500), line(3, 1, 150, item="ADDL")]
-		r = core.analyse(sheet(self.rows()), quote(lines))
+		r = core.analyse(sheet(self.rows()), quote(lines, legacy_evidence=True))
 		self.assertFalse(r["issuable"])
 		self.assertIn("scope_changed", r["states"])
 
@@ -261,6 +262,136 @@ class Suggestions(unittest.TestCase):
 	def test_suggestions_are_not_applied_by_analysis(self):
 		r = core.analyse(sheet(), quote([line(1, 2, 4000), line(2, 1, 2000)]))
 		self.assertFalse(r["mapped"])
+
+
+class MappingRemovalBypass(unittest.TestCase):
+	"""Review finding 1: removing mappings must never relax the rules."""
+
+	def uom_lines(self, l1="L1", i1="I1"):
+		# 2 laptops quoted as qty 2 in a unit of 2 (stock 4): the reviewer's reproduction.
+		return [line(1, 2, 4000, l1, stock_qty=4), line(2, 1, 2000, i1)]
+
+	def test_reviewer_reproduction_is_refused_with_and_without_mapping(self):
+		self.assertFalse(core.analyse(sheet(), quote(self.uom_lines()))["issuable"])
+		r = core.analyse(sheet(), quote(self.uom_lines(None, None)))
+		self.assertFalse(r["issuable"])
+		self.assertIn("scope_changed", r["states"])
+		self.assertTrue(all("unmapped" in l["status"] for l in r["lines"]))
+
+	def test_partial_removal_is_refused(self):
+		for lines in (self.uom_lines("L1", None), self.uom_lines(None, "I1"),
+				[line(1, 2, 4000, "L1"), line(2, 1, 2000, "")]):
+			self.assertFalse(core.analyse(sheet(), quote(lines))["issuable"])
+
+	def test_exact_unmapped_copy_without_evidence_is_refused(self):
+		r = core.analyse(sheet(), quote([line(1, 2, 4000), line(2, 1, 2000)]))
+		self.assertFalse(r["issuable"])
+		self.assertFalse(r["legacy"])
+
+	def test_legacy_evidence_does_not_apply_to_mapped_lines_check(self):
+		# Evidence is only honoured by the server for unmapped pre-migration records; with
+		# evidence the legacy multiset rule still refuses a changed scope.
+		r = core.analyse(sheet(), quote([line(1, 4, 2000), line(2, 1, 2000)], legacy_evidence=True))
+		self.assertFalse(r["issuable"])
+
+
+class PackageQuantity(unittest.TestCase):
+	"""Review finding 3: a bundle is one complete package; no multiplier."""
+
+	def test_bundle_multiplier_is_refused(self):
+		r = core.analyse(sheet(), quote([line(1, 4, 2500, "L1,I1")]))
+		self.assertFalse(r["issuable"])
+		self.assertIn("package_qty", r["lines"][0]["status"])
+
+	def test_bundle_quantities(self):
+		for qty, rate, stock in ((1, 10000, 1), (2, 5000, 2), (0.5, 20000, 0.5), (0, 10000, 0), (-1, -10000, -1)):
+			r = core.analyse(sheet(), quote([line(1, qty, rate, "L1,I1", stock_qty=stock)]))
+			self.assertEqual(r["issuable"], qty == 1, (qty, r["lines"][0]["status"]))
+
+	def test_bundle_conversion_factor_must_be_one_to_one(self):
+		# qty 1 in a unit of 2, or qty 0.5 in a unit of 2: neither is one package.
+		for qty, stock in ((1, 2), (0.5, 1)):
+			r = core.analyse(sheet(), quote([line(1, qty, 10000 / qty, "L1,I1", stock_qty=stock)]))
+			self.assertFalse(r["issuable"], (qty, stock))
+
+	def test_charge_lines_are_single_packages(self):
+		rows = sheet()["rows"] + [
+			{"token": "C1", "kind": "charge", "item_code": None, "qty": 1, "selling_rate": 100, "selling_amount": 100},
+			{"token": "C2", "kind": "charge", "item_code": None, "qty": 1, "selling_rate": 50, "selling_amount": 50}]
+		ok = [*generated(), line(3, 1, 150, "C1,C2", item="ADDL")]
+		self.assertTrue(core.analyse(sheet(rows), quote(ok))["issuable"])
+		for bad in ([*generated(), line(3, 3, 50, "C1,C2", item="ADDL")],
+				[*generated(), line(3, 2, 50, "C1", item="ADDL"), line(4, 1, 50, "C2", item="ADDL")]):
+			self.assertFalse(core.analyse(sheet(rows), quote(bad))["issuable"])
+		# A charge inside an item bundle is still one package.
+		mixed = [line(1, 1, 8100, "L1,C1"), line(2, 1, 2000, "I1"), line(3, 1, 50, "C2", item="ADDL")]
+		self.assertTrue(core.analyse(sheet(rows), quote(mixed))["issuable"])
+		mixed[0].update(qty=3, rate=2700, stock_qty=3)
+		self.assertFalse(core.analyse(sheet(rows), quote(mixed))["issuable"])
+
+	def test_zero_quantity_single_line_is_invalid(self):
+		r = core.analyse(sheet(), quote([line(1, 0, 4000, "L1"), line(2, 1, 2000, "I1")]))
+		self.assertIn("invalid", r["lines"][0]["status"])
+
+
+class InitialAuthority(unittest.TestCase):
+	"""Review finding 2: revision-0 positions get no blanket exemption."""
+
+	def test_rejected_returned_and_blocked_refuse(self):
+		for state in ("Rejected", "Returned for Rework", "Blocked"):
+			self.assertTrue(core.initial_authority(state, "None", "None", 10000), state)
+		self.assertTrue(core.initial_authority("", "Blocked", "None", 10000))
+		self.assertTrue(core.initial_authority("", "None", "Blocked", 10000))
+
+	def test_pending_or_required_without_approval_refuses(self):
+		self.assertTrue(core.initial_authority("Pending Manager", "Manager", "Manager", 10000))
+		self.assertTrue(core.initial_authority("", None, "Manager", 10000), "below-floor margin needs approval")
+		self.assertTrue(core.initial_authority("In Negotiation", "Manager", "None", 10000))
+
+	def test_approved_must_match_current_figures(self):
+		self.assertEqual(core.initial_authority("Approved", "Manager", "Manager", 10000, approval_matches=True), "")
+		self.assertTrue(core.initial_authority("Approved", "Manager", "Manager", 10000, approval_matches=False))
+
+	def test_clear_position_is_authorised(self):
+		for state in (None, "", "Not Started", "In Negotiation"):
+			self.assertEqual(core.initial_authority(state, None, "None", 10000), "", state)
+
+	def test_ambiguous_state_or_no_selling_never_authorises(self):
+		self.assertTrue(core.initial_authority("Pending MD", None, "None", 10000))
+		self.assertTrue(core.initial_authority("", None, "None", 0))
+		self.assertTrue(core.initial_authority("", None, "None", float("nan")))
+
+
+class Labels(unittest.TestCase):
+	"""Review finding 4: Generic rows are distinguishable."""
+
+	def test_labels_carry_row_description_quantity_and_unit(self):
+		a = core.row_label("item", 1, "Business laptop\n 14 inch", 2, "Nos")
+		b = core.row_label("item", 2, "Installation and commissioning", 1, "Nos")
+		self.assertEqual(a, "Row 1: Business laptop 14 inch - 2 Nos")
+		self.assertNotEqual(a, b)
+		self.assertEqual(core.row_label("charge", 1, "Freight", 1, ""), "Charge 1: Freight - 1")
+		self.assertTrue(core.row_label("item", 3, "x" * 300, 1, "Nos").endswith("... - 1 Nos"))
+
+
+class PaymentTermsWording(unittest.TestCase):
+	"""Review finding 6: wording comes from the template's actual rows, never its name."""
+
+	def test_wording_from_rows_including_discount(self):
+		rows = [{"payment_term": "Advance", "description": "Advance on order", "invoice_portion": 50,
+				"due_date_based_on": "Day(s) after invoice date", "credit_days": 0},
+			{"payment_term": "Balance", "invoice_portion": 50, "due_date_based_on": "Day(s) after invoice date",
+				"credit_days": 30, "discount": 2, "discount_type": "Percentage", "discount_validity": 10,
+				"discount_validity_based_on": "Day(s) after invoice date"}]
+		text = core.payment_terms_wording(rows)
+		self.assertEqual(text, "50% Advance on order, due on invoice; 50% Balance, due 30 day(s) after invoice date; "
+			"2% early-payment discount within 10 day(s) after invoice date.")
+
+	def test_month_basis_and_empty(self):
+		rows = [{"payment_term": "Net", "invoice_portion": 100, "due_date_based_on": "Month(s) after the end of the invoice month",
+			"credit_months": 1}]
+		self.assertEqual(core.payment_terms_wording(rows), "100% Net, due 1 month(s) after the end of the invoice month.")
+		self.assertEqual(core.payment_terms_wording([]), "")
 
 
 if __name__ == "__main__":

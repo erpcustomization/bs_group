@@ -93,7 +93,9 @@ def quotation_values(dcs, total):
 		"custom_payment_terms": f"{PREFIX} 100% on delivery",
 		"taxes_and_charges": vat_template,
 		"taxes": taxes,
-		"items": [{"item_code": item, "qty": 1, "uom": uom, "stock_uom": uom, "conversion_factor": 1, "rate": total, "price_list_rate": total}],
+		# Presents the sheet's first row; new quotations are always row-mapped (no grandfathering).
+		"items": [{"item_code": item, "qty": 1, "uom": uom, "stock_uom": uom, "conversion_factor": 1, "rate": total, "price_list_rate": total,
+			"custom_dcs_source_rows": dcs.items[0].get("source_key") or dcs.items[0].name}],
 	}
 
 
@@ -119,6 +121,9 @@ def make_quotation_for(dcs, total=None):
 		q.db_insert()
 		for row in q.items:
 			row.parent, row.parenttype, row.parentfield = q.name, "Quotation", "items"
+			# The shortcut skips ERPNext's totals; keep line amounts consistent with qty x rate.
+			for f in ("amount", "net_amount", "base_amount", "base_net_amount"):
+				row.set(f, (row.qty or 0) * (row.rate or 0))
 			row.db_insert()
 	frappe.db.set_value("Deal Cost Sheet", dcs.name, {"custom_quotation": q.name, "custom_deal_status": "Quoted"}, update_modified=False)
 	return q

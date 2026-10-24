@@ -32,3 +32,4 @@ bsgroup.patches.v0_1.dcs_costing_subject
 bsgroup.patches.v0_1.dcs_procurement
 
 bsgroup.patches.v0_1.dcs_quote_alignment
+bsgroup.patches.v0_1.dcs_quote_status_owner

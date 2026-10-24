@@ -74,7 +74,11 @@ def analyse(sheet, quote):
 	``quote``: currency, revision_reference, net_total, discount_amount,
 	additional_discount_percentage, taxes [{charge_type, rate, tax_amount}],
 	lines [{idx, item_code, qty, stock_qty, rate, amount, price_list_rate,
-	discount_percentage, discount_amount, sources}].
+	discount_percentage, discount_amount, sources}], legacy_evidence.
+
+	``legacy_evidence`` is server-owned: set only for a quotation that was already
+	submitted when row mapping was introduced (``custom_dcs_legacy_basis``). It is
+	never inferred from an empty mapping, so removing mappings never relaxes a rule.
 	"""
 	currency = sheet.get("currency")
 	tol = tolerance(currency)
@@ -104,7 +108,7 @@ def analyse(sheet, quote):
 		issues.append(("dcs_rows_out_of_sync", "The living DCS selling total differs from its BOQ rows; "
 			"record a BOQ revision before quoting."))
 
-	mapped_mode = any(parse_sources(l.get("sources")) for l in quote["lines"])
+	legacy = bool(quote.get("legacy_evidence"))
 	seen = {}
 	for line in quote["lines"]:
 		for token in parse_sources(line.get("sources")):
@@ -114,8 +118,8 @@ def analyse(sheet, quote):
 		tokens = parse_sources(line.get("sources"))
 		info = {"idx": line.get("idx"), "sources": tokens, "status": [], "actual_amount": money(line.get("amount"), currency)}
 		amount, qty = number(line.get("amount")), number(line.get("stock_qty", line.get("qty")))
-		if not all(finite(line.get(f)) for f in ("qty", "rate", "amount")) or number(line.get("qty")) < 0 \
-				or number(line.get("rate")) < 0 or amount < 0:
+		if not all(finite(line.get(f)) for f in ("qty", "rate", "amount", "stock_qty")) or number(line.get("qty")) <= 0 \
+				or qty <= 0 or number(line.get("rate")) < 0 or amount < 0:
 			info["status"].append("invalid")
 			state.add("scope_changed")
 		if abs(amount - number(line.get("qty")) * number(line.get("rate"))) > tol * max(1, abs(number(line.get("qty")))):
@@ -128,7 +132,7 @@ def analyse(sheet, quote):
 		if discount:
 			info["status"].append("discounted")
 			state.add("repriced")
-		if not mapped_mode:
+		if legacy:
 			lines.append(info)
 			continue
 		if not tokens:
@@ -166,6 +170,11 @@ def analyse(sheet, quote):
 				info["status"].append("qty_changed")
 				state.add("scope_changed")
 		elif sources:
+			# A bundle, or a lump-sum charge line, is one complete package: quantity 1 in a
+			# 1:1 unit. Exact component coverage is by source rows; no multiplier is allowed.
+			if abs(number(line.get("qty")) - 1) > QTY_TOLERANCE or abs(qty - 1) > QTY_TOLERANCE:
+				info["status"].append("package_qty")
+				state.add("scope_changed")
 			allowed = {r["item_code"] for r in items}
 			if any(r["kind"] == "charge" for r in sources):
 				allowed.add(sheet.get("additional_item"))
@@ -178,22 +187,23 @@ def analyse(sheet, quote):
 		lines.append(info)
 
 	uncovered = []
-	if mapped_mode:
+	if legacy:
+		if not legacy_signature(sheet, quote):
+			state.add("scope_changed")
+			issues.append(("legacy_differs", "This pre-mapping quotation differs from the DCS BOQ."))
+	else:
 		uncovered = [r["token"] for r in sheet["rows"] if r["token"] not in covered]
 		if uncovered:
 			state.add("scope_changed")
 			issues.append(("uncovered", f"{len(uncovered)} DCS row(s) are not presented on any quotation line."))
-	elif not legacy_signature(sheet, quote):
-		state.add("scope_changed")
-		issues.append(("unmapped", "Quotation lines are not mapped to DCS rows and differ from the DCS BOQ; "
-			"map each line to its DCS source rows."))
 	unknown = sorted({t for l in lines for t in l["sources"] if t not in by_token})
 	duplicates = sorted(t for t, n in seen.items() if n > 1)
 	if unknown:
 		issues.append(("unknown_source", "Some lines name rows that are not quotable rows of this DCS."))
 	if duplicates:
 		issues.append(("duplicate_source", "Some DCS rows are presented on more than one line."))
-	for code, label in (("unmapped", "unmapped"), ("item_changed", "item changed"), ("qty_changed", "quantity changed"),
+	for code, label in (("unmapped", "not mapped to DCS rows"), ("item_changed", "item changed"),
+			("qty_changed", "quantity changed"), ("package_qty", "bundle or charge not a single package"),
 			("repriced", "repriced"), ("discounted", "discounted"), ("invalid", "invalid figures")):
 		count = sum(1 for l in lines if code in l["status"])
 		if count:
@@ -224,8 +234,8 @@ def analyse(sheet, quote):
 		"labels": [STATE_LABELS[s] for s in ordered],
 		"matching": "matching" in state,
 		"issuable": "matching" in state and "stale" not in state,
-		"mapped": mapped_mode,
-		"legacy": not mapped_mode,
+		"mapped": not legacy and all(parse_sources(l.get("sources")) for l in quote["lines"]),
+		"legacy": legacy,
 		"lines": lines,
 		"uncovered": uncovered,
 		"unknown": unknown,
@@ -236,6 +246,74 @@ def analyse(sheet, quote):
 		"variance": money(quote_net - dcs_selling, currency),
 		"currency": currency,
 	}
+
+
+INITIAL_CLEAR_STATES = ("", "Not Started", "In Negotiation")
+
+
+def initial_authority(state, required_stored, required_now, selling, approval_matches=False):
+	"""Authority for a position with no living revision yet (revision 0), under the existing policy.
+
+	``required_now`` is the existing ``negotiation.requirement`` for the sheet's own
+	totals (no concession). Rejection, return and blocking always refuse; a required
+	approval must be on record for exactly these totals; an unrecognised state never
+	authorises. Returns "" when authorised, else the reason.
+	"""
+	state = state or ""
+	if not finite(selling) or number(selling) <= 0:
+		return "The DCS has no positive selling position to issue."
+	if state in ("Rejected", "Returned for Rework"):
+		return ("The current DCS position was " + state.lower()
+			+ ". A new commercial revision and fresh approval are required before issue.")
+	if "Blocked" in (required_stored, required_now) or state == "Blocked":
+		return "The current DCS position is blocked and cannot be authorised."
+	needed = required_now == "Manager" or required_stored not in (None, "", "None")
+	if state == "Approved":
+		if not needed or approval_matches:
+			return ""
+		return "The recorded approval does not match the current DCS figures. Fresh approval is required before issue."
+	if needed:
+		return ("The current DCS position requires recorded commercial approval. Initialise the living position "
+			"and obtain approval through the existing route before issue.")
+	if state in INITIAL_CLEAR_STATES:
+		return ""
+	return f"The DCS approval state '{state}' is not a clear state. Review the position before issue."
+
+
+def row_label(kind, position, text, qty, uom):
+	"""Customer-appropriate label for the mapping dialog: row number, description, quantity and unit."""
+	text = " ".join(str(text or "").split())
+	if len(text) > 120:
+		text = text[:117] + "..."
+	prefix = ("Row " if kind == "item" else "Charge ") + str(position)
+	amount = f"{number(qty):g}" + (f" {uom}" if uom else "")
+	return f"{prefix}: {text} - {amount}" if text else f"{prefix} - {amount}"
+
+
+def payment_terms_wording(rows):
+	"""Suggested customer wording from a Payment Terms Template's actual rows, for the user to confirm.
+
+	Never used without confirmation; never a template name. Early-payment discounts are stated.
+	"""
+	parts = []
+	for r in rows or []:
+		portion = f"{number(r.get('invoice_portion')):g}%"
+		label = " ".join(str(r.get("description") or r.get("payment_term") or "").split())
+		basis = r.get("due_date_based_on") or "Day(s) after invoice date"
+		days, months = int(number(r.get("credit_days"))), int(number(r.get("credit_months")))
+		if basis == "Month(s) after the end of the invoice month":
+			due = f"due {months} month(s) after the end of the invoice month"
+		elif basis == "Day(s) after the end of the invoice month":
+			due = f"due {days} day(s) after the end of the invoice month"
+		else:
+			due = "due on invoice" if not days else f"due {days} day(s) after invoice date"
+		text = f"{portion} {label}, {due}" if label else f"{portion} {due}"
+		if number(r.get("discount")) > 0:
+			kind = "%" if r.get("discount_type") == "Percentage" else " (amount)"
+			text += (f"; {number(r.get('discount')):g}{kind} early-payment discount within "
+				f"{int(number(r.get('discount_validity')))} {str(r.get('discount_validity_based_on') or 'day(s)').lower()}")
+		parts.append(text)
+	return "; ".join(parts) + ("." if parts else "")
 
 
 def headline(result):

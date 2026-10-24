@@ -148,12 +148,29 @@ def assign_source_keys(doc):
 
 
 def quotation_payment_defaults(source, quotation_to=None, party_name=None):
-	"""Existing applicable defaults only (the party's Payment Terms Template); nothing is composed."""
+	"""The party's existing default Payment Terms Template and a suggested wording from its actual rows.
+
+	The wording is only a suggestion shown for the user to confirm; generation never substitutes it.
+	"""
 	template = None
 	if quotation_to == "Customer" and party_name:
 		from erpnext.accounts.party import get_payment_terms_template
 		template = get_payment_terms_template(party_name, "Customer", source.company)
-	return {"payment_terms_template": template, "payment_terms": template or ""}
+	return {"payment_terms_template": template, "suggested_terms": payment_terms_suggestion(template)}
+
+
+def payment_terms_suggestion(template):
+	if not template or not frappe.db.exists("Payment Terms Template", template):
+		return ""
+	from bsgroup.dcs.quote_alignment_core import payment_terms_wording
+	return payment_terms_wording([r.as_dict() for r in frappe.get_doc("Payment Terms Template", template).terms])
+
+
+@frappe.whitelist()
+def describe_payment_terms(template):
+	"""Suggested wording for a template the user picked in the generation dialog."""
+	frappe.has_permission("Payment Terms Template", "read", template, throw=True)
+	return payment_terms_suggestion(template)
 
 
 def quotation_party_display(quotation_to, party_name):
@@ -232,16 +249,16 @@ def make_quotation(source_name, payment_terms=None, payment_terms_template=None)
 	quotation.custom_organization_name = opp.get("custom_organization_name") or ""
 	quotation.update(quotation_party_display(quotation.quotation_to, quotation.party_name))
 
-	# Payment Terms are mandatory on the Quotation: the user's entry, else the party's existing
-	# default. Generation is refused rather than saving a draft that cannot be saved again.
-	defaults = quotation_payment_defaults(source, quotation.quotation_to, quotation.party_name)
-	template = payment_terms_template or defaults["payment_terms_template"]
+	# Payment Terms are mandatory on the Quotation and are contract wording: the user must state
+	# them explicitly. A template (selected, else the party's default) drives only the schedule.
+	terms = (payment_terms or "").strip()
+	if not terms:
+		frappe.throw("Enter and confirm the Payment Terms wording agreed for this offer before generating the quotation.",
+			title="Payment Terms required")
+	template = payment_terms_template or quotation_payment_defaults(
+		source, quotation.quotation_to, quotation.party_name)["payment_terms_template"]
 	if template and not frappe.db.exists("Payment Terms Template", template):
 		frappe.throw("The selected Payment Terms Template does not exist.")
-	terms = (payment_terms or "").strip() or defaults["payment_terms"]
-	if not terms:
-		frappe.throw("Enter the Payment Terms agreed for this offer before generating the quotation.",
-			title="Payment Terms required")
 	quotation.custom_payment_terms = terms
 	if template:
 		quotation.payment_terms_template = template

@@ -206,6 +206,8 @@ def _sync_quotation(sheet, requested):
             "discount_percentage": 0, "rate": row.selling_rate,
             "custom_dcs_source_rows": row_token(row)})
     q.set("items", items)
+    # The user chose to update this draft from the revised BOQ: an explicit review of the revision.
+    q.custom_dcs_revision_reference = sheet.custom_revision_reference
     # The draft was created by make_quotation with ignore_mandatory; quotation
     # mandatory fields (e.g. payment terms) are enforced when it is submitted,
     # not when the governed BOQ sync refreshes its lines.
