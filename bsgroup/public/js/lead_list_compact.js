@@ -18,7 +18,7 @@
       body.bs-sales-ui[data-route="List/Lead/List"] .filter-section .btn { min-height: 30px; padding-top: 4px; padding-bottom: 4px; }
       body.bs-sales-ui[data-route="List/Lead/List"] .filter-section > * { margin-top: 0; margin-bottom: 0; }
       body.bs-sales-ui[data-route="List/Lead/List"] .result-container { margin: 0; width: 100%; }
-      body.bs-sales-ui[data-route="List/Lead/List"] :is(.result,.list-row-container) { display: block; width: 100% !important; min-width: 0 !important; }
+      body.bs-sales-ui[data-route="List/Lead/List"] :is(.result,.list-row-container) { display: block !important; width: 100% !important; min-width: 0 !important; }
       body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-shell :is(.list-row,.list-row-head) { width: 100%; min-height: 36px; padding: 2px 6px; margin: 0; }
       body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-shell .list-row > .level-left,
       body.bs-sales-ui[data-route="List/Lead/List"] .list-header-subject { min-width: 0 !important; flex: 1 1 0%; gap: 6px; }
