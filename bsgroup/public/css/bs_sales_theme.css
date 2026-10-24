@@ -2,7 +2,7 @@
    Screen-only: print formats, documents and accounting behaviour are untouched. */
 @media screen {
     .bs-sales-ui {
-        --bs-sales-theme-version: "20261024-list-shell";
+        --bs-sales-theme-version: "20261024-lead-toolbar";
         --bs-navy: #102d59;
         --bs-blue: #1d5fc4;
         --bs-ink: #172b4d;
