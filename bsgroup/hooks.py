@@ -315,8 +315,11 @@ doctype_js = {
 
 doctype_list_js = {
     "Lead": "public/js/lead_list_compact.js",
+    "Opportunity": "public/js/lead_list_compact.js",
+    "Deal Cost Sheet": "public/js/lead_list_compact.js",
+    "Quotation": "public/js/lead_list_compact.js",
     "Project": "public/js/project_list.js",
-    "Presales Request": "public/js/presales_request_list.js",
+    "Presales Request": ["public/js/presales_request_list.js", "public/js/lead_list_compact.js"],
     "PPM Management": "public/js/ppm_management_list.js",
 }
 

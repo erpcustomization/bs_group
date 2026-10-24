@@ -1,5 +1,5 @@
 // Loaded through native list metadata; never replace list settings or handlers.
-// Scope every rule to the Lead list so cached styles cannot affect other pages.
+// Scope every rule to the selected sales lists so cached styles cannot affect other pages.
 (() => {
     const id = "bsi-lead-compact-list";
     if (document.getElementById(id)) return;
@@ -7,80 +7,94 @@
     style.id = id;
     style.textContent = `
     @media screen {
-      body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-shell .layout-main-section { padding: 10px 14px 12px; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-heading { margin-bottom: 8px; gap: 8px; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-heading h1 { font-size: 20px; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .list-page-form { padding: 8px 10px; margin-bottom: 8px; gap: 8px 12px; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section { gap: 6px 8px; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section :is(.form-control,.match-type-dropdown-btn) { height: 30px; min-height: 30px; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section :is(.select-icon,.placeholder) { top: 6px; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .filter-section { padding-left: 10px; gap: 6px; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .filter-section .btn { min-height: 30px; padding-top: 4px; padding-bottom: 4px; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .filter-section > * { margin-top: 0; margin-bottom: 0; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .result-container { margin: 0; width: 100%; }
-      body.bs-sales-ui[data-route="List/Lead/List"] :is(.result,.list-row-container) { display: block !important; width: 100% !important; min-width: 0 !important; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-shell :is(.list-row,.list-row-head) { width: 100%; min-height: 36px; padding: 2px 6px; margin: 0; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-shell .list-row > .level-left,
-      body.bs-sales-ui[data-route="List/Lead/List"] .list-header-subject { min-width: 0 !important; flex: 1 1 0%; gap: 6px; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .list-row-col { flex-shrink: 1 !important; min-width: 0 !important; margin-right: 0; padding-right: 6px; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .list-row-col[data-fieldname="status_field"] { max-width: 104px !important; }
-      body.bs-sales-ui[data-route="List/Lead/List"] :is(.list-row,.list-row-head) > .level-right { width: 178px; min-width: 178px; flex: 0 0 178px; padding-left: 6px; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .list-row-activity { width: 100%; min-width: 0; gap: 5px; margin: 0; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .list-row-activity .modified { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .list-row .level-left { min-height: 30px; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .list-paging-area { margin-top: 6px; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .bs-list-shell .layout-main-section { padding: 10px 14px 12px; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .bs-list-heading { margin-bottom: 8px; gap: 8px; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .bs-list-heading h1 { font-size: 20px; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-page-form { padding: 8px 10px; margin-bottom: 8px; gap: 8px 12px; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .standard-filter-section { gap: 6px 8px; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .standard-filter-section :is(.form-control,.match-type-dropdown-btn) { height: 30px; min-height: 30px; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .standard-filter-section :is(.select-icon,.placeholder) { top: 6px; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .filter-section { padding-left: 10px; gap: 6px; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .filter-section .btn { min-height: 30px; padding-top: 4px; padding-bottom: 4px; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .filter-section > * { margin-top: 0; margin-bottom: 0; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .result-container { margin: 0; width: 100%; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) :is(.result,.list-row-container) { display: block !important; width: 100% !important; min-width: 0 !important; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .bs-list-shell :is(.list-row,.list-row-head) { width: 100%; min-height: 36px; padding: 2px 6px; margin: 0; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .bs-list-shell .list-row > .level-left,
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-header-subject { min-width: 0 !important; flex: 1 1 0%; gap: 6px; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row-col { flex-shrink: 1 !important; min-width: 0 !important; margin-right: 0; padding-right: 6px; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row-col[data-fieldname="status_field"] { max-width: 104px !important; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) :is(.list-row,.list-row-head) > .level-right { width: 178px; min-width: 178px; flex: 0 0 178px; padding-left: 6px; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row-activity { width: 100%; min-width: 0; gap: 5px; margin: 0; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row-activity .modified { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row .level-left { min-height: 30px; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-paging-area { margin-top: 6px; }
       @media(max-width:1000px) {
-        body.bs-sales-ui[data-route="List/Lead/List"] .list-page-form { gap: 6px; }
-        body.bs-sales-ui[data-route="List/Lead/List"] .filter-section { padding: 6px 0 0; }
+        body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-page-form { gap: 6px; }
+        body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .filter-section { padding: 6px 0 0; }
       }
       @media(max-width:767px) {
-        body.bs-sales-ui[data-route="List/Lead/List"] :is(.list-row,.list-row-head) > .level-right { width: auto; min-width: 0; flex: 0 1 auto; }
+        body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) :is(.list-row,.list-row-head) > .level-right { width: auto; min-width: 0; flex: 0 1 auto; }
       }
       @media(min-width:768px) {
-        body.bs-sales-ui[data-route="List/Lead/List"] .list-page-form { grid-template-columns: minmax(0,1fr) auto; gap: 8px; padding: 8px; }
-        body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section { grid-template-columns: .7fr 1.35fr .9fr .9fr .9fr .8fr; gap: 6px; }
-        body.bs-sales-ui[data-route="List/Lead/List"] .filter-section { flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 6px; border-top: 0; border-left: 1px solid #e6ecf5; padding: 0 0 0 8px; }
-        body.bs-sales-ui[data-route="List/Lead/List"] .filter-section .btn { padding-left: 6px; padding-right: 6px; font-size: 11px; }
-        body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section .form-control { padding-left: 7px; padding-right: 7px; font-size: 11px; }
-        body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section .match-type-dropdown-btn { padding-left: 4px; padding-right: 4px; }
-        body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section .input-group-btn { flex: 0 0 24px; }
+        body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-page-form { grid-template-columns: minmax(0,1fr) auto; gap: 8px; padding: 8px; }
+        body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .standard-filter-section { grid-template-columns: .7fr 1.35fr .9fr .9fr .9fr .8fr; gap: 6px; }
+        body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .filter-section { flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 6px; border-top: 0; border-left: 1px solid #e6ecf5; padding: 0 0 0 8px; }
+        body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .filter-section .btn { padding-left: 6px; padding-right: 6px; font-size: 11px; }
+        body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .standard-filter-section .form-control { padding-left: 7px; padding-right: 7px; font-size: 11px; }
+        body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .standard-filter-section .match-type-dropdown-btn { padding-left: 4px; padding-right: 4px; }
+        body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .standard-filter-section .input-group-btn { flex: 0 0 24px; }
+      }
+
+      body.bs-sales-ui:is([data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-page-form { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; background: #fff; border: 1px solid #dfe7f2; }
+      body.bs-sales-ui:is([data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .standard-filter-section { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0,1fr); grid-template-columns: none; width: 100%; min-width: 0; }
+      body.bs-sales-ui:is([data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .standard-filter-section > .frappe-control { width: 100%; max-width: none; min-width: 0; padding: 0; margin: 0; flex: none; }
+      body.bs-sales-ui:is([data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .standard-filter-section .input-group { flex-wrap: nowrap; }
+      body.bs-sales-ui:is([data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .standard-filter-section .form-control { min-width: 0; border-radius: 6px; }
+      body.bs-sales-ui:is([data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .standard-filter-section .input-group > .form-control { border-radius: 6px 0 0 6px; }
+      body.bs-sales-ui:is([data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .match-type-dropdown-btn { border-radius: 0 6px 6px 0; }
+      body.bs-sales-ui:is([data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .filter-section { margin: 0; }
+      @media(max-width:767px) {
+        body.bs-sales-ui:is([data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-page-form { grid-template-columns: minmax(0,1fr); }
+        body.bs-sales-ui:is([data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .standard-filter-section { grid-auto-flow: row; grid-template-columns: repeat(2,minmax(0,1fr)); }
       }
       /* Refined surface hierarchy; no controls or document state are replaced. */
-      body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-shell .layout-main-section { border-color: #e2e9f3; box-shadow: none; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-heading { min-height: 36px; margin-bottom: 10px; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-heading h1 { font-size: 23px; font-weight: 650; letter-spacing: -.65px; color: #102d59; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-heading .btn-primary { background: #1d5fc4; border-color: #1d5fc4; box-shadow: 0 2px 4px #102d591a; font-weight: 600; border-radius: 7px; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-heading .btn-default { background: #fff; border-color: #dfe7f2; box-shadow: 0 1px 2px #102d5905; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .list-page-form { border-color: #e2e9f3; border-radius: 9px; box-shadow: 0 2px 5px #102d5905; margin-bottom: 10px; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section .form-control { background: #f8faff; border-color: #e4eaf3; color: #172b4d; font-weight: 450; letter-spacing: 0; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section .form-control::placeholder { color: #60718b; opacity: 1; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section .match-type-dropdown-btn { background: #f8faff; border-color: #e4eaf3; color: #60718b; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section .input-group:focus-within { border-radius: 6px; box-shadow: 0 0 0 2px #1d5fc414; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section .form-control:focus { background: #fff; border-color: #1d5fc4; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .filter-section .btn { border-color: #dfe7f2; color: #294b77; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .result-container { border: 1px solid #dfe7f2; border-radius: 9px; box-shadow: 0 3px 10px #102d5907; background: #fff; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-shell .frappe-list .list-row-head { background: #eef3fb; color: #4c6486 !important; border-bottom: 1px solid #dfe7f2; min-height: 34px; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .list-row-head .list-row-col { font-weight: 600; letter-spacing: .1px; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .list-row-container { border-bottom: 1px solid #edf1f7; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .list-row-container:last-child { border-bottom: 0; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-shell .list-row { border-bottom: 0; color: #29405f; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .page-container .list-row .level-item a { color: #163b70; font-size: 12px; font-weight: 600; letter-spacing: -.1px; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .list-row:hover { background: #f5f8fe; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .list-row:focus-within { background: #f5f8fe; box-shadow: inset 2px 0 #1d5fc4; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .list-row-col[data-fieldname="title"] { flex-grow: 1.45 !important; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .list-row-col[data-fieldname="name"] { font-size: 11px; color: #60718b; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .bs-list-shell .layout-main-section { border-color: #e2e9f3; box-shadow: none; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .bs-list-heading { min-height: 36px; margin-bottom: 10px; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .bs-list-heading h1 { font-size: 23px; font-weight: 650; letter-spacing: -.65px; color: #102d59; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .bs-list-heading .btn-primary { background: #1d5fc4; border-color: #1d5fc4; box-shadow: 0 2px 4px #102d591a; font-weight: 600; border-radius: 7px; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .bs-list-heading .btn-default { background: #fff; border-color: #dfe7f2; box-shadow: 0 1px 2px #102d5905; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-page-form { border-color: #e2e9f3; border-radius: 9px; box-shadow: 0 2px 5px #102d5905; margin-bottom: 10px; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .standard-filter-section .form-control { background: #f8faff; border-color: #e4eaf3; color: #172b4d; font-weight: 450; letter-spacing: 0; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .standard-filter-section .form-control::placeholder { color: #60718b; opacity: 1; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .standard-filter-section .match-type-dropdown-btn { background: #f8faff; border-color: #e4eaf3; color: #60718b; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .standard-filter-section .input-group:focus-within { border-radius: 6px; box-shadow: 0 0 0 2px #1d5fc414; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .standard-filter-section .form-control:focus { background: #fff; border-color: #1d5fc4; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .filter-section .btn { border-color: #dfe7f2; color: #294b77; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .result-container { border: 1px solid #dfe7f2; border-radius: 9px; box-shadow: 0 3px 10px #102d5907; background: #fff; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .bs-list-shell .frappe-list .list-row-head { background: #eef3fb; color: #4c6486 !important; border-bottom: 1px solid #dfe7f2; min-height: 34px; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row-head .list-row-col { font-weight: 600; letter-spacing: .1px; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row-container { border-bottom: 1px solid #edf1f7; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row-container:last-child { border-bottom: 0; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .bs-list-shell .list-row { border-bottom: 0; color: #29405f; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .page-container .list-row .level-item a { color: #163b70; font-size: 12px; font-weight: 600; letter-spacing: -.1px; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row:hover { background: #f5f8fe; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row:focus-within { background: #f5f8fe; box-shadow: inset 2px 0 #1d5fc4; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row-col[data-fieldname="title"] { flex-grow: 1.45 !important; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row-col[data-fieldname="name"] { font-size: 11px; color: #60718b; font-variant-numeric: tabular-nums; letter-spacing: 0; }
       body.bs-sales-ui[data-route="List/Lead/List"] .es-badge { border-radius: 5px; border: 1px solid #e2e9f3; background: #f4f7fc; color: #4c6486; font-size: 10px; font-weight: 550; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .es-badge[data-filter="status,=,Opportunity"] { background: #eaf2ff; border-color: #d7e5fc; color: #1d5fc4; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .es-badge[data-filter="status,=,Converted"] { background: #eaf7f2; border-color: #cce9dd; color: #176747; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .list-row-activity .modified { flex: 0 0 35px; text-align: right; font-size: 11px; color: #60718b; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .list-row-activity .comment-count { flex-shrink: 0; gap: 3px; font-size: 11px; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .list-row-activity .mx-2 { margin-left: 2px !important; margin-right: 2px !important; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .list-paging-area { padding-top: 2px; font-size: 11px; color: #60718b; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .es-badge[data-filter="status,=,Opportunity"] { background: #eaf2ff; border-color: #d7e5fc; color: #1d5fc4; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .es-badge[data-filter="status,=,Converted"] { background: #eaf7f2; border-color: #cce9dd; color: #176747; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row-activity .modified { flex: 0 0 35px; text-align: right; font-size: 11px; color: #60718b; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row-activity .comment-count { flex-shrink: 0; gap: 3px; font-size: 11px; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row-activity .mx-2 { margin-left: 2px !important; margin-right: 2px !important; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-paging-area { padding-top: 2px; font-size: 11px; color: #60718b; }
+body.bs-sales-ui:is([data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .es-badge { border-radius: 5px; font-size: 10px; font-weight: 550; }
       /* Consistent dense rows, including records with assignment avatars. */
-      body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-shell .list-row { min-height: 34px; padding-top: 1px; padding-bottom: 1px; }
-      body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-shell .list-row > :is(.level-left,.level-right) { padding-top: 0; padding-bottom: 0; min-height: 30px; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .bs-list-shell .list-row { min-height: 34px; padding-top: 1px; padding-bottom: 1px; }
+      body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .bs-list-shell .list-row > :is(.level-left,.level-right) { padding-top: 0; padding-bottom: 0; min-height: 30px; }
       @media(prefers-reduced-motion:no-preference) {
-        body.bs-sales-ui[data-route="List/Lead/List"] :is(.list-row,.btn,.form-control) { transition: background-color .12s ease, border-color .12s ease, box-shadow .12s ease; }
+        body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) :is(.list-row,.btn,.form-control) { transition: background-color .12s ease, border-color .12s ease, box-shadow .12s ease; }
       }
     }`;
     document.head.appendChild(style);
