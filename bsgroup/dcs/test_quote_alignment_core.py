@@ -163,9 +163,34 @@ class DiscountPaths(unittest.TestCase):
 		self.assertIn("repriced", r["states"])
 		self.assertFalse(r["issuable"])
 
-	def test_price_list_margin_is_repriced(self):
+	def test_rate_below_price_list_is_repriced(self):
 		lines = generated()
-		lines[0]["price_list_rate"] = 3500
+		lines[0]["price_list_rate"] = 5000  # 5000 list presented at 4000, discount fields left empty
+		r = core.analyse(sheet(), quote(lines))
+		self.assertIn("discounted", r["lines"][0]["status"])
+		self.assertFalse(r["issuable"])
+
+	def test_markup_over_unrelated_price_list_is_not_repriced(self):
+		# Staging case: 1 x 10000 bundle of both rows; ERPNext re-fetched a 1890 list price and
+		# carried the rest as an 8110 margin. The mapped DCS selling is met exactly.
+		lines = [line(1, 1, 10000, "L1,I1", price_list_rate=1890, margin_type="Amount", margin_rate_or_amount=8110)]
+		r = core.analyse(sheet(), quote(lines))
+		self.assertEqual(r["states"], ["matching", "bundled"])
+		self.assertEqual(r["lines"][0]["status"], ["bundle"])
+		self.assertTrue(r["issuable"])
+		single = generated()
+		single[0].update(price_list_rate=3500)  # 4000 over a 3500 list: markup on a single-row line
+		self.assertTrue(core.analyse(sheet(), quote(single))["issuable"])
+
+	def test_selling_reduction_behind_markup_is_still_caught(self):
+		lines = [line(1, 1, 9000, "L1,I1", price_list_rate=1890, margin_type="Amount", margin_rate_or_amount=7110)]
+		r = core.analyse(sheet(), quote(lines))
+		self.assertIn("repriced", r["lines"][0]["status"])
+		self.assertIn("total_changed", r["states"])
+		self.assertEqual(r["variance"], -1000)
+		self.assertFalse(r["issuable"])
+		# A line discount presented on the bundle stays a discount even when the net is met.
+		lines = [line(1, 1, 10000, "L1,I1", price_list_rate=12500, discount_percentage=20)]
 		self.assertFalse(core.analyse(sheet(), quote(lines))["issuable"])
 
 	def test_document_discount_is_total_changed(self):

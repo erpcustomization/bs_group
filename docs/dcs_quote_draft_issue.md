@@ -49,7 +49,7 @@ reaches the customer as an offer may differ from the approved DCS position.
   * A single-source line keeps its item code and stock quantity (`qty × conversion_factor`).
   * A bundle (several rows), or any charge line, is **one package**: qty 1 in a 1:1 unit. Multipliers and conversions (qty 4 at 2500, qty 1 of a pack of 2) are scope changes. Qty ≤ 0 is invalid.
   * Line amount = sum of its sources' selling, and `amount` = `qty × rate`.
-  * Every discount path counts. Line discount or price-list difference → repriced. Document discount or fixed/negative tax rows → total changed. `net_total` and `total` must both equal the DCS selling total.
+  * Every discount path counts. A line discount, or a rate below the price-list rate, → repriced. A rate above the price-list rate is ERPNext markup over an unrelated list price and is not a change by itself; the line amount is still held to its mapped DCS selling. Document discount or fixed/negative tax rows → total changed. `net_total` and `total` must both equal the DCS selling total.
   * Stale: the revision changed since preparation, the sheet was superseded or not submitted, or the living total differs from the BOQ rows.
 
 ## Legacy records

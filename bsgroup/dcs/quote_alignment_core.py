@@ -126,8 +126,11 @@ def analyse(sheet, quote):
 			info["status"].append("repriced")
 			state.add("repriced")
 		discount = any(abs(number(line.get(f))) > tol for f in ("discount_percentage", "discount_amount"))
+		# A rate below the price-list rate presents a reduction from list to the customer. A rate
+		# above it is ERPNext markup (margin) over an unrelated list price: not an offer change by
+		# itself, since the line amount is still held to its mapped DCS selling below.
 		plr = number(line.get("price_list_rate"))
-		if plr and abs(plr - number(line.get("rate"))) > tol:
+		if plr and number(line.get("rate")) < plr - tol:
 			discount = True
 		if discount:
 			info["status"].append("discounted")

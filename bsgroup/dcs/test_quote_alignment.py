@@ -287,6 +287,26 @@ class IntegrationTestDCSQuoteAlignment(IntegrationTestCase):
 		self.assertEqual(self.q.custom_dcs_alignment, "Matching, Bundled")
 		self.submit()
 
+	def bundle_over_price_list(self, rate):
+		"""The bundle as the form leaves it: an unrelated 1890 list price plus an Amount margin."""
+		self.lines((1, rate, f"{self.laptop},{self.install}"))
+		self.q.items[0].update({"price_list_rate": 1890, "margin_type": "Amount", "margin_rate_or_amount": rate - 1890})
+		self.save()
+
+	def test_bundle_marked_up_over_price_list_submits(self):
+		self.bundle_over_price_list(10000)
+		self.q.reload()
+		self.assertEqual((self.q.items[0].rate, self.q.items[0].amount, self.q.net_total), (10000, 10000, 10000))
+		self.assertEqual(self.q.custom_dcs_alignment, "Matching, Bundled")
+		self.submit()
+
+	def test_bundle_selling_reduction_behind_markup_cannot_submit(self):
+		self.bundle_over_price_list(9000)
+		self.assertIn("Repriced", self.q.custom_dcs_alignment)
+		self.assertIn("Total changed", self.q.custom_dcs_alignment)
+		with self.assertRaises(frappe.ValidationError):
+			self.submit()
+
 	def test_bundle_multiplier_and_conversion_cannot_submit(self):
 		for spec in ((4, 2500, f"{self.laptop},{self.install}"), (1, 10000, f"{self.laptop},{self.install}", 2)):
 			self.q.reload()
