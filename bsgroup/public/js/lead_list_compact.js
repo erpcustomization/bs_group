@@ -45,6 +45,40 @@
         body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section .match-type-dropdown-btn { padding-left: 4px; padding-right: 4px; }
         body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section .input-group-btn { flex: 0 0 24px; }
       }
+      /* Refined surface hierarchy; no controls or document state are replaced. */
+      body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-shell .layout-main-section { border-color: #e2e9f3; box-shadow: none; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-heading { min-height: 36px; margin-bottom: 10px; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-heading h1 { font-size: 23px; font-weight: 650; letter-spacing: -.65px; color: #102d59; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-heading .btn-primary { background: #1d5fc4; border-color: #1d5fc4; box-shadow: 0 2px 4px #102d591a; font-weight: 600; border-radius: 7px; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-heading .btn-default { background: #fff; border-color: #dfe7f2; box-shadow: 0 1px 2px #102d5905; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .list-page-form { border-color: #e2e9f3; border-radius: 9px; box-shadow: 0 2px 5px #102d5905; margin-bottom: 10px; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section .form-control { background: #f8faff; border-color: #e4eaf3; color: #172b4d; font-weight: 450; letter-spacing: 0; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section .form-control::placeholder { color: #60718b; opacity: 1; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section .match-type-dropdown-btn { background: #f8faff; border-color: #e4eaf3; color: #60718b; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section .input-group:focus-within { border-radius: 6px; box-shadow: 0 0 0 2px #1d5fc414; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section .form-control:focus { background: #fff; border-color: #1d5fc4; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .filter-section .btn { border-color: #dfe7f2; color: #294b77; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .result-container { border: 1px solid #dfe7f2; border-radius: 9px; box-shadow: 0 3px 10px #102d5907; background: #fff; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-shell .frappe-list .list-row-head { background: #eef3fb; color: #4c6486 !important; border-bottom: 1px solid #dfe7f2; min-height: 34px; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .list-row-head .list-row-col { font-weight: 600; letter-spacing: .1px; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .list-row-container { border-bottom: 1px solid #edf1f7; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .list-row-container:last-child { border-bottom: 0; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-shell .list-row { border-bottom: 0; color: #29405f; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .page-container .list-row .level-item a { color: #163b70; font-size: 12px; font-weight: 600; letter-spacing: -.1px; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .list-row:hover { background: #f5f8fe; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .list-row:focus-within { background: #f5f8fe; box-shadow: inset 2px 0 #1d5fc4; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .list-row-col[data-fieldname="title"] { flex-grow: 1.45 !important; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .list-row-col[data-fieldname="name"] { font-size: 11px; color: #60718b; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .es-badge { border-radius: 5px; border: 1px solid #e2e9f3; background: #f4f7fc; color: #4c6486; font-size: 10px; font-weight: 550; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .es-badge[data-filter="status,=,Opportunity"] { background: #eaf2ff; border-color: #d7e5fc; color: #1d5fc4; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .es-badge[data-filter="status,=,Converted"] { background: #eaf7f2; border-color: #cce9dd; color: #176747; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .list-row-activity .modified { flex: 0 0 35px; text-align: right; font-size: 11px; color: #60718b; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .list-row-activity .comment-count { flex-shrink: 0; gap: 3px; font-size: 11px; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .list-row-activity .mx-2 { margin-left: 2px !important; margin-right: 2px !important; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .list-paging-area { padding-top: 2px; font-size: 11px; color: #60718b; }
+      @media(prefers-reduced-motion:no-preference) {
+        body.bs-sales-ui[data-route="List/Lead/List"] :is(.list-row,.btn,.form-control) { transition: background-color .12s ease, border-color .12s ease, box-shadow .12s ease; }
+      }
     }`;
     document.head.appendChild(style);
 })();
