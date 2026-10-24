@@ -110,6 +110,16 @@ branch, next to `assert_issue_authority`. Hooks here are appended with the same 
 `pdf_body_html`, `on_print_pdf`, `has_permission["Quotation"]` and the `communication.email.make`
 override are new keys that the release branch doesn't use.
 
+Verified on the isolated site (2026-10-24) with a throwaway merge of this branch into
+`release/bs-procurement-20261020`:
+* four mechanical conflicts (`quotation_control.py`, `hooks.py`, `patches.txt`, `quotation.js`);
+* `assert_clearance` stays on quotation issue, Sales Order validate and `make_sales_order`;
+* `bsgroup.dcs.test_quote_alignment` passes 41/41;
+* `bsgroup.dcs.test_obligation` shows a strict subset of the release branch's own failures, all
+  from production-only configuration, once one test call is updated at merge time:
+  `make_quotation(self.sheet.name, payment_terms="ZZTEST 100% on delivery")` in
+  `test_quotation_has_only_delivery_prices`, because generation now requires confirmed wording.
+
 ## Tests
 
 ```bash
