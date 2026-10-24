@@ -298,6 +298,153 @@ frappe.ui.form.on(cur_frm ? cur_frm.doctype : 'Quotation', {
     if (document.documentElement.classList.contains('lite-theme')) colorize();
   }, 1500);
 })();
+// DCS draft / issue separation: server-derived alignment banner and source-row mapping.
+// Presentation only; the server decides alignment, issue and authority.
+frappe.ui.form.on('Quotation', {
+    refresh(frm) {
+        if (!frm.doc.custom_deal_cost_sheet || frm.is_new()) return;
+        dcs_alignment_banner(frm);
+        if (frm.doc.docstatus === 0) {
+            frm.add_custom_button(__('Map DCS Rows'), () => dcs_map_rows_dialog(frm), __('DCS'));
+        }
+    }
+});
+
+function dcs_alignment_banner(frm) {
+    frappe.call({
+        method: 'bsgroup.dcs.quote_alignment.alignment_summary',
+        args: {quotation: frm.doc.name},
+        callback(r) {
+            if (!r.message) return;
+            frm.__dcs_alignment = r.message;
+            frm.dashboard.set_headline_alert(dcs_alignment_html(r.message));
+            if (frm.doc.docstatus === 0 && (r.message.actions || []).includes('review_revision')) {
+                frm.add_custom_button(__('Review DCS Revision'), () => dcs_review_revision(frm, r.message), __('DCS'));
+            }
+        }
+    });
+}
+
+const DCS_ACTIONS = {
+    map_rows: 'Map each line to its DCS rows (DCS > Map DCS Rows).',
+    request_revision: 'Prices or totals differ: record an approved commercial revision on the Deal Cost Sheet, then align this draft.',
+    regenerate: 'The DCS has moved on: generate a replacement quotation for the current revision.',
+    review_revision: 'The DCS was revised after this draft was prepared: review the revision (DCS > Review DCS Revision), then align the draft.',
+    obtain_approval: 'Obtain the recorded commercial approval on the current DCS revision.'
+};
+
+function dcs_alignment_html(s) {
+    const esc = frappe.utils.escape_html;
+    const ok = s.issuable;
+    const fmt = v => (v === null || v === undefined) ? '' : format_currency(v, s.currency);
+    let h = '<div class="dcs-alignment"><b>' + esc(ok ? __('Ready to issue') : (s.docstatus === 0 ? __('Draft - not for customer issue') : __('Not issuable'))) + '</b> ';
+    h += (s.labels || []).map(l => '<span class="indicator-pill ' + (l === 'Matching' ? 'green' : l === 'Bundled' ? 'blue' : 'orange') + '">' + esc(l) + '</span>').join(' ');
+    if (s.dcs_selling !== null && s.dcs_selling !== undefined) {
+        h += '<div>' + esc(__('DCS selling')) + ': ' + esc(fmt(s.dcs_selling)) + ' &middot; ' + esc(__('Quotation net')) + ': ' + esc(fmt(s.quote_net))
+            + ' &middot; ' + esc(__('Variance')) + ': ' + esc(fmt(s.variance));
+        if (s.approved) h += ' &middot; ' + esc(__('Approved selling')) + ': ' + esc(fmt(s.approved.selling)) + (s.approved.current_revision ? '' : ' (' + esc(__('earlier revision')) + ')');
+        h += '</div>';
+    }
+    if (s.approval_state) h += '<div>' + esc(__('Approval')) + ': ' + esc(s.approval_state) + '</div>';
+    if (!ok) {
+        h += '<ul>' + (s.problems || []).map(p => '<li>' + esc(p) + '</li>').join('') + '</ul>';
+        h += (s.actions || []).map(a => '<div>&rarr; ' + esc(__(DCS_ACTIONS[a] || a)) + '</div>').join('');
+    }
+    return h + '</div>';
+}
+
+function dcs_review_revision(frm, s) {
+    if (frm.is_dirty()) { frappe.msgprint(__('Save the quotation before reviewing the DCS revision.')); return; }
+    const esc = frappe.utils.escape_html;
+    frappe.confirm(esc(__('This draft was prepared against DCS revision {0}; the current revision is {1}. Review the revised DCS, then confirm to re-check this draft against it.', [s.quote_revision || '-', s.dcs_revision || '-'])), () => {
+        frappe.call({
+            method: 'bsgroup.dcs.quote_alignment.review_revision',
+            args: {quotation: frm.doc.name},
+            freeze: true,
+            callback() { frm.reload_doc(); }
+        });
+    });
+}
+
+function dcs_map_rows_dialog(frm) {
+    if (frm.is_dirty()) { frappe.msgprint(__('Save the quotation before mapping DCS rows.')); return; }
+    frappe.call({
+        method: 'bsgroup.dcs.quote_alignment.source_rows',
+        args: {quotation: frm.doc.name},
+        callback(r) {
+            if (!r.message) return;
+            const data = r.message;
+            const d = new frappe.ui.Dialog({
+                title: __('Map quotation lines to DCS rows'),
+                size: 'extra-large',
+                fields: [{fieldtype: 'HTML', fieldname: 'grid'}],
+                primary_action_label: __('Apply mapping'),
+                primary_action() {
+                    const chosen = dcs_read_mapping(d.$wrapper);
+                    const problems = dcs_mapping_problems(chosen, data.rows);
+                    const apply = () => {
+                        dcs_apply_mapping(frm, chosen);
+                        d.hide();
+                        frappe.show_alert({message: __('Mapping applied. Save to re-check alignment.'), indicator: 'blue'});
+                    };
+                    if (!problems.length) { apply(); return; }
+                    // A draft may differ; the server refuses issue until the mapping is complete and exact.
+                    frappe.confirm(problems.map(p => frappe.utils.escape_html(p)).join('<br>')
+                        + '<br><br>' + frappe.utils.escape_html(__('Apply anyway? The draft will stay not issuable.')), apply);
+                }
+            });
+            d.fields_dict.grid.$wrapper.html(dcs_mapping_html(frm.doc.items || [], data));
+            d.show();
+        }
+    });
+}
+
+function dcs_mapping_html(items, data) {
+    const esc = frappe.utils.escape_html;
+    // The server label carries the DCS row number, customer description, quantity and unit.
+    const label = r => esc((r.label || r.item_code || r.token) + (r.selling_amount !== undefined ? ' = ' + r.selling_amount : ''));
+    let h = '<p>' + esc(__('Select the DCS rows each line presents. Several rows on one line form a bundle, which is quoted as quantity 1; every row must be presented exactly once. Suggestions are only offered when unambiguous and still need your confirmation.')) + '</p>';
+    h += '<table class="table table-bordered"><thead><tr><th>#</th><th>' + esc(__('Quotation line')) + '</th><th>' + esc(__('DCS source rows')) + '</th></tr></thead><tbody>';
+    items.forEach(it => {
+        const current = String(it.custom_dcs_source_rows || data.suggestions[it.idx] || '').split(',').map(t => t.trim()).filter(Boolean);
+        h += '<tr><td>' + esc(it.idx) + '</td><td>' + esc(it.item_code) + ' x ' + esc(it.qty) + ' = ' + esc(it.amount)
+            + '</td><td><select multiple class="form-control dcs-map" data-row="' + esc(it.name) + '" size="' + Math.min(6, data.rows.length || 1) + '">';
+        data.rows.forEach(r => {
+            h += '<option value="' + esc(r.token) + '"' + (current.includes(r.token) ? ' selected' : '') + '>' + label(r) + '</option>';
+        });
+        h += '</select></td></tr>';
+    });
+    return h + '</tbody></table>';
+}
+
+function dcs_read_mapping($wrapper) {
+    const chosen = {};
+    $wrapper.find('select.dcs-map').each(function () {
+        chosen[this.getAttribute('data-row')] = Array.from(this.selectedOptions || []).map(o => o.value);
+    });
+    return chosen;
+}
+
+function dcs_mapping_problems(chosen, rows) {
+    const problems = [], seen = {};
+    Object.values(chosen).forEach(tokens => tokens.forEach(t => { seen[t] = (seen[t] || 0) + 1; }));
+    Object.entries(seen).filter(([, n]) => n > 1).forEach(([t]) => problems.push(__('A DCS row is selected on more than one line: {0}', [t])));
+    rows.filter(r => !seen[r.token]).forEach(r => problems.push(__('Not presented on any line: {0}', [r.label || r.token])));
+    Object.entries(chosen).filter(([, tokens]) => !tokens.length).forEach(([name]) => problems.push(__('A line has no DCS source row: {0}', [name])));
+    return problems;
+}
+
+function dcs_apply_mapping(frm, chosen) {
+    (frm.doc.items || []).forEach(it => {
+        if (!(it.name in chosen)) return;
+        const value = chosen[it.name].join(',');
+        if ((it.custom_dcs_source_rows || '') !== value) {
+            frappe.model.set_value(it.doctype, it.name, 'custom_dcs_source_rows', value);
+        }
+    });
+    frm.refresh_field('items');
+}
+
 // Customer purchase order and sales-to-procurement handoff.
 frappe.ui.form.on('Quotation', {
     refresh(frm) {
