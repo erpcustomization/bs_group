@@ -76,6 +76,9 @@
       body.bs-sales-ui[data-route="List/Lead/List"] .list-row-activity .comment-count { flex-shrink: 0; gap: 3px; font-size: 11px; }
       body.bs-sales-ui[data-route="List/Lead/List"] .list-row-activity .mx-2 { margin-left: 2px !important; margin-right: 2px !important; }
       body.bs-sales-ui[data-route="List/Lead/List"] .list-paging-area { padding-top: 2px; font-size: 11px; color: #60718b; }
+      /* Consistent dense rows, including records with assignment avatars. */
+      body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-shell .list-row { min-height: 34px; padding-top: 1px; padding-bottom: 1px; }
+      body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-shell .list-row > :is(.level-left,.level-right) { padding-top: 0; padding-bottom: 0; min-height: 30px; }
       @media(prefers-reduced-motion:no-preference) {
         body.bs-sales-ui[data-route="List/Lead/List"] :is(.list-row,.btn,.form-control) { transition: background-color .12s ease, border-color .12s ease, box-shadow .12s ease; }
       }
