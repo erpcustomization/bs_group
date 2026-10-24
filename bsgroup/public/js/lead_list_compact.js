@@ -36,6 +36,15 @@
       @media(max-width:767px) {
         body.bs-sales-ui[data-route="List/Lead/List"] :is(.list-row,.list-row-head) > .level-right { width: auto; min-width: 0; flex: 0 1 auto; }
       }
+      @media(min-width:768px) {
+        body.bs-sales-ui[data-route="List/Lead/List"] .list-page-form { grid-template-columns: minmax(0,1fr) auto; gap: 8px; padding: 8px; }
+        body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section { grid-template-columns: .7fr 1.35fr .9fr .9fr .9fr .8fr; gap: 6px; }
+        body.bs-sales-ui[data-route="List/Lead/List"] .filter-section { flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 6px; border-top: 0; border-left: 1px solid #e6ecf5; padding: 0 0 0 8px; }
+        body.bs-sales-ui[data-route="List/Lead/List"] .filter-section .btn { padding-left: 6px; padding-right: 6px; font-size: 11px; }
+        body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section .form-control { padding-left: 7px; padding-right: 7px; font-size: 11px; }
+        body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section .match-type-dropdown-btn { padding-left: 4px; padding-right: 4px; }
+        body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section .input-group-btn { flex: 0 0 24px; }
+      }
     }`;
     document.head.appendChild(style);
 })();
