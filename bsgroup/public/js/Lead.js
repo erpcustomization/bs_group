@@ -256,7 +256,7 @@ const bsi_customer_brief = (() => {
 // Presentation only. Original controls, permissions, dependencies and handlers
 // remain authoritative; no values, status options or required flags are changed.
 const bsi_lead_focus = (() => {
-    const secondary = ["salutation", "middle_name", "gender", "job_title", "type", "request_type",
+    const secondary = ["salutation", "middle_name", "lead_name", "gender", "job_title", "type", "request_type",
         "no_of_employees", "annual_revenue", "industry", "market_segment", "territory", "fax",
         "website", "whatsapp_no", "phone_ext", "language", "blog_subscriber"];
     function required(field) {
@@ -292,18 +292,36 @@ const bsi_lead_focus = (() => {
         });
         // Keep customer contact and status at the top without duplicating inputs.
         const first = frm.fields_dict.first_name?.$wrapper?.[0];
-        const contactColumn = frm.fields_dict.company_name?.$wrapper?.[0]?.parentElement || first?.parentElement;
-        if (contactColumn) ["email_id", "mobile_no", "phone"].forEach(name => {
+        const core = first?.closest('.form-section')?.querySelector('.section-body');
+        if (core) {
+            core.classList.add('bsi-core-fields');
+            core.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px 24px';
+            core.querySelectorAll('.form-column').forEach(column => { column.style.display = 'contents'; });
+        }
+        if (core) ["first_name", "last_name", "company_name", "email_id", "mobile_no", "phone", "lead_owner", "status", "company"].forEach(name => {
             const node = frm.fields_dict[name]?.$wrapper?.[0];
-            if (node && pane.contains(node)) contactColumn.appendChild(node);
+            if (node && pane.contains(node)) {
+                node.style.marginBottom = '0';
+                node.style.maxWidth = 'none';
+                core.appendChild(node);
+            }
         });
         for (const name of ["contact_info_tab", "organization_section"]) {
             const section = pane.querySelector(`.form-section[data-fieldname="${name}"]`);
             if (section) section.style.display = section.querySelector('.frappe-control') ? '' : 'none';
         }
-        // Native collapsed sections retain Frappe's validation expansion behavior.
+        // Secondary sections remain native controls, inside one disclosure.
+        // Required sections stay outside so workflow requirements remain visible.
         for (const section of frm.layout?.sections || []) {
             if (!["address_section", "qualification_tab", "other_info_tab", "utm_analytics_section"].includes(section.df.fieldname)) continue;
+            const node = section.wrapper?.[0];
+            if (node && pane.contains(node)) {
+                if (section.fields_list.some(required)) {
+                    if (box.contains(node)) box.before(node);
+                } else {
+                    box.appendChild(node);
+                }
+            }
             if (section._bsi_initialized) continue;
             section._bsi_initialized = true;
             if (!section.fields_list.some(required)) section.collapse(true);
@@ -324,6 +342,7 @@ const bsi_lead_focus = (() => {
             }
             if (follow.lastElementChild.children.length) box.before(follow);
         }
+        if (follow && core) core.closest('.form-section').after(follow);
     }
     return { refresh, required };
 })();

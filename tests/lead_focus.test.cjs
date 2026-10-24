@@ -1,6 +1,6 @@
 const fs = require('fs'), vm = require('vm'), assert = require('node:assert/strict');
 const {parseHTML} = require('./bs_procurement/ui/node_modules/linkedom');
-const {document, window} = parseHTML('<html><body><main><button role="tab" data-fieldname="activities_tab"></button><button role="tab" data-fieldname="notes_tab"></button><div class="tab-pane"><div class="form-section"><div id="identity"></div><div id="contact"></div><div id="responsibility"></div></div><div class="form-section" data-fieldname="organization_section"></div><div class="form-section" data-fieldname="contact_info_tab"></div></div></main></body></html>');
+const {document, window} = parseHTML('<html><body><main><button role="tab" data-fieldname="activities_tab"></button><button role="tab" data-fieldname="notes_tab"></button><div class="tab-pane"><div class="form-section"><div class="section-body"><div id="identity"></div><div id="contact"></div><div id="responsibility"></div></div></div><div class="form-section" data-fieldname="organization_section"></div><div class="form-section" data-fieldname="contact_info_tab"></div></div></main></body></html>');
 const root = document.querySelector('main'), fields_dict = {};
 for (const [name, parent] of [['first_name','identity'],['company_name','contact'],['status','responsibility'],['gender','identity'],['annual_revenue','identity'],['email_id','identity'],['mobile_no','identity'],['phone','identity']]) {
   const node = document.createElement('div'); node.className='frappe-control';
@@ -20,8 +20,8 @@ assert.equal(root.querySelectorAll('.bsi-additional-details').length,1);
 assert.equal(root.querySelector('.bsi-additional-details').hasAttribute('open'),false);
 assert.equal(root.querySelector('.bsi-extra-fields [data-fieldname=gender]'),before);
 before.firstChild.dispatchEvent(new window.Event('change')); assert.equal(changed,1);
-assert.equal(fields_dict.status.$wrapper[0],status); assert.equal(status.parentElement.id,'responsibility');
-assert.equal(frm.doc.status,'Open'); assert.equal(fields_dict.email_id.$wrapper[0].parentElement.id,'contact');
+assert.equal(fields_dict.status.$wrapper[0],status); assert.equal(status.parentElement.className,'section-body bsi-core-fields');
+assert.equal(frm.doc.status,'Open'); assert.equal(fields_dict.email_id.$wrapper[0].parentElement,status.parentElement);
 root.querySelector('.bsi-follow-up button').click(); assert.equal(follow,1);
 assert.deepEqual(collapsed,[true]);
 fields_dict.gender.df.reqd=1; ctx.focus.refresh(frm);
