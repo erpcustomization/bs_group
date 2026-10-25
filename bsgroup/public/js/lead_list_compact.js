@@ -97,8 +97,8 @@ body.bs-sales-ui:is([data-route="List/Opportunity/List"],[data-route="List/Presa
       body.bs-sales-ui:is([data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row-col { flex: 1 1 0% !important; }
       body.bs-sales-ui:is([data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row-col:first-child { flex-grow: 1.6 !important; }
       body.bs-sales-ui:is([data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row-col:is([data-fieldname="grand_total"],[data-fieldname="total_selling"],[data-fieldname="margin_value"]) { flex-grow: 1.3 !important; }
-      @media(min-width:768px) and (max-width:1400px) {
-        body.bs-sales-ui[data-route="List/Quotation/List"] .standard-filter-section { grid-auto-flow: row; grid-template-columns: repeat(4,minmax(0,1fr)); }
+      @media(min-width:768px) {
+        body.bs-sales-ui[data-route="List/Quotation/List"] .standard-filter-section { grid-auto-flow: column; grid-template-columns: .7fr 1.15fr .85fr 1.25fr .8fr .95fr 1.05fr 1.05fr; gap: 5px; }
       }
       @media(prefers-reduced-motion:no-preference) {
         body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) :is(.list-row,.btn,.form-control) { transition: background-color .12s ease, border-color .12s ease, box-shadow .12s ease; }
