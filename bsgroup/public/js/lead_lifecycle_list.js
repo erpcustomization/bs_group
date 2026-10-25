@@ -15,6 +15,7 @@
             style.textContent = Object.entries(colors).map(([color,[bg,text,border]]) =>
                 `.bsi-lead-list-colors .es-badge[data-filter^="status,"][data-theme="${color}"],.bsi-lead-list-colors .indicator-pill.${color}[data-filter^="status,"]{background:${bg}!important;color:${text}!important;border:1px solid ${border}!important}.bsi-lead-list-colors .es-badge[data-filter^="status,"][data-theme="${color}"] .es-badge__label{color:${text}!important}`
             ).join('');
+            style.textContent += '.bsi-lead-list-colors{--text-color:#172b4d;--text-muted:#60718b;--border-color:#dfe7f2;color:#172b4d}.bsi-lead-list-colors .list-row-head{background:#eef3fb!important;color:#4c6486!important;border-color:#dfe7f2!important}.bsi-lead-list-colors .list-row{color:#172b4d}.bsi-lead-list-colors .list-row a{color:#1b5ab4!important}.bsi-lead-list-colors .title-text{color:#12335f!important}.bsi-lead-list-colors .primary-action{background:#1d5fc4!important;color:#fff!important;border-color:#1d5fc4!important}';
             root.append(style);
         }
 
