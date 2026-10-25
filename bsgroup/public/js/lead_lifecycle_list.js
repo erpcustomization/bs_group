@@ -5,6 +5,7 @@ frappe.bsi_setup_sales_list = (doctype) => {
     const ownerField = isLead ? 'lead_owner' : 'opportunity_owner';
     const settings = frappe.listview_settings[doctype] || (frappe.listview_settings[doctype] = {});
     settings.add_fields = [...new Set([...(settings.add_fields || []), "status", "creation", ownerField])];
+    if (!isLead) settings.add_fields = [...new Set([...settings.add_fields, "custom_subject", "custom_organization_name", "opportunity_amount", "currency"])];
     const active = ["Lead", "Open", "Replied", "Interested", "Delayed"];
     const closed = ["Opportunity", "Quotation", "Converted", "Lost Quotation"];
     settings.formatters = {...(settings.formatters || {})};
@@ -43,6 +44,25 @@ frappe.bsi_setup_sales_list = (doctype) => {
         nativeOnload?.call(this, listview);
         const root = listview.page.wrapper[0] || listview.page.wrapper;
         root.classList.add('bsi-lead-list-colors');
+        if (!isLead) {
+            root.classList.add('bsi-opportunity-columns');
+            const applyColumns = () => {
+                const field = (name, label) => ({...frappe.meta.get_docfield('Opportunity', name), fieldname:name, label:__(label)});
+                listview.columns = [
+                    {type:'Subject', df:field('custom_subject', 'Title')},
+                    {type:'Status'},
+                    {type:'Field', df:field('custom_organization_name', 'Organization')},
+                    {type:'Field', df:field('opportunity_amount', 'Opportunity Amount')},
+                    {type:'Field', df:{fieldname:'name', label:__('ID'), fieldtype:'Data'}}
+                ];
+            };
+            const nativeColumns = listview.setup_columns;
+            listview.setup_columns = async function(...args) {
+                await nativeColumns.apply(this, args);
+                applyColumns();
+            };
+            applyColumns();
+        }
         if (!root.querySelector('.bsi-lead-status-style')) {
             const style = document.createElement('style'); style.className = 'bsi-lead-status-style';
             const colors = {blue:['#ddd6fe','#5b21b6','#a78bfa'],green:['#087f5b','#ffffff','#087f5b'],red:['#c92a2a','#ffffff','#c92a2a'],orange:['#a35b00','#ffffff','#a35b00'],amber:['#a35b00','#ffffff','#a35b00']};
@@ -59,6 +79,7 @@ frappe.bsi_setup_sales_list = (doctype) => {
             style.textContent += '.bsi-lead-list-colors .bsi-lead-owner{display:inline-flex;align-items:center;justify-content:center;flex:0 0 26px;width:26px;height:26px;border-radius:50%;background:#eef3fb;color:#12335f;font-size:12px;font-weight:600;border:1px solid #dfe7f2}';
             style.textContent += '.bsi-lead-list-colors .list-row-head>.level-right{position:relative}.bsi-lead-list-colors .list-row-head .list-count{visibility:hidden}.bsi-lead-list-colors .bsi-lead-meta-head{position:absolute;right:10px;display:flex;align-items:center;gap:10px;white-space:nowrap;font-size:10px}.bsi-lead-list-colors .bsi-lead-meta-head .date-heading{width:82px;text-align:center}.bsi-lead-list-colors .bsi-lead-meta-head .owner-heading{width:26px;text-align:center}';
             style.textContent += '.bsi-lead-list-colors .list-row-activity .list-assignments-container{display:none!important}';
+            style.textContent += '@media(min-width:768px){.bsi-opportunity-columns .list-row-col[data-fieldname="custom_organization_name"]{order:3;flex:1 1 150px!important}.bsi-opportunity-columns .list-row-col[data-fieldname="custom_subject"]{order:4;position:static!important;flex:1.3 1 180px!important}.bsi-opportunity-columns .list-row-col[data-fieldname="opportunity_amount"]{order:5;flex:0 1 135px!important;text-align:right}.bsi-opportunity-columns .list-row-col[data-fieldname="custom_subject"]>.select-like{position:absolute;left:0;top:50%;transform:translateY(-50%);margin:0}}';
             root.append(style);
         }
 
@@ -73,7 +94,7 @@ frappe.bsi_setup_sales_list = (doctype) => {
                 if (right) {
                     const headings = document.createElement('span');
                     headings.className = 'bsi-lead-meta-head hidden-xs';
-                    for (const [className, label] of [['date-heading', 'Date'], ['owner-heading', 'Owners']]) {
+                    for (const [className, label] of [['date-heading', 'Date'], ['owner-heading', isLead ? 'Owners' : 'Owner']]) {
                         const heading = document.createElement('span');
                         heading.className = className;
                         heading.textContent = __(label);
