@@ -150,8 +150,6 @@ const bsi_customer_brief = (() => {
             item("Receiving company", text(lead.company)),
             item("Country recorded on enquiry", text(doc.country)),
             item("AI classification", text(ai.verdict ? words(ai.verdict) : null)),
-            item("Source", text("Website enquiry")),
-            item("Enquiry record", route("lead-intake", doc.name))
         
         ]) + paragraph("Review note", doc.bsli_review_note) + "</section>";
     }
