@@ -195,6 +195,11 @@ const bsi_customer_brief = (() => {
         // Keep native summary/confidence fields and their Section Breaks intact:
         // Frappe hides an entire tab if every native section is marked hidden.
     }
+    function manual_requirement(frm, show) {
+        if (frm.fields_dict.custom_requirement) frm.toggle_display("custom_requirement", show);
+        const card = frm.fields_dict.custom_requirement?.$wrapper?.[0]?.closest('.bsi-requirement-card');
+        if (card) card.style.display = show ? '' : 'none';
+    }
     async function refresh(frm) {
         const generation = (frm._bsi_brief_generation || 0) + 1;
         frm._bsi_brief_generation = generation;
@@ -202,6 +207,7 @@ const bsi_customer_brief = (() => {
             if (frm.fields_dict[name]) frm.toggle_display(name, visible);
         });
         frm._bsi_legacy_visibility = null;
+        manual_requirement(frm, frm.is_new());
         if (frm.is_new()) {
             $(frm.wrapper).find('.bsi-customer-brief').remove();
             return;
@@ -237,7 +243,8 @@ const bsi_customer_brief = (() => {
             const docs = [...(original.message || []), ...(recent.message || [])]
                 .filter((d, i, all) => all.findIndex(x => x.name === d.name) === i);
             if (!docs.length) {
-                mount(frm, '<p class="text-muted">No website enquiry is linked to this Lead.</p>');
+                manual_requirement(frm, true);
+                mount(frm, "", '<p class="text-muted">No website enquiry is linked to this Lead.</p>');
                 return;
             }
             let doc = primary(docs, name);
@@ -258,7 +265,9 @@ const bsi_customer_brief = (() => {
             const context = header(doc, lead);
             const source = disclosure("Original customer enquiry and source", enquiry_html(doc, lead));
             const history = related_html(docs, doc);
-            mount(frm, paragraph("Requirement", doc.transcript),
+            const manual = doc.converted_lead !== name || !!frm.doc.custom_requirement;
+            manual_requirement(frm, manual);
+            mount(frm, manual ? "" : paragraph("Requirement", doc.transcript),
                 focused_html(doc, lead).replace(paragraph("Requirement", doc.transcript), "") + history +
                 disclosure("AI analysis and routing", context + ai_html(doc, lead, true) + source));
         } catch (_) {
@@ -291,6 +300,7 @@ const bsi_lead_focus = (() => {
             }
             return node.querySelector('.section-body');
         }
+        const requirement = card(details, 'bsi-requirement-card', 'Requirement');
         const customer = card(details, 'bsi-contact-card', 'Contact details');
         customer.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px 24px';
         const follow = card(details, 'bsi-follow-card', 'Next follow-up date');
@@ -305,7 +315,8 @@ const bsi_lead_focus = (() => {
         for (const [name, field] of Object.entries(frm.fields_dict)) {
             const node = field.$wrapper?.[0];
             if (!node || ['Section Break','Column Break','Tab Break'].includes(field.df.fieldtype)) continue;
-            if (contact.has(name)) { customer.append(node); field.tab = detailsTab; }
+            if (name === 'custom_requirement') { requirement.append(node); field.tab = detailsTab; }
+            else if (contact.has(name)) { customer.append(node); field.tab = detailsTab; }
             else if (name === 'custom_next_follow_up_date') { follow.append(node); node.style.maxWidth = '280px'; field.tab = detailsTab; }
             else if (['notes_html','notes'].includes(name)) { notes.append(node); field.tab = detailsTab; }
             else if (extra.contains(node)) field.tab = extraTab;

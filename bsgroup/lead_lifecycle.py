@@ -99,6 +99,7 @@ def mark_delayed():
 def setup():
     from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
     create_custom_fields({"Lead": [
+        {"fieldname": "custom_requirement", "label": "Requirement", "fieldtype": "Small Text", "insert_after": "company_name"},
         {"fieldname": "custom_next_follow_up_date", "label": "Next Follow Up Date", "fieldtype": "Date", "insert_after": "phone", "placeholder": "Select date"},
         {"fieldname": "custom_bsi_status_tab", "label": "Status", "fieldtype": "Tab Break", "insert_after": "notes"},
         {"fieldname": "custom_bsi_status_controls", "label": "Status", "fieldtype": "HTML", "insert_after": "custom_bsi_status_tab"},
