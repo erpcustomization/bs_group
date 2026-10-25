@@ -105,3 +105,37 @@ function reduce_subject_height(frm){
             });
     }, 300);
 }
+
+// Existing and converted records retain their original party and workflow.
+frappe.ui.form.on('Opportunity', {
+    onload(frm) {
+        if (!frm.is_new()) return;
+        const convertedLead = frm.doc.opportunity_from === 'Lead' && !!frm.doc.party_name;
+        if (!convertedLead) {
+            if (frm.doc.opportunity_from !== 'Customer') {
+                frm.set_value({opportunity_from: 'Customer', party_name: ''});
+            }
+            frm.set_df_property('party_name', 'only_select', 1);
+        }
+        frm.set_df_property('opportunity_from', 'read_only', 1);
+    },
+    refresh(frm) {
+        const root = frm.page.wrapper[0] || frm.page.wrapper;
+        root.classList.add('bsi-opportunity-form');
+        if (root.querySelector('.bsi-opportunity-style')) return;
+        const style = document.createElement('style');
+        style.className = 'bsi-opportunity-style';
+        style.textContent = `
+            .bsi-opportunity-form{--text-color:#172b4d;--text-muted:#60718b;--border-color:#dfe7f2;color:#172b4d}
+            .bsi-opportunity-form .form-layout{background:#f5f7fb!important}
+            .bsi-opportunity-form .form-section{background:#fff;border-color:#dfe7f2!important;border-radius:10px;box-shadow:0 2px 7px rgba(18,51,95,.045)}
+            .bsi-opportunity-form .section-head{color:#12335f!important;background:#eef3fb;border-radius:8px;padding:8px 12px;font-weight:600}
+            .bsi-opportunity-form .form-tabs .nav-link.active{background:#eef3fb!important;color:#12335f!important;border-bottom:2px solid #1d5fc4!important;border-radius:7px 7px 0 0}
+            .bsi-opportunity-form .control-label{color:#4c6486!important;font-size:11px;font-weight:500}
+            .bsi-opportunity-form :is(input.form-control,textarea.form-control,select.form-control){background:#f8fafd!important;border:1px solid #dfe7f2!important;border-radius:6px!important;color:#172b4d}
+            .bsi-opportunity-form :is(input.form-control,textarea.form-control,select.form-control):focus{background:#fff!important;border-color:#1d5fc4!important;box-shadow:0 0 0 2px rgba(29,95,196,.12)!important}
+            .bsi-opportunity-form .btn-primary{background:#1d5fc4!important;border-color:#1d5fc4!important;color:white!important}
+        `;
+        root.append(style);
+    }
+});

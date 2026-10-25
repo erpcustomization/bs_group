@@ -1,26 +1,29 @@
 // Preserve native list actions and links; replace only the visible lifecycle indicator.
 (() => {
-    const settings = frappe.listview_settings.Lead || (frappe.listview_settings.Lead = {});
-    settings.add_fields = [...new Set([...(settings.add_fields || []), "status", "creation", "lead_owner"])];
+    const doctype = frappe.get_route()[1] === 'Opportunity' ? 'Opportunity' : 'Lead';
+    const isLead = doctype === 'Lead';
+    const ownerField = isLead ? 'lead_owner' : 'opportunity_owner';
+    const settings = frappe.listview_settings[doctype] || (frappe.listview_settings[doctype] = {});
+    settings.add_fields = [...new Set([...(settings.add_fields || []), "status", "creation", ownerField])];
     const active = ["Lead", "Open", "Replied", "Interested", "Delayed"];
     const closed = ["Opportunity", "Quotation", "Converted", "Lost Quotation"];
     settings.formatters = {...(settings.formatters || {})};
-    for (const field of ['name', 'company_name']) {
+    for (const field of ['name', isLead ? 'company_name' : 'customer_name']) {
         settings.formatters[field] = (value, df, doc) => {
             const label = frappe.utils.escape_html(String(value || ''));
             const name = frappe.utils.escape_html(String(doc.name));
-            return `<a class="ellipsis" data-doctype="Lead" data-name="${name}" href="/desk/lead/${encodeURIComponent(doc.name)}" title="${label}">${label}</a>`;
+            return `<a class="ellipsis" data-doctype="${doctype}" data-name="${name}" href="/desk/${doctype.toLowerCase()}/${encodeURIComponent(doc.name)}" title="${label}">${label}</a>`;
         };
     }
     const ownerLabels = {};
     const nativeRefresh = settings.refresh;
     settings.refresh = function(listview) {
         nativeRefresh?.call(this, listview);
-        const missing = (listview.data || []).filter(doc => doc.lead_owner && !ownerLabels[doc.lead_owner]);
+        const missing = (listview.data || []).filter(doc => doc[ownerField] && !ownerLabels[doc[ownerField]]);
         if (!missing.length || listview._bsi_owner_labels_loading) return;
         listview._bsi_owner_labels_loading = true;
         frappe.call({method: 'bsgroup.lead_lifecycle.list_owner_labels',
-            args: {names: missing.map(doc => doc.name)},
+            args: {names: missing.map(doc => doc.name), doctype},
             callback: result => {
                 Object.assign(ownerLabels, result.message || {});
                 const root = listview.page.wrapper[0] || listview.page.wrapper;
@@ -28,7 +31,7 @@
                     const label = ownerLabels[badge.dataset.leadOwner];
                     if (!label) return;
                     badge.textContent = label.initial;
-                    badge.title = __('Lead Owner') + ': ' + label.full_name;
+                    badge.title = __(isLead ? 'Lead Owner' : 'Opportunity Owner') + ': ' + label.full_name;
                     badge.setAttribute('aria-label', badge.title);
                 });
             },
@@ -98,7 +101,7 @@
                 });
                 const comment = holder.querySelector('.comment-count');
                 if (comment) {
-                    const owner = doc.lead_owner;
+                    const owner = doc[ownerField];
                     const label = ownerLabels[owner];
                     const fullName = label?.full_name || (owner && frappe.boot.user_info?.[owner]?.fullname);
                     const badge = document.createElement('span');
@@ -114,7 +117,7 @@
                         badge.style.borderColor = `hsl(${hue}, 45%, 80%)`;
                     }
                     badge.textContent = label?.initial || (owner ? '?' : '—');
-                    badge.title = owner ? __('Lead Owner') + ': ' + (fullName || owner) : __('Lead Owner not set');
+                    badge.title = owner ? __(isLead ? 'Lead Owner' : 'Opportunity Owner') + ': ' + (fullName || owner) : __(isLead ? 'Lead Owner not set' : 'Opportunity Owner not set');
                     badge.setAttribute('aria-label', badge.title);
                     comment.replaceWith(badge);
                     holder.querySelectorAll('.list-row-activity > .mx-2').forEach(node => node.remove());
@@ -159,12 +162,12 @@
             listview._bsi_sort_in_filter = true;
         }
         const field = listview.page.fields_dict.status;
-        if (field) {
+        if (isLead && field) {
             field.df.options = "\nOpen\nDelayed\nOpportunity\nDropped";
             field.refresh();
         }
     };
-    settings.get_indicator = doc => {
+    if (isLead) settings.get_indicator = doc => {
         if (closed.includes(doc.status)) return [__(doc.status === "Opportunity" ? "Opportunity · Closed" : "Closed"), "green", "status,=," + doc.status];
         if (["Dropped", "Do Not Contact"].includes(doc.status)) return [__("Dropped"), "red", "status,=," + doc.status];
         const age = doc.creation ? moment().diff(frappe.datetime.convert_to_user_tz(doc.creation, false), 'hours', true) : 0;

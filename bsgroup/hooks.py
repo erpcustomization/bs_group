@@ -648,3 +648,7 @@ doc_events["Lead"]["onload"] = ["bsgroup.lead_lifecycle.load_responsibility"]
 
 _prior = doc_events.setdefault("Opportunity", {}).get("after_delete", [])
 doc_events["Opportunity"]["after_delete"] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.lead_lifecycle.opportunity_deleted"]
+
+# Share the compact sales-list presentation; retain each DocType's native status logic.
+doctype_list_js["Opportunity"] = ["public/js/lead_list_compact.js", "public/js/lead_lifecycle_list.js"]
+doc_events["Opportunity"]["before_insert"].append("bsgroup.utils.opportunity.validate_creation_source")

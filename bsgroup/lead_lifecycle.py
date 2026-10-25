@@ -184,14 +184,17 @@ def confirm_opportunity(source_name, subject):
 
 
 @frappe.whitelist()
-def list_owner_labels(names):
+def list_owner_labels(names, doctype="Lead"):
     """Return profile labels only for owners of Leads the caller can read."""
+    if doctype not in ("Lead", "Opportunity"):
+        frappe.throw(_("Invalid document type."))
+    owner_field = "lead_owner" if doctype == "Lead" else "opportunity_owner"
     names = frappe.parse_json(names)
     if not isinstance(names, list) or len(names) > 2500:
         frappe.throw(_("Invalid Lead list."))
-    leads = frappe.get_list("Lead", filters={"name": ["in", names]},
-                            fields=["lead_owner"], limit_page_length=len(names)) if names else []
-    owners = list({row.lead_owner for row in leads if row.lead_owner})
+    leads = frappe.get_list(doctype, filters={"name": ["in", names]},
+                            fields=[owner_field], limit_page_length=len(names)) if names else []
+    owners = list({row.get(owner_field) for row in leads if row.get(owner_field)})
     if not owners:
         return {}
     users = frappe.get_all("User", filters={"name": ["in", owners]},

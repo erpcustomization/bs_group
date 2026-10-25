@@ -90,3 +90,11 @@ def set_last_updates(doc, method=None):
 
         doc.custom_last_sales_update = old_doc.custom_next_action
         doc.custom_last_update_date = old_doc.custom_next_action_date
+
+def validate_creation_source(doc, method=None):
+    """New manual opportunities need an existing Customer; retain linked Lead conversion."""
+    source, party = doc.opportunity_from, doc.party_name
+    if source not in ("Customer", "Lead") or not party or not frappe.db.exists(source, party):
+        frappe.throw(frappe._("Select an existing Customer for a manual Opportunity, or convert an existing Lead."))
+    # Respect the source record's access rules, including company restrictions.
+    frappe.get_doc(source, party).check_permission("read")
