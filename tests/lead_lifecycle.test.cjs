@@ -1,30 +1,17 @@
-const fs = require('fs'), vm = require('vm'), assert = require('node:assert/strict');
-const {parseHTML} = require('./bs_procurement/ui/node_modules/linkedom');
-const {document, window} = parseHTML('<html><body><main><div id="status"></div></main></body></html>');
-let config, interval, mapped, routed, prompt, calls=0;
-const now = Date.parse('2026-10-25T12:00:00Z');
-const frappe = {ui:{form:{on(){}}},session:{user:'sales@test'},datetime:{convert_to_user_tz:(x)=>x,now_datetime:()=>new Date(now).toISOString()},
- utils:{escape_html:x=>String(x).replaceAll('<','&lt;')},model:{sync:x=>mapped=x},set_route:(...x)=>routed=x,
- msgprint:()=>{},prompt:(fields,fn)=>{prompt=fn; assert.equal(fields[0].reqd,1)},
- call:async args=>{calls++;config=args;args.callback({message:{doctype:'Opportunity',name:'new-opp'}})}};
-const context={document,frappe,__:x=>x,moment:()=>({diff:x=>(now-Date.parse(x))/3600000}),clearInterval(){},setInterval:fn=>{interval=fn;return 1}};
-vm.createContext(context);vm.runInContext(fs.readFileSync('bsgroup/public/js/lead_lifecycle_form.js','utf8')+';this.life=bsi_lead_lifecycle;',context);
-const frm={wrapper:document.querySelector('main'),fields_dict:{status:{df:{options:'Open\nDelayed\nDropped'},$wrapper:[document.getElementById('status')]}},
- doc:{name:'L1',status:'Open',creation:'2026-10-25T11:00:00Z',company_name:'Acme'},perm:[{write:1}],page:{set_indicator(){}},set_df_property(){},is_new:()=>false,is_dirty:()=>false,
- async set_value(k,v){this.doc[k]=v},async save(){this.saved=true},add_child:(table,n)=>{frm.note=n;assert.equal(table,'notes')}};
-context.life.refresh(frm); context.life.refresh(frm);
-assert.equal(document.querySelectorAll('.bsi-lead-outcome').length,1);
-assert.deepEqual(Array.from(document.querySelectorAll('option:not([hidden])')).map(x=>x.textContent),['Open','Opportunity','Dropped']);
-assert.equal(context.life.display(frm.doc)[0],'Open');assert.equal(document.querySelector('.bsi-current-status').textContent,'Open');assert.equal(document.querySelector('.bsi-current-status').style.color,'#1d5dcc');
-frm.doc.creation='2026-10-24T12:00:00Z';assert.equal(context.life.display(frm.doc)[0],'Delayed');
-frm.doc.status='Dropped';assert.equal(context.life.display(frm.doc)[0],'Dropped');
-frm.doc.status='Opportunity';assert.equal(context.life.display(frm.doc)[0],'Opportunity \u00b7 Closed');
-context.life.refresh(frm);assert.equal(document.querySelector('select').disabled,true);assert.equal(document.querySelector('.bsi-current-status').textContent,'Opportunity');assert.equal(document.querySelector('.bsi-current-status').style.color,'#087f5b');
-frm.doc.status='Open';context.life.refresh(frm);
+const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
+const {parseHTML}=require('./bs_procurement/ui/node_modules/linkedom');
+const {document,window}=parseHTML('<html><body><main><div id="status"></div><div><div id="date"></div></div></main></body></html>');
+Object.defineProperty(window.HTMLSelectElement.prototype,'value',{get(){return Array.from(this.options).find(o=>o.selected)?.value;},set(v){for(const o of this.options)o.removeAttribute('selected');const o=Array.from(this.options).find(o=>o.value===v);if(o)o.setAttribute('selected','');},configurable:true});
+let prompt,config,calls=0,saves=0,dirty=false;
+const now=Date.parse('2026-10-25T12:00:00Z');
+const frappe={session:{user:'Administrator'},ui:{form:{on(){}}},datetime:{convert_to_user_tz:x=>x,now_datetime:()=>new Date(now).toISOString()},utils:{escape_html:x=>x},show_alert(){},msgprint(){},prompt:(fields,fn,title,label)=>{prompt=fn;assert.equal(label,'OK');assert.equal(fields[0].reqd,1)},call:async args=>{config=args;calls++;return {message:'OPP-TEST'}}};
+const ctx={document,frappe,__:x=>x,moment:()=>({diff:x=>(now-Date.parse(x))/3600000}),clearInterval(){},setInterval(){return 1}};vm.createContext(ctx);vm.runInContext(fs.readFileSync('bsgroup/public/js/lead_lifecycle_form.js','utf8')+';this.life=bsi_lead_lifecycle;',ctx);
+const frm={wrapper:document.querySelector('main'),fields_dict:{status:{df:{options:'Open\nDelayed\nDropped'},$wrapper:[document.getElementById('status')]},custom_next_follow_up_date:{$wrapper:[document.getElementById('date')]}},doc:{name:'L1',status:'Open',creation:'2026-10-25T11:00:00Z',company_name:'Acme'},perm:[{write:1}],page:{set_indicator(){}},set_df_property(){},is_new:()=>false,is_dirty:()=>dirty,async save(){saves++;dirty=false;},async reload_doc(){this.doc.status='Opportunity';},async set_value(k,v){this.doc[k]=v;dirty=true;},add_child:(t,n)=>{frm.note=n;}};
 (async()=>{
- await context.life.convert(frm);assert.equal(config.method,'bsgroup.lead_lifecycle.make_opportunity');assert.equal(mapped.sales_stage,'Proposal');assert.equal(mapped.custom_organization_name,'Acme');assert.equal(frm.doc.status,'Open');assert.equal(routed[1],'Opportunity');
- frm.is_dirty=()=>true;await context.life.convert(frm);assert.equal(calls,1);
- const select=document.querySelector('select');select.querySelector('option[value=drop]').selected=true;select.dispatchEvent(new window.Event('change'));await prompt({reason:'Not relevant'});assert.equal(frm.doc.status,'Dropped');assert.equal(frm.note.note,'Dropped: Not relevant');assert.equal(frm.saved,true);context.life.refresh(frm);assert.equal(document.querySelector('.bsi-current-status').textContent,'Dropped');assert.equal(document.querySelector('.bsi-current-status').style.color,'#c92a2a');
- console.log('PASS: three choices, 24-hour display, read-only closed state, required drop note, no premature close, existing Opportunity mapping.');
+ctx.life.refresh(frm);ctx.life.refresh(frm);assert.equal(document.querySelectorAll('.bsi-lead-outcome').length,1);assert.equal(document.querySelector('label').textContent,'Status');assert.equal(document.querySelector('select').getAttribute('aria-label'),'Status');assert.equal(document.querySelector('select').value,'open');assert.deepEqual(Array.from(document.querySelectorAll('option')).map(x=>x.textContent),['Open','Opportunity','Dropped']);
+ctx.life.convert(frm);assert.equal(calls,0);assert.equal(frm.doc.status,'Open');dirty=true;await prompt({subject:'Network upgrade'});assert.equal(saves,1);assert.equal(config.method,'bsgroup.lead_lifecycle.confirm_opportunity');assert.equal(config.args.subject,'Network upgrade');assert.equal(frm.doc.status,'Opportunity');ctx.life.refresh(frm);assert.equal(document.querySelector('select').value,'convert');assert.equal(document.querySelector('select').disabled,true);assert.equal(document.querySelector('select').style.getPropertyValue('background-color'),'#087f5b');
+frm.doc.status='Open';ctx.life.refresh(frm);let sel=document.querySelector('select');sel.querySelector('option[value=drop]').selected=true;sel.dispatchEvent(new window.Event('change'));await prompt({reason:'Not relevant'});assert.equal(frm.doc.status,'Dropped');assert.equal(frm.note.note,'Dropped: Not relevant');ctx.life.refresh(frm);assert.equal(document.querySelector('select').style.getPropertyValue('background-color'),'#c92a2a');
+frm._bsi_saved_followup='';ctx.life.followup(frm);assert.equal(document.querySelector('.bsi-followup-ok').hidden,true);frm.doc.custom_next_follow_up_date='2026-11-01';dirty=true;ctx.life.followup(frm);assert.equal(document.querySelector('.bsi-followup-ok').hidden,false);const before=saves;document.querySelector('.bsi-followup-ok').click();await new Promise(setImmediate);assert.equal(saves,before+1);assert.equal(document.querySelector('.bsi-followup-ok').hidden,true);assert.equal(frm._bsi_saved_followup,'2026-11-01');
+frm.doc.custom_next_follow_up_date='2026-11-02';dirty=true;ctx.life.followup(frm);const save=frm.save;frm.save=async()=>{};document.querySelector('.bsi-followup-ok').click();await new Promise(setImmediate);assert.equal(document.querySelector('.bsi-followup-ok').hidden,false);assert.equal(frm._bsi_saved_followup,'2026-11-01');frm.save=save;
+console.log('PASS: current Status dropdown, OK-only saved conversion, colours, mandatory drop reason, date OK persistence and validation failure.');
 })().catch(e=>{console.error(e);process.exitCode=1});
-
