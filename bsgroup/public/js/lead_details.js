@@ -43,8 +43,8 @@ const bsi_customer_brief = (() => {
         encodeURIComponent(name) + '">' + esc(label || name) + '</a>';
     const item = (label, value) => '<div style="min-width:0;overflow-wrap:anywhere">' +
         '<div class="text-muted small">' + esc(label) + '</div><div style="font-weight:500">' + value + '</div></div>';
-    const group = items => '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:12px 20px;margin:14px 0">' + items.join("") + '</div>';
-    const paragraph = (title, value) => '<div style="margin:14px 0"><strong>' + esc(title) +
+    const group = items => '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:8px 16px;margin:8px 0">' + items.join("") + '</div>';
+    const paragraph = (title, value) => '<div style="margin:6px 0"><strong>' + esc(title) +
         '</strong><div style="white-space:pre-wrap;overflow-wrap:anywhere;margin-top:4px">' + text(value) + '</div></div>';
     function safe_url(value) {
         try {
@@ -175,7 +175,7 @@ const bsi_customer_brief = (() => {
         [details, ai].forEach((pane, index) => {
             if (!pane.length) return;
             let box = pane.children('.bsi-customer-brief');
-            if (!box.length) box = $('<section class="bsi-customer-brief" aria-label="Customer enquiry and AI brief" style="padding:20px;border:1px solid var(--border-color);border-radius:8px;margin:12px 0 20px;font-size:var(--text-base,14px);line-height:1.55"></section>').prependTo(pane);
+            if (!box.length) box = $('<section class="bsi-customer-brief" aria-label="Customer enquiry and AI brief" style="padding:10px 14px;border:1px solid var(--border-color);border-radius:8px;margin:6px 0;font-size:var(--text-base,14px);line-height:1.45"></section>').prependTo(pane);
             box.html(index === 0 ? html : aiHtml);
         });
     }
@@ -288,13 +288,19 @@ const bsi_lead_focus = (() => {
         const extraTab = tabs.find(t => t.df.fieldname === "custom_bsi_status_tab");
         if (!detailsTab || !extraTab) return;
         const details = detailsTab.wrapper[0], extra = extraTab.wrapper[0];
+        root.classList.add('bsi-compact-lead');
+        if (!root.querySelector('.bsi-compact-style')) {
+            const style = document.createElement('style'); style.className = 'bsi-compact-style';
+            style.textContent = '.bsi-compact-lead .bsi-contact-card .frappe-control,.bsi-compact-lead .bsi-follow-card .frappe-control,.bsi-compact-lead .bsi-requirement-card .frappe-control{margin-bottom:4px!important}.bsi-compact-lead .bsi-contact-card h5,.bsi-compact-lead .bsi-follow-card h5,.bsi-compact-lead .bsi-notes-card h5,.bsi-compact-lead .bsi-requirement-card h5{margin:0 0 8px}.bsi-compact-lead .bsi-requirement-card textarea{min-height:72px;height:72px}.bsi-compact-lead .bsi-follow-card .control-label,.bsi-compact-lead .bsi-requirement-card .control-label{display:none}.bsi-compact-lead .bsi-notes-card .notes-section{margin-top:0!important}';
+            root.append(style);
+        }
         extraTab.df.label = extraTab.label = "Additional details";
         extraTab.tab_link.find('.nav-link').text(__('Additional details'));
         function card(parent, cls, label) {
             let node = parent.querySelector('.' + cls);
             if (!node) {
                 node = document.createElement('section'); node.className = 'form-section ' + cls;
-                node.style.cssText = 'padding:16px 20px;border:1px solid var(--border-color);border-radius:8px;margin:12px 0';
+                node.style.cssText = 'padding:10px 14px;border:1px solid var(--border-color);border-radius:8px;margin:6px 0';
                 const title = document.createElement('h5'); title.textContent = __(label); node.append(title);
                 const body = document.createElement('div'); body.className = 'section-body'; node.append(body); parent.append(node);
             }
@@ -302,7 +308,7 @@ const bsi_lead_focus = (() => {
         }
         const requirement = card(details, 'bsi-requirement-card', 'Requirement');
         const customer = card(details, 'bsi-contact-card', 'Contact details');
-        customer.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px 24px';
+        customer.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:6px 16px';
         const follow = card(details, 'bsi-follow-card', 'Next follow-up date');
         const notes = card(details, 'bsi-notes-card', 'Notes');
         // Move whole native sections first, retaining section dependencies and controls.

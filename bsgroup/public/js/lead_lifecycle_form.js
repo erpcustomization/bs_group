@@ -39,14 +39,16 @@ const bsi_lead_lifecycle = (() => {
             if (host) host.prepend(box); else statusField.$wrapper[0].after(box);
         }
         box.replaceChildren();
-        box.style.cssText = 'display:flex;justify-content:flex-end;padding:8px 0;';
+        box.style.cssText = 'display:flex;justify-content:flex-end;align-items:center;gap:10px;padding:4px 0;';
         const style = document.createElement('style');
         style.textContent = '.bsi-lead-outcome select{background-color:var(--primary,#1d5dcc);color:#fff;border:1px solid var(--primary,#1d5dcc);border-radius:8px;width:144px;min-height:34px;padding:6px 12px;font-weight:600;cursor:pointer}.bsi-lead-outcome select:disabled{opacity:.7;cursor:default}.bsi-lead-outcome option{background:#fff;color:var(--text-color,#15345c)}';
         box.append(style);
-        const badge = document.createElement('div'); badge.style.display = 'none'; box.append(badge);
+        const badge = document.createElement('span'); badge.className = 'bsi-current-status'; badge.setAttribute('role','status'); badge.setAttribute('aria-live','polite'); badge.style.cssText = 'order:2;font-weight:600;font-size:13px;padding:4px 10px;border-radius:6px;white-space:nowrap'; box.append(badge);
         const render = () => {
             const [text, color] = display(frm.doc);
-            badge.innerHTML = '<span class="indicator-pill ' + color + '">' + frappe.utils.escape_html(__(text)) + '</span>';
+            badge.textContent = __(frm.doc.status === 'Opportunity' ? 'Opportunity' : text);
+            const palette = {blue:['#1d5dcc','#edf3ff'],green:['#087f5b','#eaf7f1'],red:['#c92a2a','#fff0f0'],orange:['#a35b00','#fff5e5']};
+            badge.style.color = palette[color][0]; badge.style.backgroundColor = palette[color][1];
             frm.page.set_indicator(__(text), color);
         };
         render();
