@@ -24,3 +24,18 @@ assert.ok(tabs[4].wrapper[0].contains(fields_dict.open_activities_html.$wrapper[
 assert.equal(fields_dict.custom_next_follow_up_date.tab,tabs[0]);
 email.firstChild.dispatchEvent(new window.Event('change'));assert.equal(edits,1);
 console.log('PASS: two tabs, native contact/follow-up/notes controls preserved, required fields retained, validation navigation, earliest date, repeat refresh.');
+
+(async()=>{
+ frm.perm=[{write:1}];frm.is_dirty=()=>false;let request,reloads=0;
+ frm.reload_doc=async()=>{reloads++};ctx.frappe.utils={escape_html:s=>s.replace(/</g,'&lt;').replace(/>/g,'&gt;')};
+ ctx.frappe.call=async args=>{request=args;return {exc:'validation error'}};
+ ctx.focus.refresh(frm);
+ assert.equal(root.querySelectorAll('.bsi-follow-notes').length,1);
+ assert.equal(root.querySelector('.bsi-follow-card').parentElement,root.querySelector('.bsi-notes-card').parentElement);
+ const composer=root.querySelector('.bsi-note-composer'),input=composer.querySelector('textarea'),ok=composer.querySelector('button');
+ assert.equal(ok.hidden,true);input.value='Call customer <tomorrow>';input.dispatchEvent(new window.Event('input'));assert.equal(ok.hidden,false);
+ ok.click();await new Promise(setImmediate);assert.equal(request.method,'add_note');assert.equal(request.args.note,'Call customer &lt;tomorrow&gt;');assert.equal(reloads,0);assert.equal(input.value,'Call customer <tomorrow>');
+ ctx.frappe.call=async()=>({});ok.click();await new Promise(setImmediate);assert.equal(reloads,1);assert.equal(input.value,'');assert.equal(ok.hidden,true);
+ frm.perm=[{read:1}];ctx.focus.refresh(frm);assert.equal(composer.hidden,true);
+ console.log('PASS: paired cards, explicit note OK, native save method, escaped text, failure retention and read-only view.');
+})().catch(e=>{console.error(e);process.exitCode=1});
