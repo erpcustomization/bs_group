@@ -82,6 +82,9 @@ def make_opportunity(source_name):
 def mark_delayed():
     if "Delayed" not in (frappe.get_meta("Lead").get_field("status").options or "").splitlines():
         return
+    # Repair pre-existing stale conversion states after an Opportunity was deleted.
+    for row in frappe.get_all("Lead", filters={"status": "Opportunity"}, fields=["name", "creation"]):
+        reopen_without_opportunity(row.name)
     cutoff = now_datetime() - timedelta(hours=24)
     rows = frappe.get_all("Lead", filters={"status": ["in", [s for s in ACTIVE if s != "Delayed"]], "creation": ["<=", cutoff]}, fields=["name", "status"])
     for row in rows:
@@ -121,3 +124,18 @@ def load_responsibility(doc, method=None):
         {"user": user, "full_name": frappe.db.get_value("User", user, "full_name") or user}
         for user in dict.fromkeys(users) if user
     ]})
+
+
+def reopen_without_opportunity(name):
+    """Reopen only an orphaned Opportunity state; preserve real downstream links."""
+    lead = frappe.db.get_value("Lead", name, ["status", "creation"], as_dict=True)
+    if not lead or lead.status != "Opportunity" or linked_outcome(name):
+        return
+    target = "Delayed" if overdue(lead.creation) else "Open"
+    frappe.db.sql("UPDATE `tabLead` SET status=%s WHERE name=%s AND status='Opportunity'", (target, name))
+    frappe.clear_document_cache("Lead", name)
+
+
+def opportunity_deleted(doc, method=None):
+    if doc.opportunity_from == "Lead" and doc.party_name:
+        reopen_without_opportunity(doc.party_name)

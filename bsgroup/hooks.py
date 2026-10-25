@@ -645,3 +645,6 @@ after_migrate.append("bsgroup.lead_lifecycle.setup")
 # Current Lead presentation; keep the lifecycle and native ERPNext handlers intact.
 doctype_js["Lead"] = ["public/js/lead_details.js" if p == "public/js/Lead.js" else p for p in doctype_js["Lead"]]
 doc_events["Lead"]["onload"] = ["bsgroup.lead_lifecycle.load_responsibility"]
+
+_prior = doc_events.setdefault("Opportunity", {}).get("after_delete", [])
+doc_events["Opportunity"]["after_delete"] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.lead_lifecycle.opportunity_deleted"]
