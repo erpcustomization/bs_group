@@ -55,6 +55,7 @@
             style.textContent += '.bsi-lead-list-colors .bsi-lead-header-filter{display:inline-flex!important;align-items:center;justify-content:center;width:34px;height:34px;padding:0!important;border-radius:8px!important;margin-right:8px}.bsi-lead-list-colors .bsi-lead-header-filter .button-label{display:none!important}.bsi-lead-list-colors .bsi-lead-header-filter .filter-icon{margin:0!important}.bsi-lead-list-colors.bsi-filter-in-header .list-page-form{display:none!important}';
             style.textContent += '.bsi-lead-list-colors .bsi-lead-owner{display:inline-flex;align-items:center;justify-content:center;flex:0 0 26px;width:26px;height:26px;border-radius:50%;background:#eef3fb;color:#12335f;font-size:12px;font-weight:600;border:1px solid #dfe7f2}';
             style.textContent += '.bsi-lead-list-colors .list-row-head>.level-right{position:relative}.bsi-lead-list-colors .list-row-head .list-count{visibility:hidden}.bsi-lead-list-colors .bsi-lead-meta-head{position:absolute;right:10px;display:flex;align-items:center;gap:10px;white-space:nowrap;font-size:10px}.bsi-lead-list-colors .bsi-lead-meta-head .date-heading{width:82px;text-align:center}.bsi-lead-list-colors .bsi-lead-meta-head .owner-heading{width:26px;text-align:center}';
+            style.textContent += '.bsi-lead-list-colors .list-row-activity .list-assignments-container{display:none!important}';
             root.append(style);
         }
 
