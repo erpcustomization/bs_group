@@ -291,7 +291,7 @@ const bsi_lead_focus = (() => {
         root.classList.add('bsi-compact-lead');
         if (!root.querySelector('.bsi-compact-style')) {
             const style = document.createElement('style'); style.className = 'bsi-compact-style';
-            style.textContent = '.bsi-compact-lead #lead-__details .form-group{margin-bottom:0!important}.bsi-compact-lead #lead-__details .section-body{margin-top:0!important}.bsi-compact-lead .bsi-contact-card .frappe-control,.bsi-compact-lead .bsi-follow-card .frappe-control,.bsi-compact-lead .bsi-requirement-card .frappe-control{margin-bottom:4px!important}.bsi-compact-lead .bsi-contact-card h5,.bsi-compact-lead .bsi-follow-card h5,.bsi-compact-lead .bsi-notes-card h5,.bsi-compact-lead .bsi-requirement-card h5{margin:0 0 8px}.bsi-compact-lead .bsi-requirement-card textarea{min-height:72px;height:72px}.bsi-compact-lead .bsi-follow-card .control-label,.bsi-compact-lead .bsi-requirement-card .control-label{display:none}.bsi-compact-lead .bsi-notes-card .notes-section{margin-top:0!important}.bsi-compact-lead #lead-__details.active{display:grid;grid-template-columns:minmax(0,1fr) 204px;column-gap:12px;align-items:start;padding-top:6px!important}.bsi-compact-lead #lead-__details> *{grid-column:1 / -1;min-width:0}.bsi-compact-lead #lead-__details>.bsi-lead-outcome{grid-column:2;grid-row:1;padding:6px 0!important}.bsi-compact-lead #lead-__details>.bsi-customer-brief,.bsi-compact-lead #lead-__details>.bsi-requirement-card{grid-column:1;grid-row:1;margin:0 0 6px!important}.bsi-compact-lead #lead-__details>.bsi-customer-brief:empty{display:none}.bsi-compact-lead #lead-__details>.bsi-customer-brief p:last-child{margin-bottom:0}@media(max-width:600px){.bsi-compact-lead #lead-__details.active{grid-template-columns:minmax(0,1fr)}.bsi-compact-lead #lead-__details>.bsi-lead-outcome{grid-column:1;grid-row:1}.bsi-compact-lead #lead-__details>.bsi-customer-brief,.bsi-compact-lead #lead-__details>.bsi-requirement-card{grid-row:2}}';
+            style.textContent = '.bsi-compact-lead #lead-__details .form-group{margin-bottom:0!important}.bsi-compact-lead #lead-__details .section-body{margin-top:0!important}.bsi-compact-lead .bsi-contact-card .frappe-control,.bsi-compact-lead .bsi-follow-card .frappe-control,.bsi-compact-lead .bsi-requirement-card .frappe-control{margin-bottom:4px!important}.bsi-compact-lead .bsi-contact-card h5,.bsi-compact-lead .bsi-follow-card h5,.bsi-compact-lead .bsi-notes-card h5,.bsi-compact-lead .bsi-requirement-card h5{margin:0 0 8px}.bsi-compact-lead .bsi-requirement-card textarea{min-height:72px;height:72px}.bsi-compact-lead .bsi-follow-card .control-label,.bsi-compact-lead .bsi-requirement-card .control-label{display:none}.bsi-compact-lead .bsi-notes-card .notes-section{margin-top:0!important}.bsi-compact-lead .bsi-follow-notes{display:grid;grid-template-columns:minmax(220px,1fr) minmax(0,2fr);gap:12px;align-items:start}.bsi-compact-lead .bsi-follow-notes>section{min-width:0}.bsi-compact-lead .bsi-note-composer{display:flex;align-items:flex-end;gap:8px;margin-bottom:8px}.bsi-compact-lead .bsi-note-composer textarea{min-height:60px;resize:vertical}.bsi-compact-lead .bsi-notes-card .notes-section{padding:0}.bsi-compact-lead .bsi-notes-card .comment-content{display:grid;grid-template-columns:minmax(0,1fr) auto;padding:10px!important;margin:6px 0;border:1px solid var(--border-color);border-radius:8px;background:var(--control-bg,#f5f7fb)}.bsi-compact-lead .bsi-notes-card .comment-content>.head{grid-column:1;max-width:100%;width:100%;padding:0}.bsi-compact-lead .bsi-notes-card .head>.row{display:flex;align-items:center;gap:8px;margin:0}.bsi-compact-lead .bsi-notes-card .head>.row>div{width:auto;max-width:none;flex:none;padding:0}.bsi-compact-lead .bsi-notes-card .head .title{max-width:220px}.bsi-compact-lead .bsi-notes-card .comment-content>.content{grid-column:1;grid-row:2;max-width:100%;width:100%;padding:0;overflow-wrap:anywhere}.bsi-compact-lead .bsi-notes-card .comment-content>.text-right{grid-column:2;grid-row:1 / 3;display:flex;align-items:flex-start;max-width:none;width:auto;padding:0}.bsi-compact-lead .bsi-notes-card .content p:last-child{margin-bottom:0}.bsi-compact-lead .bsi-notes-card .no-activity{min-height:0;padding:12px!important}@media(max-width:700px){.bsi-compact-lead .bsi-follow-notes{grid-template-columns:minmax(0,1fr)}}.bsi-compact-lead #lead-__details.active{display:grid;grid-template-columns:minmax(0,1fr) 204px;column-gap:12px;align-items:start;padding-top:6px!important}.bsi-compact-lead #lead-__details> *{grid-column:1 / -1;min-width:0}.bsi-compact-lead #lead-__details>.bsi-lead-outcome{grid-column:2;grid-row:1;padding:6px 0!important}.bsi-compact-lead #lead-__details>.bsi-customer-brief,.bsi-compact-lead #lead-__details>.bsi-requirement-card{grid-column:1;grid-row:1;margin:0 0 6px!important}.bsi-compact-lead #lead-__details>.bsi-customer-brief:empty{display:none}.bsi-compact-lead #lead-__details>.bsi-customer-brief p:last-child{margin-bottom:0}@media(max-width:600px){.bsi-compact-lead #lead-__details.active{grid-template-columns:minmax(0,1fr)}.bsi-compact-lead #lead-__details>.bsi-lead-outcome{grid-column:1;grid-row:1}.bsi-compact-lead #lead-__details>.bsi-customer-brief,.bsi-compact-lead #lead-__details>.bsi-requirement-card{grid-row:2}}';
             root.append(style);
         }
         extraTab.df.label = extraTab.label = "Additional details";
@@ -311,6 +311,35 @@ const bsi_lead_focus = (() => {
         customer.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:6px 16px';
         const follow = card(details, 'bsi-follow-card', 'Next follow-up date');
         const notes = card(details, 'bsi-notes-card', 'Notes');
+        let followNotes = details.querySelector('.bsi-follow-notes');
+        if (!followNotes) {
+            followNotes = document.createElement('div'); followNotes.className = 'bsi-follow-notes';
+            details.append(followNotes);
+        }
+        followNotes.append(follow.parentElement, notes.parentElement);
+        let composer = notes.querySelector('.bsi-note-composer');
+        if (!composer) {
+            composer = document.createElement('div'); composer.className = 'bsi-note-composer';
+            const input = document.createElement('textarea'); input.className = 'form-control';
+            input.placeholder = __('Write a note'); input.setAttribute('aria-label', __('New note')); input.rows = 2;
+            const ok = document.createElement('button'); ok.type = 'button'; ok.className = 'btn btn-primary btn-sm';
+            ok.textContent = __('OK'); ok.hidden = true;
+            input.addEventListener('input', () => { ok.hidden = !input.value.trim(); });
+            ok.addEventListener('click', async () => {
+                const value = input.value.trim(); if (!value || ok.disabled) return;
+                ok.disabled = true;
+                try {
+                    if (frm.is_new() || frm.is_dirty()) await frm.save();
+                    if (frm.is_new() || frm.is_dirty()) return;
+                    const result = await frappe.call({method:'add_note', doc:frm.doc,
+                        args:{note:frappe.utils.escape_html(value).replace(/\n/g, '<br>')}, freeze:true});
+                    if (!result.exc) { input.value = ''; ok.hidden = true; await frm.reload_doc(); }
+                } finally { ok.disabled = false; }
+            });
+            composer.append(input, ok); notes.prepend(composer);
+        }
+        composer.hidden = !frm.perm?.some(p => p.write);
+
         // Move whole native sections first, retaining section dependencies and controls.
         for (const tab of tabs) {
             if (tab === extraTab || tab.df.fieldname === 'dashboard_tab') continue;
