@@ -29,6 +29,7 @@
             style.textContent += '.bsi-lead-list-colors .list-liked-by-me,.bsi-lead-list-colors .list-row-like{display:none!important}';
             style.textContent += '.bsi-lead-list-colors .list-row-activity .modified{min-width:82px!important;width:82px!important;flex:0 0 82px!important;white-space:nowrap}.bsi-lead-list-colors .bsi-lead-date{font-variant-numeric:tabular-nums}';
             style.textContent += '.bsi-lead-list-colors .page-actions .view-switcher,.bsi-lead-list-colors .page-actions .page-icon-group,.bsi-lead-list-colors .page-actions .menu-btn-group{display:none!important}';
+            style.textContent += '.bsi-lead-list-colors .bsi-lead-header-filter{display:inline-flex!important;align-items:center;justify-content:center;width:34px;height:34px;padding:0!important;border-radius:8px!important;margin-right:8px}.bsi-lead-list-colors .bsi-lead-header-filter .button-label{display:none!important}.bsi-lead-list-colors .bsi-lead-header-filter .filter-icon{margin:0!important}.bsi-lead-list-colors.bsi-filter-in-header .list-page-form{display:none!important}';
             root.append(style);
         }
 
@@ -53,6 +54,13 @@
         // Reparent the native sorter so its handlers and saved order stay intact.
         const sorter = root.querySelector('.sort-selector');
         const filterButton = root.querySelector('.filter-button');
+        const addLead = root.querySelector('.page-actions .primary-action');
+        if (filterButton && addLead) {
+            filterButton.classList.add('bsi-lead-header-filter');
+            filterButton.setAttribute('aria-label', __('Filter'));
+            addLead.before(filterButton);
+            root.classList.add('bsi-filter-in-header');
+        }
         if (sorter && filterButton && !listview._bsi_sort_in_filter) {
             const home = document.createElement('div');
             home.hidden = true;
