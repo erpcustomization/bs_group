@@ -56,7 +56,7 @@ const bsi_lead_lifecycle = (() => {
         box.replaceChildren();
         box.style.cssText = 'display:flex;justify-content:flex-end;align-items:center;gap:10px;padding:4px 0;';
         const style = document.createElement('style');
-        style.textContent = '.bsi-compact-lead .indicator-pill.blue{background:#ede9fe!important;color:#6d28d9!important}.bsi-lead-outcome select{background-color:var(--primary,#1d5dcc);color:#fff;border:1px solid var(--primary,#1d5dcc);border-radius:8px;width:144px;min-height:34px;padding:6px 12px;font-weight:600;cursor:pointer}.bsi-lead-outcome select:disabled{opacity:.7;cursor:default}.bsi-lead-outcome option{background:#fff;color:var(--text-color,#15345c)}';
+        style.textContent = '.bsi-compact-lead .indicator-pill.blue{background:#ddd6fe!important;color:#5b21b6!important}.bsi-lead-outcome select{background-color:var(--primary,#1d5dcc);color:#fff;border:1px solid var(--primary,#1d5dcc);border-radius:8px;width:144px;min-height:34px;padding:6px 12px;font-weight:600;cursor:pointer}.bsi-lead-outcome select:disabled{opacity:.7;cursor:default}.bsi-lead-outcome option{background:#fff;color:var(--text-color,#15345c)}';
         box.append(style);
         const label=document.createElement('label');label.textContent=__('Status');label.style.cssText='font-weight:600;margin:0';box.append(label);
         const select=document.createElement('select');select.className='form-control bsi-current-status';select.setAttribute('aria-label','Status');
@@ -70,8 +70,8 @@ const bsi_lead_lifecycle = (() => {
         box.append(select);
         const render=()=>{
             const [text,color]=display(frm.doc);
-            const palette={blue:'#ede9fe',green:'#087f5b',red:'#c92a2a',orange:'#a35b00'};
-            select.style.setProperty('background-color',palette[color],'important');select.style.setProperty('border-color',color==='blue'?'#c4b5fd':palette[color],'important');select.style.setProperty('color',color==='blue'?'#6d28d9':'#fff','important');
+            const palette={blue:'#ddd6fe',green:'#087f5b',red:'#c92a2a',orange:'#a35b00'};
+            select.style.setProperty('background-color',palette[color],'important');select.style.setProperty('border-color',color==='blue'?'#a78bfa':palette[color],'important');select.style.setProperty('color',color==='blue'?'#5b21b6':'#fff','important');
             frm.page.set_indicator(__(text),color);
         };
         render();clearInterval(timer);timer=setInterval(()=>{if(document.body.dataset.route==='Form/Lead/'+frm.doc.name)render();},60000);
