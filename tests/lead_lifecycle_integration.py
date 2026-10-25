@@ -24,6 +24,7 @@ def hooks(hook=None, *args, **kwargs):
         result["Lead"] = {"before_validate": ["bsgroup.lead_lifecycle.before_validate"], "validate": ["bsgroup.lead_lifecycle.validate"]}
         result["Opportunity"] = dict(result.get("Opportunity", {}))
         result["Opportunity"]["before_insert"] = list(result["Opportunity"].get("before_insert", [])) + ["bsgroup.lead_lifecycle.guard_conversion"]
+        result["Opportunity"]["after_delete"] = ["bsgroup.lead_lifecycle.opportunity_deleted"]
     return result
 frappe.get_hooks = hooks
 
@@ -102,6 +103,13 @@ try:
     rejects(lead.save, "linked lead cannot be dropped")
     module.mark_delayed()
     check(frappe.db.get_value("Lead", lead.name, "status") == "Opportunity", "scheduler leaves closed lead untouched")
+    mapped.delete()
+    check(frappe.db.get_value("Lead", lead.name, "status") == "Delayed", "deleting final Opportunity reopens aged Lead as Delayed")
+    frappe.db.set_value("Lead", lead.name, "creation", now, update_modified=False)
+    frappe.db.set_value("Lead", lead.name, "status", "Opportunity", update_modified=False)
+    module.mark_delayed()
+    check(frappe.db.get_value("Lead", lead.name, "status") == "Open", "scheduler repairs stale closed Lead under 24 hours")
+    check(module.make_opportunity(lead.name).is_new(), "repaired Lead can convert again")
     frappe.set_user("Guest")
     try:
         module.make_opportunity(lead.name)
