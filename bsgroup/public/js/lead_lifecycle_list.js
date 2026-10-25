@@ -27,9 +27,28 @@
             style.textContent += '@media(min-width:768px){.bsi-lead-list-colors .list-row-col{order:10}.bsi-lead-list-colors .list-row-col[data-fieldname="title"]{position:static!important}.bsi-lead-list-colors .list-row>.level-left:first-child,.bsi-lead-list-colors .list-header-subject{position:relative;padding-left:26px}.bsi-lead-list-colors .list-row-col[data-fieldname="name"]{order:1}.bsi-lead-list-colors .list-row-col[data-fieldname="status_field"]{order:2}.bsi-lead-list-colors .list-row-col[data-fieldname="company_name"]{order:3}.bsi-lead-list-colors .list-row-col[data-fieldname="title"]{order:4}.bsi-lead-list-colors .list-row-col[data-fieldname="title"]>.select-like{position:absolute;left:0;top:50%;transform:translateY(-50%);margin:0}.bsi-lead-list-colors .list-row-col.tag-col{order:5}}';
             style.textContent += '.bsi-lead-list-colors .standard-filter-section{display:none!important}.bsi-lead-list-colors .list-page-form{display:flex!important;justify-content:flex-end;align-items:center;gap:10px}.bsi-lead-list-colors .filter-section{margin-left:0!important;border-left:0!important;padding-left:0!important}';
             style.textContent += '.bsi-lead-list-colors .list-liked-by-me,.bsi-lead-list-colors .list-row-like{display:none!important}';
+            style.textContent += '.bsi-lead-list-colors .list-row-activity .modified{min-width:82px;width:82px;flex:0 0 82px;white-space:nowrap}.bsi-lead-list-colors .bsi-lead-date{font-variant-numeric:tabular-nums}';
             root.append(style);
         }
 
+        // Format the existing modified timestamp at row creation, including
+        // virtual rows. Keep its full timestamp tooltip and all other controls.
+        if (!listview._bsi_absolute_dates && typeof listview.get_meta_html === 'function') {
+            const nativeMeta = listview.get_meta_html;
+            listview.get_meta_html = function(doc) {
+                const holder = document.createElement('div');
+                holder.innerHTML = nativeMeta.call(this, doc);
+                holder.querySelectorAll('.modified [data-timestamp]').forEach(node => {
+                    const timestamp = node.dataset.timestamp;
+                    node.textContent = frappe.datetime.str_to_user(frappe.datetime.convert_to_user_tz(timestamp).split(' ')[0]);
+                    node.classList.remove('frappe-timestamp', 'mini');
+                    node.classList.add('bsi-lead-date');
+                    node.setAttribute('aria-label', __('Last updated') + ': ' + node.textContent);
+                });
+                return holder.innerHTML;
+            };
+            listview._bsi_absolute_dates = true;
+        }
         const field = listview.page.fields_dict.status;
         if (field) {
             field.df.options = "\nOpen\nDelayed\nOpportunity\nDropped";
