@@ -104,6 +104,15 @@
                     const badge = document.createElement('span');
                     badge.className = 'bsi-lead-owner';
                     badge.dataset.leadOwner = owner || '';
+                    if (owner) {
+                        // Stable per user, including owners who share the same initial.
+                        const hash = Array.from(owner.toLowerCase()).reduce((value, char) =>
+                            (Math.imul(value, 31) + char.codePointAt(0)) >>> 0, 0);
+                        const hue = hash % 360;
+                        badge.style.backgroundColor = `hsl(${hue}, 65%, 93%)`;
+                        badge.style.color = `hsl(${hue}, 55%, 28%)`;
+                        badge.style.borderColor = `hsl(${hue}, 45%, 80%)`;
+                    }
                     badge.textContent = label?.initial || (owner ? '?' : '—');
                     badge.title = owner ? __('Lead Owner') + ': ' + (fullName || owner) : __('Lead Owner not set');
                     badge.setAttribute('aria-label', badge.title);
