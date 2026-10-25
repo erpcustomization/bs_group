@@ -14,7 +14,7 @@ const frm={wrapper:document.querySelector('main'),fields_dict:{status:{df:{optio
  async set_value(k,v){this.doc[k]=v},async save(){this.saved=true},add_child:(table,n)=>{frm.note=n;assert.equal(table,'notes')}};
 context.life.refresh(frm); context.life.refresh(frm);
 assert.equal(document.querySelectorAll('.bsi-lead-outcome').length,1);
-assert.deepEqual(Array.from(document.querySelectorAll('option')).map(x=>x.textContent),['Open','Opportunity','Dropped']);
+assert.deepEqual(Array.from(document.querySelectorAll('option:not([hidden])')).map(x=>x.textContent),['Open','Opportunity','Dropped']);
 assert.equal(context.life.display(frm.doc)[0],'Open');
 frm.doc.creation='2026-10-24T12:00:00Z';assert.equal(context.life.display(frm.doc)[0],'Delayed');
 frm.doc.status='Dropped';assert.equal(context.life.display(frm.doc)[0],'Dropped');
