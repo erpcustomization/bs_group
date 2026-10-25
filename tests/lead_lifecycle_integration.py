@@ -48,6 +48,15 @@ try:
     check(module.overdue(now - timedelta(hours=24), now), "delayed at exactly 24 hours")
     lead = frappe.get_doc({"doctype":"Lead", "first_name":"Lifecycle transaction test", "company_name":"Lifecycle test"}).insert()
     check(lead.status == "Open", "new lead defaults Open")
+    lead.title = "Network upgrade enquiry"
+    lead.save()
+    lead.reload()
+    check(lead.title == "Network upgrade enquiry", "Open Lead title can be edited")
+    lead.company_name = "Updated lifecycle organization"
+    lead.save()
+    lead.reload()
+    check(lead.title == "Network upgrade enquiry", "manual title persists through later native saves")
+
     lead.custom_requirement = "Customer requires 20 network switches."
     lead.custom_next_follow_up_date = "2026-11-01"
     lead.save()
@@ -62,6 +71,9 @@ try:
     frappe.db.set_value("Lead", lead.name, "creation", lead.creation, update_modified=False)
     lead.save()
     check(lead.status == "Delayed", "aged lead becomes Delayed on save")
+    lead.title = "Not allowed after delay"
+    rejects(lead.save, "Delayed Lead title edit is blocked")
+    lead.reload()
     lead.status = "Open"
     lead.save()
     check(lead.status == "Delayed", "editing cannot reset age")
