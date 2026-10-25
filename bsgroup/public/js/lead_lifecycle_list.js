@@ -1,6 +1,6 @@
 // Preserve native list actions and links; replace only the visible lifecycle indicator.
-(() => {
-    const doctype = frappe.get_route()[1] === 'Opportunity' ? 'Opportunity' : 'Lead';
+frappe.bsi_setup_sales_list = (doctype) => {
+
     const isLead = doctype === 'Lead';
     const ownerField = isLead ? 'lead_owner' : 'opportunity_owner';
     const settings = frappe.listview_settings[doctype] || (frappe.listview_settings[doctype] = {});
@@ -174,4 +174,4 @@
         return doc.status === "Delayed" || (active.includes(doc.status) && age >= 24)
             ? [__("Delayed"), "orange", "status,=,Delayed"] : [__("Open"), "blue", "status,=," + doc.status];
     };
-})();
+};
