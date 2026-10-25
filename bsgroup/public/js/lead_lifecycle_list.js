@@ -54,9 +54,33 @@
             style.textContent += '.bsi-lead-list-colors .page-actions .view-switcher,.bsi-lead-list-colors .page-actions .page-icon-group,.bsi-lead-list-colors .page-actions .menu-btn-group{display:none!important}';
             style.textContent += '.bsi-lead-list-colors .bsi-lead-header-filter{display:inline-flex!important;align-items:center;justify-content:center;width:34px;height:34px;padding:0!important;border-radius:8px!important;margin-right:8px}.bsi-lead-list-colors .bsi-lead-header-filter .button-label{display:none!important}.bsi-lead-list-colors .bsi-lead-header-filter .filter-icon{margin:0!important}.bsi-lead-list-colors.bsi-filter-in-header .list-page-form{display:none!important}';
             style.textContent += '.bsi-lead-list-colors .bsi-lead-owner{display:inline-flex;align-items:center;justify-content:center;flex:0 0 26px;width:26px;height:26px;border-radius:50%;background:#eef3fb;color:#12335f;font-size:12px;font-weight:600;border:1px solid #dfe7f2}';
+            style.textContent += '.bsi-lead-list-colors .list-row-head>.level-right{position:relative}.bsi-lead-list-colors .list-row-head .list-count{visibility:hidden}.bsi-lead-list-colors .bsi-lead-meta-head{position:absolute;right:10px;display:flex;align-items:center;gap:10px;white-space:nowrap;font-size:10px}.bsi-lead-list-colors .bsi-lead-meta-head .date-heading{width:82px;text-align:center}.bsi-lead-list-colors .bsi-lead-meta-head .owner-heading{width:26px;text-align:center}';
             root.append(style);
         }
 
+        if (!listview._bsi_meta_headings && typeof listview.get_header_html === 'function') {
+            const nativeHeader = listview.get_header_html;
+            listview.get_header_html = function(...args) {
+                const html = nativeHeader.apply(this, args);
+                if (!html) return html;
+                const holder = document.createElement('div');
+                holder.innerHTML = html;
+                const right = holder.querySelector('.list-row-head > .level-right');
+                if (right) {
+                    const headings = document.createElement('span');
+                    headings.className = 'bsi-lead-meta-head hidden-xs';
+                    for (const [className, label] of [['date-heading', 'Date'], ['owner-heading', 'Owners']]) {
+                        const heading = document.createElement('span');
+                        heading.className = className;
+                        heading.textContent = __(label);
+                        headings.append(heading);
+                    }
+                    right.append(headings);
+                }
+                return holder.innerHTML;
+            };
+            listview._bsi_meta_headings = true;
+        }
         // Format the existing modified timestamp at row creation, including
         // virtual rows. Keep its full timestamp tooltip and all other controls.
         if (!listview._bsi_absolute_dates && typeof listview.get_meta_html === 'function') {
