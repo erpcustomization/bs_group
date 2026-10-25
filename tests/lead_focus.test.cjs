@@ -14,7 +14,7 @@ root.querySelector('[data-fieldname="activities_tab"]').addEventListener('click'
 let collapsed=[];
 const frm={wrapper:root,fields_dict,doc:{name:'LEAD1',status:'Open'},is_new:()=>false,layout:{sections:[{df:{fieldname:'address_section'},fields_list:[],collapse:v=>collapsed.push(v)}]}};
 const ctx={document,frappe:{ui:{form:{on(){}}}}}; vm.createContext(ctx);
-vm.runInContext(fs.readFileSync(__dirname+'/../bsgroup/public/js/Lead.js','utf8')+'\nthis.focus=bsi_lead_focus;',ctx);
+vm.runInContext(fs.readFileSync(__dirname+'/../bsgroup/public/js/lead_details.js','utf8')+'\nthis.focus=bsi_lead_focus;',ctx);
 ctx.focus.refresh(frm); ctx.focus.refresh(frm);
 assert.equal(root.querySelectorAll('.bsi-additional-details').length,1);
 assert.equal(root.querySelector('.bsi-additional-details').hasAttribute('open'),false);

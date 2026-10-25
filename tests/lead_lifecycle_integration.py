@@ -80,6 +80,9 @@ try:
     lead.status = "Opportunity"
     rejects(lead.save, "manual closure without Opportunity rejected")
     lead.reload()
+    frappe.get_doc({"doctype":"ToDo", "reference_type":"Lead", "reference_name":lead.name, "allocated_to":"Administrator", "description":"Lead lifecycle assignment test"}).insert()
+    module.load_responsibility(lead)
+    check(lead.get_onload("bsi_sales_responsibility")["source"] == "Lead", "direct Lead assignment is displayed")
     mapped = module.make_opportunity(lead.name)
     check(mapped.is_new(), "mapper returns unsaved Opportunity")
     check(frappe.db.get_value("Lead", lead.name, "status") == "Delayed", "opening mapper does not close lead")
@@ -91,6 +94,9 @@ try:
     mapped.insert()
     check(frappe.db.get_value("Lead", lead.name, "status") == "Opportunity", "saved Opportunity closes lead natively")
     lead.reload()
+    module.load_responsibility(lead)
+    responsibility = lead.get_onload("bsi_sales_responsibility")
+    check(responsibility["source"] == "Opportunity" and responsibility["users"][0]["user"] == "Administrator", "converted Lead displays transferred Opportunity assignment")
     lead.status = "Dropped"
     lead.append("notes", {"note":"Cannot drop a converted lead"})
     rejects(lead.save, "linked lead cannot be dropped")

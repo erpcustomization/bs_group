@@ -14,12 +14,12 @@ const frm={wrapper:document.querySelector('main'),fields_dict:{status:{df:{optio
  async set_value(k,v){this.doc[k]=v},async save(){this.saved=true},add_child:(table,n)=>{frm.note=n;assert.equal(table,'notes')}};
 context.life.refresh(frm); context.life.refresh(frm);
 assert.equal(document.querySelectorAll('.bsi-lead-outcome').length,1);
-assert.deepEqual(Array.from(document.querySelectorAll('option')).map(x=>x.textContent),['Choose action','Open','Convert to Opportunity','Dropped']);
+assert.deepEqual(Array.from(document.querySelectorAll('option')).map(x=>x.textContent),['Open','Opportunity','Dropped']);
 assert.equal(context.life.display(frm.doc)[0],'Open');
 frm.doc.creation='2026-10-24T12:00:00Z';assert.equal(context.life.display(frm.doc)[0],'Delayed');
 frm.doc.status='Dropped';assert.equal(context.life.display(frm.doc)[0],'Dropped');
 frm.doc.status='Opportunity';assert.equal(context.life.display(frm.doc)[0],'Opportunity \u00b7 Closed');
-context.life.refresh(frm);assert.equal(document.querySelectorAll('select').length,0);
+context.life.refresh(frm);assert.equal(document.querySelector('select').disabled,true);
 frm.doc.status='Open';context.life.refresh(frm);
 (async()=>{
  await context.life.convert(frm);assert.equal(config.method,'bsgroup.lead_lifecycle.make_opportunity');assert.equal(mapped.sales_stage,'Proposal');assert.equal(mapped.custom_organization_name,'Acme');assert.equal(frm.doc.status,'Open');assert.equal(routed[1],'Opportunity');

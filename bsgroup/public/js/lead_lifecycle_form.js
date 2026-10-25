@@ -34,7 +34,8 @@ const bsi_lead_lifecycle = (() => {
         let box = frm.wrapper.querySelector?.('.bsi-lead-outcome') || frm.wrapper[0]?.querySelector('.bsi-lead-outcome');
         if (!box) {
             box = document.createElement('div'); box.className = 'bsi-lead-outcome';
-            statusField.$wrapper[0].after(box);
+            const host = frm.fields_dict.custom_bsi_status_controls?.$wrapper?.[0];
+            if (host) host.append(box); else statusField.$wrapper[0].after(box);
         }
         box.replaceChildren();
         const label = document.createElement('label'); label.className = 'control-label'; label.textContent = __('Status'); box.append(label);
@@ -49,14 +50,18 @@ const bsi_lead_lifecycle = (() => {
         timer = setInterval(() => {
             if (document.body.dataset.route === 'Form/Lead/' + frm.doc.name) render();
         }, 60000);
-        if (!frm.perm?.some(p => p.write) || closed.has(frm.doc.status)) return;
-        const select = document.createElement('select'); select.className = 'form-control'; select.setAttribute('aria-label', 'Lead action');
-        for (const [value, text] of [['','Choose action'],['open','Open'],['convert','Convert to Opportunity'],['drop','Dropped']]) {
+
+        const select = document.createElement('select'); select.className = 'form-control'; select.setAttribute('aria-label', 'Status');
+        for (const [value, text] of [['open','Open'],['convert','Opportunity'],['drop','Dropped']]) {
             const option = document.createElement('option'); option.value = value; option.textContent = __(text); select.append(option);
         }
+        const selected = closed.has(frm.doc.status) ? 'convert' : ['Dropped','Do Not Contact'].includes(frm.doc.status) ? 'drop' : 'open';
+        select.value = selected;
+        select.disabled = !frm.perm?.some(p => p.write) || closed.has(frm.doc.status);
+        if (closed.has(frm.doc.status)) select.title = __('This Lead is closed through its existing sales document.');
         box.append(select);
         select.addEventListener('change', async () => {
-            const action = select.value; select.value = '';
+            const action = select.value; select.value = selected;
             if (action === 'convert') return convert(frm);
             if (action === 'open') {
                 await frm.set_value('status', 'Open');

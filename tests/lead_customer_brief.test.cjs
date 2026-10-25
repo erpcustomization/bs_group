@@ -1,5 +1,5 @@
 const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
-const code=fs.readFileSync(__dirname+'/../bsgroup/public/js/Lead.js','utf8');
+const code=fs.readFileSync(__dirname+'/../bsgroup/public/js/lead_details.js','utf8');
 let hooks,calls=[],responses=[],boxes={details:'',ai:''};
 const pane=key=>({length:1,children:()=>({length:!!boxes[key],html:h=>{boxes[key]=h;}})});
 const details=pane('details'),ai=pane('ai');
@@ -41,7 +41,9 @@ const sale={name:'LI-SALES',converted_lead:'LEAD1',ai_status:'Completed',ai_conf
  check(boxes.details.includes('<strong>Requirement</strong>'),'Overview highlights original customer requirement');
  check(boxes.details.indexOf('original requirement')<boxes.details.indexOf('Enquiry details'),'Original message precedes source metadata');
  check(boxes.ai.includes('Quotation request')&&!boxes.ai.includes('>rfq<'),'Business-friendly intent label retained in AI tab');
- check(!boxes.details.includes(' open><summary'),'Overview secondary sections collapsed');
+ check(boxes.details.includes('class="bsi-enquiry-details"')&&!boxes.details.includes('<summary style="cursor:pointer;font-weight:600;padding:4px 0">Enquiry details'),'Enquiry details always visible without collapse arrow');
+ check(boxes.details.includes('AI analysis result')&&boxes.details.includes('&lt;img'),'Saved AI conclusion visible and escaped on Details');
+ check(ctx.brief.focused_html(sale,{__onload:{bsi_sales_responsibility:{source:'Opportunity',users:[{user:'priya@example.org',full_name:'Padmapriya'}]}}}).includes('Padmapriya'),'Transferred Opportunity assignee stays visible on Lead');
  check(boxes.ai.includes(' open><summary'),'AI diagnostics expanded on AI tab');
  check(boxes.details.includes('grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr))'),'Grid can shrink to mobile container width');
  check(!code.includes('<style')&&!code.includes('<script src')&&!code.includes('ent-lead-styles'),'No global stylesheet or external UI library injected');

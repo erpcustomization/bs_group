@@ -94,9 +94,30 @@ def mark_delayed():
 
 
 def setup():
+    from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+    create_custom_fields({"Lead": [
+        {"fieldname": "custom_bsi_status_tab", "label": "Status", "fieldtype": "Tab Break", "insert_after": "notes"},
+        {"fieldname": "custom_bsi_status_controls", "label": "Status", "fieldtype": "HTML", "insert_after": "custom_bsi_status_tab"},
+    ]})
     from frappe.custom.doctype.property_setter.property_setter import make_property_setter
     field = frappe.get_meta("Lead").get_field("status")
     options = list(dict.fromkeys((field.options or "").splitlines() + ["Delayed", "Dropped"]))
     make_property_setter("Lead", "status", "options", "\n".join(options), "Text")
     make_property_setter("Lead", "status", "default", "Open", "Text")
     frappe.clear_cache(doctype="Lead")
+
+
+def load_responsibility(doc, method=None):
+    """Conversion moves open ToDos to Opportunity; show its current assignee on Lead."""
+    doc.check_permission("read")
+    users = frappe.get_all("ToDo", filters={"reference_type": "Lead", "reference_name": doc.name, "status": "Open"}, pluck="allocated_to")
+    source = "Lead"
+    if not users:
+        opportunities = frappe.get_list("Opportunity", filters={"opportunity_from": "Lead", "party_name": doc.name}, pluck="name", limit_page_length=0)
+        if opportunities:
+            users = frappe.get_all("ToDo", filters={"reference_type": "Opportunity", "reference_name": ["in", opportunities], "status": "Open"}, pluck="allocated_to")
+            source = "Opportunity"
+    doc.set_onload("bsi_sales_responsibility", {"source": source, "users": [
+        {"user": user, "full_name": frappe.db.get_value("User", user, "full_name") or user}
+        for user in dict.fromkeys(users) if user
+    ]})
