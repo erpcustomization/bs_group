@@ -27,6 +27,7 @@ def linked_outcome(name):
 
 def before_validate(doc, method=None):
     doc.flags.bsi_requested_lead_status = doc.status
+    doc.flags.bsi_requested_lead_title = doc.title
 
 
 def validate(doc, method=None):
@@ -59,6 +60,21 @@ def validate(doc, method=None):
         doc.status = requested
     else:
         frappe.throw(_("Choose Open, Convert to Opportunity, or Dropped."))
+
+
+    # Native Lead validation derives Title from organization/name. Preserve an
+    # explicitly edited title while allowing the normal initial default.
+    incoming_title = doc.flags.get("bsi_requested_lead_title")
+    if previous and incoming_title != previous.title:
+        if previous.status != "Open" or doc.status != "Open" or linked or overdue(doc.creation):
+            frappe.throw(_("Title can only be edited while the Lead is Open."))
+        if not (incoming_title or "").strip():
+            frappe.throw(_("Enter a Title."))
+        doc.title = incoming_title.strip()
+    elif previous and previous.title and previous.title != (previous.company_name or previous.lead_name):
+        doc.title = previous.title
+    elif not previous and (incoming_title or "").strip():
+        doc.title = incoming_title.strip()
 
 
 def guard_conversion(doc, method=None):

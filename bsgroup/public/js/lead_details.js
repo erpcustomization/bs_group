@@ -280,7 +280,7 @@ const bsi_customer_brief = (() => {
 
 // Two tabs, using the original controls and their existing save/permission handlers.
 const bsi_lead_focus = (() => {
-    const contact = new Set(["first_name", "last_name", "company_name", "email_id", "mobile_no", "phone", "whatsapp_no"]);
+    const contact = new Set(["title", "first_name", "last_name", "company_name", "email_id", "mobile_no", "phone", "whatsapp_no"]);
     function refresh(frm) {
         const root = frm.wrapper[0] || frm.wrapper;
         const tabs = frm.layout?.tabs || [];
@@ -379,6 +379,12 @@ const bsi_lead_focus = (() => {
             else if (name === 'custom_next_follow_up_date') { follow.append(node); node.style.maxWidth = '280px'; field.tab = detailsTab; }
             else if (['notes_html','notes'].includes(name)) { notes.append(node); field.tab = detailsTab; }
             else if (extra.contains(node)) field.tab = extraTab;
+        }
+        if (frm.fields_dict.title) {
+            frm.set_df_property('title', 'hidden', 0);
+            frm.set_df_property('title', 'read_only', frm.doc.status === 'Open' ? 0 : 1);
+            const titleNode = frm.fields_dict.title.$wrapper?.[0];
+            if (titleNode) { titleNode.style.gridColumn = '1 / -1'; customer.prepend(titleNode); }
         }
         const requirementInput = requirement.querySelector('textarea');
         if (requirementInput) {
