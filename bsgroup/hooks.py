@@ -623,3 +623,21 @@ for _dt, _event, _method in (
     _prior = doc_events.setdefault(_dt, {}).get(_event, [])
     doc_events[_dt][_event] = ([_prior] if isinstance(_prior, str) else list(_prior)) + [
         "bsgroup.procurement_payments." + _method]
+
+
+# Lead outcomes extend native hooks without replacing existing integrations.
+for _hook_map, _path in (
+    (doctype_js, "public/js/lead_lifecycle_form.js"),
+    (doctype_list_js, "public/js/lead_lifecycle_list.js"),
+):
+    _prior = _hook_map.get("Lead", [])
+    _hook_map["Lead"] = ([_prior] if isinstance(_prior, str) else list(_prior)) + [_path]
+for _dt, _event, _method in (
+    ("Lead", "before_validate", "before_validate"),
+    ("Lead", "validate", "validate"),
+    ("Opportunity", "before_insert", "guard_conversion"),
+):
+    _prior = doc_events.setdefault(_dt, {}).get(_event, [])
+    doc_events[_dt][_event] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.lead_lifecycle." + _method]
+scheduler_events.setdefault("cron", {}).setdefault("* * * * *", []).append("bsgroup.lead_lifecycle.mark_delayed")
+after_migrate.append("bsgroup.lead_lifecycle.setup")
