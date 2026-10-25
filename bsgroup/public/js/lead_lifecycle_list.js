@@ -5,7 +5,7 @@
     const active = ["Lead", "Open", "Replied", "Interested", "Delayed"];
     const closed = ["Opportunity", "Quotation", "Converted", "Lost Quotation"];
     settings.formatters = {...(settings.formatters || {})};
-    for (const field of ['name', 'company_name', 'title']) {
+    for (const field of ['name', 'company_name']) {
         settings.formatters[field] = (value, df, doc) => {
             const label = frappe.utils.escape_html(String(value || ''));
             const name = frappe.utils.escape_html(String(doc.name));
