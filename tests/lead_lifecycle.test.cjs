@@ -15,16 +15,16 @@ const frm={wrapper:document.querySelector('main'),fields_dict:{status:{df:{optio
 context.life.refresh(frm); context.life.refresh(frm);
 assert.equal(document.querySelectorAll('.bsi-lead-outcome').length,1);
 assert.deepEqual(Array.from(document.querySelectorAll('option:not([hidden])')).map(x=>x.textContent),['Open','Opportunity','Dropped']);
-assert.equal(context.life.display(frm.doc)[0],'Open');
+assert.equal(context.life.display(frm.doc)[0],'Open');assert.equal(document.querySelector('.bsi-current-status').textContent,'Open');assert.equal(document.querySelector('.bsi-current-status').style.color,'#1d5dcc');
 frm.doc.creation='2026-10-24T12:00:00Z';assert.equal(context.life.display(frm.doc)[0],'Delayed');
 frm.doc.status='Dropped';assert.equal(context.life.display(frm.doc)[0],'Dropped');
 frm.doc.status='Opportunity';assert.equal(context.life.display(frm.doc)[0],'Opportunity \u00b7 Closed');
-context.life.refresh(frm);assert.equal(document.querySelector('select').disabled,true);
+context.life.refresh(frm);assert.equal(document.querySelector('select').disabled,true);assert.equal(document.querySelector('.bsi-current-status').textContent,'Opportunity');assert.equal(document.querySelector('.bsi-current-status').style.color,'#087f5b');
 frm.doc.status='Open';context.life.refresh(frm);
 (async()=>{
  await context.life.convert(frm);assert.equal(config.method,'bsgroup.lead_lifecycle.make_opportunity');assert.equal(mapped.sales_stage,'Proposal');assert.equal(mapped.custom_organization_name,'Acme');assert.equal(frm.doc.status,'Open');assert.equal(routed[1],'Opportunity');
  frm.is_dirty=()=>true;await context.life.convert(frm);assert.equal(calls,1);
- const select=document.querySelector('select');select.querySelector('option[value=drop]').selected=true;select.dispatchEvent(new window.Event('change'));await prompt({reason:'Not relevant'});assert.equal(frm.doc.status,'Dropped');assert.equal(frm.note.note,'Dropped: Not relevant');assert.equal(frm.saved,true);
+ const select=document.querySelector('select');select.querySelector('option[value=drop]').selected=true;select.dispatchEvent(new window.Event('change'));await prompt({reason:'Not relevant'});assert.equal(frm.doc.status,'Dropped');assert.equal(frm.note.note,'Dropped: Not relevant');assert.equal(frm.saved,true);context.life.refresh(frm);assert.equal(document.querySelector('.bsi-current-status').textContent,'Dropped');assert.equal(document.querySelector('.bsi-current-status').style.color,'#c92a2a');
  console.log('PASS: three choices, 24-hour display, read-only closed state, required drop note, no premature close, existing Opportunity mapping.');
 })().catch(e=>{console.error(e);process.exitCode=1});
 
