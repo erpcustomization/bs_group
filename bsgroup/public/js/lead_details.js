@@ -306,7 +306,7 @@ const bsi_lead_focus = (() => {
             const node = field.$wrapper?.[0];
             if (!node || ['Section Break','Column Break','Tab Break'].includes(field.df.fieldtype)) continue;
             if (contact.has(name)) { customer.append(node); field.tab = detailsTab; }
-            else if (name === 'open_activities_html') { follow.append(node); field.tab = detailsTab; }
+            else if (name === 'custom_next_follow_up_date') { follow.append(node); node.style.maxWidth = '280px'; field.tab = detailsTab; }
             else if (['notes_html','notes'].includes(name)) { notes.append(node); field.tab = detailsTab; }
             else if (extra.contains(node)) field.tab = extraTab;
         }
@@ -315,18 +315,9 @@ const bsi_lead_focus = (() => {
             tab.refresh();
         }
         if (![detailsTab, extraTab].some(t => t.is_active())) detailsTab.set_active();
-        // Reuse the native task/event dates; do not create a second follow-up record.
-        let date = follow.querySelector('.bsi-next-follow-date');
-        if (!date) { date = document.createElement('p'); date.className = 'bsi-next-follow-date text-muted'; follow.prepend(date); }
-        date.textContent = __('Not scheduled');
-        if (!frm.is_new()) {
-            const name = frm.doc.name;
-            frappe.call({method:'erpnext.crm.utils.get_open_activities',args:{ref_doctype:'Lead',ref_docname:name},callback(r) {
-                if (frm.doc.name !== name || r.exc) return;
-                const values = [...(r.message?.tasks || []).map(x => x.date), ...(r.message?.events || []).map(x => x.starts_on)].filter(Boolean).sort();
-                date.textContent = values.length ? frappe.datetime.str_to_user(values[0]) : __('Not scheduled');
-            }});
-        }
+        // The native Date control saves on Lead with its existing permissions and Save action.
+        // Task/event dates remain independent in Additional details.
+
     }
     return {refresh};
 })();
