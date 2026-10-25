@@ -22,7 +22,15 @@ frappe.ui.form.on("Lead", {
         }, "Create");
         bsi_customer_brief.refresh(frm);
         bsi_lead_focus.refresh(frm);
-        if (frm.fields_dict.dashboard_tab) frm.set_df_property("dashboard_tab", "hidden", 1);
+        // Frappe rebuilds the generated Connections tab after refresh handlers.
+        // Keep presentation scoped to this Lead form without altering its links.
+        const root = frm.wrapper[0] || frm.wrapper;
+        if (!root.querySelector('.bsi-lead-connections-visibility')) {
+            const style = document.createElement('style');
+            style.className = 'bsi-lead-connections-visibility';
+            style.textContent = '#lead-dashboard_tab-tab, #lead-dashboard_tab { display:none !important; }';
+            root.appendChild(style);
+        }
     }
 });
 
