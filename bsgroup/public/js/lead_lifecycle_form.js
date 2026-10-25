@@ -41,7 +41,7 @@ const bsi_lead_lifecycle = (() => {
         box.replaceChildren();
         box.style.cssText = 'display:flex;justify-content:flex-end;padding:8px 0;';
         const style = document.createElement('style');
-        style.textContent = '#lead-custom_bsi_status_tab-tab,#lead-custom_bsi_status_tab{display:none!important}.bsi-lead-outcome select{background-color:var(--primary,#1d5dcc);color:#fff;border:1px solid var(--primary,#1d5dcc);border-radius:8px;width:144px;min-height:34px;padding:6px 12px;font-weight:600;cursor:pointer}.bsi-lead-outcome select:disabled{opacity:.7;cursor:default}.bsi-lead-outcome option{background:#fff;color:var(--text-color,#15345c)}';
+        style.textContent = '.bsi-lead-outcome select{background-color:var(--primary,#1d5dcc);color:#fff;border:1px solid var(--primary,#1d5dcc);border-radius:8px;width:144px;min-height:34px;padding:6px 12px;font-weight:600;cursor:pointer}.bsi-lead-outcome select:disabled{opacity:.7;cursor:default}.bsi-lead-outcome option{background:#fff;color:var(--text-color,#15345c)}';
         box.append(style);
         const badge = document.createElement('div'); badge.style.display = 'none'; box.append(badge);
         const render = () => {

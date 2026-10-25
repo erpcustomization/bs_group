@@ -20,8 +20,8 @@ frappe.ui.form.on("Lead", {
                 }
             });
         }, "Create");
-        bsi_customer_brief.refresh(frm);
         bsi_lead_focus.refresh(frm);
+        bsi_customer_brief.refresh(frm);
         // Frappe rebuilds the generated Connections tab after refresh handlers.
         // Keep presentation scoped to this Lead form without altering its links.
         const root = frm.wrapper[0] || frm.wrapper;
@@ -170,7 +170,7 @@ const bsi_customer_brief = (() => {
         const wrap = $(frm.wrapper);
         const panes = wrap.find('.tab-pane');
         const details = panes.first();
-        let ai = wrap.find('#lead-bsi_ai_tab');
+        let ai = wrap.find('#lead-custom_bsi_status_tab');
         if (!ai.length) ai = wrap.find('[data-fieldname="bsi_ai_section"]').closest('.tab-pane');
         [details, ai].forEach((pane, index) => {
             if (!pane.length) return;
@@ -258,8 +258,9 @@ const bsi_customer_brief = (() => {
             const context = header(doc, lead);
             const source = disclosure("Original customer enquiry and source", enquiry_html(doc, lead));
             const history = related_html(docs, doc);
-            mount(frm, focused_html(doc, lead) + history,
-                context + ai_html(doc, lead, true) + source + history);
+            mount(frm, paragraph("Requirement", doc.transcript),
+                focused_html(doc, lead).replace(paragraph("Requirement", doc.transcript), "") + history +
+                disclosure("AI analysis and routing", context + ai_html(doc, lead, true) + source));
         } catch (_) {
             if (frm.doc.name !== name || frm._bsi_brief_generation !== generation) return;
             mount(frm, '<h5>Customer enquiry and AI brief</h5><p role="alert">The linked enquiry could not be loaded. Refresh to retry. If this persists, ask your administrator to check your existing Lead Intake access.</p>');
@@ -268,96 +269,64 @@ const bsi_customer_brief = (() => {
     return { refresh, primary, safe_url, ai_html, enquiry_html, focused_html };
 })();
 
-// Presentation only. Original controls, permissions, dependencies and handlers
-// remain authoritative; no values, status options or required flags are changed.
+// Two tabs, using the original controls and their existing save/permission handlers.
 const bsi_lead_focus = (() => {
-    const secondary = ["salutation", "middle_name", "lead_name", "gender", "job_title", "type", "request_type",
-        "no_of_employees", "annual_revenue", "industry", "market_segment", "territory", "fax",
-        "website", "whatsapp_no", "phone_ext", "language", "blog_subscriber"];
-    function required(field) {
-        return !!(field.df.reqd || field.df.mandatory_depends_on);
-    }
+    const contact = new Set(["first_name", "last_name", "company_name", "email_id", "mobile_no", "phone", "whatsapp_no"]);
     function refresh(frm) {
-        const root = frm.wrapper?.jquery ? frm.wrapper[0] : frm.wrapper;
-        if (!root?.querySelector) return;
-        const pane = root.querySelector('.tab-pane');
-        if (!pane) return;
-        let box = pane.querySelector('.bsi-additional-details');
-        if (!box) {
-            box = document.createElement('details');
-            box.className = 'bsi-additional-details';
-            box.style.cssText = 'padding:16px 20px;border:1px solid var(--border-color);border-radius:8px;margin:12px 0';
-            box.innerHTML = '<summary style="cursor:pointer;font-weight:600">Additional details</summary><div class="bsi-extra-fields" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px 24px;padding-top:16px"></div>';
-            pane.appendChild(box);
-        }
-        const grid = box.querySelector('.bsi-extra-fields');
-        secondary.forEach(name => {
-            const field = frm.fields_dict[name];
-            const node = field?.$wrapper?.[0];
-            if (!node || !pane.contains(node)) return;
-            if (required(field)) {
-                if (node.parentNode === grid && field._bsi_origin?.parentNode) field._bsi_origin.after(node);
-                return;
+        const root = frm.wrapper[0] || frm.wrapper;
+        const tabs = frm.layout?.tabs || [];
+        const detailsTab = tabs.find(t => t.df.fieldname === "__details") || tabs[0];
+        const extraTab = tabs.find(t => t.df.fieldname === "custom_bsi_status_tab");
+        if (!detailsTab || !extraTab) return;
+        const details = detailsTab.wrapper[0], extra = extraTab.wrapper[0];
+        extraTab.df.label = extraTab.label = "Additional details";
+        extraTab.tab_link.find('.nav-link').text(__('Additional details'));
+        function card(parent, cls, label) {
+            let node = parent.querySelector('.' + cls);
+            if (!node) {
+                node = document.createElement('section'); node.className = 'form-section ' + cls;
+                node.style.cssText = 'padding:16px 20px;border:1px solid var(--border-color);border-radius:8px;margin:12px 0';
+                const title = document.createElement('h5'); title.textContent = __(label); node.append(title);
+                const body = document.createElement('div'); body.className = 'section-body'; node.append(body); parent.append(node);
             }
-            if (!field._bsi_origin?.isConnected) {
-                field._bsi_origin = document.createComment('Original Lead field position');
-                node.before(field._bsi_origin);
-            }
-            grid.appendChild(node);
-        });
-        // Keep customer contact and status at the top without duplicating inputs.
-        const first = frm.fields_dict.first_name?.$wrapper?.[0];
-        const core = first?.closest('.form-section')?.querySelector('.section-body');
-        if (core) {
-            core.classList.add('bsi-core-fields');
-            core.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px 24px';
-            core.querySelectorAll('.form-column').forEach(column => { column.style.display = 'contents'; });
+            return node.querySelector('.section-body');
         }
-        if (core) ["first_name", "last_name", "company_name", "email_id", "mobile_no", "phone", "lead_owner", "status", "company"].forEach(name => {
-            const node = frm.fields_dict[name]?.$wrapper?.[0];
-            if (node && pane.contains(node)) {
-                node.style.marginBottom = '0';
-                node.style.maxWidth = 'none';
-                core.appendChild(node);
+        const customer = card(details, 'bsi-contact-card', 'Contact details');
+        customer.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px 24px';
+        const follow = card(details, 'bsi-follow-card', 'Next follow-up date');
+        const notes = card(details, 'bsi-notes-card', 'Notes');
+        // Move whole native sections first, retaining section dependencies and controls.
+        for (const tab of tabs) {
+            if (tab === extraTab || tab.df.fieldname === 'dashboard_tab') continue;
+            for (const section of Array.from(tab.wrapper[0].children)) {
+                if (section.classList.contains('form-section') && !section.className.includes('bsi-')) extra.append(section);
             }
-        });
-        for (const name of ["contact_info_tab", "organization_section"]) {
-            const section = pane.querySelector(`.form-section[data-fieldname="${name}"]`);
-            if (section) section.style.display = section.querySelector('.frappe-control') ? '' : 'none';
         }
-        // Secondary sections remain native controls, inside one disclosure.
-        // Required sections stay outside so workflow requirements remain visible.
-        for (const section of frm.layout?.sections || []) {
-            if (!["address_section", "qualification_tab", "other_info_tab", "utm_analytics_section"].includes(section.df.fieldname)) continue;
-            const node = section.wrapper?.[0];
-            if (node && pane.contains(node)) {
-                if (section.fields_list.some(required)) {
-                    if (box.contains(node)) box.before(node);
-                } else {
-                    box.appendChild(node);
-                }
-            }
-            if (section._bsi_initialized) continue;
-            section._bsi_initialized = true;
-            if (!section.fields_list.some(required)) section.collapse(true);
+        for (const [name, field] of Object.entries(frm.fields_dict)) {
+            const node = field.$wrapper?.[0];
+            if (!node || ['Section Break','Column Break','Tab Break'].includes(field.df.fieldtype)) continue;
+            if (contact.has(name)) { customer.append(node); field.tab = detailsTab; }
+            else if (name === 'open_activities_html') { follow.append(node); field.tab = detailsTab; }
+            else if (['notes_html','notes'].includes(name)) { notes.append(node); field.tab = detailsTab; }
+            else if (extra.contains(node)) field.tab = extraTab;
         }
-        let follow = pane.querySelector('.bsi-follow-up');
-        if (!follow && !frm.is_new()) {
-            follow = document.createElement('section');
-            follow.className = 'bsi-follow-up';
-            follow.style.cssText = 'padding:16px 20px;border:1px solid var(--border-color);border-radius:8px;margin:12px 0';
-            follow.innerHTML = '<strong>Follow-up</strong><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>';
-            for (const [label, tab] of [["Next action / follow-up date", "activities_tab"], ["Outcome / short note", "notes_tab"]]) {
-                const link = root.querySelector(`[role="tab"][data-fieldname="${tab}"]`);
-                if (!link) continue;
-                const button = document.createElement('button');
-                button.type = 'button'; button.className = 'btn btn-default btn-sm'; button.textContent = label;
-                button.addEventListener('click', () => link.click());
-                follow.lastElementChild.appendChild(button);
-            }
-            if (follow.lastElementChild.children.length) box.before(follow);
+        for (const tab of tabs) {
+            tab.df.hidden = ![detailsTab, extraTab].includes(tab) ? 1 : 0;
+            tab.refresh();
         }
-        if (follow && core) core.closest('.form-section').after(follow);
+        if (![detailsTab, extraTab].some(t => t.is_active())) detailsTab.set_active();
+        // Reuse the native task/event dates; do not create a second follow-up record.
+        let date = follow.querySelector('.bsi-next-follow-date');
+        if (!date) { date = document.createElement('p'); date.className = 'bsi-next-follow-date text-muted'; follow.prepend(date); }
+        date.textContent = __('Not scheduled');
+        if (!frm.is_new()) {
+            const name = frm.doc.name;
+            frappe.call({method:'erpnext.crm.utils.get_open_activities',args:{ref_doctype:'Lead',ref_docname:name},callback(r) {
+                if (frm.doc.name !== name || r.exc) return;
+                const values = [...(r.message?.tasks || []).map(x => x.date), ...(r.message?.events || []).map(x => x.starts_on)].filter(Boolean).sort();
+                date.textContent = values.length ? frappe.datetime.str_to_user(values[0]) : __('Not scheduled');
+            }});
+        }
     }
-    return { refresh, required };
+    return {refresh};
 })();
