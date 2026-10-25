@@ -37,5 +37,9 @@ console.log('PASS: two tabs, native contact/follow-up/notes controls preserved, 
  ok.click();await new Promise(setImmediate);assert.equal(request.method,'add_note');assert.equal(request.args.note,'Call customer &lt;tomorrow&gt;');assert.equal(reloads,0);assert.equal(input.value,'Call customer <tomorrow>');
  ctx.frappe.call=async()=>({});ok.click();await new Promise(setImmediate);assert.equal(reloads,1);assert.equal(input.value,'');assert.equal(ok.hidden,true);
  frm.perm=[{read:1}];ctx.focus.refresh(frm);assert.equal(composer.hidden,true);
+ let dirty=true,saves=0;frm.perm=[{write:1}];frm.is_dirty=()=>dirty;frm.save=async()=>{saves++;dirty=false};ctx.focus.refresh(frm);
+ const contactOk=root.querySelector('.bsi-contact-card>.bsi-section-ok');assert.equal(contactOk.hidden,false);contactOk.click();await new Promise(setImmediate);assert.equal(saves,1);assert.equal(contactOk.hidden,true);
+ dirty=true;frm.save=async()=>{};ctx.focus.refresh(frm);contactOk.click();await new Promise(setImmediate);assert.equal(contactOk.hidden,false);
+ console.log('PASS: contact OK uses native save and remains visible when validation prevents saving.');
  console.log('PASS: paired cards, explicit note OK, native save method, escaped text, failure retention and read-only view.');
 })().catch(e=>{console.error(e);process.exitCode=1});
