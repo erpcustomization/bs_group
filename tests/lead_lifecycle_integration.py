@@ -50,10 +50,12 @@ def rejects(fn, name):
 try:
     module.setup()
     for source, party in [("Prospect", "test"), ("Customer", ""), ("Customer", "__missing_customer__"), ("Lead", "__missing_lead__")]:
-        rejects(lambda source=source, party=party: opp_module.validate_creation_source(frappe._dict(opportunity_from=source, party_name=party)), "reject invalid new opportunity source " + source + ":" + party)
+        rejects(lambda source=source, party=party: opp_module.validate_creation_source(frappe._dict(opportunity_from=source, party_name=party, opportunity_amount=100)), "reject invalid new opportunity source " + source + ":" + party)
     customer = frappe.get_doc({"doctype": "Customer", "customer_name": "Opportunity source test", "customer_type": "Company"}).insert()
-    opp_module.validate_creation_source(frappe._dict(opportunity_from="Customer", party_name=customer.name))
+    opp_module.validate_creation_source(frappe._dict(opportunity_from="Customer", party_name=customer.name, opportunity_amount=100))
     check(True, "existing customer accepted for manual opportunity")
+    for amount in (None, 0, -1):
+        rejects(lambda amount=amount: opp_module.validate_creation_source(frappe._dict(opportunity_from="Customer", party_name=customer.name, opportunity_amount=amount)), "reject missing or nonpositive amount " + str(amount))
     now = module.now_datetime()
     check(not module.overdue(now - timedelta(hours=24) + timedelta(seconds=1), now), "not delayed before 24 hours")
     check(module.overdue(now - timedelta(hours=24), now), "delayed at exactly 24 hours")
@@ -125,6 +127,7 @@ try:
     mapped.opportunity_type = "Sales"
     mapped.custom_subject = "Lifecycle conversion test"
     mapped.sales_stage = frappe.db.get_value("Sales Stage", {}, "name")
+    mapped.opportunity_amount = 100
     mapped.insert()
     check(frappe.db.get_value("Lead", lead.name, "status") == "Opportunity", "saved Opportunity closes lead natively")
     lead.reload()
@@ -146,7 +149,7 @@ try:
     lead.reload()
     lead.company = lead.company or frappe.db.get_value("Company", {}, "name")
     lead.save()
-    converted = module.confirm_opportunity(lead.name, "Confirmed conversion test")
+    converted = module.confirm_opportunity(lead.name, "Confirmed conversion test", 250)
     check(frappe.db.exists("Opportunity", converted), "OK creates a saved Opportunity")
     check(frappe.db.get_value("Lead", lead.name, "status") == "Opportunity", "confirmed conversion closes Lead only after insert")
     rejects(lambda: module.confirm_opportunity(lead.name, "Repeat click"), "duplicate confirmation cannot create a second Opportunity")
