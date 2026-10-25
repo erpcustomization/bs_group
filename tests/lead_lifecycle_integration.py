@@ -48,9 +48,11 @@ try:
     check(module.overdue(now - timedelta(hours=24), now), "delayed at exactly 24 hours")
     lead = frappe.get_doc({"doctype":"Lead", "first_name":"Lifecycle transaction test", "company_name":"Lifecycle test"}).insert()
     check(lead.status == "Open", "new lead defaults Open")
+    lead.custom_requirement = "Customer requires 20 network switches."
     lead.custom_next_follow_up_date = "2026-11-01"
     lead.save()
     lead.reload()
+    check(lead.custom_requirement == "Customer requires 20 network switches.", "manual requirement persists after saving and reopening")
     check(str(lead.custom_next_follow_up_date) == "2026-11-01", "selected follow-up date persists on Lead")
     lead.custom_next_follow_up_date = None
     lead.save()

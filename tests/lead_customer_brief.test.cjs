@@ -8,13 +8,14 @@ const $=v=>typeof v==='string'?{prependTo:p=>({html:h=>{boxes[p===details?'detai
 const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ctx={URL,$,frappe:{model:{with_doctype:async()=>{}},get_meta:()=>({fields:["name","creation","ai_intent","subject","status","bsli_review_state","converted_lead","matched_lead","full_name","organization_name","email","phone","normalized_email","normalized_phone","transcript","source_url","country","ai_status","ai_confidence","ai_summary","ai_next_action","ai_processed_on","bsli_submission_ref","bsli_ai_result","bsli_ai_model","bsli_proposed_outcome","bsli_decision_reason","bsli_human_outcome","bsli_reviewed_by","bsli_reviewed_on","bsli_review_note"].map(fieldname=>({fieldname}))}),utils:{escape_html:escape},datetime:{str_to_user:s=>s},ui:{form:{on:(d,h)=>hooks=h}},call:async args=>{calls.push(args);let r=responses.shift();if(r instanceof Error)throw r;return r;}}};
 vm.createContext(ctx);vm.runInContext(code+'\nthis.brief=bsi_customer_brief;',ctx);
-let hidden=[];const frm={doc:{name:'LEAD1',company:'UAE',lead_name:'Person'},is_new:()=>false,wrapper:{},fields_dict:{bsi_ai_status:{df:{hidden:0}},bsi_ai_score:{df:{hidden:0}},bsi_rfq_value_estimate:{df:{hidden:0}},bsi_ai_section:{df:{}},bsi_intake_section:{df:{}},bsi_rfq_section:{df:{}}},toggle_display:(n,v)=>hidden.push([n,v])};
+let hidden=[];const frm={doc:{name:'LEAD1',company:'UAE',lead_name:'Person'},is_new:()=>false,wrapper:{},fields_dict:{custom_requirement:{df:{hidden:0}},bsi_ai_status:{df:{hidden:0}},bsi_ai_score:{df:{hidden:0}},bsi_rfq_value_estimate:{df:{hidden:0}},bsi_ai_section:{df:{}},bsi_intake_section:{df:{}},bsi_rfq_section:{df:{}}},toggle_display:(n,v)=>hidden.push([n,v])};
 let count=0;function check(ok,msg){assert.ok(ok,msg);count++;}
 const sale={name:'LI-SALES',converted_lead:'LEAD1',ai_status:'Completed',ai_confidence:95,ai_intent:'rfq',ai_summary:'20 switches <img src=x onerror=alert(1)>',full_name:'Customer',transcript:'original requirement',creation:'2026-10-16',source_url:'https://bitssecureit.com/ae/',bsli_review_state:'Awaiting Review',bsli_ai_result:JSON.stringify({summary:'real',products_or_services:['switches'],reasons:['quote'],risk_flags:['none'],customer_type:'end_user'})};
 (async()=>{
  responses.push({message:[sale]},{message:[{name:'LI-SUPPORT',matched_lead:'LEAD1',ai_intent:'support'},sale]});
  await ctx.brief.refresh(frm);
  check(boxes.details.includes('original requirement'),'Customer message in Details');
+ check(hidden.filter(([n])=>n==='custom_requirement').at(-1)[1]===false,'Website original requirement is not replaced by an editable field');
  check(boxes.ai.includes('original requirement'),'Customer message in AI tab');
  check(boxes.ai.includes('95%')&&boxes.ai.includes('Completed'),'Actual model confidence/status');
  check(boxes.ai.includes('Awaiting Review'),'Review independent of confidence');
@@ -50,12 +51,14 @@ const sale={name:'LI-SALES',converted_lead:'LEAD1',ai_status:'Completed',ai_conf
  responses.push({message:[sale]},{message:[sale]});await ctx.brief.refresh(frm);
  check(boxes.ai.includes('95%')&&!boxes.ai.includes('Recent linked enquiries'),'Refresh rebuilds from saved data');
  responses.push({message:[]},{message:[]});await ctx.brief.refresh(frm);
- check(boxes.details.includes('No website enquiry is linked'),'Manual/nonwebsite empty state');
+ check(boxes.ai.includes('No website enquiry is linked'),'Manual/nonwebsite empty state');
+ check(hidden.filter(([n])=>n==='custom_requirement').at(-1)[1]===true,'Manual saved Lead exposes editable requirement');
  responses.push(new Error('403'),{message:[]});await ctx.brief.refresh(frm);
  check(boxes.ai.includes('could not be loaded'),'Permission/network failure explicit, not blank');
  check(!boxes.ai.includes('403'),'No internal exception leaked');
  await ctx.brief.refresh({...frm,is_new:()=>true});
  check(calls.length===8,'Unsaved Lead makes no requests');
+ check(hidden.filter(([n])=>n==='custom_requirement').at(-1)[1]===true,'New Lead exposes editable requirement');
  check(!boxes.details&&!boxes.ai,'New Lead clears previous record brief');
  let resolveOriginal,resolveRecent;
  responses.push(new Promise(r=>resolveOriginal=r),new Promise(r=>resolveRecent=r));
