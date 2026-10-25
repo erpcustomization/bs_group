@@ -15,6 +15,12 @@ sys.modules[spec.name] = module
 spec.loader.exec_module(module)
 import bsgroup
 bsgroup.lead_lifecycle = module
+opp_spec = importlib.util.spec_from_file_location("bsgroup.utils.opportunity", root / "bsgroup/utils/opportunity.py")
+opp_module = importlib.util.module_from_spec(opp_spec)
+sys.modules[opp_spec.name] = opp_module
+opp_spec.loader.exec_module(opp_module)
+import bsgroup.utils
+bsgroup.utils.opportunity = opp_module
 original_get_hooks = frappe.get_hooks
 
 def hooks(hook=None, *args, **kwargs):
@@ -23,7 +29,7 @@ def hooks(hook=None, *args, **kwargs):
         result = dict(result)
         result["Lead"] = {"before_validate": ["bsgroup.lead_lifecycle.before_validate"], "validate": ["bsgroup.lead_lifecycle.validate"]}
         result["Opportunity"] = dict(result.get("Opportunity", {}))
-        result["Opportunity"]["before_insert"] = list(result["Opportunity"].get("before_insert", [])) + ["bsgroup.lead_lifecycle.guard_conversion"]
+        result["Opportunity"]["before_insert"] = list(result["Opportunity"].get("before_insert", [])) + ["bsgroup.lead_lifecycle.guard_conversion", "bsgroup.utils.opportunity.validate_creation_source"]
         result["Opportunity"]["after_delete"] = ["bsgroup.lead_lifecycle.opportunity_deleted"]
     return result
 frappe.get_hooks = hooks
@@ -43,6 +49,11 @@ def rejects(fn, name):
 
 try:
     module.setup()
+    for source, party in [("Prospect", "test"), ("Customer", ""), ("Customer", "__missing_customer__"), ("Lead", "__missing_lead__")]:
+        rejects(lambda source=source, party=party: opp_module.validate_creation_source(frappe._dict(opportunity_from=source, party_name=party)), "reject invalid new opportunity source " + source + ":" + party)
+    customer = frappe.get_doc({"doctype": "Customer", "customer_name": "Opportunity source test", "customer_type": "Company"}).insert()
+    opp_module.validate_creation_source(frappe._dict(opportunity_from="Customer", party_name=customer.name))
+    check(True, "existing customer accepted for manual opportunity")
     now = module.now_datetime()
     check(not module.overdue(now - timedelta(hours=24) + timedelta(seconds=1), now), "not delayed before 24 hours")
     check(module.overdue(now - timedelta(hours=24), now), "delayed at exactly 24 hours")
