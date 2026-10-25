@@ -213,20 +213,23 @@ const bsi_customer_brief = (() => {
         const name = frm.doc.name;
         mount(frm, '<h5>Customer enquiry and AI brief</h5><p role="status">Loading saved enquiry and analysis…</p>');
         try {
+            await frappe.model.with_doctype("Lead Intake");
+            const available = new Set(["name", "creation", ...frappe.get_meta("Lead Intake").fields.map(f => f.fieldname)]);
+            const present = fields => fields.filter(f => available.has(f));
             const query = {
                 method: "frappe.client.get_list",
                 args: {
                     doctype: "Lead Intake",
                     filters: { external_system: "website-form" },
                     or_filters: [["converted_lead", "=", name], ["matched_lead", "=", name]],
-                    fields: ["name", "creation", "ai_intent", "subject", "status", "bsli_review_state", "converted_lead", "matched_lead"],
+                    fields: present(["name", "creation", "ai_intent", "subject", "status", "bsli_review_state", "converted_lead", "matched_lead"]),
                     order_by: "creation desc", limit_page_length: 20
                 }
             };
-            const detailFields = ["name", "creation", "full_name", "organization_name", "email", "phone", "normalized_email", "normalized_phone",
+            const detailFields = present(["name", "creation", "full_name", "organization_name", "email", "phone", "normalized_email", "normalized_phone",
                         "subject", "transcript", "source_url", "country", "converted_lead", "matched_lead", "status", "ai_status", "ai_intent", "ai_confidence",
                         "ai_summary", "ai_next_action", "ai_processed_on", "bsli_submission_ref", "bsli_ai_result", "bsli_ai_model",
-                        "bsli_review_state", "bsli_proposed_outcome", "bsli_decision_reason", "bsli_human_outcome", "bsli_reviewed_by", "bsli_reviewed_on", "bsli_review_note"];
+                        "bsli_review_state", "bsli_proposed_outcome", "bsli_decision_reason", "bsli_human_outcome", "bsli_reviewed_by", "bsli_reviewed_on", "bsli_review_note"]);
             // Fetch the creating enquiry independently so later linked enquiries
             // cannot push it out of the bounded recent-history window.
             const originalQuery = { method: query.method, args: {
