@@ -8,22 +8,37 @@ const bsi_lead_lifecycle = (() => {
         const age = doc.creation ? moment().diff(frappe.datetime.convert_to_user_tz(doc.creation, false), 'hours', true) : 0;
         return doc.status === "Delayed" || (active.has(doc.status) && age >= 24) ? ["Delayed", "orange"] : ["Open", "blue"];
     }
-    async function convert(frm) {
-        if (frm.is_new() || frm.is_dirty()) {
-            frappe.msgprint(__("Save the Lead before converting it to an Opportunity."));
-            return;
-        }
-        return frappe.call({
-            method: "bsgroup.lead_lifecycle.make_opportunity", args: {source_name: frm.doc.name}, freeze: true,
-            callback(r) {
-                if (!r.exc && r.message) {
-                    r.message.sales_stage = "Proposal";
-                    r.message.custom_organization_name = frm.doc.company_name;
-                    frappe.model.sync(r.message);
-                    frappe.set_route("Form", r.message.doctype, r.message.name);
+    function convert(frm) {
+        return frappe.prompt([{fieldname:'subject',fieldtype:'Data',label:__('Opportunity subject'),reqd:1,
+            default:frm.doc.company_name || frm.doc.lead_name || ''}], async values => {
+            if (frm._bsi_converting) return;
+            frm._bsi_converting = true;
+            try {
+                if (frm.is_new() || frm.is_dirty()) await frm.save();
+                if (frm.is_new() || frm.is_dirty()) return;
+                const result = await frappe.call({method:'bsgroup.lead_lifecycle.confirm_opportunity',
+                    args:{source_name:frm.doc.name,subject:values.subject},freeze:true});
+                if (!result.exc && result.message) {
+                    await frm.reload_doc();
+                    frappe.show_alert({message:__('Opportunity created: {0}', [result.message]),indicator:'green'});
                 }
-            }
-        });
+            } finally { frm._bsi_converting = false; }
+        }, __('Convert to Opportunity'), __('OK'));
+    }
+    function followup(frm) {
+        const field = frm.fields_dict.custom_next_follow_up_date;
+        if (!field?.$wrapper?.[0]) return;
+        let button = field.$wrapper[0].parentElement.querySelector('.bsi-followup-ok');
+        if (!button) {
+            button = document.createElement('button');button.type='button';button.className='btn btn-primary btn-sm bsi-followup-ok';button.textContent=__('OK');
+            field.$wrapper[0].after(button);
+            button.addEventListener('click', async () => {
+                button.disabled=true;
+                try { await frm.save(); if (!frm.is_dirty()) { frm._bsi_saved_followup=frm.doc.custom_next_follow_up_date || ''; button.hidden=true; } }
+                finally {button.disabled=false;}
+            });
+        }
+        button.hidden=(frm.doc.custom_next_follow_up_date || '') === (frm._bsi_saved_followup || '') || !frm.perm?.some(p=>p.write);
     }
     let timer;
     function refresh(frm) {
@@ -43,34 +58,25 @@ const bsi_lead_lifecycle = (() => {
         const style = document.createElement('style');
         style.textContent = '.bsi-lead-outcome select{background-color:var(--primary,#1d5dcc);color:#fff;border:1px solid var(--primary,#1d5dcc);border-radius:8px;width:144px;min-height:34px;padding:6px 12px;font-weight:600;cursor:pointer}.bsi-lead-outcome select:disabled{opacity:.7;cursor:default}.bsi-lead-outcome option{background:#fff;color:var(--text-color,#15345c)}';
         box.append(style);
-        const badge = document.createElement('span'); badge.className = 'bsi-current-status'; badge.setAttribute('role','status'); badge.setAttribute('aria-live','polite'); badge.style.cssText = 'order:2;font-weight:600;font-size:13px;padding:4px 10px;border-radius:6px;white-space:nowrap'; box.append(badge);
-        const render = () => {
-            const [text, color] = display(frm.doc);
-            badge.textContent = __(frm.doc.status === 'Opportunity' ? 'Opportunity' : text);
-            const palette = {blue:['#1d5dcc','#edf3ff'],green:['#087f5b','#eaf7f1'],red:['#c92a2a','#fff0f0'],orange:['#a35b00','#fff5e5']};
-            badge.style.color = palette[color][0]; badge.style.backgroundColor = palette[color][1];
-            frm.page.set_indicator(__(text), color);
-        };
-        render();
-        clearInterval(timer);
-        timer = setInterval(() => {
-            if (document.body.dataset.route === 'Form/Lead/' + frm.doc.name) render();
-        }, 60000);
-
-        const select = document.createElement('select'); select.className = 'form-control'; select.setAttribute('aria-label', 'Set as');
-        select.style.setProperty('background-color', '#1d5dcc', 'important');
-        select.style.setProperty('color', '#fff', 'important');
-        select.style.setProperty('border-color', '#1d5dcc', 'important');
-        const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = __('Set as'); placeholder.disabled = true; placeholder.hidden = true; select.append(placeholder);
-        for (const [value, text] of [['open','Open'],['convert','Opportunity'],['drop','Dropped']]) {
-            const option = document.createElement('option'); option.value = value; option.textContent = __(text); select.append(option);
+        const label=document.createElement('label');label.textContent=__('Status');label.style.cssText='font-weight:600;margin:0';box.append(label);
+        const select=document.createElement('select');select.className='form-control bsi-current-status';select.setAttribute('aria-label','Status');
+        for (const [value,text] of [['open','Open'],['convert','Opportunity'],['drop','Dropped']]) {
+            const option=document.createElement('option');option.value=value;option.textContent=__(text);select.append(option);
         }
-        select.value = '';
-        select.disabled = !frm.perm?.some(p => p.write) || closed.has(frm.doc.status);
-        if (closed.has(frm.doc.status)) select.title = __('This Lead is closed through its existing sales document.');
+        const current=closed.has(frm.doc.status)?'convert':['Dropped','Do Not Contact'].includes(frm.doc.status)?'drop':'open';
+        select.value=current;
+        select.disabled=!frm.perm?.some(p=>p.write)||closed.has(frm.doc.status);
+        if (closed.has(frm.doc.status)) select.title=__('This Lead is closed through its existing sales document.');
         box.append(select);
+        const render=()=>{
+            const [text,color]=display(frm.doc);
+            const palette={blue:'#1d5dcc',green:'#087f5b',red:'#c92a2a',orange:'#a35b00'};
+            select.style.setProperty('background-color',palette[color],'important');select.style.setProperty('border-color',palette[color],'important');select.style.setProperty('color','#fff','important');
+            frm.page.set_indicator(__(text),color);
+        };
+        render();clearInterval(timer);timer=setInterval(()=>{if(document.body.dataset.route==='Form/Lead/'+frm.doc.name)render();},60000);
         select.addEventListener('change', async () => {
-            const action = select.value; select.value = '';
+            const action = select.value; select.value = current;
             if (action === 'convert') return convert(frm);
             if (action === 'open') {
                 await frm.set_value('status', 'Open');
@@ -82,14 +88,16 @@ const bsi_lead_lifecycle = (() => {
                     frm.add_child('notes', {note: frappe.utils.escape_html('Dropped: ' + reason), added_by: frappe.session.user, added_on: frappe.datetime.now_datetime()});
                     await frm.set_value('status', 'Dropped');
                     await frm.save();
-                }, __('Drop Lead'), __('Save as Dropped'));
+                }, __('Drop Lead'), __('OK'));
             }
         });
     }
-    return {refresh, convert, display};
+    return {refresh, convert, display, followup};
 })();
 
-frappe.ui.form.on("Lead", {refresh(frm) {
+frappe.ui.form.on("Lead", {custom_next_follow_up_date(frm) { bsi_lead_lifecycle.followup(frm); }, refresh(frm) {
+    frm._bsi_saved_followup=frm.doc.custom_next_follow_up_date || '';
+    bsi_lead_lifecycle.followup(frm);
     bsi_lead_lifecycle.refresh(frm);
     frm.page.remove_inner_button("Opportunity", "Create");
     if (!frm.is_new() && frm.perm?.some(p => p.write) && !["Opportunity", "Quotation", "Converted", "Lost Quotation", "Dropped", "Do Not Contact"].includes(frm.doc.status)) {

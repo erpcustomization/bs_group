@@ -141,3 +141,27 @@ def reopen_without_opportunity(name):
 def opportunity_deleted(doc, method=None):
     if doc.opportunity_from == "Lead" and doc.party_name:
         reopen_without_opportunity(doc.party_name)
+
+
+@frappe.whitelist()
+def confirm_opportunity(source_name, subject):
+    """Create one real Opportunity only after the salesperson confirms OK."""
+    lead = frappe.get_doc("Lead", source_name)
+    lead.check_permission("write")
+    subject = (subject or "").strip()
+    if not subject:
+        frappe.throw(_("Enter an Opportunity subject."))
+    # Serialize confirmations for this Lead so repeat clicks cannot create duplicates.
+    frappe.db.sql("SELECT name FROM `tabLead` WHERE name=%s FOR UPDATE", source_name)
+    opportunity = make_opportunity(source_name)
+    opportunity.company = lead.company
+    if not opportunity.currency and lead.company:
+        opportunity.currency = frappe.db.get_value("Company", lead.company, "default_currency")
+    if opportunity.meta.has_field("custom_subject"):
+        opportunity.custom_subject = subject
+    if opportunity.meta.has_field("custom_organization_name"):
+        opportunity.custom_organization_name = lead.company_name
+    if frappe.db.exists("Sales Stage", "Proposal"):
+        opportunity.sales_stage = "Proposal"
+    opportunity.insert()
+    return opportunity.name
