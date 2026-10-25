@@ -11,7 +11,7 @@
         root.classList.add('bsi-lead-list-colors');
         if (!root.querySelector('.bsi-lead-status-style')) {
             const style = document.createElement('style'); style.className = 'bsi-lead-status-style';
-            const colors = {blue:['#ddd6fe','#5b21b6','#a78bfa'],green:['#087f5b','#ffffff','#087f5b'],red:['#c92a2a','#ffffff','#c92a2a'],orange:['#a35b00','#ffffff','#a35b00']};
+            const colors = {blue:['#ddd6fe','#5b21b6','#a78bfa'],green:['#087f5b','#ffffff','#087f5b'],red:['#c92a2a','#ffffff','#c92a2a'],orange:['#a35b00','#ffffff','#a35b00'],amber:['#a35b00','#ffffff','#a35b00']};
             style.textContent = Object.entries(colors).map(([color,[bg,text,border]]) =>
                 `.bsi-lead-list-colors .es-badge[data-filter^="status,"][data-theme="${color}"],.bsi-lead-list-colors .indicator-pill.${color}[data-filter^="status,"]{background:${bg}!important;color:${text}!important;border:1px solid ${border}!important}.bsi-lead-list-colors .es-badge[data-filter^="status,"][data-theme="${color}"] .es-badge__label{color:${text}!important}`
             ).join('');
