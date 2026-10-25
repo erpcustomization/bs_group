@@ -34,12 +34,16 @@ const bsi_lead_lifecycle = (() => {
         let box = frm.wrapper.querySelector?.('.bsi-lead-outcome') || frm.wrapper[0]?.querySelector('.bsi-lead-outcome');
         if (!box) {
             box = document.createElement('div'); box.className = 'bsi-lead-outcome';
-            const host = frm.fields_dict.custom_bsi_status_controls?.$wrapper?.[0];
-            if (host) host.append(box); else statusField.$wrapper[0].after(box);
+            const root = frm.wrapper[0] || frm.wrapper;
+            const host = root.querySelector('#lead-__details') || root.querySelector('.tab-pane');
+            if (host) host.prepend(box); else statusField.$wrapper[0].after(box);
         }
         box.replaceChildren();
-        const label = document.createElement('label'); label.className = 'control-label'; label.textContent = __('Status'); box.append(label);
-        const badge = document.createElement('div'); badge.style.marginBottom = '6px'; box.append(badge);
+        box.style.cssText = 'display:flex;justify-content:flex-end;padding:8px 0;';
+        const style = document.createElement('style');
+        style.textContent = '#lead-custom_bsi_status_tab-tab,#lead-custom_bsi_status_tab{display:none!important}.bsi-lead-outcome select{background-color:var(--primary,#1d5dcc);color:#fff;border:1px solid var(--primary,#1d5dcc);border-radius:8px;width:144px;min-height:34px;padding:6px 12px;font-weight:600;cursor:pointer}.bsi-lead-outcome select:disabled{opacity:.7;cursor:default}.bsi-lead-outcome option{background:#fff;color:var(--text-color,#15345c)}';
+        box.append(style);
+        const badge = document.createElement('div'); badge.style.display = 'none'; box.append(badge);
         const render = () => {
             const [text, color] = display(frm.doc);
             badge.innerHTML = '<span class="indicator-pill ' + color + '">' + frappe.utils.escape_html(__(text)) + '</span>';
@@ -51,17 +55,17 @@ const bsi_lead_lifecycle = (() => {
             if (document.body.dataset.route === 'Form/Lead/' + frm.doc.name) render();
         }, 60000);
 
-        const select = document.createElement('select'); select.className = 'form-control'; select.setAttribute('aria-label', 'Status');
+        const select = document.createElement('select'); select.className = 'form-control'; select.setAttribute('aria-label', 'Set as');
+        const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = __('Set as'); placeholder.disabled = true; placeholder.hidden = true; select.append(placeholder);
         for (const [value, text] of [['open','Open'],['convert','Opportunity'],['drop','Dropped']]) {
             const option = document.createElement('option'); option.value = value; option.textContent = __(text); select.append(option);
         }
-        const selected = closed.has(frm.doc.status) ? 'convert' : ['Dropped','Do Not Contact'].includes(frm.doc.status) ? 'drop' : 'open';
-        select.value = selected;
+        select.value = '';
         select.disabled = !frm.perm?.some(p => p.write) || closed.has(frm.doc.status);
         if (closed.has(frm.doc.status)) select.title = __('This Lead is closed through its existing sales document.');
         box.append(select);
         select.addEventListener('change', async () => {
-            const action = select.value; select.value = selected;
+            const action = select.value; select.value = '';
             if (action === 'convert') return convert(frm);
             if (action === 'open') {
                 await frm.set_value('status', 'Open');

@@ -149,8 +149,6 @@ const bsi_customer_brief = (() => {
             item("Landing page", safe_url(doc.source_url)),
             item("Receiving company", text(lead.company)),
             item("Country recorded on enquiry", text(doc.country)),
-            item("Review status", text(doc.bsli_review_state)),
-            item("Review result", text(doc.bsli_human_outcome ? words(doc.bsli_human_outcome) : null)),
             item("AI classification", text(ai.verdict ? words(ai.verdict) : null)),
             item("Source", text("Website enquiry")),
             item("Enquiry record", route("lead-intake", doc.name))
