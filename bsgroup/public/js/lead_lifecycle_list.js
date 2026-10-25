@@ -12,6 +12,29 @@
             return `<a class="ellipsis" data-doctype="Lead" data-name="${name}" href="/desk/lead/${encodeURIComponent(doc.name)}" title="${label}">${label}</a>`;
         };
     }
+    const ownerLabels = {};
+    const nativeRefresh = settings.refresh;
+    settings.refresh = function(listview) {
+        nativeRefresh?.call(this, listview);
+        const missing = (listview.data || []).filter(doc => doc.lead_owner && !ownerLabels[doc.lead_owner]);
+        if (!missing.length || listview._bsi_owner_labels_loading) return;
+        listview._bsi_owner_labels_loading = true;
+        frappe.call({method: 'bsgroup.lead_lifecycle.list_owner_labels',
+            args: {names: missing.map(doc => doc.name)},
+            callback: result => {
+                Object.assign(ownerLabels, result.message || {});
+                const root = listview.page.wrapper[0] || listview.page.wrapper;
+                root.querySelectorAll('.bsi-lead-owner').forEach(badge => {
+                    const label = ownerLabels[badge.dataset.leadOwner];
+                    if (!label) return;
+                    badge.textContent = label.initial;
+                    badge.title = __('Lead Owner') + ': ' + label.full_name;
+                    badge.setAttribute('aria-label', badge.title);
+                });
+            },
+            always: () => { listview._bsi_owner_labels_loading = false; }
+        });
+    };
     const nativeOnload = settings.onload;
     settings.onload = function(listview) {
         nativeOnload?.call(this, listview);
@@ -51,10 +74,12 @@
                 const comment = holder.querySelector('.comment-count');
                 if (comment) {
                     const owner = doc.lead_owner;
-                    const fullName = owner && frappe.boot.user_info?.[owner]?.fullname;
+                    const label = ownerLabels[owner];
+                    const fullName = label?.full_name || (owner && frappe.boot.user_info?.[owner]?.fullname);
                     const badge = document.createElement('span');
                     badge.className = 'bsi-lead-owner';
-                    badge.textContent = fullName ? Array.from(fullName.trim())[0].toLocaleUpperCase() : (owner ? '?' : '—');
+                    badge.dataset.leadOwner = owner || '';
+                    badge.textContent = label?.initial || (owner ? '?' : '—');
                     badge.title = owner ? __('Lead Owner') + ': ' + (fullName || owner) : __('Lead Owner not set');
                     badge.setAttribute('aria-label', badge.title);
                     comment.replaceWith(badge);

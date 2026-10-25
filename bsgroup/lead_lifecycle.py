@@ -181,3 +181,20 @@ def confirm_opportunity(source_name, subject):
         opportunity.sales_stage = "Proposal"
     opportunity.insert()
     return opportunity.name
+
+
+@frappe.whitelist()
+def list_owner_labels(names):
+    """Return profile labels only for owners of Leads the caller can read."""
+    names = frappe.parse_json(names)
+    if not isinstance(names, list) or len(names) > 2500:
+        frappe.throw(_("Invalid Lead list."))
+    leads = frappe.get_list("Lead", filters={"name": ["in", names]},
+                            fields=["lead_owner"], limit_page_length=len(names)) if names else []
+    owners = list({row.lead_owner for row in leads if row.lead_owner})
+    if not owners:
+        return {}
+    users = frappe.get_all("User", filters={"name": ["in", owners]},
+                           fields=["name", "first_name", "full_name"])
+    return {row.name: {"initial": (row.first_name or "").strip()[:1].upper() or "?",
+                       "full_name": row.full_name or row.name} for row in users}
