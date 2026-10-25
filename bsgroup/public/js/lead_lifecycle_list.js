@@ -1,7 +1,7 @@
 // Preserve native list actions and links; replace only the visible lifecycle indicator.
 (() => {
     const settings = frappe.listview_settings.Lead || (frappe.listview_settings.Lead = {});
-    settings.add_fields = [...new Set([...(settings.add_fields || []), "status", "creation"])];
+    settings.add_fields = [...new Set([...(settings.add_fields || []), "status", "creation", "lead_owner"])];
     const active = ["Lead", "Open", "Replied", "Interested", "Delayed"];
     const closed = ["Opportunity", "Quotation", "Converted", "Lost Quotation"];
     settings.formatters = {...(settings.formatters || {})};
@@ -30,6 +30,7 @@
             style.textContent += '.bsi-lead-list-colors .list-row-activity .modified{min-width:82px!important;width:82px!important;flex:0 0 82px!important;white-space:nowrap}.bsi-lead-list-colors .bsi-lead-date{font-variant-numeric:tabular-nums}';
             style.textContent += '.bsi-lead-list-colors .page-actions .view-switcher,.bsi-lead-list-colors .page-actions .page-icon-group,.bsi-lead-list-colors .page-actions .menu-btn-group{display:none!important}';
             style.textContent += '.bsi-lead-list-colors .bsi-lead-header-filter{display:inline-flex!important;align-items:center;justify-content:center;width:34px;height:34px;padding:0!important;border-radius:8px!important;margin-right:8px}.bsi-lead-list-colors .bsi-lead-header-filter .button-label{display:none!important}.bsi-lead-list-colors .bsi-lead-header-filter .filter-icon{margin:0!important}.bsi-lead-list-colors.bsi-filter-in-header .list-page-form{display:none!important}';
+            style.textContent += '.bsi-lead-list-colors .bsi-lead-owner{display:inline-flex;align-items:center;justify-content:center;flex:0 0 26px;width:26px;height:26px;border-radius:50%;background:#eef3fb;color:#12335f;font-size:12px;font-weight:600;border:1px solid #dfe7f2}';
             root.append(style);
         }
 
@@ -47,6 +48,18 @@
                     node.classList.add('bsi-lead-date');
                     node.setAttribute('aria-label', __('Last updated') + ': ' + node.textContent);
                 });
+                const comment = holder.querySelector('.comment-count');
+                if (comment) {
+                    const owner = doc.lead_owner;
+                    const fullName = owner && frappe.boot.user_info?.[owner]?.fullname;
+                    const badge = document.createElement('span');
+                    badge.className = 'bsi-lead-owner';
+                    badge.textContent = fullName ? Array.from(fullName.trim())[0].toLocaleUpperCase() : (owner ? '?' : '—');
+                    badge.title = owner ? __('Lead Owner') + ': ' + (fullName || owner) : __('Lead Owner not set');
+                    badge.setAttribute('aria-label', badge.title);
+                    comment.replaceWith(badge);
+                    holder.querySelectorAll('.list-row-activity > .mx-2').forEach(node => node.remove());
+                }
                 return holder.innerHTML;
             };
             listview._bsi_absolute_dates = true;
