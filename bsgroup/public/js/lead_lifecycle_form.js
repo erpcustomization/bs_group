@@ -56,9 +56,9 @@ const bsi_lead_lifecycle = (() => {
         }, 60000);
 
         const select = document.createElement('select'); select.className = 'form-control'; select.setAttribute('aria-label', 'Set as');
-        select.style.setProperty('background-color', 'var(--primary,#1d5dcc)', 'important');
+        select.style.setProperty('background-color', '#1d5dcc', 'important');
         select.style.setProperty('color', '#fff', 'important');
-        select.style.setProperty('border-color', 'var(--primary,#1d5dcc)', 'important');
+        select.style.setProperty('border-color', '#1d5dcc', 'important');
         const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = __('Set as'); placeholder.disabled = true; placeholder.hidden = true; select.append(placeholder);
         for (const [value, text] of [['open','Open'],['convert','Opportunity'],['drop','Dropped']]) {
             const option = document.createElement('option'); option.value = value; option.textContent = __(text); select.append(option);
