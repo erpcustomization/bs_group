@@ -28,6 +28,7 @@
             style.textContent += '.bsi-lead-list-colors .standard-filter-section{display:none!important}.bsi-lead-list-colors .list-page-form{display:flex!important;justify-content:flex-end;align-items:center;gap:10px}.bsi-lead-list-colors .filter-section{margin-left:0!important;border-left:0!important;padding-left:0!important}';
             style.textContent += '.bsi-lead-list-colors .list-liked-by-me,.bsi-lead-list-colors .list-row-like{display:none!important}';
             style.textContent += '.bsi-lead-list-colors .list-row-activity .modified{min-width:82px!important;width:82px!important;flex:0 0 82px!important;white-space:nowrap}.bsi-lead-list-colors .bsi-lead-date{font-variant-numeric:tabular-nums}';
+            style.textContent += '.bsi-lead-list-colors .page-actions .view-switcher,.bsi-lead-list-colors .page-actions .page-icon-group,.bsi-lead-list-colors .page-actions .menu-btn-group{display:none!important}';
             root.append(style);
         }
 
