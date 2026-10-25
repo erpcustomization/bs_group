@@ -641,3 +641,7 @@ for _dt, _event, _method in (
     doc_events[_dt][_event] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.lead_lifecycle." + _method]
 scheduler_events.setdefault("cron", {}).setdefault("* * * * *", []).append("bsgroup.lead_lifecycle.mark_delayed")
 after_migrate.append("bsgroup.lead_lifecycle.setup")
+
+# Current Lead presentation; keep the lifecycle and native ERPNext handlers intact.
+doctype_js["Lead"] = ["public/js/lead_details.js" if p == "public/js/Lead.js" else p for p in doctype_js["Lead"]]
+doc_events["Lead"]["onload"] = ["bsgroup.lead_lifecycle.load_responsibility"]
