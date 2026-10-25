@@ -50,6 +50,34 @@
             };
             listview._bsi_absolute_dates = true;
         }
+        // Reparent the native sorter so its handlers and saved order stay intact.
+        const sorter = root.querySelector('.sort-selector');
+        const filterButton = root.querySelector('.filter-button');
+        if (sorter && filterButton && !listview._bsi_sort_in_filter) {
+            const home = document.createElement('div');
+            home.hidden = true;
+            sorter.before(home);
+            home.append(sorter);
+            $(filterButton).on('shown.bs.popover.bsi_lead_sort', () => {
+                const popover = document.getElementById(filterButton.getAttribute('aria-describedby'));
+                const body = popover?.querySelector('.popover-body');
+                if (!body) return;
+                let row = body.querySelector('.bsi-lead-filter-sort');
+                if (!row) {
+                    row = document.createElement('div');
+                    row.className = 'bsi-lead-filter-sort';
+                    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 0 12px;margin:0 0 12px;border-bottom:1px solid #dfe7f2';
+                    const label = document.createElement('span');
+                    label.textContent = __('Sort by');
+                    row.append(label);
+                    body.prepend(row);
+                }
+                row.append(sorter);
+                $(filterButton).popover('update');
+            });
+            $(filterButton).on('hide.bs.popover.bsi_lead_sort', () => home.append(sorter));
+            listview._bsi_sort_in_filter = true;
+        }
         const field = listview.page.fields_dict.status;
         if (field) {
             field.df.options = "\nOpen\nDelayed\nOpportunity\nDropped";
