@@ -38,6 +38,9 @@ def execute():
     make_property_setter("Opportunity", "custom_presales_required", "insert_after", "custom_site_survey_needed", "Data")
     make_property_setter("Opportunity", "sales_stage", "reqd", 0, "Check")
     make_property_setter("Opportunity", "sales_stage", "hidden", 1, "Check")
+    make_property_setter("Opportunity", "contact_info", "label", "Additional details", "Data")
+    for tab in ("items_section", "activities_tab", "notes_tab", "dashboard_tab"):
+        make_property_setter("Opportunity", tab, "fieldtype", "Section Break", "Data")
     options = (frappe.get_meta("Presales Request").get_field("status").options or "").splitlines()
     for status in (WAITING, RECEIVED):
         if status not in options:
