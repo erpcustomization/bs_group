@@ -1,6 +1,7 @@
 (() => {
     const fields = ['custom_survey_instructions','custom_survey_location','custom_survey_contact_phone'];
     const selected = d => d.custom_presales_required && (d.custom_elv_site_survey_required || d.custom_technical_site_survey_required);
+    const entered = field => String(field?.$wrapper?.[0]?.querySelector('input,textarea')?.value ?? field?.get_value?.() ?? '').trim();
     function render(frm) {
         if (!frm.fields_dict.custom_survey_step) return;
         const active = !!selected(frm.doc), sent = !!frm.doc.custom_site_survey_request;
@@ -23,11 +24,13 @@
                 button.className = 'btn btn-primary btn-sm bsi-survey-step-ok';
                 button.textContent = __('OK');
                 button.style.marginTop = '7px';
-                button.addEventListener('click', async () => {
+                wrapper.append(button);
+            }
+                button.onclick = async () => {
                     if (frm._saving_survey_step || frm.doc.custom_site_survey_request) return;
-                    const value = String(field.get_value() || '').trim();
+                    const value = entered(field);
                     if (!value) { field.set_focus(); return; }
-                    const contactName = String(contact?.get_value() || '').trim();
+                    const contactName = entered(contact);
                     if (index === 2 && !contactName) {
                         frappe.msgprint(__('Enter the contact person name.'));
                         contact?.set_focus();
@@ -62,19 +65,17 @@
                         button.disabled = false;
                         render(frm);
                     }
-                });
-                wrapper.append(button);
-            }
+                };
             // Controls hidden by depends_on may create/recreate their input only
             // when revealed. Listen on the persistent wrapper, not that input.
             const updateButton = () => {
-                button.hidden = !selected(frm.doc) || !!frm.doc.custom_site_survey_request || !String(field.get_value() || '').trim()
-                    || (index === 2 && !String(contact?.get_value() || '').trim());
+                button.hidden = !selected(frm.doc) || !!frm.doc.custom_site_survey_request || !entered(field)
+                    || (index === 2 && !entered(contact));
             };
             field.$wrapper.off('input.bsi_survey').on('input.bsi_survey','input,textarea',updateButton);
             if (index === 2 && contact) contact.$wrapper.off('input.bsi_survey_contact').on('input.bsi_survey_contact','input,textarea',updateButton);
-            button.hidden = !active || sent || step !== index || !String(field.get_value() || '').trim();
-            if (index === 2 && !String(contact?.get_value() || '').trim()) button.hidden = true;
+            button.hidden = !active || sent || step !== index || !entered(field);
+            if (index === 2 && !entered(contact)) button.hidden = true;
             button.disabled = !!frm._saving_survey_step;
         });
     }
