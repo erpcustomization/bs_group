@@ -58,7 +58,7 @@
         row.hidden = !frm.is_new() || !ready(frm);
         // Hidden must override the inline flex display as well.
         row.style.display = row.hidden ? 'none' : 'flex';
-        if (frm.is_new()) frm.page.hide_primary_action();
+        if (frm.is_new()) frm.page.clear_primary_action();
     }
     frappe.ui.form.on('Opportunity',{
         refresh(frm) {
