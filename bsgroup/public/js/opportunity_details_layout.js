@@ -13,8 +13,7 @@
                 box = document.createElement('div');
                 box.className = 'bsi-opportunity-enquiry';
                 box.style.cssText = 'background:#fff;border:1px solid #dfe7f2;border-radius:10px;padding:12px 14px;margin:0 0 10px;width:100%;box-shadow:0 2px 7px rgba(18,51,95,.045)';
-                const status = details.querySelector('.bsi-opportunity-status');
-                if (status) status.after(box); else details.prepend(box);
+                details.append(box);
             }
             if (enquiry.parentElement !== box) box.append(enquiry);
             enquiry.style.marginBottom = '0';
