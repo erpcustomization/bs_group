@@ -329,30 +329,6 @@ const bsi_lead_focus = (() => {
         customer.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:4px 12px';
         const follow = card(details, 'bsi-follow-card', 'Next follow-up date');
         const notes = card(details, 'bsi-notes-card', 'Notes');
-        // Contextual confirmations use native save, including permissions and validation.
-        const saveHosts = [customer.parentElement, requirement.parentElement, extra];
-        for (const host of saveHosts) {
-            let ok = host.querySelector(':scope > .bsi-section-ok');
-            if (!ok) {
-                ok = document.createElement('button'); ok.type = 'button';
-                ok.className = 'btn btn-primary btn-sm bsi-section-ok'; ok.textContent = __('OK');
-                ok.addEventListener('click', async () => {
-                    ok.disabled = true;
-                    try { await frm.save(); updateSaveButtons(); }
-                    finally { ok.disabled = false; }
-                });
-                host.append(ok);
-            }
-        }
-        function updateSaveButtons() {
-            const visible = !!frm.perm?.some(p => p.write || (frm.is_new() && p.create)) && !!frm.is_dirty?.();
-            for (const host of saveHosts) host.querySelector(':scope > .bsi-section-ok').hidden = !visible;
-        }
-        updateSaveButtons();
-        if (frm.$wrapper?.off) {
-            frm.$wrapper.off('dirty.bsi_section_ok').on('dirty.bsi_section_ok', updateSaveButtons);
-        }
-
         let followNotes = details.querySelector('.bsi-follow-notes');
         if (!followNotes) {
             followNotes = document.createElement('div'); followNotes.className = 'bsi-follow-notes';
@@ -364,23 +340,9 @@ const bsi_lead_focus = (() => {
             composer = document.createElement('div'); composer.className = 'bsi-note-composer';
             const input = document.createElement('textarea'); input.className = 'form-control';
             input.placeholder = __('Write a note'); input.setAttribute('aria-label', __('New note')); input.rows = 2;
-            const ok = document.createElement('button'); ok.type = 'button'; ok.className = 'btn btn-primary btn-sm';
-            ok.textContent = __('OK'); ok.hidden = true;
-            input.addEventListener('input', () => { ok.hidden = !input.value.trim(); });
-            ok.addEventListener('click', async () => {
-                const value = input.value.trim(); if (!value || ok.disabled) return;
-                ok.disabled = true;
-                try {
-                    if (frm.is_new() || frm.is_dirty()) await frm.save();
-                    if (frm.is_new() || frm.is_dirty()) return;
-                    const result = await frappe.call({method:'add_note', doc:frm.doc,
-                        args:{note:frappe.utils.escape_html(value).replace(/\n/g, '<br>')}, freeze:true});
-                    if (!result.exc) { input.value = ''; ok.hidden = true; await frm.reload_doc(); }
-                } finally { ok.disabled = false; }
-            });
-            composer.append(input, ok); notes.prepend(composer);
+            composer.append(input); notes.prepend(composer);
         }
-        composer.hidden = !frm.perm?.some(p => p.write);
+        composer.hidden = !frm.perm?.some(p => p.write || (frm.is_new() && p.create));
 
         // Move whole native sections first, retaining section dependencies and controls.
         for (const tab of tabs) {

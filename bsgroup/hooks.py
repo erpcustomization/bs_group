@@ -669,6 +669,7 @@ doctype_list_js["Opportunity"].append("public/js/opportunity_progress_list.js")
 doctype_js["Opportunity"].append("public/js/opportunity_details_layout.js")
 doctype_js["Opportunity"].append("public/js/opportunity_survey_steps.js")
 doctype_js["Opportunity"].append("public/js/opportunity_submit.js")
+doctype_js["Lead"].append("public/js/lead_submit.js")
 doctype_list_js["Opportunity"].append("public/js/opportunity_progress_filter.js")
 for _sales_doctype in ("Lead", "Opportunity"):
     doctype_list_js[_sales_doctype].append("public/js/sales_filter_popup.js")

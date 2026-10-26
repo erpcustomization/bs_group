@@ -4,6 +4,9 @@ from frappe import _
 from frappe.utils import cint, flt
 
 FIELDS = ("custom_business_type", "custom_service_type", "custom_service_survey", "custom_service_details", "custom_installation_type", "custom_camera_count", "custom_site_survey_needed")
+ADDITIONAL_SOLUTIONS = ("Networking & Security", "Structured Cabling & Fiber", "Unified Communications & Intercom", "IT Infrastructure - Multi Solution")
+SERVICE_TYPES = ("CCTV", "3CX", "ELV", *ADDITIONAL_SOLUTIONS)
+INSTALLATION_TYPES = ("CCTV", "3CX", "Networking", "Other", *ADDITIONAL_SOLUTIONS)
 
 
 def no_presales(doc):
@@ -20,15 +23,15 @@ def validate(doc, method=None):
     if kind not in ("Supply", "Service", "Supply and Installation"):
         frappe.throw(_("Choose Supply, Service or Supply and Installation."))
     if kind == "Service":
-        if doc.get("custom_service_type") not in ("CCTV", "3CX", "ELV"):
-            frappe.throw(_("Choose CCTV, 3CX or ELV as the Service Type."))
+        if doc.get("custom_service_type") not in SERVICE_TYPES:
+            frappe.throw(_("Choose a Service Type."))
         if doc.get("custom_service_survey") not in ("Site Survey by ELV", "Site Survey by Technical Team", "No Site Survey Required"):
             frappe.throw(_("Choose the service site survey requirement."))
         if doc.get("custom_service_survey") == "No Site Survey Required" and not (doc.get("custom_service_details") or "").strip():
             frappe.throw(_("Enter the service details."))
     if kind == "Supply and Installation":
-        if doc.get("custom_installation_type") not in ("CCTV", "3CX", "Networking", "Other"):
-            frappe.throw(_("Choose CCTV, 3CX, Networking or Other."))
+        if doc.get("custom_installation_type") not in INSTALLATION_TYPES:
+            frappe.throw(_("Choose an Installation Type."))
         if doc.custom_installation_type == "CCTV":
             count = flt(doc.get("custom_camera_count"))
             if count <= 0 or count != int(count):
