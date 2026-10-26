@@ -37,6 +37,7 @@
         for (const field of ['expected_closing', 'probability', 'opportunity_owner']) {
             frm.set_df_property(field, 'hidden', 1);
         }
+        frm.set_df_property('opportunity_from', 'hidden', d.opportunity_from === 'Customer');
         if (!frm.fields_dict.custom_business_type) return;
         const cctv = isCctv(d), small = cctv && d.custom_camera_count > 0 && d.custom_camera_count < 30;
         const blocked = d.custom_business_type === 'Supply' || small;
@@ -71,6 +72,9 @@
         },
         refresh(frm) { positionStatus(frm); return update(frm); },
         status(frm) { positionStatus(frm); },
+        opportunity_from(frm) {
+            frm.set_df_property('opportunity_from', 'hidden', frm.doc.opportunity_from === 'Customer');
+        },
         async custom_business_type(frm) {
             if (!frm.doc.custom_site_survey_request) await frm.set_value({custom_service_type: '', custom_installation_type: '', custom_camera_count: 0, custom_site_survey_needed: '', custom_presales_required: 0, custom_elv_site_survey_required: 0, custom_technical_site_survey_required: 0});
             await update(frm);
