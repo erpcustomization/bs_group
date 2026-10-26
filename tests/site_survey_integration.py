@@ -51,7 +51,7 @@ try:
             opportunity_amount=1234, company=company, currency=frappe.db.get_value("Company", company, "default_currency"),
             opportunity_owner="Administrator", sales_stage=frappe.db.get_value("Sales Stage", {}, "name"), custom_subject="Survey fixture", custom_organization_name=customer.customer_name,
             custom_presales_required=1, custom_elv_site_survey_required=elv, custom_technical_site_survey_required=technical,
-            **dict(dict(custom_business_type='Service',custom_service_type='New Service Opportunity'), **intake))).insert()
+            **dict(dict(custom_business_type='Supply and Installation',custom_installation_type='Other'), **intake))).insert()
     plain = opportunity()
     check(not plain.custom_site_survey_request, "no survey without survey options")
     for elv, tech in ((1,0), (0,1), (1,1)):
@@ -87,7 +87,21 @@ try:
     check(site_survey.survey_permission(survey, user="Guest") is False, "unrelated direct access denied")
     for kind in ('', 'Invalid'):
         rejects(lambda: opportunity(custom_business_type=kind), "category mandatory "+kind)
-    rejects(lambda: opportunity(custom_service_type=''), "service subtype mandatory")
+    rejects(lambda: opportunity(custom_business_type='Service',custom_service_type=''), "service subtype mandatory")
+    for service_type in ('CCTV', '3CX', 'ELV'):
+        for decision, expected in (('Site Survey by ELV',(1,0)), ('Site Survey by Technical Team',(0,1)), ('No Site Survey Required',(0,0))):
+            service = opportunity(custom_business_type='Service', custom_service_type=service_type,
+                custom_service_survey=decision, custom_service_details='Maintain the existing customer system.')
+            check((service.custom_elv_site_survey_required,service.custom_technical_site_survey_required)==expected, 'service team routing '+service_type+decision)
+            check(bool(service.custom_site_survey_request)==any(expected), 'service survey creation '+decision)
+            if any(expected):
+                request = frappe.get_doc('Site Survey Request',service.custom_site_survey_request)
+                check(request.custom_service_details==service.custom_service_details, 'service requirement reaches Projects')
+                check(frappe.db.get_value('Presales Request', request.presales_request, 'custom_service_details')==service.custom_service_details, 'service requirement reaches Presales')
+                service.reload().save()
+                check(frappe.db.count('Site Survey Request', {'opportunity':service.name})==1, 'service repeat save does not duplicate')
+    rejects(lambda: opportunity(custom_business_type='Service',custom_service_type='CCTV'), 'service survey decision mandatory')
+    rejects(lambda: opportunity(custom_business_type='Service',custom_service_type='CCTV',custom_service_survey='No Site Survey Required'), 'service details mandatory without survey')
     for category in ('CCTV', '3CX', 'Networking', 'Other'):
         if category == 'CCTV':
             for number in (0, -1):
