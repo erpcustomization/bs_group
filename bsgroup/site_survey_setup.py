@@ -11,6 +11,7 @@ def execute():
     frappe.reload_doc("bs_group", "doctype", "site_survey_request", force=True)
     create_custom_fields({
         "Opportunity": [
+            dict(fieldname="custom_enquiry", label="Enquiry", fieldtype="Text", insert_after="custom_subject"),
             dict(fieldname="custom_business_type", label="Supply / Service", fieldtype="Select", options="\nSupply\nService\nSupply and Installation", insert_after="sales_stage", mandatory_depends_on="eval:doc.__islocal || doc.custom_business_type"),
             dict(fieldname="custom_service_type", label="Service Type", fieldtype="Select", options="\nCCTV\n3CX\nELV", insert_after="custom_business_type", depends_on="eval:doc.custom_business_type === 'Service'", mandatory_depends_on="eval:doc.custom_business_type === 'Service'"),
             dict(fieldname="custom_service_survey", label="Site Survey Requirement", fieldtype="Select", options="\nSite Survey by ELV\nSite Survey by Technical Team\nNo Site Survey Required", insert_after="custom_service_type", depends_on="eval:doc.custom_business_type === 'Service' && ['CCTV','3CX','ELV'].includes(doc.custom_service_type)", mandatory_depends_on="eval:doc.custom_business_type === 'Service'"),
