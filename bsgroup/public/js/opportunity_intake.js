@@ -34,7 +34,7 @@
     const isCctv = d => d.custom_business_type === 'Supply and Installation' && d.custom_installation_type === 'CCTV';
     async function update(frm, notify = false) {
         const d = frm.doc;
-        for (const field of ['expected_closing', 'probability']) {
+        for (const field of ['expected_closing', 'probability', 'opportunity_owner']) {
             frm.set_df_property(field, 'hidden', 1);
         }
         if (!frm.fields_dict.custom_business_type) return;
