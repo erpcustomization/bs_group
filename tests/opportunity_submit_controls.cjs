@@ -7,6 +7,9 @@ const frm={wrapper:root,doc:{custom_business_type:'Supply',party_name:'Customer'
   async save(){saveCount++;await new Promise(resolve=>{releaseSave=resolve;});newRecord=false;}
 };
 for(const name of ['custom_business_type','party_name','custom_subject','opportunity_amount'])frm.fields_dict[name]={df:{fieldname:name,fieldtype:'Data',reqd:1},get_value:()=>frm.doc[name]};
+frm.doc.opportunity_from='Customer';
+frm.fields_dict.opportunity_from={df:{fieldname:'opportunity_from',fieldtype:'Select',reqd:1,hidden:1},get_value:()=>'',get_status:()=> 'None'};
+frm.fields_dict.inactive_required={df:{fieldname:'inactive_required',fieldtype:'Data',reqd:1},get_value:()=>'',get_status:()=> 'None'};
 const jq={off(){return this;},on(){return this;}};
 vm.runInNewContext(fs.readFileSync(require('path').join(__dirname,'../bsgroup/public/js/opportunity_submit.js'),'utf8'),{
   document:{createElement(){return {style:{},listeners:{},append(child){this.button=child;},addEventListener(event,fn){this.listeners[event]=fn;}};}},
