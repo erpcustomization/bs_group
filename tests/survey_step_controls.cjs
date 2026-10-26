@@ -2,7 +2,7 @@ const fs = require('fs'), vm = require('vm'), assert = require('assert');
 let handlers;
 const elements = () => ({style:{}, listeners:{}, addEventListener(event,fn){this.listeners[event]=fn;}});
 const frm = {doc:{custom_presales_required:1,custom_elv_site_survey_required:1,custom_survey_step:0},fields_dict:{},saves:[],
-  set_df_property(){},toggle_display(){},is_dirty(){return false;},is_new(){return false;},
+  set_df_property(){},toggle_display(){},trigger(){},is_dirty(){return false;},is_new(){return !!this.newRecord;},
   async set_value(k,v){this.doc[k]=v;}, async save(){this.saves.push(this.doc.custom_survey_step);}
 };
 for (const name of ['custom_survey_step','custom_survey_instructions','custom_survey_location','custom_survey_contact_name','custom_survey_contact_phone']) {
@@ -39,6 +39,14 @@ async function run(){
   await phone.$wrapper[0].button.listeners.click();
   assert.equal(frm.doc.custom_survey_contact_name,'Site manager');
   assert.deepEqual(frm.saves,[1,2,3]);
-  console.log('PASS lazy input OK buttons and three saved steps with contact name and phone');
+  frm.newRecord = true;
+  frm.doc.custom_survey_step = 0;
+  handlers.refresh(frm);
+  await instructions.$wrapper[0].button.listeners.click();
+  await location.$wrapper[0].button.listeners.click();
+  await phone.$wrapper[0].button.listeners.click();
+  assert.equal(frm.doc.custom_survey_step,3);
+  assert.deepEqual(frm.saves,[1,2,3],'new Opportunity OK steps must never create a record');
+  console.log('PASS lazy input OK buttons, existing saves, and new draft confirmation without creation');
 }
 run().catch(e=>{console.error(e);process.exitCode=1;});
