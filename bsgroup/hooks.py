@@ -660,4 +660,7 @@ doc_events["Opportunity"].setdefault("on_update", []).append("bsgroup.site_surve
 doc_events.setdefault("Presales Request", {}).setdefault("validate", []).append("bsgroup.site_survey.validate_presales")
 permission_query_conditions["Site Survey Request"] = "bsgroup.site_survey.survey_query"
 permission_query_conditions["Presales Request"] = "bsgroup.site_survey.presales_query"
+doc_events["Opportunity"]["validate"].insert(0, "bsgroup.opportunity_intake.validate")
+doc_events["Presales Request"]["validate"].append("bsgroup.opportunity_intake.guard_presales")
+doctype_js["Opportunity"] = ["public/js/opportunity.js", "public/js/opportunity_intake.js"]
 has_permission["Site Survey Request"] = "bsgroup.site_survey.survey_permission"

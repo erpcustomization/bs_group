@@ -11,14 +11,19 @@ const bsi_lead_lifecycle = (() => {
     function convert(frm) {
         return frappe.prompt([{fieldname:'subject',fieldtype:'Data',label:__('Opportunity subject'),reqd:1,
             default:frm.doc.company_name || frm.doc.lead_name || ''},
-            {fieldname:'opportunity_amount',fieldtype:'Currency',label:__('Opportunity Amount'),reqd:1}], async values => {
+            {fieldname:'opportunity_amount',fieldtype:'Currency',label:__('Opportunity Amount'),reqd:1},
+            {fieldname:'custom_business_type',fieldtype:'Select',label:__('Supply / Service'),options:'\nSupply\nService\nSupply and Installation',reqd:1},
+            {fieldname:'custom_service_type',fieldtype:'Select',label:__('Service Type'),options:'\nAMC\nNew Service Opportunity',depends_on:"eval:doc.custom_business_type === 'Service'",mandatory_depends_on:"eval:doc.custom_business_type === 'Service'"},
+            {fieldname:'custom_installation_type',fieldtype:'Select',label:__('Installation Type'),options:'\nCCTV\n3CX\nNetworking\nOther',depends_on:"eval:doc.custom_business_type === 'Supply and Installation'",mandatory_depends_on:"eval:doc.custom_business_type === 'Supply and Installation'"},
+            {fieldname:'custom_camera_count',fieldtype:'Int',label:__('Number of Cameras'),depends_on:"eval:doc.custom_business_type === 'Supply and Installation' && doc.custom_installation_type === 'CCTV'",mandatory_depends_on:"eval:doc.custom_business_type === 'Supply and Installation' && doc.custom_installation_type === 'CCTV'"},
+            {fieldname:'custom_site_survey_needed',fieldtype:'Select',label:__('Site Survey Required?'),options:'\nYes\nNo',depends_on:"eval:doc.custom_business_type === 'Supply and Installation' && doc.custom_installation_type === 'CCTV' && doc.custom_camera_count >= 30",mandatory_depends_on:"eval:doc.custom_business_type === 'Supply and Installation' && doc.custom_installation_type === 'CCTV' && doc.custom_camera_count >= 30"}], async values => {
             if (frm._bsi_converting) return;
             frm._bsi_converting = true;
             try {
                 if (frm.is_new() || frm.is_dirty()) await frm.save();
                 if (frm.is_new() || frm.is_dirty()) return;
                 const result = await frappe.call({method:'bsgroup.lead_lifecycle.confirm_opportunity',
-                    args:{source_name:frm.doc.name,subject:values.subject,opportunity_amount:values.opportunity_amount},freeze:true});
+                    args:{source_name:frm.doc.name,subject:values.subject,opportunity_amount:values.opportunity_amount,intake:values},freeze:true});
                 if (!result.exc && result.message) {
                     await frm.reload_doc();
                     frappe.show_alert({message:__('Opportunity created: {0}', [result.message]),indicator:'green'});

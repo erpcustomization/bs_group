@@ -160,7 +160,7 @@ def opportunity_deleted(doc, method=None):
 
 
 @frappe.whitelist()
-def confirm_opportunity(source_name, subject, opportunity_amount=None):
+def confirm_opportunity(source_name, subject, opportunity_amount=None, intake=None):
     """Create one real Opportunity only after the salesperson confirms OK."""
     lead = frappe.get_doc("Lead", source_name)
     lead.check_permission("write")
@@ -171,6 +171,11 @@ def confirm_opportunity(source_name, subject, opportunity_amount=None):
     frappe.db.sql("SELECT name FROM `tabLead` WHERE name=%s FOR UPDATE", source_name)
     opportunity = make_opportunity(source_name)
     opportunity.opportunity_amount = opportunity_amount
+    opportunity.opportunity_owner = frappe.session.user
+    from bsgroup.opportunity_intake import FIELDS
+    intake = frappe.parse_json(intake) if intake else {}
+    for field in FIELDS:
+        opportunity.set(field, intake.get(field))
     opportunity.company = lead.company
     if not opportunity.currency and lead.company:
         opportunity.currency = frappe.db.get_value("Company", lead.company, "default_currency")

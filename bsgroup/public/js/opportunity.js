@@ -13,6 +13,8 @@ frappe.ui.form.on("Opportunity", {
             organisation_name: frm.doc.custom_organization_name,
             subject: frm.doc.custom_subject || frm.doc.title,
         };
+        frm.remove_custom_button('Presales Request', __('Create'));
+        frm.remove_custom_button('Deal Cost Sheet', __('Create'));
         if(frm.doc.custom_presales_required == 1){
             frm.add_custom_button("Presales Request", ()=>{
                 if (frm.doc.custom_site_survey_request) {
@@ -33,6 +35,10 @@ frappe.ui.form.on("Opportunity", {
         }
         else{
             frm.add_custom_button("Deal Cost Sheet", ()=>{
+                if (frm.is_new() || frm.is_dirty()) {
+                    frappe.msgprint(__('Save the Opportunity before creating the Deal Cost Sheet.'));
+                    return;
+                }
                 frappe.new_doc("Deal Cost Sheet", Object.assign({}, party_defaults))
             },__("Create"))
         }
@@ -158,6 +164,7 @@ frappe.ui.form.on('Opportunity', {
         }
     },
     refresh(frm) {
+        frm.remove_custom_button(__('Site Survey Request'), __('Projects'));
         const selected = frm.doc.custom_presales_required &&
             (frm.doc.custom_elv_site_survey_required || frm.doc.custom_technical_site_survey_required);
         if (selected) {

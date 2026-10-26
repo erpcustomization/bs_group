@@ -11,6 +11,11 @@ def execute():
     frappe.reload_doc("bs_group", "doctype", "site_survey_request", force=True)
     create_custom_fields({
         "Opportunity": [
+            dict(fieldname="custom_business_type", label="Supply / Service", fieldtype="Select", options="\nSupply\nService\nSupply and Installation", insert_after="sales_stage", mandatory_depends_on="eval:doc.__islocal || doc.custom_business_type"),
+            dict(fieldname="custom_service_type", label="Service Type", fieldtype="Select", options="\nAMC\nNew Service Opportunity", insert_after="custom_business_type", depends_on="eval:doc.custom_business_type === 'Service'", mandatory_depends_on="eval:doc.custom_business_type === 'Service'"),
+            dict(fieldname="custom_installation_type", label="Installation Type", fieldtype="Select", options="\nCCTV\n3CX\nNetworking\nOther", insert_after="custom_service_type", depends_on="eval:doc.custom_business_type === 'Supply and Installation'", mandatory_depends_on="eval:doc.custom_business_type === 'Supply and Installation'"),
+            dict(fieldname="custom_camera_count", label="Number of Cameras", fieldtype="Int", insert_after="custom_installation_type", depends_on="eval:doc.custom_business_type === 'Supply and Installation' && doc.custom_installation_type === 'CCTV'", mandatory_depends_on="eval:doc.custom_business_type === 'Supply and Installation' && doc.custom_installation_type === 'CCTV'"),
+            dict(fieldname="custom_site_survey_needed", label="Site Survey Required?", fieldtype="Select", options="\nYes\nNo", insert_after="custom_camera_count", depends_on="eval:doc.custom_business_type === 'Supply and Installation' && doc.custom_installation_type === 'CCTV' && doc.custom_camera_count >= 30", mandatory_depends_on="eval:doc.custom_business_type === 'Supply and Installation' && doc.custom_installation_type === 'CCTV' && doc.custom_camera_count >= 30"),
             dict(fieldname="custom_elv_site_survey_required", label="ELV Site Survey Required", fieldtype="Check", default="0",
                  insert_after="custom_presales_required", depends_on="eval:doc.custom_presales_required"),
             dict(fieldname="custom_technical_site_survey_required", label="Technical Expertise and Site Survey Required", fieldtype="Check", default="0",
@@ -25,6 +30,9 @@ def execute():
                  fetch_from="custom_site_survey_request.results", insert_after="custom_site_survey_request")]
     }, update=True)
     make_property_setter("Opportunity", "custom_presales_required", "label", "Presales Support Required", "Data")
+    make_property_setter("Opportunity", "custom_presales_required", "insert_after", "custom_site_survey_needed", "Data")
+    make_property_setter("Opportunity", "sales_stage", "reqd", 0, "Check")
+    make_property_setter("Opportunity", "sales_stage", "hidden", 1, "Check")
     options = (frappe.get_meta("Presales Request").get_field("status").options or "").splitlines()
     for status in (WAITING, RECEIVED):
         if status not in options:
