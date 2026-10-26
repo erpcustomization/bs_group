@@ -51,9 +51,38 @@ try:
             opportunity_amount=1234, company=company, currency=frappe.db.get_value("Company", company, "default_currency"),
             opportunity_owner="Administrator", sales_stage=frappe.db.get_value("Sales Stage", {}, "name"), custom_subject="Survey fixture", custom_organization_name=customer.customer_name,
             custom_presales_required=1, custom_elv_site_survey_required=elv, custom_technical_site_survey_required=technical,
-            **dict(dict(custom_business_type='Supply and Installation',custom_installation_type='Other'), **intake))).insert()
+            **dict(dict(custom_business_type='Supply and Installation',custom_installation_type='Other',custom_survey_step=3,
+                custom_survey_instructions='Maintain the existing customer system.',custom_survey_location='Customer office, Dubai',custom_survey_contact_phone='+971501234567'), **intake))).insert()
     plain = opportunity()
     check(not plain.custom_site_survey_request, "no survey without survey options")
+    staged = opportunity(1,0,custom_survey_step=0,custom_survey_instructions='',custom_survey_location='',custom_survey_contact_phone='')
+    check(not staged.custom_site_survey_request, 'no request before instructions confirmed')
+    staged.custom_survey_instructions = 'Inspect camera coverage and cable routes.'
+    staged.custom_survey_step = 1
+    staged.save()
+    staged.reload()
+    check(staged.custom_survey_instructions=='Inspect camera coverage and cable routes.' and not staged.custom_site_survey_request, 'instructions persist without dispatch')
+    staged.custom_survey_step = 2
+    rejects(staged.save,'location required at second confirmation')
+    staged.reload()
+    staged.custom_survey_step = 2
+    staged.custom_survey_location = 'Building A, floor 2, reception'
+    staged.save()
+    staged.reload()
+    check(staged.custom_survey_step==2 and not staged.custom_site_survey_request, 'location saved without dispatch')
+    staged.custom_survey_step = 3
+    rejects(staged.save,'contact phone required before dispatch')
+    staged.reload()
+    staged.custom_survey_step = 3
+    staged.custom_survey_contact_phone = '+971501234567'
+    staged.save()
+    staged.reload()
+    dispatched = frappe.get_doc('Site Survey Request',staged.custom_site_survey_request)
+    check(dispatched.custom_survey_instructions==staged.custom_survey_instructions and dispatched.site_address==staged.custom_survey_location and dispatched.contact_phone==staged.custom_survey_contact_phone,'complete instructions location and phone reach Projects')
+    dispatched.save()
+    check(dispatched.contact_phone==staged.custom_survey_contact_phone,'survey phone retained on later saves')
+    staged.save()
+    check(frappe.db.count('Site Survey Request',{'opportunity':staged.name})==1,'repeated final save creates no duplicate')
     for elv, tech in ((1,0), (0,1), (1,1)):
         opp = opportunity(elv, tech)
         survey = frappe.get_doc("Site Survey Request", opp.custom_site_survey_request)
@@ -127,6 +156,7 @@ try:
         scope_details="Existing customer requirement")).insert()
     plain.reload()
     plain.custom_elv_site_survey_required = 1
+    plain.custom_survey_step = 3
     plain.save()
     existing.reload()
     check(existing.status == site_survey.WAITING and bool(existing.custom_site_survey_request), "reuses existing open presales")
