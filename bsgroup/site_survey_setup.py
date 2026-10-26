@@ -1,0 +1,65 @@
+"""Idempotent, additive schema and navigation for survey intake."""
+import frappe
+from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+from frappe.custom.doctype.property_setter.property_setter import make_property_setter
+from bsgroup.site_survey import WAITING, RECEIVED, DEFERRED_FIELDS
+
+
+@frappe.whitelist(methods=["POST"])
+def execute():
+    frappe.only_for("System Manager")
+    frappe.reload_doc("bs_group", "doctype", "site_survey_request", force=True)
+    create_custom_fields({
+        "Opportunity": [
+            dict(fieldname="custom_elv_site_survey_required", label="ELV Site Survey Required", fieldtype="Check", default="0",
+                 insert_after="custom_presales_required", depends_on="eval:doc.custom_presales_required"),
+            dict(fieldname="custom_technical_site_survey_required", label="Technical Expertise and Site Survey Required", fieldtype="Check", default="0",
+                 insert_after="custom_elv_site_survey_required", depends_on="eval:doc.custom_presales_required"),
+            dict(fieldname="custom_site_survey_request", label="Projects — Site Survey Request", fieldtype="Link", options="Site Survey Request",
+                 insert_after="custom_technical_site_survey_required", read_only=1, no_copy=1,
+                 depends_on="eval:doc.custom_site_survey_request")],
+        "Presales Request": [
+            dict(fieldname="custom_site_survey_request", label="Site Survey Request", fieldtype="Link", options="Site Survey Request",
+                 insert_after="site_visit", read_only=1, no_copy=1),
+            dict(fieldname="custom_survey_results", label="Site Survey Results", fieldtype="Text Editor", read_only=1,
+                 fetch_from="custom_site_survey_request.results", insert_after="custom_site_survey_request")]
+    }, update=True)
+    make_property_setter("Opportunity", "custom_presales_required", "label", "Presales Support Required", "Data")
+    options = (frappe.get_meta("Presales Request").get_field("status").options or "").splitlines()
+    for status in (WAITING, RECEIVED):
+        if status not in options:
+            options.append(status)
+    make_property_setter("Presales Request", "status", "options", "\n".join(options), "Text")
+    for field in DEFERRED_FIELDS:
+        make_property_setter("Presales Request", field, "reqd", 0, "Check")
+        make_property_setter("Presales Request", field, "mandatory_depends_on",
+            "eval:!doc.custom_site_survey_request || !['Awaiting Site Survey Results','Site Survey Results Received','Cancelled','On Hold'].includes(doc.status)", "Data")
+    ensure_navigation()
+    frappe.clear_cache()
+    return {"status": "ready", "doctype": "Site Survey Request"}
+
+
+def ensure_navigation():
+    # Update the current sidebar documents in place, preserving unrelated links.
+    for doctype in ("Sidebar", "Workspace Sidebar"):
+        if not frappe.db.exists("DocType", doctype):
+            continue
+        for name in frappe.get_all(doctype, pluck="name"):
+            nav = frappe.get_doc(doctype, name)
+            rows = nav.get("items") or []
+            project = next((r for r in rows if r.link_type == "DocType" and r.link_to == "Project"), None)
+            if not project or any(r.link_to == "Site Survey Request" for r in rows):
+                continue
+            row = nav.append("items", dict(type="Link", label="Site Survey Request", link_type="DocType",
+                link_to="Site Survey Request", icon="clipboard-list", child=project.child or 0,
+                indent=project.indent or 0))
+            rows.remove(row)
+            rows.insert(rows.index(project), row)
+            for idx, item in enumerate(rows, 1):
+                item.idx = idx
+            previous = frappe.flags.in_migrate
+            try:
+                frappe.flags.in_migrate = True
+                nav.save(ignore_permissions=True)
+            finally:
+                frappe.flags.in_migrate = previous

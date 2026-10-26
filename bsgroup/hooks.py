@@ -653,3 +653,11 @@ doc_events["Opportunity"]["after_delete"] = ([_prior] if isinstance(_prior, str)
 doctype_list_js["Opportunity"] = ["public/js/lead_list_compact.js", "public/js/lead_lifecycle_list.js", "public/js/opportunity_list_setup.js"]
 doctype_list_js["Lead"].append("public/js/lead_list_setup.js")
 doc_events["Opportunity"]["before_insert"].append("bsgroup.utils.opportunity.validate_creation_source")
+
+after_migrate.append("bsgroup.site_survey_setup.execute")
+doc_events["Opportunity"].setdefault("validate", []).append("bsgroup.site_survey.validate_opportunity")
+doc_events["Opportunity"].setdefault("on_update", []).append("bsgroup.site_survey.create_requests")
+doc_events.setdefault("Presales Request", {}).setdefault("validate", []).append("bsgroup.site_survey.validate_presales")
+permission_query_conditions["Site Survey Request"] = "bsgroup.site_survey.survey_query"
+permission_query_conditions["Presales Request"] = "bsgroup.site_survey.presales_query"
+has_permission["Site Survey Request"] = "bsgroup.site_survey.survey_permission"

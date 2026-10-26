@@ -1,0 +1,281 @@
+{
+ "doctype": "DocType",
+ "name": "Site Survey Request",
+ "module": "BS Group",
+ "autoname": "format:SSR-{#####}",
+ "naming_rule": "Expression",
+ "engine": "InnoDB",
+ "track_changes": 1,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "field_order": [
+  "request_details",
+  "opportunity",
+  "title",
+  "organization",
+  "company",
+  "request_date",
+  "request_column",
+  "status",
+  "elv_required",
+  "technical_required",
+  "currency",
+  "opportunity_amount",
+  "presales_request",
+  "sales_details",
+  "salesperson",
+  "salesperson_name",
+  "requested_by",
+  "contact_column",
+  "contact_person",
+  "contact_email",
+  "contact_phone",
+  "planning",
+  "assigned_to",
+  "planned_date",
+  "site_address",
+  "results_section",
+  "results",
+  "attachment",
+  "completed_by",
+  "completed_on"
+ ],
+ "fields": [
+  {
+   "fieldname": "request_details",
+   "label": "Site Survey Request",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "opportunity",
+   "label": "Opportunity",
+   "fieldtype": "Link",
+   "options": "Opportunity",
+   "reqd": 1,
+   "read_only": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "title",
+   "label": "Title",
+   "fieldtype": "Data",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "organization",
+   "label": "Organization",
+   "fieldtype": "Data",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "company",
+   "label": "Company",
+   "fieldtype": "Link",
+   "options": "Company",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "request_date",
+   "label": "Requested On",
+   "fieldtype": "Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "request_column",
+   "label": "",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "label": "Status",
+   "fieldtype": "Select",
+   "options": "Requested\nScheduled\nIn Progress\nCompleted\nCancelled",
+   "default": "Requested",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "elv_required",
+   "label": "ELV Site Survey Required",
+   "fieldtype": "Check",
+   "read_only": 1
+  },
+  {
+   "fieldname": "technical_required",
+   "label": "Technical Expertise and Site Survey Required",
+   "fieldtype": "Check",
+   "read_only": 1
+  },
+  {
+   "fieldname": "currency",
+   "label": "Currency",
+   "fieldtype": "Link",
+   "options": "Currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "opportunity_amount",
+   "label": "Opportunity Amount",
+   "fieldtype": "Currency",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "presales_request",
+   "label": "Presales Request",
+   "fieldtype": "Link",
+   "options": "Presales Request",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sales_details",
+   "label": "Salesperson and Customer Contact",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "salesperson",
+   "label": "Salesperson",
+   "fieldtype": "Link",
+   "options": "User",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "salesperson_name",
+   "label": "Salesperson Name",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "requested_by",
+   "label": "Requested By",
+   "fieldtype": "Link",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "contact_column",
+   "label": "",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "contact_person",
+   "label": "Contact Person",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "contact_email",
+   "label": "Email",
+   "fieldtype": "Data",
+   "options": "Email",
+   "read_only": 1
+  },
+  {
+   "fieldname": "contact_phone",
+   "label": "Phone",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "planning",
+   "label": "Survey Planning",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "assigned_to",
+   "label": "Assigned To",
+   "fieldtype": "Link",
+   "options": "User"
+  },
+  {
+   "fieldname": "planned_date",
+   "label": "Planned Survey Date",
+   "fieldtype": "Date"
+  },
+  {
+   "fieldname": "site_address",
+   "label": "Site Address",
+   "fieldtype": "Small Text"
+  },
+  {
+   "fieldname": "results_section",
+   "label": "Survey Results",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "results",
+   "label": "Survey Results",
+   "fieldtype": "Text Editor"
+  },
+  {
+   "fieldname": "attachment",
+   "label": "Survey Attachment",
+   "fieldtype": "Attach"
+  },
+  {
+   "fieldname": "completed_by",
+   "label": "Completed By",
+   "fieldtype": "Link",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "completed_on",
+   "label": "Completed On",
+   "fieldtype": "Datetime",
+   "read_only": 1
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "report": 1,
+   "write": 1,
+   "export": 1
+  },
+  {
+   "role": "Projects Manager",
+   "read": 1,
+   "report": 1,
+   "write": 1,
+   "export": 0
+  },
+  {
+   "role": "Presales",
+   "read": 1,
+   "report": 1,
+   "write": 1,
+   "export": 0
+  },
+  {
+   "role": "Sales Manager",
+   "read": 1,
+   "report": 1,
+   "write": 1,
+   "export": 0
+  },
+  {
+   "role": "Technician",
+   "read": 1,
+   "report": 1,
+   "write": 1,
+   "export": 0
+  },
+  {
+   "role": "Sales User",
+   "read": 1,
+   "report": 1,
+   "write": 0,
+   "export": 0
+  }
+ ],
+ "actions": [],
+ "links": [],
+ "states": []
+}

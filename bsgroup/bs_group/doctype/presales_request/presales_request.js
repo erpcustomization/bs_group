@@ -95,6 +95,8 @@ function set_status_indicator(frm){
         "In Progress": "orange",
         "Awaiting Sales Input": "yellow",
         "Awaiting Customer Input": "purple",
+        "Awaiting Site Survey Results": "orange",
+        "Site Survey Results Received": "green",
         "Costing in Progress": "pink",
         "Ready for Quotation": "green",
         "Submitted to Sales": "blue",

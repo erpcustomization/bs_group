@@ -15,6 +15,16 @@ frappe.ui.form.on("Opportunity", {
         };
         if(frm.doc.custom_presales_required == 1){
             frm.add_custom_button("Presales Request", ()=>{
+                if (frm.doc.custom_site_survey_request) {
+                    frappe.db.get_value('Site Survey Request', frm.doc.custom_site_survey_request, 'presales_request').then(r => {
+                        if (r.message && r.message.presales_request) frappe.set_route('Form', 'Presales Request', r.message.presales_request);
+                    });
+                    return;
+                }
+                if (frm.is_new() || frm.is_dirty()) {
+                    frappe.msgprint(__('Save the Opportunity first. Selected survey options will create the linked requests automatically.'));
+                    return;
+                }
                 frappe.new_doc("Presales Request", Object.assign({}, party_defaults, {
                     subject: frm.doc.custom_subject,
                     expected_close_date: frm.doc.expected_closing,
@@ -139,4 +149,29 @@ frappe.ui.form.on('Opportunity', {
         `;
         root.append(style);
     }
+});
+
+frappe.ui.form.on('Opportunity', {
+    custom_presales_required(frm) {
+        if (!frm.doc.custom_presales_required && !frm.doc.custom_site_survey_request) {
+            frm.set_value({custom_elv_site_survey_required: 0, custom_technical_site_survey_required: 0});
+        }
+    },
+    refresh(frm) {
+        const selected = frm.doc.custom_presales_required &&
+            (frm.doc.custom_elv_site_survey_required || frm.doc.custom_technical_site_survey_required);
+        if (selected) {
+            frm.add_custom_button(__('Site Survey Request'), async () => {
+                if (frm.is_new() || frm.is_dirty()) await frm.save();
+                if (frm.doc.custom_site_survey_request) {
+                    frappe.set_route('Form', 'Site Survey Request', frm.doc.custom_site_survey_request);
+                }
+            }, __('Projects'));
+        }
+        for (const field of ['custom_presales_required', 'custom_elv_site_survey_required', 'custom_technical_site_survey_required']) {
+            if (frm.fields_dict[field]) frm.set_df_property(field, 'read_only', !!frm.doc.custom_site_survey_request);
+        }
+    },
+    custom_elv_site_survey_required(frm) { frm.trigger('refresh'); },
+    custom_technical_site_survey_required(frm) { frm.trigger('refresh'); }
 });
