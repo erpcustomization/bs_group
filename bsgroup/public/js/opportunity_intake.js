@@ -1,4 +1,57 @@
 (() => {
+    function supplyValue(frm) {
+        const amount = frm.fields_dict.opportunity_amount;
+        const wrapper = amount?.$wrapper?.[0];
+        const anchor = frm.fields_dict.custom_business_type?.$wrapper?.[0];
+        if (!wrapper || !anchor) return;
+        if (!frm._supply_amount_home) {
+            frm._supply_amount_home = document.createComment('Opportunity amount original position');
+            wrapper.before(frm._supply_amount_home);
+        }
+        let button = wrapper.querySelector('.bsi-supply-ok');
+        if (!button) {
+            button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'btn btn-primary btn-sm bsi-supply-ok';
+            button.textContent = __('OK');
+            button.title = __('Save Opportunity and open Deal Cost Sheet');
+            button.style.marginTop = '8px';
+            wrapper.append(button);
+            button.addEventListener('click', async () => {
+                if (frm._supply_handoff || frm.doc.custom_business_type !== 'Supply') return;
+                if (!(Number(frm.doc.opportunity_amount) > 0)) {
+                    frappe.msgprint(__('Enter an Opportunity Value greater than zero.'));
+                    amount.set_focus();
+                    return;
+                }
+                frm._supply_handoff = true;
+                button.disabled = true;
+                try {
+                    if (frm.is_new() || frm.is_dirty()) await frm.save();
+                    if (frm.is_new() || frm.is_dirty() || frm.doc.custom_business_type !== 'Supply') return;
+                    await frappe.new_doc('Deal Cost Sheet', {
+                        opportunity: frm.doc.name,
+                        party_type: frm.doc.opportunity_from,
+                        party: frm.doc.party_name,
+                        organisation_name: frm.doc.custom_organization_name,
+                        subject: frm.doc.custom_subject || frm.doc.title
+                    });
+                } finally {
+                    frm._supply_handoff = false;
+                    button.disabled = false;
+                }
+            });
+        }
+        const supply = frm.doc.custom_business_type === 'Supply';
+        button.hidden = !supply || !frm.perm?.some(p => frm.is_new() ? p.create : p.write);
+        frm.set_df_property('opportunity_amount', 'label', supply ? __('Opportunity Value') : __('Opportunity Amount'));
+        if (supply) {
+            frm.toggle_reqd('opportunity_amount', true);
+            if (anchor.nextElementSibling !== wrapper) anchor.after(wrapper);
+        } else if (wrapper.previousSibling !== frm._supply_amount_home) {
+            frm._supply_amount_home.after(wrapper);
+        }
+    }
     function positionStatus(frm) {
         const field = frm.fields_dict.status;
         const wrapper = field?.$wrapper?.[0];
@@ -39,6 +92,7 @@
         }
         frm.set_df_property('opportunity_from', 'hidden', d.opportunity_from === 'Customer');
         if (!frm.fields_dict.custom_business_type) return;
+        supplyValue(frm);
         const cctv = isCctv(d), small = cctv && d.custom_camera_count > 0 && d.custom_camera_count < 30;
         const blocked = d.custom_business_type === 'Supply' || small;
         frm.set_df_property('sales_stage', 'hidden', 1);
