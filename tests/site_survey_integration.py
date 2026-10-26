@@ -7,7 +7,8 @@ frappe.init(site="rel1-test.local", sites_path="/home/bitssecureit/rel1-bench/si
 frappe.connect()
 frappe.set_user("Administrator")
 root = Path(__file__).resolve().parents[1]
-import bsgroup, bsgroup.bs_group, bsgroup.bs_group.doctype
+import bsgroup, bsgroup.hooks, bsgroup.bs_group, bsgroup.bs_group.doctype
+frappe.clear_cache()
 bsgroup.__path__.insert(0, str(root / "bsgroup"))
 bsgroup.bs_group.__file__ = str(root / "bsgroup/bs_group/__init__.py")
 bsgroup.bs_group.__path__.insert(0, str(root / "bsgroup/bs_group"))
@@ -110,4 +111,5 @@ try:
     print("PASS",len(checks),"checks")
 finally:
     frappe.db.rollback()
+    frappe.clear_cache()
     frappe.destroy()
