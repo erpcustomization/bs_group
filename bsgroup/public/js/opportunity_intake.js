@@ -48,6 +48,10 @@
             frm.set_df_property(field, 'read_only', !!d.custom_site_survey_request);
         }
         frm.toggle_display('custom_presales_required', !blocked && !cctv && !!d.custom_business_type);
+        const presales = frm.fields_dict.custom_presales_required?.$wrapper?.[0];
+        const anchor = frm.fields_dict[d.custom_business_type === 'Service'
+            ? 'custom_business_type' : 'custom_site_survey_needed']?.$wrapper?.[0];
+        if (presales && anchor && anchor.nextElementSibling !== presales) anchor.after(presales);
         for (const field of ['custom_elv_site_survey_required', 'custom_technical_site_survey_required']) {
             frm.set_df_property(field, 'depends_on', `eval:doc.custom_presales_required && !(doc.custom_business_type === 'Supply and Installation' && doc.custom_installation_type === 'CCTV')`);
             frm.toggle_display(field, !blocked && !cctv && !!d.custom_presales_required);
