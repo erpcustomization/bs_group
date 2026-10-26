@@ -2,6 +2,9 @@
     const isCctv = d => d.custom_business_type === 'Supply and Installation' && d.custom_installation_type === 'CCTV';
     async function update(frm, notify = false) {
         const d = frm.doc;
+        for (const field of ['expected_closing', 'probability']) {
+            frm.set_df_property(field, 'hidden', 1);
+        }
         if (!frm.fields_dict.custom_business_type) return;
         const cctv = isCctv(d), small = cctv && d.custom_camera_count > 0 && d.custom_camera_count < 30;
         const blocked = d.custom_business_type === 'Supply' || small;
