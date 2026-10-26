@@ -31,6 +31,11 @@
             return filter;
         };
         group.filters.forEach(configureFilter);
+        // Restored filters can finish building after onload. Configure their
+        // controls again when the native popup opens.
+        group.filter_button.on('shown.bs.popover.bsi_progress_options', () => {
+            group.filters.forEach(configureFilter);
+        });
         const nativeCount = listview.get_count_str;
         listview.get_count_str = async function() {
             const filters = this.get_filters_for_args();
