@@ -3,7 +3,7 @@ let handlers,row,saveCount=0,newRecord=true,releaseSave;
 const root={querySelector(selector){return selector==='.bsi-opportunity-status'?status:row;}};
 const status={before(element){row=element;}};
 const frm={wrapper:root,doc:{custom_business_type:'Supply',party_name:'Customer',custom_subject:'Supply request',opportunity_amount:100},fields_dict:{},
-  page:{hide_primary_action(){}},is_new(){return newRecord;},is_dirty(){return false;},
+  page:{clear_primary_action(){}},is_new(){return newRecord;},is_dirty(){return false;},
   async save(){saveCount++;await new Promise(resolve=>{releaseSave=resolve;});newRecord=false;}
 };
 for(const name of ['custom_business_type','party_name','custom_subject','opportunity_amount'])frm.fields_dict[name]={df:{fieldname:name,fieldtype:'Data',reqd:1},get_value:()=>frm.doc[name]};
