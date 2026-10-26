@@ -1,5 +1,8 @@
 (() => {
-    const value = (frm,name) => frm.fields_dict[name]?.get_value?.() ?? frm.doc[name];
+    const value = (frm,name) => {
+        const field = frm.fields_dict[name];
+        return field?.df.hidden || field?.df.read_only ? frm.doc[name] : (field?.get_value?.() ?? frm.doc[name]);
+    };
     const filled = v => Array.isArray(v) ? v.length > 0 : v !== null && v !== undefined && String(v).trim() !== '';
     function ready(frm) {
         if (!filled(value(frm,'party_name')) || !filled(value(frm,'custom_subject')) || !(Number(value(frm,'opportunity_amount')) > 0)) return false;
