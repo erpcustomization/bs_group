@@ -664,3 +664,5 @@ doc_events["Opportunity"]["validate"].insert(0, "bsgroup.opportunity_intake.vali
 doc_events["Presales Request"]["validate"].append("bsgroup.opportunity_intake.guard_presales")
 doctype_js["Opportunity"] = ["public/js/opportunity.js", "public/js/opportunity_intake.js"]
 has_permission["Site Survey Request"] = "bsgroup.site_survey.survey_permission"
+doctype_js["Opportunity"].append("public/js/opportunity_progress.js")
+doctype_list_js["Opportunity"].append("public/js/opportunity_progress_list.js")
