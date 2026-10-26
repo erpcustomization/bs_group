@@ -45,6 +45,11 @@ def statuses(names):
         frappe.throw("Request at most 500 Opportunity statuses.")
     # Permission-filter the requested opportunities before reading any related work.
     opportunities = frappe.get_list("Opportunity", filters={"name": ["in", names]}, fields=["name", "status"], limit_page_length=500)
+    return resolve_many(opportunities)
+
+
+def resolve_many(opportunities):
+    """Resolve a permission-filtered batch using three related-record queries."""
     allowed = [o.name for o in opportunities]
     if not allowed:
         return {}
