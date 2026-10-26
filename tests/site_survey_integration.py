@@ -64,6 +64,12 @@ try:
                 custom_survey_instructions='Maintain the existing customer system.',custom_survey_location='Customer office, Dubai',custom_survey_contact_name='Survey contact',custom_survey_contact_phone='+971501234567'), **intake))).insert()
     plain = opportunity()
     check(not plain.custom_site_survey_request, "no survey without survey options")
+    for solution in opportunity_intake.ADDITIONAL_SOLUTIONS:
+        service = opportunity(custom_business_type='Service', custom_service_type=solution,
+            custom_service_survey='No Site Survey Required', custom_service_details='Service scope')
+        check(service.custom_service_type == solution, 'service category '+solution)
+        installation = opportunity(custom_installation_type=solution)
+        check(installation.custom_installation_type == solution, 'installation category '+solution)
     staged = opportunity(1,0,custom_survey_step=0,custom_survey_instructions='',custom_survey_location='',custom_survey_contact_name='',custom_survey_contact_phone='')
     check(not staged.custom_site_survey_request, 'no request before instructions confirmed')
     staged.custom_survey_instructions = 'Inspect camera coverage and cable routes.'
