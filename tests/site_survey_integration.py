@@ -13,7 +13,7 @@ bsgroup.__path__.insert(0, str(root / "bsgroup"))
 bsgroup.bs_group.__file__ = str(root / "bsgroup/bs_group/__init__.py")
 bsgroup.bs_group.__path__.insert(0, str(root / "bsgroup/bs_group"))
 bsgroup.bs_group.doctype.__path__.insert(0, str(root / "bsgroup/bs_group/doctype"))
-from bsgroup import site_survey, site_survey_setup
+from bsgroup import site_survey, site_survey_setup, opportunity_intake
 original_hooks = frappe.get_hooks
 
 def hooks(hook=None, *args, **kwargs):
@@ -21,10 +21,10 @@ def hooks(hook=None, *args, **kwargs):
     if hook == "doc_events":
         result = dict(result)
         result["Opportunity"] = dict(result.get("Opportunity", {}))
-        result["Opportunity"]["validate"] = ["bsgroup.site_survey.validate_opportunity"]
+        result["Opportunity"]["validate"] = ["bsgroup.opportunity_intake.validate", "bsgroup.site_survey.validate_opportunity"]
         result["Opportunity"]["on_update"] = ["bsgroup.site_survey.create_requests"]
         result["Presales Request"] = dict(result.get("Presales Request", {}))
-        result["Presales Request"]["validate"] = ["bsgroup.site_survey.validate_presales"]
+        result["Presales Request"]["validate"] = ["bsgroup.site_survey.validate_presales", "bsgroup.opportunity_intake.guard_presales"]
     return result
 frappe.get_hooks = hooks
 if "--skip-setup" not in sys.argv:
@@ -46,11 +46,12 @@ try:
     site_survey_setup.ensure_navigation()
     customer = frappe.get_doc(dict(doctype="Customer", customer_name="Survey integration fixture", customer_type="Company")).insert()
     company = frappe.db.get_value("Company", {}, "name")
-    def opportunity(elv=0, technical=0):
+    def opportunity(elv=0, technical=0, **intake):
         return frappe.get_doc(dict(doctype="Opportunity", opportunity_from="Customer", party_name=customer.name,
             opportunity_amount=1234, company=company, currency=frappe.db.get_value("Company", company, "default_currency"),
             opportunity_owner="Administrator", sales_stage=frappe.db.get_value("Sales Stage", {}, "name"), custom_subject="Survey fixture", custom_organization_name=customer.customer_name,
-            custom_presales_required=1, custom_elv_site_survey_required=elv, custom_technical_site_survey_required=technical)).insert()
+            custom_presales_required=1, custom_elv_site_survey_required=elv, custom_technical_site_survey_required=technical,
+            **dict(dict(custom_business_type='Service',custom_service_type='New Service Opportunity'), **intake))).insert()
     plain = opportunity()
     check(not plain.custom_site_survey_request, "no survey without survey options")
     for elv, tech in ((1,0), (0,1), (1,1)):
@@ -84,6 +85,27 @@ try:
     rejects(opp.save, "cannot silently change routed survey scope")
     check("salesperson" in site_survey.survey_query("Guest"), "restricted users see only relevant surveys")
     check(site_survey.survey_permission(survey, user="Guest") is False, "unrelated direct access denied")
+    for kind in ('', 'Invalid'):
+        rejects(lambda: opportunity(custom_business_type=kind), "category mandatory "+kind)
+    rejects(lambda: opportunity(custom_service_type=''), "service subtype mandatory")
+    for category in ('CCTV', '3CX', 'Networking', 'Other'):
+        if category == 'CCTV':
+            for number in (0, -1):
+                rejects(lambda: opportunity(custom_business_type='Supply and Installation', custom_installation_type=category, custom_camera_count=number), "invalid camera count")
+            rejects(lambda: opportunity(custom_business_type='Supply and Installation', custom_installation_type=category, custom_camera_count=30), "30 requires survey decision")
+            high = opportunity(custom_business_type='Supply and Installation', custom_installation_type=category, custom_camera_count=30, custom_site_survey_needed='Yes')
+            check(bool(high.custom_site_survey_request), "30 cameras and Yes creates survey")
+            high = opportunity(custom_business_type='Supply and Installation', custom_installation_type=category, custom_camera_count=31, custom_site_survey_needed='No')
+            check(not high.custom_site_survey_request and not high.custom_presales_required, "No survey decision respected")
+        else:
+            other = opportunity(custom_business_type='Supply and Installation', custom_installation_type=category)
+            check(not other.custom_site_survey_request, "no invented specific routing for "+category)
+    for intake in (dict(custom_business_type='Supply'), dict(custom_business_type='Supply and Installation', custom_installation_type='CCTV', custom_camera_count=29)):
+        rejects(lambda: opportunity(**intake), "supply/small CCTV blocks presales flags")
+        draft = frappe.get_doc(dict(doctype='Opportunity', opportunity_from='Customer',party_name=customer.name,company=company,
+            opportunity_amount=200,custom_subject='Direct costing fixture',custom_organization_name=customer.customer_name,**intake)).insert()
+        check(not draft.custom_site_survey_request and not draft.custom_presales_required, "direct costing without survey")
+        rejects(lambda: opportunity_intake.guard_presales(frappe.get_doc(dict(doctype='Presales Request',opportunity=draft.name))), "direct Presales creation blocked")
     existing = frappe.get_doc(dict(doctype="Presales Request", opportunity=plain.name,
         party_type="Customer", party=customer.name, subject="Existing intake", status="Open", company=company,
         estimated_value=1234, presales_owner="Administrator", requested_by="Administrator", priority="Medium",

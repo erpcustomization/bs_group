@@ -21,6 +21,11 @@ sys.modules[opp_spec.name] = opp_module
 opp_spec.loader.exec_module(opp_module)
 import bsgroup.utils
 bsgroup.utils.opportunity = opp_module
+intake_spec = importlib.util.spec_from_file_location("bsgroup.opportunity_intake", root / "bsgroup/opportunity_intake.py")
+intake_module = importlib.util.module_from_spec(intake_spec)
+sys.modules[intake_spec.name] = intake_module
+intake_spec.loader.exec_module(intake_module)
+bsgroup.opportunity_intake = intake_module
 original_get_hooks = frappe.get_hooks
 
 def hooks(hook=None, *args, **kwargs):
@@ -31,6 +36,7 @@ def hooks(hook=None, *args, **kwargs):
         result["Opportunity"] = dict(result.get("Opportunity", {}))
         result["Opportunity"]["before_insert"] = list(result["Opportunity"].get("before_insert", [])) + ["bsgroup.lead_lifecycle.guard_conversion", "bsgroup.utils.opportunity.validate_creation_source"]
         result["Opportunity"]["after_delete"] = ["bsgroup.lead_lifecycle.opportunity_deleted"]
+        result["Opportunity"]["validate"] = ["bsgroup.opportunity_intake.validate"]
     return result
 frappe.get_hooks = hooks
 
@@ -128,6 +134,7 @@ try:
     mapped.custom_subject = "Lifecycle conversion test"
     mapped.sales_stage = frappe.db.get_value("Sales Stage", {}, "name")
     mapped.opportunity_amount = 100
+    mapped.custom_business_type = "Supply"
     mapped.insert()
     check(frappe.db.get_value("Lead", lead.name, "status") == "Opportunity", "saved Opportunity closes lead natively")
     lead.reload()
@@ -149,7 +156,7 @@ try:
     lead.reload()
     lead.company = lead.company or frappe.db.get_value("Company", {}, "name")
     lead.save()
-    converted = module.confirm_opportunity(lead.name, "Confirmed conversion test", 250)
+    converted = module.confirm_opportunity(lead.name, "Confirmed conversion test", 250, {"custom_business_type": "Supply"})
     check(frappe.db.exists("Opportunity", converted), "OK creates a saved Opportunity")
     check(frappe.db.get_value("Lead", lead.name, "status") == "Opportunity", "confirmed conversion closes Lead only after insert")
     rejects(lambda: module.confirm_opportunity(lead.name, "Repeat click"), "duplicate confirmation cannot create a second Opportunity")
