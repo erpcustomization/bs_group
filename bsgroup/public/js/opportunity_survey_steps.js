@@ -5,6 +5,11 @@
         if (!frm.fields_dict.custom_survey_step) return;
         const active = !!selected(frm.doc), sent = !!frm.doc.custom_site_survey_request;
         const step = Number(frm.doc.custom_survey_step || 0);
+        const contact = frm.fields_dict.custom_survey_contact_name;
+        if (contact) {
+            frm.set_df_property('custom_survey_contact_name','read_only',sent);
+            frm.toggle_display('custom_survey_contact_name',active && (sent || step >= 2));
+        }
         fields.forEach((name,index) => {
             const field = frm.fields_dict[name];
             if (!field) return;
@@ -22,11 +27,18 @@
                     if (frm._saving_survey_step || frm.doc.custom_site_survey_request) return;
                     const value = String(field.get_value() || '').trim();
                     if (!value) { field.set_focus(); return; }
+                    const contactName = String(contact?.get_value() || '').trim();
+                    if (index === 2 && !contactName) {
+                        frappe.msgprint(__('Enter the contact person name.'));
+                        contact?.set_focus();
+                        return;
+                    }
                     frm._saving_survey_step = true;
                     button.disabled = true;
                     const previous = Number(frm.doc.custom_survey_step || 0);
                     try {
                         await frm.set_value(name,value);
+                        if (index === 2) await frm.set_value('custom_survey_contact_name',contactName);
                         await frm.set_value('custom_survey_step',index + 1);
                         await frm.save();
                         if (frm.is_dirty() || frm.is_new()) {
@@ -35,7 +47,7 @@
                         }
                         frappe.show_alert({message:__(index === 2 ? 'Survey request saved and sent to Projects.' : 'Saved. Complete the next step.'),indicator:'green'});
                         render(frm);
-                        if (index < 2) frm.fields_dict[fields[index+1]].set_focus();
+                        if (index < 2) (index === 1 && contact ? contact : frm.fields_dict[fields[index+1]]).set_focus();
                     } catch (error) {
                         await frm.set_value('custom_survey_step',previous);
                         throw error;
@@ -46,11 +58,17 @@
                     }
                 });
                 wrapper.append(button);
-                field.$input?.on('input.bsi_survey', () => {
-                    button.hidden = !selected(frm.doc) || !!frm.doc.custom_site_survey_request || !String(field.get_value() || '').trim();
-                });
             }
+            // Controls hidden by depends_on may create/recreate their input only
+            // when revealed. Listen on the persistent wrapper, not that input.
+            const updateButton = () => {
+                button.hidden = !selected(frm.doc) || !!frm.doc.custom_site_survey_request || !String(field.get_value() || '').trim()
+                    || (index === 2 && !String(contact?.get_value() || '').trim());
+            };
+            field.$wrapper.off('input.bsi_survey').on('input.bsi_survey','input,textarea',updateButton);
+            if (index === 2 && contact) contact.$wrapper.off('input.bsi_survey_contact').on('input.bsi_survey_contact','input,textarea',updateButton);
             button.hidden = !active || sent || step !== index || !String(field.get_value() || '').trim();
+            if (index === 2 && !String(contact?.get_value() || '').trim()) button.hidden = true;
             button.disabled = !!frm._saving_survey_step;
         });
     }
@@ -70,6 +88,7 @@
         custom_survey_instructions(frm){return changed(frm,0);},
         custom_survey_location(frm){return changed(frm,1);},
         custom_survey_contact_phone(frm){return changed(frm,2);},
+        custom_survey_contact_name(frm){return changed(frm,2);},
         custom_service_survey:reset,
         custom_business_type:reset,
         custom_site_survey_needed:reset,

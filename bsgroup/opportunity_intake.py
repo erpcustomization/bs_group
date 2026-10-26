@@ -68,7 +68,7 @@ def validate(doc, method=None):
 
 
 def validate_survey_steps(doc, before=None):
-    fields = ("custom_survey_instructions", "custom_survey_location", "custom_survey_contact_phone", "custom_survey_step")
+    fields = ("custom_survey_instructions", "custom_survey_location", "custom_survey_contact_phone", "custom_survey_step", "custom_survey_contact_name")
     if doc.get("custom_site_survey_request") or (before and before.get("custom_site_survey_request")):
         if before and any(doc.get(f) != before.get(f) for f in fields):
             frappe.throw(_("The survey request has already been sent. Update its details in Projects."))
@@ -80,6 +80,8 @@ def validate_survey_steps(doc, before=None):
     for index, field in enumerate(fields[:3], 1):
         if step >= index and not (doc.get(field) or "").strip():
             frappe.throw(_("Complete {0} before confirming this step.").format(doc.meta.get_label(field)))
+    if step == 3 and not (doc.get('custom_survey_contact_name') or '').strip():
+        frappe.throw(_("Enter the contact person name before sending the survey request."))
     if before and selected:
         for index, field in enumerate(fields[:2]):
             if doc.get(field) != before.get(field) and cint(before.get("custom_survey_step")) > index and step > index + 1:

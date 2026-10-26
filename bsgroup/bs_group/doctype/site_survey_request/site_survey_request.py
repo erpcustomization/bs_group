@@ -20,12 +20,13 @@ class SiteSurveyRequest(Document):
         for target, source in {
             "organization": "custom_organization_name", "title": "custom_subject", "company": "company",
             "opportunity_amount": "opportunity_amount", "currency": "currency", "salesperson": "opportunity_owner",
-            "contact_person": "custom_contact_person_name", "contact_email": "contact_email",
+            "contact_email": "contact_email",
             "elv_required": "custom_elv_site_survey_required",
             "technical_required": "custom_technical_site_survey_required"}.items():
             self.set(target, opp.get(source))
         self.title = self.title or opp.title or opp.name
         if self.is_new():
+            self.contact_person = opp.get("custom_survey_contact_name") or opp.get("custom_contact_person_name")
             self.contact_phone = opp.get("custom_survey_contact_phone") or opp.get("contact_mobile")
         self.salesperson_name = frappe.db.get_value("User", self.salesperson, "full_name") if self.salesperson else None
         if before and before.status in ("Completed", "Cancelled") and self.status != before.status:
