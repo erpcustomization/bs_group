@@ -6,6 +6,15 @@ import frappe
 frappe.init(site="rel1-test.local", sites_path="/home/bitssecureit/rel1-bench/sites")
 frappe.connect()
 frappe.set_user("Administrator")
+original_enqueue = frappe.enqueue
+def enqueue(method, *args, **kwargs):
+    # Run schema cleanup synchronously in this local test rather than requiring
+    # capacity in the unrelated background worker queue.
+    if method == 'frappe.model.delete_doc.delete_dynamic_links':
+        kwargs['now'] = True
+        kwargs['enqueue_after_commit'] = False
+    return original_enqueue(method, *args, **kwargs)
+frappe.enqueue = enqueue
 root = Path(__file__).resolve().parents[1]
 import bsgroup, bsgroup.hooks, bsgroup.bs_group, bsgroup.bs_group.doctype
 frappe.clear_cache()
@@ -52,10 +61,10 @@ try:
             opportunity_owner="Administrator", sales_stage=frappe.db.get_value("Sales Stage", {}, "name"), custom_subject="Survey fixture", custom_organization_name=customer.customer_name,
             custom_presales_required=1, custom_elv_site_survey_required=elv, custom_technical_site_survey_required=technical,
             **dict(dict(custom_business_type='Supply and Installation',custom_installation_type='Other',custom_survey_step=3,
-                custom_survey_instructions='Maintain the existing customer system.',custom_survey_location='Customer office, Dubai',custom_survey_contact_phone='+971501234567'), **intake))).insert()
+                custom_survey_instructions='Maintain the existing customer system.',custom_survey_location='Customer office, Dubai',custom_survey_contact_name='Survey contact',custom_survey_contact_phone='+971501234567'), **intake))).insert()
     plain = opportunity()
     check(not plain.custom_site_survey_request, "no survey without survey options")
-    staged = opportunity(1,0,custom_survey_step=0,custom_survey_instructions='',custom_survey_location='',custom_survey_contact_phone='')
+    staged = opportunity(1,0,custom_survey_step=0,custom_survey_instructions='',custom_survey_location='',custom_survey_contact_name='',custom_survey_contact_phone='')
     check(not staged.custom_site_survey_request, 'no request before instructions confirmed')
     staged.custom_survey_instructions = 'Inspect camera coverage and cable routes.'
     staged.custom_survey_step = 1
@@ -75,12 +84,18 @@ try:
     staged.reload()
     staged.custom_survey_step = 3
     staged.custom_survey_contact_phone = '+971501234567'
+    rejects(staged.save,'contact name required before dispatch')
+    staged.reload()
+    staged.custom_survey_step = 3
+    staged.custom_survey_contact_phone = '+971501234567'
+    staged.custom_survey_contact_name = 'Site contact'
     staged.save()
     staged.reload()
     dispatched = frappe.get_doc('Site Survey Request',staged.custom_site_survey_request)
     check(dispatched.custom_survey_instructions==staged.custom_survey_instructions and dispatched.site_address==staged.custom_survey_location and dispatched.contact_phone==staged.custom_survey_contact_phone,'complete instructions location and phone reach Projects')
     dispatched.save()
     check(dispatched.contact_phone==staged.custom_survey_contact_phone,'survey phone retained on later saves')
+    check(dispatched.contact_person==staged.custom_survey_contact_name,'survey contact name retained on later saves')
     staged.save()
     check(frappe.db.count('Site Survey Request',{'opportunity':staged.name})==1,'repeated final save creates no duplicate')
     for elv, tech in ((1,0), (0,1), (1,1)):
@@ -180,6 +195,7 @@ try:
                     check(project > 0 and items[project-1].link_to=="Site Survey Request", "survey immediately before Project "+n)
     print("PASS",len(checks),"checks")
 finally:
+    frappe.enqueue = original_enqueue
     frappe.db.rollback()
     frappe.clear_cache()
     frappe.destroy()
