@@ -12,7 +12,9 @@ def execute():
     create_custom_fields({
         "Opportunity": [
             dict(fieldname="custom_business_type", label="Supply / Service", fieldtype="Select", options="\nSupply\nService\nSupply and Installation", insert_after="sales_stage", mandatory_depends_on="eval:doc.__islocal || doc.custom_business_type"),
-            dict(fieldname="custom_service_type", label="Service Type", fieldtype="Select", options="\nAMC\nNew Service Opportunity", insert_after="custom_business_type", depends_on="eval:doc.custom_business_type === 'Service'", mandatory_depends_on="eval:doc.custom_business_type === 'Service'"),
+            dict(fieldname="custom_service_type", label="Service Type", fieldtype="Select", options="\nCCTV\n3CX\nELV", insert_after="custom_business_type", depends_on="eval:doc.custom_business_type === 'Service'", mandatory_depends_on="eval:doc.custom_business_type === 'Service'"),
+            dict(fieldname="custom_service_survey", label="Site Survey Requirement", fieldtype="Select", options="\nSite Survey by ELV\nSite Survey by Technical Team\nNo Site Survey Required", insert_after="custom_service_type", depends_on="eval:doc.custom_business_type === 'Service' && ['CCTV','3CX','ELV'].includes(doc.custom_service_type)", mandatory_depends_on="eval:doc.custom_business_type === 'Service'"),
+            dict(fieldname="custom_service_details", label="Service Details", fieldtype="Small Text", insert_after="custom_service_survey", depends_on="eval:doc.custom_business_type === 'Service' && doc.custom_service_survey", mandatory_depends_on="eval:doc.custom_business_type === 'Service'"),
             dict(fieldname="custom_installation_type", label="Installation Type", fieldtype="Select", options="\nCCTV\n3CX\nNetworking\nOther", insert_after="custom_service_type", depends_on="eval:doc.custom_business_type === 'Supply and Installation'", mandatory_depends_on="eval:doc.custom_business_type === 'Supply and Installation'"),
             dict(fieldname="custom_camera_count", label="Number of Cameras", fieldtype="Int", insert_after="custom_installation_type", depends_on="eval:doc.custom_business_type === 'Supply and Installation' && doc.custom_installation_type === 'CCTV'", mandatory_depends_on="eval:doc.custom_business_type === 'Supply and Installation' && doc.custom_installation_type === 'CCTV'"),
             dict(fieldname="custom_site_survey_needed", label="Site Survey Required?", fieldtype="Select", options="\nYes\nNo", insert_after="custom_camera_count", depends_on="eval:doc.custom_business_type === 'Supply and Installation' && doc.custom_installation_type === 'CCTV' && doc.custom_camera_count >= 30", mandatory_depends_on="eval:doc.custom_business_type === 'Supply and Installation' && doc.custom_installation_type === 'CCTV' && doc.custom_camera_count >= 30"),
@@ -23,7 +25,10 @@ def execute():
             dict(fieldname="custom_site_survey_request", label="Projects — Site Survey Request", fieldtype="Link", options="Site Survey Request",
                  insert_after="custom_technical_site_survey_required", read_only=1, no_copy=1,
                  depends_on="eval:doc.custom_site_survey_request")],
+        "Site Survey Request": [
+            dict(fieldname="custom_service_details", label="Service Details", fieldtype="Small Text", read_only=1, fetch_from="opportunity.custom_service_details", insert_after="opportunity", depends_on="eval:doc.custom_service_details")],
         "Presales Request": [
+            dict(fieldname="custom_service_details", label="Service Details", fieldtype="Small Text", read_only=1, fetch_from="opportunity.custom_service_details", insert_after="opportunity", depends_on="eval:doc.custom_service_details"),
             dict(fieldname="custom_site_survey_request", label="Site Survey Request", fieldtype="Link", options="Site Survey Request",
                  insert_after="site_visit", read_only=1, no_copy=1),
             dict(fieldname="custom_survey_results", label="Site Survey Results", fieldtype="Text Editor", read_only=1,

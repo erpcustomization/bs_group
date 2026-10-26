@@ -3,7 +3,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt
 
-FIELDS = ("custom_business_type", "custom_service_type", "custom_installation_type", "custom_camera_count", "custom_site_survey_needed")
+FIELDS = ("custom_business_type", "custom_service_type", "custom_service_survey", "custom_service_details", "custom_installation_type", "custom_camera_count", "custom_site_survey_needed")
 
 
 def no_presales(doc):
@@ -19,8 +19,13 @@ def validate(doc, method=None):
         return
     if kind not in ("Supply", "Service", "Supply and Installation"):
         frappe.throw(_("Choose Supply, Service or Supply and Installation."))
-    if kind == "Service" and doc.get("custom_service_type") not in ("AMC", "New Service Opportunity"):
-        frappe.throw(_("Choose AMC or New Service Opportunity."))
+    if kind == "Service":
+        if doc.get("custom_service_type") not in ("CCTV", "3CX", "ELV"):
+            frappe.throw(_("Choose CCTV, 3CX or ELV as the Service Type."))
+        if doc.get("custom_service_survey") not in ("Site Survey by ELV", "Site Survey by Technical Team", "No Site Survey Required"):
+            frappe.throw(_("Choose the service site survey requirement."))
+        if not (doc.get("custom_service_details") or "").strip():
+            frappe.throw(_("Enter the service details."))
     if kind == "Supply and Installation":
         if doc.get("custom_installation_type") not in ("CCTV", "3CX", "Networking", "Other"):
             frappe.throw(_("Choose CCTV, 3CX, Networking or Other."))
@@ -39,6 +44,10 @@ def validate(doc, method=None):
             frappe.throw(_("An active Presales Request already exists. Resolve it before changing to a category that does not require presales."))
         if any(cint(doc.get(f)) for f in ("custom_presales_required", "custom_elv_site_survey_required", "custom_technical_site_survey_required")):
             frappe.throw(_("Presales support and site survey are not available for Supply or CCTV with fewer than 30 cameras. Proceed to the Deal Cost Sheet."))
+    if kind == "Service":
+        doc.custom_elv_site_survey_required = int(doc.custom_service_survey == "Site Survey by ELV")
+        doc.custom_technical_site_survey_required = int(doc.custom_service_survey == "Site Survey by Technical Team")
+        doc.custom_presales_required = int(bool(doc.custom_elv_site_survey_required or doc.custom_technical_site_survey_required))
     if kind == "Supply and Installation" and doc.custom_installation_type == "CCTV" and cint(doc.custom_camera_count) >= 30:
         needed = int(doc.custom_site_survey_needed == "Yes")
         doc.custom_presales_required = needed
@@ -46,6 +55,8 @@ def validate(doc, method=None):
         doc.custom_technical_site_survey_required = 0
     if kind != "Service":
         doc.custom_service_type = None
+        doc.custom_service_survey = None
+        doc.custom_service_details = None
     if kind != "Supply and Installation":
         doc.custom_installation_type = None
     if kind != "Supply and Installation" or doc.custom_installation_type != "CCTV":
