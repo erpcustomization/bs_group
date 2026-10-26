@@ -24,6 +24,12 @@
                     amount.set_focus();
                     return;
                 }
+                if (frm.is_new()) {
+                    frm._supply_open_dcs = true;
+                    frappe.show_alert({message:__('Value confirmed. Click Submit Opportunity to create the Opportunity and open the Deal Cost Sheet.'),indicator:'green'});
+                    frm.trigger('bsi_update_submit');
+                    return;
+                }
                 frm._supply_handoff = true;
                 button.disabled = true;
                 try {

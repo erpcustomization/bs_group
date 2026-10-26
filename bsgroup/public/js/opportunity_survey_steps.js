@@ -40,12 +40,18 @@
                         await frm.set_value(name,value);
                         if (index === 2) await frm.set_value('custom_survey_contact_name',contactName);
                         await frm.set_value('custom_survey_step',index + 1);
-                        await frm.save();
-                        if (frm.is_dirty() || frm.is_new()) {
-                            await frm.set_value('custom_survey_step',previous);
-                            return;
+                        const draft = frm.is_new();
+                        if (!draft) {
+                            await frm.save();
+                            if (frm.is_dirty()) {
+                                await frm.set_value('custom_survey_step',previous);
+                                return;
+                            }
                         }
-                        frappe.show_alert({message:__(index === 2 ? 'Survey request saved and sent to Projects.' : 'Saved. Complete the next step.'),indicator:'green'});
+                        frappe.show_alert({message:__(draft
+                            ? (index === 2 ? 'Details confirmed. Click Submit Opportunity when ready.' : 'Confirmed. Complete the next step.')
+                            : (index === 2 ? 'Survey request saved and sent to Projects.' : 'Saved. Complete the next step.')),indicator:'green'});
+                        frm.trigger('bsi_update_submit');
                         render(frm);
                         if (index < 2) (index === 1 && contact ? contact : frm.fields_dict[fields[index+1]]).set_focus();
                     } catch (error) {
