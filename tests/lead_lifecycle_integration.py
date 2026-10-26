@@ -39,6 +39,14 @@ def hooks(hook=None, *args, **kwargs):
         result["Opportunity"]["validate"] = ["bsgroup.opportunity_intake.validate"]
     return result
 frappe.get_hooks = hooks
+original_enqueue = frappe.enqueue
+def enqueue(method, *args, **kwargs):
+    # These fixture deletions are rolled back, so their after-commit cleanup
+    # never runs. Avoid depending on the unrelated local worker queue capacity.
+    if method == "frappe.model.delete_doc.delete_dynamic_links" and kwargs.get("enqueue_after_commit"):
+        return None
+    return original_enqueue(method, *args, **kwargs)
+frappe.enqueue = enqueue
 
 checks = []
 def check(condition, name):
@@ -170,6 +178,7 @@ try:
         raise AssertionError("permission check missing")
     print("PASS", len(checks), "checks:", "; ".join(checks))
 finally:
+    frappe.enqueue = original_enqueue
     frappe.db.rollback()
     frappe.set_user("Administrator")
     frappe.clear_cache(doctype="Lead")
