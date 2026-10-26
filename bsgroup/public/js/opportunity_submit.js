@@ -9,6 +9,9 @@
         const kind = value(frm,'custom_business_type');
         if (!kind) return false;
         for (const field of Object.values(frm.fields_dict)) {
+            // Hidden and read-only defaults are validated by Frappe on save;
+            // only fields the user can complete should gate this button.
+            if (field.get_status && field.get_status() !== 'Write') continue;
             if (field.df.reqd && !['Section Break','Column Break','Tab Break','HTML','Button'].includes(field.df.fieldtype)
                 && !filled(value(frm,field.df.fieldname))) return false;
         }
