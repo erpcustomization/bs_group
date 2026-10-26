@@ -43,6 +43,7 @@ def rejects(fn, title):
         raise AssertionError(title)
 
 try:
+    site_survey_setup.ensure_navigation()
     customer = frappe.get_doc(dict(doctype="Customer", customer_name="Survey integration fixture", customer_type="Company")).insert()
     company = frappe.db.get_value("Company", {}, "name")
     def opportunity(elv=0, technical=0):
@@ -103,11 +104,14 @@ try:
     survey.requested_by = "Guest"
     rejects(survey.save, "request origin cannot be forged")
     # Setup is repeatable and must not insert duplicate navigation entries.
-    for dt in ("Sidebar", "Workspace Sidebar"):
+    for dt in ("Sidebar", "Workspace Sidebar", "Custom Sidebar"):
         if frappe.db.exists("DocType",dt):
             for n in frappe.get_all(dt,pluck="name"):
-                items=frappe.get_doc(dt,n).get("items") or []
+                items=frappe.get_doc(dt,n).get("sidebar_items" if dt == "Custom Sidebar" else "items") or []
                 check(sum(r.link_to=="Site Survey Request" for r in items)<=1, "unique survey sidebar link "+n)
+                project = next((i for i,r in enumerate(items) if r.link_type=="DocType" and r.link_to=="Project"),None)
+                if project is not None:
+                    check(project > 0 and items[project-1].link_to=="Site Survey Request", "survey immediately before Project "+n)
     print("PASS",len(checks),"checks")
 finally:
     frappe.db.rollback()
