@@ -41,18 +41,24 @@ def execute():
 
 def ensure_navigation():
     # Update the current sidebar documents in place, preserving unrelated links.
-    for doctype in ("Sidebar", "Workspace Sidebar"):
+    for doctype in ("Sidebar", "Workspace Sidebar", "Custom Sidebar"):
         if not frappe.db.exists("DocType", doctype):
             continue
         for name in frappe.get_all(doctype, pluck="name"):
             nav = frappe.get_doc(doctype, name)
-            rows = nav.get("items") or []
+            table = "sidebar_items" if doctype == "Custom Sidebar" else "items"
+            rows = nav.get(table) or []
             project = next((r for r in rows if r.link_type == "DocType" and r.link_to == "Project"), None)
-            if not project or any(r.link_to == "Site Survey Request" for r in rows):
+            if not project:
                 continue
-            row = nav.append("items", dict(type="Link", label="Site Survey Request", link_type="DocType",
-                link_to="Site Survey Request", icon="clipboard-list", child=project.child or 0,
-                indent=project.indent or 0))
+            row = next((r for r in rows if r.link_to == "Site Survey Request"), None)
+            if row and rows.index(row) == rows.index(project) - 1 and row.child == project.child:
+                continue
+            if not row:
+                row = nav.append(table, dict(type="Link", label="Site Survey Request", link_type="DocType",
+                    link_to="Site Survey Request", icon="clipboard-list", child=project.child or 0,
+                    indent=project.indent or 0, added=0))
+            row.child = project.child or 0
             rows.remove(row)
             rows.insert(rows.index(project), row)
             for idx, item in enumerate(rows, 1):
