@@ -24,7 +24,7 @@ def validate(doc, method=None):
             frappe.throw(_("Choose CCTV, 3CX or ELV as the Service Type."))
         if doc.get("custom_service_survey") not in ("Site Survey by ELV", "Site Survey by Technical Team", "No Site Survey Required"):
             frappe.throw(_("Choose the service site survey requirement."))
-        if not (doc.get("custom_service_details") or "").strip():
+        if doc.get("custom_service_survey") == "No Site Survey Required" and not (doc.get("custom_service_details") or "").strip():
             frappe.throw(_("Enter the service details."))
     if kind == "Supply and Installation":
         if doc.get("custom_installation_type") not in ("CCTV", "3CX", "Networking", "Other"):
@@ -64,6 +64,30 @@ def validate(doc, method=None):
         doc.custom_site_survey_needed = None
     elif cint(doc.custom_camera_count) < 30:
         doc.custom_site_survey_needed = None
+    validate_survey_steps(doc, before)
+
+
+def validate_survey_steps(doc, before=None):
+    fields = ("custom_survey_instructions", "custom_survey_location", "custom_survey_contact_phone", "custom_survey_step")
+    if doc.get("custom_site_survey_request") or (before and before.get("custom_site_survey_request")):
+        if before and any(doc.get(f) != before.get(f) for f in fields):
+            frappe.throw(_("The survey request has already been sent. Update its details in Projects."))
+        return
+    selected = cint(doc.get("custom_presales_required")) and any(cint(doc.get(f)) for f in ("custom_elv_site_survey_required", "custom_technical_site_survey_required"))
+    step = cint(doc.get("custom_survey_step")) if selected else 0
+    if step not in (0, 1, 2, 3):
+        frappe.throw(_("Invalid survey confirmation step."))
+    for index, field in enumerate(fields[:3], 1):
+        if step >= index and not (doc.get(field) or "").strip():
+            frappe.throw(_("Complete {0} before confirming this step.").format(doc.meta.get_label(field)))
+    if before and selected:
+        for index, field in enumerate(fields[:2]):
+            if doc.get(field) != before.get(field) and cint(before.get("custom_survey_step")) > index and step > index + 1:
+                step = index
+                break
+    doc.custom_survey_step = step
+    if selected and doc.get("custom_business_type") == "Service":
+        doc.custom_service_details = doc.get("custom_survey_instructions") or None
 
 
 def guard_presales(doc, method=None):

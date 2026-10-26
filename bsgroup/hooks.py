@@ -667,3 +667,4 @@ has_permission["Site Survey Request"] = "bsgroup.site_survey.survey_permission"
 doctype_js["Opportunity"].append("public/js/opportunity_progress.js")
 doctype_list_js["Opportunity"].append("public/js/opportunity_progress_list.js")
 doctype_js["Opportunity"].append("public/js/opportunity_details_layout.js")
+doctype_js["Opportunity"].append("public/js/opportunity_survey_steps.js")

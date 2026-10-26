@@ -35,6 +35,8 @@ def create_requests(doc, method=None):
     existing = frappe.db.get_value("Site Survey Request", {"opportunity": doc.name}, "name")
     if existing:
         return
+    if cint(doc.get("custom_survey_step")) < 3:
+        return
     presales_name = frappe.db.get_value("Presales Request", {
         "opportunity": doc.name, "docstatus": ["<", 2], "status": ["!=", "Cancelled"]})
     if presales_name:
@@ -43,7 +45,7 @@ def create_requests(doc, method=None):
             frappe.throw(_("This Opportunity already has a Presales Request in progress. Arrange its survey from that request before changing the Opportunity."))
     survey = frappe.get_doc({"doctype": "Site Survey Request", "opportunity": doc.name,
                             "status": "Requested", "requested_by": frappe.session.user,
-                            "request_date": nowdate()})
+                            "request_date": nowdate(), "site_address": doc.get("custom_survey_location")})
     survey.flags.from_opportunity = True
     # Intake creation is a bounded consequence of an authorised Opportunity save;
     # sales users do not gain general write access to project/presales documents.
