@@ -105,6 +105,16 @@ try:
     check(dispatched.custom_survey_instructions==staged.custom_survey_instructions and dispatched.site_address==staged.custom_survey_location and dispatched.contact_phone==staged.custom_survey_contact_phone,'complete instructions location and phone reach Projects')
     dispatched.save()
     check(dispatched.survey_request_details == original_details, 'request snapshot cannot be overwritten on survey save')
+    dispatched.assigned_to = 'Administrator'
+    dispatched.save()
+    check(dispatched.status == 'Requested', 'assignee alone does not schedule survey')
+    dispatched.planned_date = frappe.utils.nowdate()
+    dispatched.save()
+    check(dispatched.status == 'Scheduled', 'assignee and date automatically schedule survey')
+    check(frappe.db.get_value('Presales Request', dispatched.presales_request, 'status') == site_survey.WAITING, 'scheduling does not release presales')
+    dispatched.planned_date = None
+    dispatched.save()
+    check(dispatched.status == 'Requested', 'removing schedule date resets requested status')
     check(dispatched.contact_phone==staged.custom_survey_contact_phone,'survey phone retained on later saves')
     check(dispatched.contact_person==staged.custom_survey_contact_name,'survey contact name retained on later saves')
     staged.save()

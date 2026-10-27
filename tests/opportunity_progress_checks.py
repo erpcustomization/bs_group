@@ -17,6 +17,7 @@ def check(expected, surveys=(), presales=(), sheets=(), opportunity=opp):
     checks += 1
 
 check('Open')
+check('Site Survey Scheduled', [frappe._dict(name='S',status='Scheduled',creation=now-timedelta(days=4))])
 for hours, expected in [(0,'Open with Site Survey Team'),(23.99,'Open with Site Survey Team'),(24,'Delayed by Site Survey Team'),(24.01,'Delayed by Site Survey Team'),(48,'2 days - Delayed by Site Survey Team'),(72,'3 days - Delayed by Site Survey Team')]:
     survey = frappe._dict(name='S',status='Requested',creation=now-timedelta(hours=hours))
     check(expected,[survey])
