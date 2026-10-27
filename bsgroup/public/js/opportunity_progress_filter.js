@@ -1,7 +1,7 @@
 (() => {
     const settings = frappe.listview_settings.Opportunity;
     const options = [
-        'Open', 'Open with Site Survey Team', 'Site Survey Scheduled', 'Delayed by Site Survey Team',
+        'Open', 'Open with Site Survey Team', 'Site Survey Scheduled', 'Site Survey Completed', 'Delayed by Site Survey Team',
         'Open with Presales', 'Delayed by Presales', 'Deal Cost Sheet in Progress',
         'Delayed Deal Cost Sheet', 'Site Survey Cancelled', 'Deal Cost Sheet Submitted',
         'Submitted to Sales', 'Ready for Quotation', 'Quoted', 'Quotation',

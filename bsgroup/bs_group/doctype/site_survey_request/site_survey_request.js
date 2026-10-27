@@ -31,7 +31,7 @@ frappe.ui.form.on('Site Survey Request', {
         }
         bar.replaceChildren();
         const done = frm.doc.status === 'Completed';
-        const label = done ? __('Submitted') : __(frm.doc.status || 'Requested');
+        const label = __(frm.doc.status || 'Requested');
         frm.page.set_indicator(label, done ? 'green' : 'blue');
         const button = document.createElement('button');
         button.type = 'button';
@@ -39,8 +39,9 @@ frappe.ui.form.on('Site Survey Request', {
         button.textContent = __('Submit Survey');
         button.hidden = done || frm.doc.status === 'Cancelled' || !frm.perm?.some(p => p.write);
         button.onclick = async () => {
-            if (frm._submitting_survey) return;
-            if (!frappe.utils.strip_html(frm.doc.results || '').trim()) {
+            if (frm._submitting_survey || frm._saving_survey_schedule) return;
+            const results = frm.fields_dict?.results?.get_value?.() ?? frm.doc.results;
+            if (!frappe.utils.strip_html(results || '').trim()) {
                 frappe.msgprint(__('Enter the site survey results before submitting.'));
                 return;
             }
@@ -48,6 +49,7 @@ frappe.ui.form.on('Site Survey Request', {
             frm._submitting_survey = true;
             button.disabled = true;
             try {
+                await frm.set_value('results', results);
                 await frm.set_value('status', 'Completed');
                 await frm.save();
                 if (frm.is_dirty()) await frm.set_value('status', previous);
