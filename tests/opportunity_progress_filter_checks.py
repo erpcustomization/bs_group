@@ -11,6 +11,11 @@ from bsgroup.opportunity_progress import resolve_many
 from bsgroup.opportunity_progress_filter import get, get_count, matches, split_filters
 
 try:
+    assert matches('3 days - Delayed by Presales', '=', 'Delayed by Presales')
+    assert matches('2 days - Delayed by Site Survey Team', '=', 'Pending from Site Survey Team')
+    assert matches('3 days - Delayed by Presales', 'in', ['Delayed by Presales'])
+    assert not matches('3 days - Delayed by Presales', '=', '2 days - Delayed by Presales')
+    assert not matches('3 days - Delayed by Presales', '!=', 'Delayed by Presales')
     assert matches('Delayed by Presales', '=', 'Delayed by Presales')
     assert not matches('Delayed by Presales', '=', 'Open')
     assert matches('Delayed by Presales', 'like', '%Presales')
