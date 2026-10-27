@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import now_datetime, strip_html
+from frappe.utils import getdate, now_datetime, strip_html
 from bsgroup.site_survey import WAITING, RECEIVED, request_details
 
 
@@ -14,7 +14,11 @@ class SiteSurveyRequest(Document):
             frappe.throw(_("The linked Opportunity cannot be changed."))
         if before:
             for field in ("requested_by", "request_date", "presales_request"):
-                if self.get(field) != before.get(field):
+                current, original = self.get(field), before.get(field)
+                if field == "request_date":
+                    current = getdate(current) if current else None
+                    original = getdate(original) if original else None
+                if current != original:
                     frappe.throw(_("The request origin and linked Presales Request cannot be changed."))
         opp = frappe.get_doc("Opportunity", self.opportunity)
         self.survey_request_details = (before.get("survey_request_details") if before else None) or request_details(opp)
