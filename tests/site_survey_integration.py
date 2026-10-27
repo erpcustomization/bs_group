@@ -109,7 +109,11 @@ try:
     dispatched.save()
     check(dispatched.status == 'Requested', 'assignee alone does not schedule survey')
     dispatched.planned_date = frappe.utils.nowdate()
+    # Browser saves send dates as strings, unlike a freshly loaded Python document.
+    dispatched = frappe.get_doc(frappe.parse_json(frappe.as_json(dispatched.as_dict())))
     dispatched.save()
+    dispatched.reload()
+    check(dispatched.assigned_to == 'Administrator' and str(dispatched.planned_date) == frappe.utils.nowdate(), 'browser schedule persists after reload')
     check(dispatched.status == 'Scheduled', 'assignee and date automatically schedule survey')
     check(frappe.db.get_value('Presales Request', dispatched.presales_request, 'status') == site_survey.WAITING, 'scheduling does not release presales')
     dispatched.planned_date = None
