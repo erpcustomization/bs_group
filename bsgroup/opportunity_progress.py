@@ -4,8 +4,11 @@ from frappe.utils import get_datetime, now_datetime
 
 
 def timed(label, delayed, started, now):
-    late = bool(started and (now - get_datetime(started)).total_seconds() > 86400)
-    return dict(label=delayed if late else label, color="red" if late else "blue", started=started)
+    seconds = (now - get_datetime(started)).total_seconds() if started else 0
+    late = seconds >= 86400
+    days = int(seconds // 86400)
+    display = f"{days} days - {delayed}" if late and days >= 2 else delayed if late else label
+    return dict(label=display, color="red" if late else "blue", started=started)
 
 
 def resolve(opportunity, surveys, presales, sheets, now=None):
@@ -15,7 +18,7 @@ def resolve(opportunity, surveys, presales, sheets, now=None):
         return dict(label=native, color="red" if native == "Lost" else "green")
     active_surveys = [s for s in surveys if s.status not in ("Completed", "Cancelled")]
     if active_surveys:
-        return timed("Open with Site Survey Team", "Pending from Site Survey Team", active_surveys[0].creation, now)
+        return timed("Open with Site Survey Team", "Delayed by Site Survey Team", active_surveys[0].creation, now)
     live_sheets = [s for s in sheets if s.docstatus < 2 and s.get("custom_record_authority") != "Superseded"]
     if live_sheets:
         sheet = live_sheets[0]

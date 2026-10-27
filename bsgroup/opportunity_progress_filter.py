@@ -8,19 +8,24 @@ from bsgroup.opportunity_progress import resolve_many
 
 
 def matches(label, operator, value):
+    def equal(value):
+        # Keep saved legacy filters valid; category filters include every delay age.
+        if value == "Pending from Site Survey Team":
+            value = "Delayed by Site Survey Team"
+        return label == value or re.sub(r"^\d+ days - ", "", label) == value
     operator = operator.lower()
     if operator in ("in", "not in"):
         values = value if isinstance(value, list) else [v.strip() for v in str(value).split(",")]
-        result = label in values
+        result = any(equal(v) for v in values)
         return not result if operator == "not in" else result
     if operator in ("like", "not like"):
         pattern = "".join(".*" if c == "%" else "." if c == "_" else re.escape(c) for c in str(value))
         result = bool(re.fullmatch(pattern, label, re.IGNORECASE))
         return not result if operator == "not like" else result
     if operator == "=":
-        return label == value
+        return equal(value)
     if operator == "!=":
-        return label != value
+        return not equal(value)
     if operator == "is":
         return bool(label) if value == "set" else not label
     frappe.throw("Use Equals, Not Equals, In, Not In, Like, Not Like or Is for Status.")
