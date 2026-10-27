@@ -5,6 +5,13 @@
         if (!details) return;
         let box = details.querySelector('.bsi-source-lead');
         const lead = frm.doc.opportunity_from === 'Lead' && frm.doc.party_name;
+        root.classList.toggle('bsi-has-source-lead', !!lead);
+        if (!root.querySelector('.bsi-source-lead-style')) {
+            const style = document.createElement('style');
+            style.className = 'bsi-source-lead-style';
+            style.textContent = '.bsi-has-source-lead #opportunity-__details .form-links{display:none!important}';
+            root.append(style);
+        }
         frm.set_df_property('party_name', 'read_only', lead ? 1 : 0);
         if (!lead) { box?.remove(); return; }
         if (!box) {
@@ -13,6 +20,8 @@
             box.style.cssText = 'background:#eef3fb;border:1px solid #dfe7f2;border-radius:10px;padding:14px;margin:10px 0;color:#172b4d';
             details.append(box);
         }
+        const dashboard = details.querySelector('.form-dashboard');
+        if (dashboard && box.nextElementSibling !== dashboard) dashboard.before(box);
         if (box.dataset.lead === lead) return;
         box.dataset.lead = lead;
         box.textContent = __('Loading Lead details…');
@@ -79,7 +88,7 @@
             additional.prepend(host);
         }
         const sections = new Set();
-        for (const name of ['custom_next_action','custom_next_action_date','custom_margin','custom_sales_updates','currency','utm_source','company']) {
+        for (const name of ['custom_next_action','custom_next_action_date','custom_margin','custom_sales_updates','custom_stage_history','currency','utm_source','company']) {
             const wrapper = frm.fields_dict[name]?.$wrapper?.[0];
             const section = wrapper?.closest('.form-section');
             if (section && details.contains(section) && !section.contains(business) && !section.contains(amount)) sections.add(section);
