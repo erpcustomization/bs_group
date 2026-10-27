@@ -14,9 +14,15 @@ const bsi_lead_lifecycle = (() => {
         try {
             if (frm.is_dirty()) await frm.save();
             if (frm.is_new() || frm.is_dirty()) return;
-            await frappe.model.open_mapped_doc({
-                method: 'bsgroup.lead_lifecycle.make_opportunity', frm: frm
+            const result = await frappe.call({
+                method: 'bsgroup.lead_lifecycle.confirm_opportunity',
+                args: {source_name: frm.doc.name, subject: frm.doc.title || frm.doc.company_name || frm.doc.lead_name},
+                freeze: true, freeze_message: __('Creating Opportunity…')
             });
+            if (!result.exc && result.message) {
+                await frm.reload_doc();
+                frappe.show_alert({message:__('Opportunity created: {0}', [result.message]),indicator:'green'});
+            }
         } finally { frm._bsi_converting = false; }
     }
     function followup(frm) { frm.trigger('bsi_lead_submission_changed'); }

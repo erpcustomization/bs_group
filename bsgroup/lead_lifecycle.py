@@ -173,7 +173,7 @@ def opportunity_deleted(doc, method=None):
 
 @frappe.whitelist()
 def confirm_opportunity(source_name, subject, opportunity_amount=None, intake=None):
-    """Create one real Opportunity only after the salesperson confirms OK."""
+    """Create the linked Opportunity; qualification may follow the Lead conversion."""
     lead = frappe.get_doc("Lead", source_name)
     lead.check_permission("write")
     subject = (subject or "").strip()
@@ -186,6 +186,7 @@ def confirm_opportunity(source_name, subject, opportunity_amount=None, intake=No
     opportunity.opportunity_owner = frappe.session.user
     from bsgroup.opportunity_intake import FIELDS
     intake = frappe.parse_json(intake) if intake else {}
+    opportunity.flags.deferred_lead_intake = not intake
     for field in FIELDS:
         opportunity.set(field, intake.get(field))
     opportunity.company = lead.company

@@ -17,6 +17,13 @@ def no_presales(doc):
 
 def validate(doc, method=None):
     kind = doc.get("custom_business_type")
+    if not kind and doc.is_new() and doc.opportunity_from == "Lead" and doc.flags.get("deferred_lead_intake"):
+        # A Lead status change creates an Open Opportunity before qualification.
+        # Do not invent a business type or dispatch any survey/presales work.
+        doc.custom_presales_required = 0
+        doc.custom_elv_site_survey_required = 0
+        doc.custom_technical_site_survey_required = 0
+        return
     # Historical records remain editable without inventing their classification.
     if not kind and not doc.is_new():
         return
