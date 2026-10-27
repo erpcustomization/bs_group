@@ -11,7 +11,6 @@ const bsi_lead_lifecycle = (() => {
     function convert(frm) {
         return frappe.prompt([{fieldname:'subject',fieldtype:'Data',label:__('Opportunity subject'),reqd:1,
             default:frm.doc.company_name || frm.doc.lead_name || ''},
-            {fieldname:'opportunity_amount',fieldtype:'Currency',label:__('Opportunity Amount'),reqd:1},
             {fieldname:'custom_business_type',fieldtype:'Select',label:__('Supply / Service'),options:'\nSupply\nService\nSupply and Installation',reqd:1},
             {fieldname:'custom_service_type',fieldtype:'Select',label:__('Service Type'),options:'\nCCTV\n3CX\nELV\nNetworking & Security\nStructured Cabling & Fiber\nUnified Communications & Intercom\nIT Infrastructure - Multi Solution',depends_on:"eval:doc.custom_business_type === 'Service'",mandatory_depends_on:"eval:doc.custom_business_type === 'Service'"},
             {fieldname:'custom_service_survey',fieldtype:'Select',label:__('Site Survey Requirement'),options:'\nSite Survey by ELV\nSite Survey by Technical Team\nNo Site Survey Required',depends_on:"eval:doc.custom_business_type === 'Service' && doc.custom_service_type",mandatory_depends_on:"eval:doc.custom_business_type === 'Service'"},
@@ -25,7 +24,7 @@ const bsi_lead_lifecycle = (() => {
                 if (frm.is_new() || frm.is_dirty()) await frm.save();
                 if (frm.is_new() || frm.is_dirty()) return;
                 const result = await frappe.call({method:'bsgroup.lead_lifecycle.confirm_opportunity',
-                    args:{source_name:frm.doc.name,subject:values.subject,opportunity_amount:values.opportunity_amount,intake:values},freeze:true});
+                    args:{source_name:frm.doc.name,subject:values.subject,intake:values},freeze:true});
                 if (!result.exc && result.message) {
                     await frm.reload_doc();
                     frappe.show_alert({message:__('Opportunity created: {0}', [result.message]),indicator:'green'});
