@@ -3,7 +3,7 @@ frappe.ui.form.on('Site Survey Request', {
         for (const field of ['custom_service_details', 'custom_survey_instructions', 'title',
             'organization', 'company', 'currency', 'opportunity_amount', 'presales_request',
             'sales_details', 'salesperson', 'salesperson_name', 'requested_by',
-            'contact_person', 'contact_email', 'contact_phone']) {
+            'contact_person', 'contact_email', 'contact_phone', 'site_address']) {
             frm.set_df_property(field, 'hidden', 1);
         }
         const root = frm.page.wrapper[0] || frm.page.wrapper;
