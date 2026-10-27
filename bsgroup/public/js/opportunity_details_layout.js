@@ -9,7 +9,7 @@
         if (!root.querySelector('.bsi-source-lead-style')) {
             const style = document.createElement('style');
             style.className = 'bsi-source-lead-style';
-            style.textContent = '.bsi-has-source-lead #opportunity-__details .form-links{display:none!important}';
+            style.textContent = '#opportunity-__details .form-links{display:none!important}';
             root.append(style);
         }
         frm.set_df_property('party_name', 'read_only', lead ? 1 : 0);
