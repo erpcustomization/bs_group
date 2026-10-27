@@ -1,4 +1,45 @@
 (() => {
+    async function leadDetails(frm) {
+        const root = frm.wrapper[0] || frm.wrapper;
+        const details = root.querySelector('#opportunity-__details');
+        if (!details) return;
+        let box = details.querySelector('.bsi-source-lead');
+        const lead = frm.doc.opportunity_from === 'Lead' && frm.doc.party_name;
+        frm.set_df_property('party_name', 'read_only', lead ? 1 : 0);
+        if (!lead) { box?.remove(); return; }
+        if (!box) {
+            box = document.createElement('section');
+            box.className = 'bsi-source-lead';
+            box.style.cssText = 'background:#eef3fb;border:1px solid #dfe7f2;border-radius:10px;padding:14px;margin:10px 0;color:#172b4d';
+            details.append(box);
+        }
+        if (box.dataset.lead === lead) return;
+        box.dataset.lead = lead;
+        box.textContent = __('Loading Lead details…');
+        try {
+            const result = await frappe.db.get_value('Lead', lead,
+                ['title','lead_name','company_name','email_id','mobile_no','phone','custom_requirement']);
+            if (frm.doc.party_name !== lead || !box.isConnected) return;
+            const data = result.message || {};
+            box.replaceChildren();
+            const heading = document.createElement('h5');
+            heading.textContent = __('Lead details / request');
+            box.append(heading);
+            for (const [label, value] of [['Lead ID',lead],['Title',data.title],['Organization',data.company_name],
+                ['Contact',data.lead_name],['Email',data.email_id],['Phone',data.mobile_no || data.phone],['Request',data.custom_requirement]]) {
+                if (!value) continue;
+                const row = document.createElement('div');
+                row.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere;margin-top:5px';
+                const caption = document.createElement('strong');
+                caption.textContent = __(label) + ': ';
+                row.append(caption, document.createTextNode(String(value)));
+                box.append(row);
+            }
+        } catch (error) {
+            box.textContent = __('Lead details could not be loaded. Check access to the linked Lead.');
+            delete box.dataset.lead;
+        }
+    }
     function arrange(frm) {
         const root = frm.wrapper[0] || frm.wrapper;
         const details = root.querySelector('#opportunity-__details');
@@ -46,7 +87,7 @@
         for (const section of sections) host.append(section);
     }
     frappe.ui.form.on('Opportunity', {
-        refresh: arrange,
+        refresh(frm) { arrange(frm); return leadDetails(frm); },
         custom_business_type: arrange
     });
 })();

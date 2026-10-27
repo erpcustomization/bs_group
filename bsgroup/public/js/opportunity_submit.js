@@ -5,10 +5,11 @@
     };
     const filled = v => Array.isArray(v) ? v.length > 0 : v !== null && v !== undefined && String(v).trim() !== '';
     function ready(frm) {
-        if (!filled(value(frm,'party_name')) || !filled(value(frm,'custom_subject')) || !(Number(value(frm,'opportunity_amount')) > 0)) return false;
+        if (!filled(value(frm,'party_name')) || !filled(value(frm,'custom_subject')) || (frm.doc.opportunity_from !== 'Lead' && !(Number(value(frm,'opportunity_amount')) > 0))) return false;
         const kind = value(frm,'custom_business_type');
         if (!kind) return false;
         for (const field of Object.values(frm.fields_dict)) {
+            if (frm.doc.opportunity_from === 'Lead' && field.df.fieldname === 'opportunity_amount') continue;
             // Hidden and read-only defaults are validated by Frappe on save;
             // only fields the user can complete should gate this button.
             if (field.get_status && field.get_status() !== 'Write') continue;

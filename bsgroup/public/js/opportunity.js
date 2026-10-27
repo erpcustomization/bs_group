@@ -126,7 +126,7 @@ function reduce_subject_height(frm){
 frappe.ui.form.on('Opportunity', {
     onload(frm) {
         if (!frm.is_new()) return;
-        frm.set_df_property('opportunity_amount', 'reqd', 1);
+        frm.set_df_property('opportunity_amount', 'reqd', frm.doc.opportunity_from !== 'Lead');
         const convertedLead = frm.doc.opportunity_from === 'Lead' && !!frm.doc.party_name;
         if (!convertedLead) {
             if (frm.doc.opportunity_from !== 'Customer') {

@@ -79,6 +79,9 @@ def validate(doc, method=None):
 
 def guard_conversion(doc, method=None):
     if doc.opportunity_from == "Lead" and doc.party_name:
+        frappe.db.sql("SELECT name FROM `tabLead` WHERE name=%s FOR UPDATE", doc.party_name)
+        if linked_outcome(doc.party_name):
+            frappe.throw(_("This Lead already has an Opportunity. Open the existing Opportunity."))
         if frappe.db.get_value("Lead", doc.party_name, "status") in ("Dropped", "Do Not Contact"):
             frappe.throw(_("Reopen the Lead before converting it to an Opportunity."))
 
@@ -92,7 +95,16 @@ def make_opportunity(source_name):
     if linked_outcome(lead.name):
         frappe.throw(_("This Lead is already closed. Use its existing Connections."))
     from erpnext.crm.doctype.lead.lead import make_opportunity as native_mapper
-    return native_mapper(source_name)
+    opportunity = native_mapper(source_name)
+    opportunity.custom_subject = lead.title or lead.company_name or lead.lead_name
+    opportunity.custom_enquiry = lead.get("custom_requirement") or ""
+    opportunity.custom_organization_name = lead.company_name
+    opportunity.custom_contact_person_name = lead.lead_name
+    opportunity.opportunity_owner = frappe.session.user
+    opportunity.company = lead.company
+    if not opportunity.currency and lead.company:
+        opportunity.currency = frappe.db.get_value("Company", lead.company, "default_currency")
+    return opportunity
 
 
 def mark_delayed():

@@ -48,11 +48,14 @@
                 }
             });
         }
+        const converted = frm.doc.opportunity_from === 'Lead';
+        frm.toggle_reqd('opportunity_amount', !converted);
+        frm.toggle_display('opportunity_amount', !converted || !frm.is_new());
         const supply = frm.doc.custom_business_type === 'Supply';
         button.hidden = !supply || !frm.perm?.some(p => frm.is_new() ? p.create : p.write);
         frm.set_df_property('opportunity_amount', 'label', supply ? __('Opportunity Value') : __('Opportunity Amount'));
         if (supply) {
-            frm.toggle_reqd('opportunity_amount', true);
+            frm.toggle_reqd('opportunity_amount', !converted);
             if (anchor.nextElementSibling !== wrapper) anchor.after(wrapper);
         } else if (wrapper.previousSibling !== frm._supply_amount_home) {
             frm._supply_amount_home.after(wrapper);
@@ -96,7 +99,7 @@
         for (const field of ['expected_closing', 'probability', 'opportunity_owner']) {
             frm.set_df_property(field, 'hidden', 1);
         }
-        frm.set_df_property('opportunity_from', 'hidden', d.opportunity_from === 'Customer');
+        frm.set_df_property('opportunity_from', 'hidden', 1);
         if (!frm.fields_dict.custom_business_type) return;
         supplyValue(frm);
         const cctv = isCctv(d), small = cctv && d.custom_camera_count > 0 && d.custom_camera_count < 30;
@@ -142,7 +145,7 @@
         refresh(frm) { positionStatus(frm); return update(frm); },
         status(frm) { positionStatus(frm); },
         opportunity_from(frm) {
-            frm.set_df_property('opportunity_from', 'hidden', frm.doc.opportunity_from === 'Customer');
+            frm.set_df_property('opportunity_from', 'hidden', 1);
         },
         async custom_business_type(frm) {
             if (!frm.doc.custom_site_survey_request) await frm.set_value({custom_service_survey: '', custom_service_details: ''});
