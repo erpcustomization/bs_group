@@ -9,6 +9,9 @@ frappe.ui.form.on('Site Survey Request', {
             frm.set_df_property(field, 'hidden', 1);
         }
         const root = frm.page.wrapper[0] || frm.page.wrapper;
+        const additional = root.querySelector('#site-survey-request-additional_details');
+        const footer = root.querySelector('.form-footer');
+        if (additional && footer && footer.parentElement !== additional) additional.append(footer);
         root.classList.add('bsi-survey-form');
         if (!root.querySelector('.bsi-survey-style')) {
             const style = document.createElement('style');
