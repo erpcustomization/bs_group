@@ -41,9 +41,16 @@
   "attachment",
   "completed_by",
   "completed_on",
-  "additional_details"
+  "additional_details",
+  "activity_panel"
  ],
  "fields": [
+  {
+   "fieldname": "activity_panel",
+   "label": "Comments and Activity",
+   "fieldtype": "HTML",
+   "options": "<div class=\"bsi-survey-activity-anchor\"></div>"
+  },
   {
    "fieldname": "details_tab",
    "label": "Details",
