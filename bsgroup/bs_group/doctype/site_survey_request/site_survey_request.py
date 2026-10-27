@@ -2,7 +2,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils import now_datetime, strip_html
-from bsgroup.site_survey import WAITING, RECEIVED
+from bsgroup.site_survey import WAITING, RECEIVED, request_details
 
 
 class SiteSurveyRequest(Document):
@@ -15,6 +15,7 @@ class SiteSurveyRequest(Document):
                 if self.get(field) != before.get(field):
                     frappe.throw(_("The request origin and linked Presales Request cannot be changed."))
         opp = frappe.get_doc("Opportunity", self.opportunity)
+        self.survey_request_details = (before.get("survey_request_details") if before else None) or request_details(opp)
         if self.is_new() and not self.flags.from_opportunity:
             frappe.throw(_("Request the site survey from the Opportunity."))
         for target, source in {

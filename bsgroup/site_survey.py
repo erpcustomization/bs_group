@@ -9,6 +9,39 @@ DEFERRED_FIELDS = ("presales_owner", "due_date", "priority", "solution_summary",
 FLAGS = ("custom_elv_site_survey_required", "custom_technical_site_survey_required")
 
 
+def request_details(opportunity):
+    """Plain-text intake snapshot for the survey team, independent of Opportunity access."""
+    teams = []
+    if opportunity.get(FLAGS[0]):
+        teams.append("ELV")
+    if opportunity.get(FLAGS[1]):
+        teams.append("Technical Team")
+    rows = [("Opportunity", opportunity.name),
+        ("Subject", opportunity.get("custom_subject") or opportunity.get("title")),
+        ("Organization", opportunity.get("custom_organization_name")),
+        ("Salesperson", opportunity.get("opportunity_owner")),
+        ("Supply / Service", opportunity.get("custom_business_type")),
+        ("Service Type", opportunity.get("custom_service_type")),
+        ("Installation Type", opportunity.get("custom_installation_type")),
+        ("Number of Cameras", opportunity.get("custom_camera_count")),
+        ("Survey Team", ", ".join(teams)),
+        ("Enquiry / Request", opportunity.get("custom_enquiry")),
+        ("Service Details", opportunity.get("custom_service_details")),
+        ("What exactly should the survey team do?", opportunity.get("custom_survey_instructions")),
+        ("Site Survey Location", opportunity.get("custom_survey_location")),
+        ("Contact Person", opportunity.get("custom_survey_contact_name") or opportunity.get("custom_contact_person_name")),
+        ("Contact Phone", opportunity.get("custom_survey_contact_phone") or opportunity.get("contact_mobile")),
+        ("Contact Email", opportunity.get("contact_email"))]
+    return "\n\n".join(f"{label}:\n{value}" for label, value in rows if value)
+
+
+def backfill_request_details():
+    for row in frappe.get_all("Site Survey Request", fields=["name", "opportunity", "survey_request_details"]):
+        if not row.survey_request_details and frappe.db.exists("Opportunity", row.opportunity):
+            frappe.db.set_value("Site Survey Request", row.name, "survey_request_details",
+                request_details(frappe.get_doc("Opportunity", row.opportunity)), update_modified=False)
+
+
 def survey_selected(doc):
     return cint(doc.get("custom_presales_required")) and any(cint(doc.get(f)) for f in FLAGS)
 

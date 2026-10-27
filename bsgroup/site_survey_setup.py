@@ -59,6 +59,8 @@ def execute():
         make_property_setter("Presales Request", field, "mandatory_depends_on",
             "eval:!doc.custom_site_survey_request || !['Awaiting Site Survey Results','Site Survey Results Received','Cancelled','On Hold'].includes(doc.status)", "Data")
     ensure_navigation()
+    from bsgroup.site_survey import backfill_request_details
+    backfill_request_details()
     frappe.clear_cache()
     return {"status": "ready", "doctype": "Site Survey Request"}
 
