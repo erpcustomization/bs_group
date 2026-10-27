@@ -1,0 +1,8 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+let handlers,bar,saves=0,release,alerts=0;
+function element(){return {className:'',children:[],append(...x){this.children.push(...x)},replaceChildren(){this.children=[]},setAttribute(){}}}
+const root={classList:{add(){}},querySelector(){return true}};
+const host={querySelector(){return bar},prepend(x){bar=x}};
+const frm={page:{wrapper:root,set_indicator(){},clear_primary_action(){}},layout:{wrapper:host},doc:{status:'Requested',results:''},perm:[{write:1}],clear_custom_buttons(){},set_df_property(){},is_dirty(){return false},async set_value(k,v){this.doc[k]=v},async save(){saves++;await new Promise(r=>release=r)}};
+vm.runInNewContext(fs.readFileSync('bsgroup/bs_group/doctype/site_survey_request/site_survey_request.js','utf8'),{document:{createElement:element},__:s=>s,frappe:{ui:{form:{on(t,h){handlers=h}}},utils:{strip_html:s=>s.replace(/<[^>]*>/g,'')},msgprint(){},show_alert(){alerts++}}});
+(async()=>{handlers.refresh(frm);let b=bar.children[0];await b.onclick();assert.equal(saves,0);frm.doc.results='Survey results';let pending=b.onclick();await Promise.resolve();await b.onclick();assert.equal(saves,1);release();await pending;assert.equal(frm.doc.status,'Completed');assert.equal(alerts,1);handlers.refresh(frm);assert(bar.children[0].hidden);assert.equal(bar.children[2].textContent,'Submitted');frm.doc.status='Requested';frm.save=async()=>{throw Error('Save failed')};handlers.refresh(frm);await assert.rejects(bar.children[0].onclick());assert.equal(frm.doc.status,'Requested');console.log('PASS results required, one submission, submitted indicator, failure recovery')})().catch(e=>{console.error(e);process.exitCode=1});
