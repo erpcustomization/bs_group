@@ -135,6 +135,8 @@ try:
     check(lead.get_onload("bsi_sales_responsibility")["source"] == "Lead", "direct Lead assignment is displayed")
     mapped = module.make_opportunity(lead.name)
     check(mapped.is_new(), "mapper returns unsaved Opportunity")
+    check(mapped.custom_enquiry == lead.custom_requirement, "mapped form inherits Lead request")
+    check(mapped.custom_subject == lead.title, "mapped form inherits Lead title")
     check(frappe.db.get_value("Lead", lead.name, "status") == "Delayed", "opening mapper does not close lead")
     mapped.company = lead.company or frappe.db.get_value("Company", {}, "name")
     mapped.currency = frappe.db.get_value("Company", mapped.company, "default_currency")

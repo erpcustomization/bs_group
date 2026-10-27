@@ -18,7 +18,8 @@ vm.runInNewContext(fs.readFileSync(require('path').join(__dirname,'../bsgroup/pu
 });
 async function run(){
   frm.doc.opportunity_amount=0;handlers.refresh(frm);assert(row.hidden);
-  frm.doc.opportunity_amount=100;handlers.bsi_update_submit(frm);assert(!row.hidden);
+  frm.doc.opportunity_from='Lead';handlers.bsi_update_submit(frm);assert(!row.hidden,'Lead conversion can submit without amount');
+  frm.doc.opportunity_from='Customer';frm.doc.opportunity_amount=100;handlers.bsi_update_submit(frm);assert(!row.hidden);
   assert.throws(()=>handlers.validate(frm),/Submit Opportunity/);
   frm.doc.custom_presales_required=1;frm.doc.custom_elv_site_survey_required=1;frm.doc.custom_survey_step=2;
   handlers.bsi_update_submit(frm);assert(row.hidden,'incomplete survey cannot submit');
