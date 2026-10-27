@@ -1,4 +1,6 @@
 frappe.ui.form.on('Site Survey Request', {
+    assigned_to(frm) { return bsi_save_survey_schedule(frm); },
+    planned_date(frm) { return bsi_save_survey_schedule(frm); },
     refresh(frm) {
         for (const field of ['custom_service_details', 'custom_survey_instructions', 'title',
             'organization', 'company', 'currency', 'opportunity_amount', 'presales_request',
@@ -64,3 +66,16 @@ frappe.ui.form.on('Site Survey Request', {
         bar.append(button, caption, status);
     }
 });
+
+async function bsi_save_survey_schedule(frm) {
+    if (frm.is_new() || frm._submitting_survey || frm._saving_survey_schedule ||
+        !['Requested','Scheduled'].includes(frm.doc.status) || !frm.perm?.some(p => p.write)) return;
+    if (!frm.doc.assigned_to || !frm.doc.planned_date) {
+        if (frm.doc.status !== 'Scheduled') return;
+    }
+    frm._saving_survey_schedule = true;
+    try {
+        await frm.save();
+        if (!frm.is_dirty()) frappe.show_alert({message:__('Survey schedule saved.'),indicator:'green'});
+    } finally { frm._saving_survey_schedule = false; }
+}

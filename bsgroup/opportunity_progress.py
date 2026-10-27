@@ -18,6 +18,8 @@ def resolve(opportunity, surveys, presales, sheets, now=None):
         return dict(label=native, color="red" if native == "Lost" else "green")
     active_surveys = [s for s in surveys if s.status not in ("Completed", "Cancelled")]
     if active_surveys:
+        if active_surveys[0].status == "Scheduled":
+            return dict(label="Site Survey Scheduled", color="blue")
         return timed("Open with Site Survey Team", "Delayed by Site Survey Team", active_surveys[0].creation, now)
     live_sheets = [s for s in sheets if s.docstatus < 2 and s.get("custom_record_authority") != "Superseded"]
     if live_sheets:

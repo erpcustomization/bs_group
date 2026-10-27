@@ -8,6 +8,8 @@ from bsgroup.site_survey import WAITING, RECEIVED, request_details
 class SiteSurveyRequest(Document):
     def validate(self):
         before = self.get_doc_before_save()
+        if self.status in ("Requested", "Scheduled"):
+            self.status = "Scheduled" if self.assigned_to and self.planned_date else "Requested"
         if before and self.opportunity != before.opportunity:
             frappe.throw(_("The linked Opportunity cannot be changed."))
         if before:
