@@ -619,7 +619,7 @@ for _dt, _event, _method in (
     # TEMP DISABLED (re-enable later): ("Journal Entry", "before_submit", "validate_payment"),
     # TEMP DISABLED (re-enable later): ("Journal Entry", "before_update_after_submit", "validate_payment"),
     ("Journal Entry", "before_cancel", "lock_payment_sources"),
-    ("Unreconcile Payment", "before_submit", "prevent_unreconcile"),
+    # TEMP DISABLED (re-enable later): ("Unreconcile Payment", "before_submit", "prevent_unreconcile"),
     ("Purchase Invoice", "validate", "validate_inline_payment"),
     ("Purchase Invoice", "before_update_after_submit", "validate_inline_payment"),
     ("Purchase Invoice", "before_cancel", "before_invoice_cancel"),
