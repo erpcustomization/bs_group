@@ -25,7 +25,7 @@ for hours, expected in [(0,'Open with Site Survey Team'),(23.99,'Open with Site 
     check(expected,[survey])
 survey = frappe._dict(name='S',status='Completed',creation=now-timedelta(days=5),completed_on=now)
 pre = frappe._dict(name='P',status='Site Survey Results Received',docstatus=0,custom_site_survey_request='S',creation=now-timedelta(days=5))
-check('Site Survey Completed',[survey],[pre])
+check('Open with Presales',[survey],[pre])
 check('Site Survey Completed',[survey])
 pre.status = 'In Progress'
 check('Open with Presales',[survey],[pre])
