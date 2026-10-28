@@ -1,6 +1,7 @@
 (() => {
     const rootOf = frm => frm.wrapper[0] || frm.wrapper;
     const value = (frm,name) => {
+        if (name === 'lead_owner') return frm.doc.lead_owner;
         const field = frm.fields_dict[name];
         return field?.df.hidden || field?.df.read_only ? frm.doc[name] : (field?.get_value?.() ?? frm.doc[name]);
     };

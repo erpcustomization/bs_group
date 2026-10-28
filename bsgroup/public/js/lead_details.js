@@ -280,6 +280,46 @@ const bsi_customer_brief = (() => {
 
 // Two tabs, using the original controls and their existing save/permission handlers.
 const bsi_lead_focus = (() => {
+    function owner_dropdown(frm, parent) {
+        const field = frm.fields_dict.lead_owner;
+        if (!field) return;
+        // Keep the native model field, but replace its navigable Link UI.
+        field.$wrapper[0].style.display = 'none';
+        let box = parent.querySelector('.bsi-owner-picker');
+        if (!box) {
+            box = document.createElement('div'); box.className = 'bsi-owner-picker frappe-control';
+            const label = document.createElement('label'); label.className = 'control-label'; label.textContent = __('Lead Owner');
+            const select = document.createElement('select'); select.className = 'form-control'; select.setAttribute('aria-label', __('Lead Owner'));
+            label.append(select); box.append(label); parent.append(box);
+            select.addEventListener('change', async () => {
+                if (!select.value) return;
+                await frm.set_value('lead_owner', select.value);
+                frm.trigger('bsi_lead_submission_changed');
+            });
+        }
+        const select = box.querySelector('select');
+        const editable = frm.perm?.some(p => frm.is_new() ? p.create : p.write);
+        select.disabled = true;
+        select.replaceChildren();
+        const current = document.createElement('option'); current.value = frm.doc.lead_owner || '';
+        current.textContent = frappe.user?.full_name?.(frm.doc.lead_owner) || frm.doc.lead_owner || __('Select owner'); select.append(current);
+        if (!editable) return;
+        const generation = (frm._owner_picker_generation || 0) + 1;
+        frm._owner_picker_generation = generation;
+        frappe.call({method:'bsgroup.lead_lifecycle.owner_choices', args:{name:frm.is_new()?null:frm.doc.name,company:frm.doc.company}}).then(result => {
+            if (frm._owner_picker_generation !== generation || result.exc) return;
+            const users = result.message || [], counts = {};
+            users.forEach(user => { counts[user.label] = (counts[user.label] || 0) + 1; });
+            select.replaceChildren(current);
+            users.forEach(user => {
+                const option = document.createElement('option'); option.value = user.value;
+                option.textContent = counts[user.label] > 1 ? `${user.label} (${user.value})` : user.label;
+                if (user.value === current.value) current.remove();
+                select.append(option);
+            });
+            select.value = frm.doc.lead_owner || ''; select.disabled = false;
+        }).catch(() => { select.title = __('Refresh to load Lead owners.'); });
+    }
     const contact = new Set(["title", "first_name", "last_name", "company_name", "email_id", "mobile_no", "phone", "whatsapp_no", "lead_owner"]);
     function refresh(frm) {
         const root = frm.wrapper[0] || frm.wrapper;
@@ -386,6 +426,7 @@ const bsi_lead_focus = (() => {
             tab.refresh();
         }
         if (![detailsTab, extraTab].some(t => t.is_active())) detailsTab.set_active();
+        owner_dropdown(frm, customer);
         // The native Date control saves on Lead with its existing permissions and Save action.
         // Task/event dates remain independent in Additional details.
 

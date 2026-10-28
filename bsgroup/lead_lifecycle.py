@@ -246,6 +246,27 @@ def confirm_opportunity(source_name, subject, opportunity_amount=None, intake=No
 
 
 @frappe.whitelist()
+def owner_choices(name=None, company=None):
+    """Small internal directory for the in-form owner picker, never a User form link."""
+    if name:
+        lead = frappe.get_doc("Lead", name)
+        lead.check_permission("write")
+        company = lead.company
+    elif not frappe.has_permission("Lead", "create"):
+        frappe.throw(_("Not permitted to create Leads."), frappe.PermissionError)
+    from frappe.permissions import get_user_permissions
+    result = []
+    for user in frappe.get_all("User", filters={"enabled": 1, "user_type": "System User"},
+                              fields=["name", "full_name"], order_by="full_name asc"):
+        companies = get_user_permissions(user.name).get("Company", [])
+        allowed = [p.doc for p in companies if not p.get("applicable_for") or p.applicable_for == "Lead"]
+        if company and allowed and company not in allowed:
+            continue
+        result.append({"value": user.name, "label": user.full_name or user.name})
+    return result
+
+
+@frappe.whitelist()
 def list_owner_labels(names, doctype="Lead"):
     """Return profile labels only for owners of Leads the caller can read."""
     if doctype not in ("Lead", "Opportunity"):
