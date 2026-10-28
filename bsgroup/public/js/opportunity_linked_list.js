@@ -1,5 +1,14 @@
 // These records are started from their linked sales workflow, not the list.
 (() => {
+    if (!document.getElementById('bsi-linked-list-actions')) {
+        const style = document.createElement('style');
+        style.id = 'bsi-linked-list-actions';
+        style.textContent = `
+            body:is([data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .page-actions .primary-action,
+            body:is([data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .btn-new-doc { display: none !important; }
+        `;
+        document.head.appendChild(style);
+    }
     for (const doctype of ['Presales Request', 'Deal Cost Sheet', 'Quotation']) {
         const settings = frappe.listview_settings[doctype] ||= {};
         if (settings.bsi_linked_creation_only) continue;
