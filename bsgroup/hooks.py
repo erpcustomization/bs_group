@@ -444,6 +444,14 @@ doc_events = {
     },
 }
 
+for _downstream in ("Presales Request", "Deal Cost Sheet", "Quotation", "Site Survey Request"):
+    for _event in ("before_insert", "before_validate"):
+        _prior = doc_events.setdefault(_downstream, {}).get(_event, [])
+        doc_events[_downstream][_event] = ["bsgroup.opportunity_required.validate"] + ([_prior] if isinstance(_prior, str) else list(_prior))
+    _prior = doctype_js.get(_downstream, [])
+    doctype_js[_downstream] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["public/js/opportunity_required.js"]
+
+
 override_whitelisted_methods = {
     "erpnext.controllers.accounts_controller.update_child_qty_rate": "bsgroup.dcs.quotation_control.update_child_qty_rate",
 	"erpnext.selling.doctype.quotation.quotation.make_sales_order": "bsgroup.dcs.quotation_control.make_sales_order",
