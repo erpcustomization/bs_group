@@ -12,6 +12,8 @@ def matches(label, operator, value):
         # Keep saved legacy filters valid; category filters include every delay age.
         if value == "Pending from Site Survey Team":
             value = "Delayed by Site Survey Team"
+        if value == "Quotation":
+            value = "Quoted"
         return label == value or re.sub(r"^\d+ days - ", "", label) == value
     operator = operator.lower()
     if operator in ("in", "not in"):
