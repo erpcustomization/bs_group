@@ -323,6 +323,10 @@ doctype_list_js = {
     "PPM Management": "public/js/ppm_management_list.js",
 }
 
+for _linked_sales_doctype in ("Presales Request", "Deal Cost Sheet", "Quotation"):
+    _prior = doctype_list_js.get(_linked_sales_doctype, [])
+    doctype_list_js[_linked_sales_doctype] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["public/js/opportunity_linked_list.js"]
+
 doc_events = {
     "DCS Governance Event": {
         "before_insert": "bsgroup.dcs.governance_event_guard.before_insert",
