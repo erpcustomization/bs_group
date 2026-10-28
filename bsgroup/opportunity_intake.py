@@ -16,6 +16,8 @@ def no_presales(doc):
 
 
 def validate(doc, method=None):
+    if doc.is_new() and not (doc.get("custom_enquiry") or "").strip():
+        frappe.throw(_("Enter the customer Enquiry before creating the Opportunity. For a Lead conversion, complete the Lead Requirement first."))
     kind = doc.get("custom_business_type")
     if not kind and doc.is_new() and doc.opportunity_from == "Lead" and doc.flags.get("deferred_lead_intake"):
         # A Lead status change creates an Open Opportunity before qualification.

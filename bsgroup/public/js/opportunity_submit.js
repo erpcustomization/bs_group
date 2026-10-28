@@ -5,6 +5,7 @@
     };
     const filled = v => Array.isArray(v) ? v.length > 0 : v !== null && v !== undefined && String(v).trim() !== '';
     function ready(frm) {
+        if (!filled(value(frm,'custom_enquiry'))) return false;
         if (!filled(value(frm,'party_name')) || !filled(value(frm,'custom_subject')) || (frm.doc.opportunity_from !== 'Lead' && !(Number(value(frm,'opportunity_amount')) > 0))) return false;
         const kind = value(frm,'custom_business_type');
         if (!kind) return false;
@@ -69,6 +70,7 @@
     }
     frappe.ui.form.on('Opportunity',{
         refresh(frm) {
+            frm.toggle_reqd('custom_enquiry', frm.is_new());
             render(frm);
             $(frm.wrapper).off('input.bsi_submit change.bsi_submit').on('input.bsi_submit change.bsi_submit','input,textarea,select',()=>{
                 clearTimeout(frm._submit_render_timer);
