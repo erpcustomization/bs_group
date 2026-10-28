@@ -60,6 +60,29 @@ function presales_status_panel(frm) {
     }
 }
 
+function presales_compact_layout(frm) {
+    for (const field of ['timeline_defined', 'site_visit_required']) {
+        frm.set_df_property(field, 'hidden', 1);
+    }
+    const root = $(frm.page.wrapper);
+    root.addClass('bsi-presales-compact');
+    if (!root.children('style.bsi-presales-compact-style').length) {
+        $('<style class="bsi-presales-compact-style"></style>').text(`
+            .bsi-presales-compact .form-layout .form-section { padding:12px 16px; margin-bottom:8px; }
+            .bsi-presales-compact .form-layout .section-head { margin-bottom:10px; }
+            .bsi-presales-compact .form-layout .section-body { margin-top:0; }
+            .bsi-presales-compact .form-layout .frappe-control { margin-bottom:10px; }
+            .bsi-presales-compact .form-layout .control-label { margin-bottom:4px; }
+            .bsi-presales-compact .form-layout .form-column:has(> form):not(:has(> form > .frappe-control:not(.hide-control))) { display:none; }
+            .bsi-presales-compact [data-fieldname="opportunity_qualification_mandatory_section"] .form-column { flex:1; max-width:100%; }
+            .bsi-presales-compact [data-fieldname="opportunity_qualification_mandatory_section"] .form-column > form { display:flex; flex-wrap:wrap; gap:8px 24px; }
+            .bsi-presales-compact [data-fieldname="opportunity_qualification_mandatory_section"] .frappe-control { margin-bottom:0; }
+            .bsi-presales-compact .presales-status-bar { padding:8px 16px!important; }
+            .bsi-presales-compact .form-footer { margin-top:12px; padding-top:8px; }
+        `).appendTo(root);
+    }
+}
+
 function presales_show_party(frm) {
     for (const name of ['party_type', 'customer', 'is_new_customer']) {
         frm.set_df_property(name, 'hidden', 1);
@@ -110,6 +133,7 @@ frappe.ui.form.on("Presales Request", {
         });
     },
     refresh(frm){
+        presales_compact_layout(frm);
         presales_show_party(frm);
         presales_move_timeline_to_additional(frm);
         set_completion_date(frm);
