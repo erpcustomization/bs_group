@@ -24,6 +24,10 @@ function dcs_group_additional_details(frm) {
         award.refresh();
         if (was_active) additional.set_active();
     }
+    const footer = $(frm.page.wrapper).find('.form-footer');
+    if (footer.length && footer.parent()[0] !== additional.wrapper[0]) {
+        footer.appendTo(additional.wrapper);
+    }
     additional.refresh();
 }
 
