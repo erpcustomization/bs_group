@@ -1,6 +1,32 @@
 // Copyright (c) 2026, Tridots Tech and contributors
 // For license information, please see license.txt
 
+// Also supports benches whose DocType metadata predates the consolidated tab.
+function dcs_group_additional_details(frm) {
+    const layout = frm.layout;
+    const additional = layout?.tabs.find(tab => tab.df.fieldname === 'dcs_approval_tab');
+    if (!additional) return;
+    additional.label = additional.df.label = __('Additional details');
+    additional.tab_link.find('.nav-link').text(additional.label);
+    const status = layout.sections_dict.custom_deal_status_section;
+    if (status && status.wrapper.parent()[0] !== additional.wrapper[0]) {
+        status.wrapper.prependTo(additional.wrapper);
+        (status.fields_list || []).forEach(field => additional.add_field(field));
+    }
+    const award = layout.tabs.find(tab => tab.df.fieldname === 'dcs_award_handover_tab');
+    if (award) {
+        const was_active = award.is_active();
+        award.wrapper.children().appendTo(additional.wrapper);
+        layout.fields_list.forEach(field => {
+            if (field.tab === award) additional.add_field(field);
+        });
+        award.df.hidden = 1;
+        award.refresh();
+        if (was_active) additional.set_active();
+    }
+    additional.refresh();
+}
+
 frappe.ui.form.on("Deal Cost Sheet", {
 	onload(frm) {
 		// set_presales_filter(frm)
@@ -9,6 +35,7 @@ frappe.ui.form.on("Deal Cost Sheet", {
 		frm.ignore_doctypes_on_cancel_all = ["Presales Request"];
 	},
 	refresh(frm) {
+		dcs_group_additional_details(frm);
 		recalc_parent(frm);
 		render_solution_matrix(frm);
 		render_summary_with_currency(frm);
