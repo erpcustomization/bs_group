@@ -31,3 +31,23 @@ assert.equal(fields_dict.lead_owner.df.hidden,0);
 assert.equal(fields_dict.lead_owner.df.label,'Lead Owner');
 assert.equal(root.querySelectorAll('.bsi-section-ok').length,0);
 console.log('PASS visible Lead Owner and no obsolete OK buttons');
+
+(async()=>{
+ frm.perm=[{write:1}]; frm.doc.lead_owner='first@example.invalid';
+ let changed, triggered;
+ frm.set_value=async(k,v)=>{changed=[k,v];frm.doc[k]=v;};
+ frm.trigger=e=>{triggered=e;};
+ ctx.frappe.call=async()=>({message:[{value:'first@example.invalid',label:'First Person'},{value:'second@example.invalid',label:'Second Person'}]});
+ ctx.focus.refresh(frm); await new Promise(setImmediate);
+ const picker=root.querySelector('.bsi-owner-picker select');
+ assert.equal(fields_dict.lead_owner.$wrapper[0].style.display,'none');
+ assert.equal(picker.disabled,false);
+ assert.equal(picker.querySelectorAll('option')[1].textContent,'Second Person');
+ // linkedom's select value is getter-only; simulate the browser selection.
+ Object.defineProperty(picker,'value',{value:'second@example.invalid',writable:true});
+ picker.dispatchEvent(new window.Event('change')); await new Promise(setImmediate);
+ assert.deepEqual(changed,['lead_owner','second@example.invalid']);
+ assert.equal(triggered,'bsi_lead_submission_changed');
+ assert.equal(root.querySelectorAll('.bsi-owner-picker a').length,0);
+ console.log('PASS name dropdown, in-place selection and Save Changes refresh');
+})().catch(e=>{console.error(e);process.exitCode=1});

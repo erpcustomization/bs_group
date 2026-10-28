@@ -76,6 +76,12 @@ try:
     assigned.reload()
     check(people[1] in frappe.parse_json(assigned._assign), "selected owner has native assignment after reload")
     check(frappe.has_permission("Lead", "write", doc=assigned, user=people[1]), "selected owner can work on assigned Lead")
+    choices = module.owner_choices(assigned.name)
+    check(any(row["value"] == people[2] and row["label"] for row in choices), "owner dropdown provides internal users with display names")
+    frappe.set_user(people[1])
+    frappe.local.form_dict.doctype = "Lead"
+    check(assigned.name in frappe.get_list("Lead", pluck="name"), "assigned user sees Lead in own list")
+    frappe.set_user(people[0])
     check(not frappe.has_permission("Lead", "read", doc=assigned, user=people[2]), "unrelated internal user cannot read Lead")
     assigned.lead_owner = people[2]
     assigned.save()
