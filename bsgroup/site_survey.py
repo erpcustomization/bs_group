@@ -9,6 +9,19 @@ DEFERRED_FIELDS = ("presales_owner", "due_date", "priority", "solution_summary",
 FLAGS = ("custom_elv_site_survey_required", "custom_technical_site_survey_required")
 
 
+@frappe.whitelist()
+def presales_handoff(name):
+    """Expose linked survey results to users allowed to read this request."""
+    pre = frappe.get_doc("Presales Request", name)
+    pre.check_permission("read")
+    survey = frappe.db.get_value("Site Survey Request", pre.get("custom_site_survey_request"),
+        ["status", "results"], as_dict=True) if pre.get("custom_site_survey_request") else None
+    label = pre.status
+    if pre.status not in ("Cancelled", "Completed", "Won", "Lost", "Submitted to Sales", "Ready for Quotation", "On Hold"):
+        label = "Open with Site Survey" if survey and survey.status not in ("Completed", "Cancelled") else "Open with Presales"
+    return {"label": label, "results": survey.results if survey and survey.status == "Completed" else None}
+
+
 def request_details(opportunity):
     """Plain-text intake snapshot for the survey team, independent of Opportunity access."""
     teams = []

@@ -56,7 +56,10 @@ class SiteSurveyRequest(Document):
                 frappe.throw(_("The Presales Request does not match this survey."))
             if pre.status == WAITING:
                 pre.status = RECEIVED
+                pre.custom_survey_results = self.results
                 pre.save(ignore_permissions=True)
+            elif pre.get("custom_survey_results") != self.results:
+                pre.db_set("custom_survey_results", self.results)
 
     def on_trash(self):
         frappe.throw(_("Cancel the Site Survey Request instead of deleting its history."))

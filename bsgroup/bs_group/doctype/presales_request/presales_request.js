@@ -23,7 +23,36 @@ function presales_move_timeline_to_additional(frm) {
         section.wrapper.appendTo(additional.wrapper);
         section.fields_list.forEach(field => additional.add_field(field));
     }
+    const footer = $(frm.page.wrapper).find('.form-footer');
+    if (footer.length && footer.parent()[0] !== additional.wrapper[0]) footer.appendTo(additional.wrapper);
     layout.refresh_tabs();
+}
+
+function presales_status_panel(frm) {
+    frm.set_df_property('status', 'hidden', 1);
+    const host = frm.layout.tabs[0]?.wrapper || frm.layout.wrapper;
+    let bar = host.children('.presales-status-bar');
+    if (!bar.length) {
+        bar = $('<div class="presales-status-bar" style="display:flex;justify-content:flex-end;align-items:center;gap:12px;padding:12px 16px"><span></span><span class="presales-status-value" style="padding:9px 14px;border-radius:8px;background:#e3edff;color:#174e9b;font-weight:600" role="status"></span></div>').prependTo(host);
+        bar.children().first().text(__('Status'));
+    }
+    const show = label => {
+        bar.find('.presales-status-value').text(__(label));
+        frm.page.set_indicator(__(label), ['Completed','Submitted to Sales','Won'].includes(label) ? 'green' : 'blue');
+    };
+    show(frm.doc.status === 'Awaiting Site Survey Results' ? 'Open with Site Survey' :
+        frm.doc.status === 'Site Survey Results Received' ? 'Open with Presales' : frm.doc.status || 'Open with Presales');
+    if (!frm.is_new()) {
+        const name = frm.doc.name;
+        frappe.call({method:'bsgroup.site_survey.presales_handoff', args:{name}}).then(r => {
+            if (frm.doc.name !== name || !r.message) return;
+            show(r.message.label);
+            if (r.message.results != null && frm.fields_dict.custom_survey_results) {
+                frm.doc.custom_survey_results = r.message.results;
+                frm.refresh_field('custom_survey_results');
+            }
+        });
+    }
 }
 
 function presales_show_party(frm) {
@@ -79,9 +108,8 @@ frappe.ui.form.on("Presales Request", {
         presales_show_party(frm);
         presales_move_timeline_to_additional(frm);
         set_completion_date(frm);
-        set_status_indicator(frm);
+        presales_status_panel(frm);
         reduce_subject_height(frm);
-        set_status_value(frm);
         frm.toggle_reqd("site_visit", frm.doc.site_visit_required == 1);
         if(frm.doc.docstatus == 1){
             frm.add_custom_button("Deal Cost Sheet", () => {
@@ -147,11 +175,4 @@ function set_status_indicator(frm){
         "Cancelled": "darkred"
     }[frm.doc.status] || "black";
     frm.page.set_indicator(frm.doc.status, color);
-}
-
-function set_status_value(frm) {
-    if (frm.doc.docstatus == 1 && frm.doc.status != "Submitted to Sales" && frm.doc.status != "Open") {
-        frm.set_value("status", "Open");
-        frm.save("Update");
-    }
 }

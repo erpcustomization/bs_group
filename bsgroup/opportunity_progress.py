@@ -36,8 +36,6 @@ def resolve(opportunity, surveys, presales, sheets, now=None, quotations=()):
         survey = next((s for s in surveys if s.name == request.get("custom_site_survey_request")), None)
         if survey and survey.status == "Cancelled":
             return dict(label="Site Survey Cancelled", color="orange")
-        if survey and survey.status == "Completed" and request.status in ("Awaiting Site Survey Results", "Site Survey Results Received"):
-            return dict(label="Site Survey Completed", color="green")
         started = request.creation
         if survey and survey.status == "Completed" and survey.completed_on:
             started = max(get_datetime(request.creation), get_datetime(survey.completed_on))
