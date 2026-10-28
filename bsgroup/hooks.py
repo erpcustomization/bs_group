@@ -635,6 +635,7 @@ for _hook_map, _path in (
 for _dt, _event, _method in (
     ("Lead", "before_validate", "before_validate"),
     ("Lead", "validate", "validate"),
+    ("Lead", "on_update", "sync_assignment"),
     ("Opportunity", "before_insert", "guard_conversion"),
 ):
     _prior = doc_events.setdefault(_dt, {}).get(_event, [])

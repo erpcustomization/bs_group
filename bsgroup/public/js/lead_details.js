@@ -280,9 +280,14 @@ const bsi_customer_brief = (() => {
 
 // Two tabs, using the original controls and their existing save/permission handlers.
 const bsi_lead_focus = (() => {
-    const contact = new Set(["title", "first_name", "last_name", "company_name", "email_id", "mobile_no", "phone", "whatsapp_no"]);
+    const contact = new Set(["title", "first_name", "last_name", "company_name", "email_id", "mobile_no", "phone", "whatsapp_no", "lead_owner"]);
     function refresh(frm) {
         const root = frm.wrapper[0] || frm.wrapper;
+        if (frm.fields_dict.lead_owner) {
+            frm.set_df_property('lead_owner', 'label', __('Lead Owner'));
+            frm.set_df_property('lead_owner', 'hidden', 0);
+            frm.set_query('lead_owner', () => ({filters: {enabled: 1, user_type: 'System User'}}));
+        }
         const tabs = frm.layout?.tabs || [];
         const detailsTab = tabs.find(t => t.df.fieldname === "__details") || tabs[0];
         const extraTab = tabs.find(t => t.df.fieldname === "custom_bsi_status_tab");

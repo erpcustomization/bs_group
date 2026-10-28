@@ -29,7 +29,7 @@
                 const note = (input?.value || '').trim();
                 try {
                     // Flush native inputs before the one explicit save.
-                    for (const name of ['first_name','last_name','company_name','title','email_id','mobile_no','phone','custom_requirement','custom_next_follow_up_date']) {
+                    for (const name of ['first_name','last_name','company_name','title','email_id','mobile_no','phone','lead_owner','custom_requirement','custom_next_follow_up_date']) {
                         const field = frm.fields_dict[name];
                         if (field && (!field.get_status || field.get_status() === 'Write')) await frm.set_value(name,value(frm,name));
                     }

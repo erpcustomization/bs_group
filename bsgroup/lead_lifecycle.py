@@ -26,6 +26,18 @@ def linked_outcome(name):
 
 
 def before_validate(doc, method=None):
+    if doc.is_new() and not doc.lead_owner:
+        doc.lead_owner = frappe.session.user
+    previous = doc.get_doc_before_save()
+    if doc.lead_owner and (not previous or previous.lead_owner != doc.lead_owner):
+        user = frappe.db.get_value("User", doc.lead_owner, ["enabled", "user_type"], as_dict=True)
+        if not user or not user.enabled or user.user_type != "System User":
+            frappe.throw(_("Assign the Lead to an active internal user."))
+        from frappe.permissions import get_user_permissions
+        companies = get_user_permissions(doc.lead_owner).get("Company", [])
+        applicable = [p.doc for p in companies if not p.get("applicable_for") or p.applicable_for == "Lead"]
+        if doc.company and applicable and doc.company not in applicable:
+            frappe.throw(_("The selected person does not have access to this Lead's company."))
     doc.flags.bsi_requested_lead_status = doc.status
     doc.flags.bsi_requested_lead_title = doc.title
 
@@ -125,6 +137,7 @@ def mark_delayed():
 
 
 def setup():
+    setup_manual_creation()
     from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
     create_custom_fields({"Lead": [
         {"fieldname": "custom_requirement", "label": "Requirement", "fieldtype": "Small Text", "insert_after": "company_name"},
@@ -138,6 +151,36 @@ def setup():
     make_property_setter("Lead", "status", "options", "\n".join(options), "Text")
     make_property_setter("Lead", "status", "default", "Open", "Text")
     frappe.clear_cache(doctype="Lead")
+
+
+def setup_manual_creation():
+    """Internal users can create and edit their own Leads; other access is unchanged."""
+    from frappe.permissions import setup_custom_perms
+    setup_custom_perms("Lead")
+    filters = {"parent": "Lead", "role": "Desk User", "permlevel": 0, "if_owner": 1}
+    name = frappe.db.exists("Custom DocPerm", filters)
+    permission = frappe.get_doc("Custom DocPerm", name) if name else frappe.get_doc({
+        "doctype": "Custom DocPerm", "parenttype": "DocType", "parentfield": "permissions", **filters
+    })
+    permission.update({"read": 1, "write": 1, "create": 1})
+    permission.save(ignore_permissions=True)
+    frappe.clear_cache(doctype="Lead")
+
+
+def sync_assignment(doc, method=None):
+    """Save the selected owner and native assignment in the same transaction."""
+    previous = doc.get_doc_before_save()
+    if not doc.lead_owner or (previous and previous.lead_owner == doc.lead_owner):
+        return
+    from frappe.desk.form import assign_to
+    import frappe.share
+    # Saving the Lead already required create/write permission. Grant only this
+    # document to the explicitly selected internal user, not general CRM access.
+    frappe.share.add("Lead", doc.name, doc.lead_owner, read=1, write=1,
+                     flags={"ignore_share_permission": True})
+    assign_to.add({"doctype": "Lead", "name": doc.name, "assign_to": [doc.lead_owner]})
+    if previous and previous.lead_owner:
+        assign_to.remove("Lead", doc.name, previous.lead_owner)
 
 
 def load_responsibility(doc, method=None):

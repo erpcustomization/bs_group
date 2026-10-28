@@ -32,7 +32,7 @@ def hooks(hook=None, *args, **kwargs):
     result = original_get_hooks(hook, *args, **kwargs)
     if hook == "doc_events":
         result = dict(result)
-        result["Lead"] = {"before_validate": ["bsgroup.lead_lifecycle.before_validate"], "validate": ["bsgroup.lead_lifecycle.validate"]}
+        result["Lead"] = {"before_validate": ["bsgroup.lead_lifecycle.before_validate"], "validate": ["bsgroup.lead_lifecycle.validate"], "on_update": ["bsgroup.lead_lifecycle.sync_assignment"]}
         result["Opportunity"] = dict(result.get("Opportunity", {}))
         result["Opportunity"]["before_insert"] = list(result["Opportunity"].get("before_insert", [])) + ["bsgroup.lead_lifecycle.guard_conversion", "bsgroup.utils.opportunity.validate_creation_source"]
         result["Opportunity"]["after_delete"] = ["bsgroup.lead_lifecycle.opportunity_deleted"]
@@ -43,7 +43,7 @@ original_enqueue = frappe.enqueue
 def enqueue(method, *args, **kwargs):
     # These fixture deletions are rolled back, so their after-commit cleanup
     # never runs. Avoid depending on the unrelated local worker queue capacity.
-    if method == "frappe.model.delete_doc.delete_dynamic_links" and kwargs.get("enqueue_after_commit"):
+    if kwargs.get("enqueue_after_commit"):
         return None
     return original_enqueue(method, *args, **kwargs)
 frappe.enqueue = enqueue
@@ -63,6 +63,27 @@ def rejects(fn, name):
 
 try:
     module.setup()
+    people = []
+    for number in range(3):
+        user = frappe.get_doc({"doctype": "User", "email": f"lead-assignment-{frappe.generate_hash(length=8)}@example.invalid",
+            "first_name": f"Lead assignment {number}", "enabled": 1, "user_type": "System User",
+            "send_welcome_email": 0, "roles": [{"role": "Employee"}]}).insert()
+        people.append(user.name)
+    frappe.set_user(people[0])
+    assigned = frappe.get_doc({"doctype": "Lead", "first_name": "Manual ownership test",
+        "company_name": "Assignment fixture", "lead_owner": people[1]}).insert()
+    check(assigned.owner == people[0] and assigned.lead_owner == people[1], "internal non-sales creator can select another owner")
+    assigned.reload()
+    check(people[1] in frappe.parse_json(assigned._assign), "selected owner has native assignment after reload")
+    check(frappe.has_permission("Lead", "write", doc=assigned, user=people[1]), "selected owner can work on assigned Lead")
+    check(not frappe.has_permission("Lead", "read", doc=assigned, user=people[2]), "unrelated internal user cannot read Lead")
+    assigned.lead_owner = people[2]
+    assigned.save()
+    assigned.reload()
+    check(people[2] in frappe.parse_json(assigned._assign) and people[1] not in frappe.parse_json(assigned._assign), "reassignment updates native task")
+    assigned.lead_owner = "Guest"
+    rejects(assigned.save, "website users cannot receive Lead ownership")
+    frappe.set_user("Administrator")
     for source, party in [("Prospect", "test"), ("Customer", ""), ("Customer", "__missing_customer__"), ("Lead", "__missing_lead__")]:
         rejects(lambda source=source, party=party: opp_module.validate_creation_source(frappe._dict(opportunity_from=source, party_name=party, opportunity_amount=100)), "reject invalid new opportunity source " + source + ":" + party)
     customer = frappe.get_doc({"doctype": "Customer", "customer_name": "Opportunity source test", "customer_type": "Company"}).insert()
