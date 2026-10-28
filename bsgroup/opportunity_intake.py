@@ -108,3 +108,27 @@ def guard_presales(doc, method=None):
     if doc.opportunity and (doc.is_new() or doc.has_value_changed("opportunity")):
         if no_presales(frappe.get_doc("Opportunity", doc.opportunity)):
             frappe.throw(_("This Opportunity proceeds directly to a Deal Cost Sheet; presales support is not required."))
+
+
+@frappe.whitelist()
+def create_supply_cost_sheet(opportunity):
+    """Create one saved draft without navigating away from the Opportunity."""
+    doc = frappe.get_doc("Opportunity", opportunity, for_update=True)
+    doc.check_permission("write")
+    if doc.get("custom_business_type") != "Supply":
+        frappe.throw(_("This action is only available for Supply opportunities."))
+    if flt(doc.get("opportunity_amount")) <= 0:
+        frappe.throw(_("Enter an Opportunity Value greater than zero."))
+    existing = frappe.get_all("Deal Cost Sheet", filters={"opportunity": doc.name, "docstatus": ["<", 2]},
+        fields=["name", "custom_record_authority"], order_by="creation desc")
+    for row in existing:
+        if row.custom_record_authority != "Superseded":
+            frappe.get_doc("Deal Cost Sheet", row.name).check_permission("read")
+            return {"name": row.name, "created": False}
+    sheet = frappe.new_doc("Deal Cost Sheet")
+    sheet.update({"opportunity": doc.name, "party_type": doc.opportunity_from,
+        "party": doc.party_name, "organisation_name": doc.get("custom_organization_name"),
+        "subject": doc.get("custom_subject") or doc.title, "company": doc.company,
+        "currency": doc.currency})
+    sheet.insert()
+    return {"name": sheet.name, "created": True}

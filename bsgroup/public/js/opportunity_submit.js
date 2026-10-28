@@ -53,10 +53,7 @@
                     if (frm.is_new() || frm.is_dirty()) return;
                     frappe.show_alert({message:__('Opportunity created.'),indicator:'green'});
                     if (frm.doc.custom_business_type === 'Supply' && frm._supply_open_dcs) {
-                        await frappe.new_doc('Deal Cost Sheet', {
-                            opportunity:frm.doc.name,party_type:frm.doc.opportunity_from,party:frm.doc.party_name,
-                            organisation_name:frm.doc.custom_organization_name,subject:frm.doc.custom_subject || frm.doc.title
-                        });
+                        await frappe.bsi_create_supply_cost_sheet(frm);
                     }
                 } finally { frm._submitting_opportunity=false;button.disabled=false;render(frm); }
             });

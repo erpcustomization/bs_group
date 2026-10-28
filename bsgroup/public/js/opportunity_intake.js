@@ -1,4 +1,14 @@
 (() => {
+    frappe.bsi_create_supply_cost_sheet = async function(frm) {
+        const response = await frappe.call({method:'bsgroup.opportunity_intake.create_supply_cost_sheet',
+            args:{opportunity:frm.doc.name}, freeze:true, freeze_message:__('Creating Deal Cost Sheet…')});
+        const result = response.message;
+        if (!result?.name) return;
+        await frm.reload_doc();
+        frappe.show_alert({message: result.created
+            ? __('Deal Cost Sheet {0} created.', [result.name])
+            : __('Deal Cost Sheet {0} already exists.', [result.name]), indicator:'green'}, 8);
+    };
     function supplyValue(frm) {
         const amount = frm.fields_dict.opportunity_amount;
         const wrapper = amount?.$wrapper?.[0];
@@ -14,7 +24,7 @@
             button.type = 'button';
             button.className = 'btn btn-primary btn-sm bsi-supply-ok';
             button.textContent = __('OK');
-            button.title = __('Save Opportunity and open Deal Cost Sheet');
+            button.title = __('Save Opportunity and create Deal Cost Sheet');
             button.style.marginTop = '8px';
             wrapper.append(button);
             button.addEventListener('click', async () => {
@@ -26,7 +36,7 @@
                 }
                 if (frm.is_new()) {
                     frm._supply_open_dcs = true;
-                    frappe.show_alert({message:__('Value confirmed. Click Submit Opportunity to create the Opportunity and open the Deal Cost Sheet.'),indicator:'green'});
+                    frappe.show_alert({message:__('Value confirmed. Click Submit Opportunity to create the Opportunity and its Deal Cost Sheet.'),indicator:'green'});
                     frm.trigger('bsi_update_submit');
                     return;
                 }
@@ -35,13 +45,7 @@
                 try {
                     if (frm.is_new() || frm.is_dirty()) await frm.save();
                     if (frm.is_new() || frm.is_dirty() || frm.doc.custom_business_type !== 'Supply') return;
-                    await frappe.new_doc('Deal Cost Sheet', {
-                        opportunity: frm.doc.name,
-                        party_type: frm.doc.opportunity_from,
-                        party: frm.doc.party_name,
-                        organisation_name: frm.doc.custom_organization_name,
-                        subject: frm.doc.custom_subject || frm.doc.title
-                    });
+                    await frappe.bsi_create_supply_cost_sheet(frm);
                 } finally {
                     frm._supply_handoff = false;
                     button.disabled = false;
