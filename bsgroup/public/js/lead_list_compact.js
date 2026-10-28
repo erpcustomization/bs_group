@@ -6,6 +6,11 @@
     const style = document.createElement("style");
     style.id = id;
     style.textContent = `
+      /* Keep standalone creation hidden even when later list scripts reset settings. */
+      body:is([data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .page-actions .primary-action,
+      body:is([data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .btn-new-doc {
+        display: none !important;
+      }
     @media screen {
       body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .bs-list-shell .layout-main-section { padding: 10px 14px 12px; }
       body.bs-sales-ui:is([data-route="List/Lead/List"],[data-route="List/Opportunity/List"],[data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .bs-list-heading { margin-bottom: 8px; gap: 8px; }
