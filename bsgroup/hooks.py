@@ -674,3 +674,10 @@ doctype_js["Lead"].append("public/js/lead_submit.js")
 doctype_list_js["Opportunity"].append("public/js/opportunity_progress_filter.js")
 for _sales_doctype in ("Lead", "Opportunity"):
     doctype_list_js[_sales_doctype].append("public/js/sales_filter_popup.js")
+
+for _downstream in ("Presales Request", "Deal Cost Sheet", "Quotation", "Site Survey Request"):
+    for _event in ("before_insert", "before_validate"):
+        _prior = doc_events.setdefault(_downstream, {}).get(_event, [])
+        doc_events[_downstream][_event] = ["bsgroup.opportunity_required.validate"] + ([_prior] if isinstance(_prior, str) else list(_prior))
+    _prior = doctype_js.get(_downstream, [])
+    doctype_js[_downstream] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["public/js/opportunity_required.js"]
