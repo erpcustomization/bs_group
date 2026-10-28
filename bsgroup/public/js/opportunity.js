@@ -1,5 +1,6 @@
 frappe.ui.form.on("Opportunity", {
     refresh(frm){
+        bsi_opportunity_survey_results(frm);
         hide_create_button(frm);
         reduce_subject_height(frm);
         set_opportunity_status(frm);
@@ -53,6 +54,29 @@ frappe.ui.form.on("Opportunity", {
         set_lead_name(frm);
     }
 })
+
+function bsi_opportunity_survey_results(frm) {
+    const tab = frm.layout?.tabs.find(t => t.df.fieldname === 'contact_info' ||
+        (t.df.label || '').toLowerCase() === 'additional details');
+    if (!tab || frm.is_new()) return;
+    const name = frm.doc.name;
+    frappe.call({method:'bsgroup.site_survey.opportunity_survey_results', args:{name}}).then(r => {
+        if (frm.doc.name !== name) return;
+        let section = tab.wrapper.children('.bsi-survey-results');
+        section.remove();
+        if (!r.message?.length) return;
+        section = $('<section class="bsi-survey-results form-section" style="padding:16px"></section>').appendTo(tab.wrapper);
+        $('<h5></h5>').text(__('Site Survey Results')).appendTo(section);
+        r.message.forEach(survey => {
+            $('<div class="text-muted"></div>').text(survey.name).appendTo(section);
+            const body = new DOMParser().parseFromString(survey.results || '', 'text/html').body;
+            body.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+            body.querySelectorAll('p,div,li').forEach(el => el.append('\n'));
+            $('<div style="white-space:pre-wrap;padding:12px 0"></div>').text(body.textContent || '').appendTo(section);
+        });
+        tab.refresh();
+    });
+}
 
 function set_lead_name(frm) {
     if (!frm.doc.party_name) return;

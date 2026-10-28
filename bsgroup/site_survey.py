@@ -10,6 +10,15 @@ FLAGS = ("custom_elv_site_survey_required", "custom_technical_site_survey_requir
 
 
 @frappe.whitelist()
+def opportunity_survey_results(name):
+    opportunity = frappe.get_doc("Opportunity", name)
+    opportunity.check_permission("read")
+    rows = frappe.get_all("Site Survey Request", filters={"opportunity": name, "status": "Completed"},
+        fields=["name", "results", "completed_on"], order_by="completed_on desc")
+    return rows
+
+
+@frappe.whitelist()
 def presales_handoff(name):
     """Expose linked survey results to users allowed to read this request."""
     pre = frappe.get_doc("Presales Request", name)

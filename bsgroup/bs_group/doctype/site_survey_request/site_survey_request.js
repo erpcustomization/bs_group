@@ -39,9 +39,13 @@ frappe.ui.form.on('Site Survey Request', {
         button.textContent = __('Submit Survey');
         button.hidden = done || frm.doc.status === 'Cancelled' || !frm.perm?.some(p => p.write);
         button.onclick = async () => {
-            if (frm._submitting_survey || frm._saving_survey_schedule) return;
+            if (frm._submitting_survey) return;
+            if (frm._saving_survey_schedule) {
+                frappe.msgprint(__('The schedule is being saved. Please click Submit Survey again once it finishes.'));
+                return;
+            }
             const results = frm.fields_dict?.results?.get_value?.() ?? frm.doc.results;
-            if (!frappe.utils.strip_html(results || '').trim()) {
+            if (!(new DOMParser().parseFromString(results || '', 'text/html').body.textContent || '').trim()) {
                 frappe.msgprint(__('Enter the site survey results before submitting.'));
                 return;
             }
