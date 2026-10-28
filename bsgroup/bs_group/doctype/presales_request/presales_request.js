@@ -26,6 +26,18 @@ function presales_move_timeline_to_additional(frm) {
     layout.refresh_tabs();
 }
 
+function presales_show_party(frm) {
+    for (const name of ['party_type', 'customer', 'is_new_customer']) {
+        frm.set_df_property(name, 'hidden', 1);
+    }
+    frm.set_df_property('party', 'label', frm.doc.party_type === 'Lead' ? __('Lead') : __('Customer'));
+    frm.set_df_property('party', 'read_only', 1);
+    frm.set_df_property('party', 'description', '');
+    frm.set_df_property('organisation_name', 'description', '');
+    frm.set_df_property('organisation_name', 'hidden',
+        frm.doc.party_type !== 'Lead' || !frm.doc.organisation_name || frm.doc.organisation_name === frm.doc.party);
+}
+
 frappe.ui.form.on("Presales Request", {
     onload(frm) {
         if (!frm.doc.requested_by) {
@@ -38,31 +50,33 @@ frappe.ui.form.on("Presales Request", {
         if (!frm.doc.opportunity) return;
         frappe.db.get_value("Opportunity", frm.doc.opportunity,
             ["opportunity_from", "party_name", "custom_organization_name"]
-        ).then(r => {
+        ).then(async r => {
             if (!r.message) return;
             let opp = r.message;
             if ((opp.opportunity_from === "Customer" || opp.opportunity_from === "Lead") && opp.party_name) {
-                frm.set_value("party_type", opp.opportunity_from);
-                frm.set_value("party", opp.party_name);
-                frm.set_value("organisation_name", opp.custom_organization_name || "");
-                frm.set_value("is_new_customer", opp.opportunity_from === "Lead" ? 1 : 0);
+                await frm.set_value("party_type", opp.opportunity_from);
+                await frm.set_value("party", opp.party_name);
+                await frm.set_value("is_new_customer", opp.opportunity_from === "Lead" ? 1 : 0);
+                presales_show_party(frm);
             }
         });
     },
     party_type(frm) {
         if (frm.doc.party && frm.doc.party_type) {
             // party is a Dynamic Link: a change of type invalidates the value.
-            frm.set_value("party", "");
+            return frm.set_value("party", "");
         }
     },
     party(frm) {
         if (!frm.doc.party || !frm.doc.party_type) return;
         let field = frm.doc.party_type === "Customer" ? "customer_name" : "company_name";
-        frappe.db.get_value(frm.doc.party_type, frm.doc.party, field).then(r => {
-            if (r.message) frm.set_value("organisation_name", r.message[field] || frm.doc.party);
+        return frappe.db.get_value(frm.doc.party_type, frm.doc.party, field).then(async r => {
+            if (r.message) await frm.set_value("organisation_name", r.message[field] || frm.doc.party);
+            presales_show_party(frm);
         });
     },
     refresh(frm){
+        presales_show_party(frm);
         presales_move_timeline_to_additional(frm);
         set_completion_date(frm);
         set_status_indicator(frm);
