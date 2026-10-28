@@ -11,6 +11,9 @@ from bsgroup.opportunity_progress import resolve_many
 from bsgroup.opportunity_progress_filter import get, get_count, matches, split_filters
 
 try:
+    assert matches('Quoted', '=', 'Quotation')
+    assert matches('Quoted', 'in', ['Quotation'])
+    assert not matches('Quoted', '!=', 'Quotation')
     assert matches('3 days - Delayed by Presales', '=', 'Delayed by Presales')
     assert matches('2 days - Delayed by Site Survey Team', '=', 'Pending from Site Survey Team')
     assert matches('3 days - Delayed by Presales', 'in', ['Delayed by Presales'])
