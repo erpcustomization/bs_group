@@ -1,6 +1,31 @@
 // Copyright (c) 2026, Tridots Tech and contributors
 // For license information, please see license.txt
 
+function presales_move_timeline_to_additional(frm) {
+    const layout = frm.layout;
+    const section = layout?.sections_dict.section_break_btny;
+    if (!section) return;
+    if (!layout.tabs.length) {
+        layout.setup_tabbed_layout();
+        const sections = [...layout.sections];
+        const details = layout.make_tab({fieldname:'presales_details_tab', fieldtype:'Tab Break', label:__('Details')});
+        sections.forEach(item => item.wrapper.appendTo(details.wrapper));
+        layout.fields_list.forEach(field => details.add_field(field));
+        details.set_active();
+    }
+    let additional = layout.tabs.find(tab =>
+        tab.df.fieldname === 'presales_additional_details' ||
+        (tab.df.label || '').toLowerCase() === 'additional details');
+    if (!additional) {
+        additional = layout.make_tab({fieldname:'presales_additional_details', fieldtype:'Tab Break', label:__('Additional details')});
+    }
+    if (section.wrapper.parent()[0] !== additional.wrapper[0]) {
+        section.wrapper.appendTo(additional.wrapper);
+        section.fields_list.forEach(field => additional.add_field(field));
+    }
+    layout.refresh_tabs();
+}
+
 frappe.ui.form.on("Presales Request", {
     onload(frm) {
         if (!frm.doc.requested_by) {
@@ -38,6 +63,7 @@ frappe.ui.form.on("Presales Request", {
         });
     },
     refresh(frm){
+        presales_move_timeline_to_additional(frm);
         set_completion_date(frm);
         set_status_indicator(frm);
         reduce_subject_height(frm);
