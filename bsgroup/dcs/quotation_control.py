@@ -4,8 +4,15 @@ import frappe
 from frappe.utils import flt
 
 def validate_quotation(doc, method=None):
-    if doc.docstatus == 2 or not doc.get("custom_deal_cost_sheet"):
+    if doc.docstatus == 2:
         return
+    if not doc.get("custom_deal_cost_sheet"):
+        previous = doc.get_doc_before_save()
+        # Keep historical submitted records editable; draft creation and
+        # submission must always pass through completed costing.
+        if not doc.is_new() and previous and previous.docstatus == 1 and not previous.get("custom_deal_cost_sheet"):
+            return
+        frappe.throw("Complete and submit the Deal Cost Sheet, then create the Quotation from that sheet.")
     sheet = frappe.get_doc("Deal Cost Sheet", doc.custom_deal_cost_sheet, for_update=doc.docstatus == 1)
     if doc.docstatus == 1:
         from bsgroup.dcs.obligation import assert_clearance
