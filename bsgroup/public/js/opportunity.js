@@ -67,7 +67,9 @@ function bsi_opportunity_survey_results(frm) {
         let section = tab.wrapper.children('.bsi-survey-results');
         section.remove();
         if (!r.message?.length) return;
-        section = $('<section class="bsi-survey-results form-section" style="padding:16px"></section>').appendTo(tab.wrapper);
+        // Frappe hides .form-section containers without registered fields as
+        // empty-section. This read-only result panel is not a form section.
+        section = $('<section class="bsi-survey-results" style="padding:16px"></section>').appendTo(tab.wrapper);
         $('<h5></h5>').text(__('Site Survey Results')).appendTo(section);
         r.message.forEach(survey => {
             $('<div class="text-muted"></div>').text(survey.name).appendTo(section);
