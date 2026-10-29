@@ -17,15 +17,16 @@
             if (field.df.reqd && !['Section Break','Column Break','Tab Break','HTML','Button'].includes(field.df.fieldtype)
                 && !filled(value(frm,field.df.fieldname))) return false;
         }
+        if (['Service','Supply and Installation'].includes(kind) && (!value(frm,'custom_service_survey') || !value(frm,'custom_presales_support'))) return false;
         if (kind === 'Service' && (!value(frm,'custom_service_type') || !value(frm,'custom_service_survey'))) return false;
         if (kind === 'Supply and Installation') {
             if (!value(frm,'custom_installation_type')) return false;
             if (value(frm,'custom_installation_type') === 'CCTV') {
                 const count=Number(value(frm,'custom_camera_count'));
-                if (!Number.isInteger(count) || count <= 0 || (count >= 30 && !value(frm,'custom_site_survey_needed'))) return false;
+                if (!Number.isInteger(count) || count <= 0) return false;
             }
         }
-        const survey = frm.doc.custom_presales_required && (frm.doc.custom_elv_site_survey_required || frm.doc.custom_technical_site_survey_required);
+        const survey = (frm.doc.custom_elv_site_survey_required || frm.doc.custom_technical_site_survey_required);
         if (survey && (Number(frm.doc.custom_survey_step) !== 3 || !['custom_survey_instructions','custom_survey_location','custom_survey_contact_name','custom_survey_contact_phone'].every(name=>filled(value(frm,name))))) return false;
         return true;
     }
@@ -70,7 +71,7 @@
                 const field = frm.fields_dict[name];
                 if (field && field.get_status() === 'Write') frm.toggle_reqd(name, true);
             }
-            frm.toggle_reqd('custom_enquiry', frm.is_new() || !!(frm.doc.custom_presales_required && (frm.doc.custom_elv_site_survey_required || frm.doc.custom_technical_site_survey_required)));
+            frm.toggle_reqd('custom_enquiry', frm.is_new() || !!((frm.doc.custom_elv_site_survey_required || frm.doc.custom_technical_site_survey_required)));
             render(frm);
             $(frm.wrapper).off('input.bsi_submit change.bsi_submit').on('input.bsi_submit change.bsi_submit','input,textarea,select',()=>{
                 clearTimeout(frm._submit_render_timer);

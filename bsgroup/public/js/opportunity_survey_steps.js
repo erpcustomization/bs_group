@@ -1,6 +1,6 @@
 (() => {
     const fields = ['custom_survey_instructions','custom_survey_location','custom_survey_contact_phone'];
-    const selected = d => d.custom_presales_required && (d.custom_elv_site_survey_required || d.custom_technical_site_survey_required);
+    const selected = d => (d.custom_elv_site_survey_required || d.custom_technical_site_survey_required);
     const entered = field => String(field?.$wrapper?.[0]?.querySelector('input,textarea')?.value ?? field?.get_value?.() ?? '').trim();
     function render(frm) {
         if (!frm.fields_dict.custom_survey_step) return;

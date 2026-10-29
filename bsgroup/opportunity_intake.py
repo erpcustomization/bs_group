@@ -10,9 +10,7 @@ INSTALLATION_TYPES = ("CCTV", "3CX", "Networking", "Other", *ADDITIONAL_SOLUTION
 
 
 def no_presales(doc):
-    return doc.get("custom_business_type") == "Supply" or (
-        doc.get("custom_business_type") == "Supply and Installation" and
-        doc.get("custom_installation_type") == "CCTV" and 0 < cint(doc.get("custom_camera_count")) < 30)
+    return doc.get("custom_business_type") == "Supply" or not cint(doc.get("custom_presales_required"))
 
 
 def validate(doc, method=None):
@@ -33,11 +31,16 @@ def validate(doc, method=None):
         return
     if kind not in ("Supply", "Service", "Supply and Installation"):
         frappe.throw(_("Choose Supply, Service or Supply and Installation."))
+    if kind in ("Service", "Supply and Installation"):
+        if doc.get("custom_presales_support") not in ("Yes", "No"):
+            frappe.throw(_("Choose Yes or No for Presales Support Required."))
+        doc.custom_presales_required = int(doc.custom_presales_support == "Yes")
     if kind == "Service":
         if doc.get("custom_service_type") not in SERVICE_TYPES:
             frappe.throw(_("Choose a Service Type."))
+    if kind in ("Service", "Supply and Installation"):
         if doc.get("custom_service_survey") not in ("Site Survey by ELV", "Site Survey by Technical Team", "No Site Survey Required"):
-            frappe.throw(_("Choose the service site survey requirement."))
+            frappe.throw(_("Choose the Site Survey Requirement."))
         if doc.get("custom_service_survey") == "No Site Survey Required" and not (doc.get("custom_enquiry") or "").strip():
             frappe.throw(_("Enter the customer Enquiry before creating the Deal Cost Sheet."))
     if kind == "Supply and Installation":
@@ -47,28 +50,21 @@ def validate(doc, method=None):
             count = flt(doc.get("custom_camera_count"))
             if count <= 0 or count != int(count):
                 frappe.throw(_("Enter a positive whole number of cameras."))
-            if count >= 30 and doc.get("custom_site_survey_needed") not in ("Yes", "No"):
-                frappe.throw(_("Choose whether a site survey is required."))
     before = doc.get_doc_before_save()
     if doc.get("custom_site_survey_request") or (before and before.get("custom_site_survey_request")):
         if before and any(doc.get(f) != before.get(f) for f in FIELDS):
             frappe.throw(_("Survey routing has already started. The Opportunity classification cannot be changed."))
-    if no_presales(doc):
+    if kind == "Supply":
         if not doc.is_new() and frappe.db.exists("Presales Request", {"opportunity": doc.name, "status": ["!=", "Cancelled"], "docstatus": ["<", 2]}):
             frappe.throw(_("An active Presales Request already exists. Resolve it before changing to a category that does not require presales."))
         if any(cint(doc.get(f)) for f in ("custom_presales_required", "custom_elv_site_survey_required", "custom_technical_site_survey_required")):
-            frappe.throw(_("Presales support and site survey are not available for Supply or CCTV with fewer than 30 cameras. Proceed to the Deal Cost Sheet."))
-    if kind == "Service":
+            frappe.throw(_("Presales support and site survey are not available for Supply. Proceed to the Deal Cost Sheet."))
+    if kind in ("Service", "Supply and Installation"):
         doc.custom_elv_site_survey_required = int(doc.custom_service_survey == "Site Survey by ELV")
         doc.custom_technical_site_survey_required = int(doc.custom_service_survey == "Site Survey by Technical Team")
-        doc.custom_presales_required = int(bool(doc.custom_elv_site_survey_required or doc.custom_technical_site_survey_required))
-    if kind == "Supply and Installation" and doc.custom_installation_type == "CCTV" and cint(doc.custom_camera_count) >= 30:
-        needed = int(doc.custom_site_survey_needed == "Yes")
-        doc.custom_presales_required = needed
-        doc.custom_elv_site_survey_required = needed
-        doc.custom_technical_site_survey_required = 0
     if kind != "Service":
         doc.custom_service_type = None
+    if kind == "Supply":
         doc.custom_service_survey = None
         doc.custom_service_details = None
     if kind != "Supply and Installation":
@@ -87,7 +83,7 @@ def validate_survey_steps(doc, before=None):
         if before and any(doc.get(f) != before.get(f) for f in fields):
             frappe.throw(_("The survey request has already been sent. Update its details in Projects."))
         return
-    selected = cint(doc.get("custom_presales_required")) and any(cint(doc.get(f)) for f in ("custom_elv_site_survey_required", "custom_technical_site_survey_required"))
+    selected = any(cint(doc.get(f)) for f in ("custom_elv_site_survey_required", "custom_technical_site_survey_required"))
     if selected:
         required = (*fields[:3], "custom_survey_contact_name", "custom_enquiry")
         missing = [doc.meta.get_label(field) for field in required if not (doc.get(field) or "").strip()]

@@ -25,13 +25,15 @@ frappe.ui.form.on("Opportunity", {
                     return;
                 }
                 if (frm.is_new() || frm.is_dirty()) {
-                    frappe.msgprint(__('Save the Opportunity first. Selected survey options will create the linked requests automatically.'));
+                    frappe.msgprint(__('Save the Opportunity first to create the selected requests.'));
                     return;
                 }
-                frappe.new_doc("Presales Request", Object.assign({}, party_defaults, {
-                    subject: frm.doc.custom_subject,
-                    expected_close_date: frm.doc.expected_closing,
-                }))
+                frappe.db.get_value('Presales Request', {
+                    opportunity: frm.doc.name, docstatus: ['<', 2], status: ['!=', 'Cancelled']
+                }, 'name').then(r => {
+                    if (r.message?.name) frappe.set_route('Form', 'Presales Request', r.message.name);
+                    else frappe.msgprint(__('Save the Opportunity to create its Presales Request.'));
+                });
             },__("Create"))
         }
         else{
@@ -196,15 +198,9 @@ frappe.ui.form.on('Opportunity', {
 });
 
 frappe.ui.form.on('Opportunity', {
-    custom_presales_required(frm) {
-        if (!frm.doc.custom_presales_required && !frm.doc.custom_site_survey_request) {
-            frm.set_value({custom_elv_site_survey_required: 0, custom_technical_site_survey_required: 0});
-        }
-    },
     refresh(frm) {
         frm.remove_custom_button(__('Site Survey Request'), __('Projects'));
-        const selected = frm.doc.custom_presales_required &&
-            (frm.doc.custom_elv_site_survey_required || frm.doc.custom_technical_site_survey_required);
+        const selected = (frm.doc.custom_elv_site_survey_required || frm.doc.custom_technical_site_survey_required);
         if (selected) {
             frm.add_custom_button(__('Site Survey Request'), async () => {
                 if (frm.is_new() || frm.is_dirty()) await frm.save();

@@ -65,12 +65,10 @@ def backfill_request_details():
 
 
 def survey_selected(doc):
-    return cint(doc.get("custom_presales_required")) and any(cint(doc.get(f)) for f in FLAGS)
+    return any(cint(doc.get(f)) for f in FLAGS)
 
 
 def validate_opportunity(doc, method=None):
-    if any(cint(doc.get(f)) for f in FLAGS) and not cint(doc.get("custom_presales_required")):
-        frappe.throw(_("Enable Presales Support Required before selecting a site survey."))
     if doc.is_new() or not frappe.db.exists("DocType", "Site Survey Request"):
         return
     linked = frappe.db.get_value("Site Survey Request", {"opportunity": doc.name}, ["name", "status"], as_dict=True)
@@ -81,42 +79,49 @@ def validate_opportunity(doc, method=None):
 
 
 def create_requests(doc, method=None):
-    if not survey_selected(doc):
+    survey_needed = survey_selected(doc)
+    presales_needed = cint(doc.get("custom_presales_required"))
+    if not survey_needed and not presales_needed:
         return
-    # The Opportunity save and both requests share a transaction. A failure rolls
-    # back everything; row locking and the unique link prevent repeat-click duplicates.
     doc.check_permission("write")
     frappe.db.get_value("Opportunity", doc.name, "name", for_update=True)
-    existing = frappe.db.get_value("Site Survey Request", {"opportunity": doc.name}, "name")
-    if existing:
-        return
-    if cint(doc.get("custom_survey_step")) < 3:
+    survey_name = frappe.db.get_value("Site Survey Request", {"opportunity": doc.name}, "name")
+    if survey_needed and not survey_name:
+        if cint(doc.get("custom_survey_step")) < 3:
+            return
+        survey = frappe.get_doc({"doctype": "Site Survey Request", "opportunity": doc.name,
+            "status": "Requested", "requested_by": frappe.session.user,
+            "request_date": nowdate(), "site_address": doc.get("custom_survey_location")})
+        survey.flags.from_opportunity = True
+        survey.insert(ignore_permissions=True)
+        survey_name = survey.name
+        doc.db_set("custom_site_survey_request", survey_name, update_modified=False)
+    if not presales_needed:
         return
     presales_name = frappe.db.get_value("Presales Request", {
         "opportunity": doc.name, "docstatus": ["<", 2], "status": ["!=", "Cancelled"]})
     if presales_name:
         pre = frappe.get_doc("Presales Request", presales_name)
+        if not survey_name or pre.custom_site_survey_request == survey_name:
+            return
         if pre.docstatus or pre.status not in ("Draft", "Open", "Assigned", WAITING):
-            frappe.throw(_("This Opportunity already has a Presales Request in progress. Arrange its survey from that request before changing the Opportunity."))
-    survey = frappe.get_doc({"doctype": "Site Survey Request", "opportunity": doc.name,
-                            "status": "Requested", "requested_by": frappe.session.user,
-                            "request_date": nowdate(), "site_address": doc.get("custom_survey_location")})
-    survey.flags.from_opportunity = True
-    # Intake creation is a bounded consequence of an authorised Opportunity save;
-    # sales users do not gain general write access to project/presales documents.
-    survey.insert(ignore_permissions=True)
-    if not presales_name:
+            frappe.throw(_("This Opportunity already has a Presales Request in progress. Arrange its survey from that request."))
+    else:
         pre = frappe.get_doc({"doctype": "Presales Request", "opportunity": doc.name,
             "party_type": doc.opportunity_from, "party": doc.party_name,
             "company": doc.company, "subject": doc.get("custom_subject") or doc.title or doc.name,
             "estimated_value": doc.opportunity_amount, "requested_by": frappe.session.user,
             "request_date": nowdate(), "expected_close_date": doc.expected_closing,
-            "is_new_customer": int(doc.opportunity_from == "Lead")})
-    pre.custom_site_survey_request = survey.name
-    pre.status = WAITING
+            "is_new_customer": int(doc.opportunity_from == "Lead"), "status": "Draft"})
+    if survey_name:
+        survey = frappe.get_doc("Site Survey Request", survey_name)
+        pre.custom_site_survey_request = survey.name
+        pre.status = RECEIVED if survey.status == "Completed" else WAITING
+        if survey.status == "Completed":
+            pre.custom_survey_results = survey.results
     pre.save(ignore_permissions=True)
-    survey.db_set("presales_request", pre.name, update_modified=False)
-    doc.db_set("custom_site_survey_request", survey.name, update_modified=False)
+    if survey_name:
+        frappe.db.set_value("Site Survey Request", survey_name, "presales_request", pre.name, update_modified=False)
     doc.db_set("status", "Presales Request", update_modified=False)
 
 
@@ -131,7 +136,7 @@ def validate_presales(doc, method=None):
         frappe.throw(_("Complete the site survey and record its results first."))
     if survey and survey.status != "Completed" and doc.status not in (WAITING, "Cancelled", "On Hold"):
         frappe.throw(_("This Presales Request is awaiting site survey results."))
-    if not (survey and doc.status in (WAITING, RECEIVED, "Cancelled", "On Hold")):
+    if doc.status != "Draft" and not (survey and doc.status in (WAITING, RECEIVED, "Cancelled", "On Hold")):
         missing = [doc.meta.get_label(f) for f in DEFERRED_FIELDS if not doc.get(f)]
         if missing:
             frappe.throw(_("Complete the Presales details before proceeding: {0}").format(", ".join(missing)))
