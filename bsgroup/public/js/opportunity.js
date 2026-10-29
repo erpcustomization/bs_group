@@ -187,9 +187,7 @@ frappe.ui.form.on('Opportunity', {
             .bsi-opportunity-form .bsi-source-lead{padding:10px 14px!important;margin:6px 0!important}
             .bsi-opportunity-form .bsi-source-lead h5{margin:0 0 6px}
             .bsi-opportunity-form .bsi-opportunity-enquiry{padding:10px 14px!important;margin-bottom:8px!important}
-            .bsi-opportunity-form [data-fieldname="custom_sales_qualification"] .form-column{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 16px}
             @media(max-width:767px){
-                .bsi-opportunity-form [data-fieldname="custom_sales_qualification"] .form-column{grid-template-columns:1fr}
                 .bsi-opportunity-form .form-section{padding:10px!important}
             }
         `;
