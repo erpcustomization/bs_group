@@ -105,6 +105,9 @@
         frm.set_df_property('opportunity_from', 'hidden', 1);
         if (!frm.fields_dict.custom_business_type) return;
         supplyValue(frm);
+        const amount = frm.fields_dict.opportunity_amount?.$wrapper?.[0];
+        const presales = frm.fields_dict.custom_presales_support?.$wrapper?.[0];
+        if (amount && presales && amount.nextElementSibling !== presales) amount.after(presales);
         const routed = ['Service', 'Supply and Installation'].includes(d.custom_business_type);
         frm.set_df_property('sales_stage', 'hidden', 1);
         frm.set_df_property('sales_stage', 'reqd', 0);
