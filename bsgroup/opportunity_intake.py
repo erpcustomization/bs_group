@@ -38,8 +38,8 @@ def validate(doc, method=None):
             frappe.throw(_("Choose a Service Type."))
         if doc.get("custom_service_survey") not in ("Site Survey by ELV", "Site Survey by Technical Team", "No Site Survey Required"):
             frappe.throw(_("Choose the service site survey requirement."))
-        if doc.get("custom_service_survey") == "No Site Survey Required" and not (doc.get("custom_service_details") or "").strip():
-            frappe.throw(_("Enter the service details."))
+        if doc.get("custom_service_survey") == "No Site Survey Required" and not (doc.get("custom_enquiry") or "").strip():
+            frappe.throw(_("Enter the customer Enquiry before creating the Deal Cost Sheet."))
     if kind == "Supply and Installation":
         if doc.get("custom_installation_type") not in INSTALLATION_TYPES:
             frappe.throw(_("Choose an Installation Type."))
@@ -131,6 +131,10 @@ def create_supply_cost_sheet(opportunity):
         frappe.throw(_("This action is only available for Supply opportunities."))
     if flt(doc.get("opportunity_amount")) <= 0:
         frappe.throw(_("Enter an Opportunity Value greater than zero."))
+    return create_cost_sheet(doc)
+
+
+def create_cost_sheet(doc):
     existing = frappe.get_all("Deal Cost Sheet", filters={"opportunity": doc.name, "docstatus": ["<", 2]},
         fields=["name", "custom_record_authority"], order_by="creation desc")
     for row in existing:
@@ -144,3 +148,23 @@ def create_supply_cost_sheet(opportunity):
         "currency": doc.currency})
     sheet.insert()
     return {"name": sheet.name, "created": True}
+
+
+def create_no_survey_cost_sheet(doc, method=None):
+    if doc.get("custom_business_type") != "Service" or doc.get("custom_service_survey") != "No Site Survey Required":
+        return
+    if doc.get("custom_site_survey_request"):
+        return
+    # The save has already checked enquiry, service type and sales qualification.
+    frappe.db.sql("SELECT name FROM `tabOpportunity` WHERE name=%s FOR UPDATE", doc.name)
+    create_cost_sheet(doc)
+
+
+@frappe.whitelist()
+def setup_no_survey_details():
+    frappe.only_for("System Manager")
+    name = frappe.db.get_value("Custom Field", {"dt": "Opportunity", "fieldname": "custom_service_details"}, "name")
+    if name:
+        frappe.db.set_value("Custom Field", name, {"hidden": 1, "reqd": 0, "depends_on": "", "mandatory_depends_on": ""})
+        frappe.clear_cache(doctype="Opportunity")
+    return "Service Details hidden and optional"

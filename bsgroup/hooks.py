@@ -663,6 +663,7 @@ doc_events["Opportunity"]["before_insert"].append("bsgroup.utils.opportunity.val
 after_migrate.append("bsgroup.site_survey_setup.execute")
 doc_events["Opportunity"].setdefault("validate", []).append("bsgroup.site_survey.validate_opportunity")
 doc_events["Opportunity"].setdefault("on_update", []).append("bsgroup.site_survey.create_requests")
+doc_events["Opportunity"]["on_update"].append("bsgroup.opportunity_intake.create_no_survey_cost_sheet")
 doc_events.setdefault("Presales Request", {}).setdefault("validate", []).append("bsgroup.site_survey.validate_presales")
 permission_query_conditions["Site Survey Request"] = "bsgroup.site_survey.survey_query"
 permission_query_conditions["Presales Request"] = "bsgroup.site_survey.presales_query"

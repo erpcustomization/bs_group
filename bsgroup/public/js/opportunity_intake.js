@@ -115,6 +115,10 @@
             frm.set_df_property(field, 'read_only', !!d.custom_site_survey_request);
         }
         const service = d.custom_business_type === 'Service';
+        frm.set_df_property('custom_service_details', 'depends_on', '');
+        frm.set_df_property('custom_service_details', 'mandatory_depends_on', '');
+        frm.toggle_reqd('custom_service_details', false);
+        frm.toggle_display('custom_service_details', false);
         frm.toggle_display('custom_presales_required', !blocked && !cctv && !service && !!d.custom_business_type);
         const presales = frm.fields_dict.custom_presales_required?.$wrapper?.[0];
         const anchor = frm.fields_dict.custom_site_survey_needed?.$wrapper?.[0];

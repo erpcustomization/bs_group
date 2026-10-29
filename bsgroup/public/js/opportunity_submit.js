@@ -18,7 +18,6 @@
                 && !filled(value(frm,field.df.fieldname))) return false;
         }
         if (kind === 'Service' && (!value(frm,'custom_service_type') || !value(frm,'custom_service_survey'))) return false;
-        if (kind === 'Service' && value(frm,'custom_service_survey') === 'No Site Survey Required' && !filled(value(frm,'custom_service_details'))) return false;
         if (kind === 'Supply and Installation') {
             if (!value(frm,'custom_installation_type')) return false;
             if (value(frm,'custom_installation_type') === 'CCTV') {
