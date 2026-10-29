@@ -59,7 +59,7 @@
                         if (index < 2) (index === 1 && contact ? contact : frm.fields_dict[fields[index+1]]).set_focus();
                     } catch (error) {
                         await frm.set_value('custom_survey_step',previous);
-                        throw error;
+                        frappe.msgprint({title:__('Unable to confirm survey details'),message:error.message || String(error),indicator:'red'});
                     } finally {
                         frm._saving_survey_step = false;
                         button.disabled = false;
