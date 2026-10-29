@@ -7,7 +7,9 @@ FIELDS = (("decision_maker_known", "Decision Maker Known"),
           ("budget_confirmed", "Budget Confirmed"))
 
 
+@frappe.whitelist()
 def setup():
+    frappe.only_for("System Manager")
     from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
     from frappe.custom.doctype.property_setter.property_setter import make_property_setter
     from frappe.permissions import add_permission
