@@ -405,6 +405,7 @@ doc_events = {
             "bsgroup.utils.opportunity.set_opportunity_owner",
         ],
         "before_save": [
+            "bsgroup.opportunity_organization.sync",
             "bsgroup.utils.opportunity.set_stage_history",
             "bsgroup.utils.opportunity.set_stage_updates",
             "bsgroup.utils.opportunity.set_last_updates",
