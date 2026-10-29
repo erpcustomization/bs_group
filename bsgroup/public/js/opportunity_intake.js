@@ -119,11 +119,14 @@
             frm.toggle_display(field, false);
         }
         for (const field of ['custom_service_survey', 'custom_presales_support']) {
-            frm.set_df_property(field, 'depends_on', '');
+            // Keep the dependency active: clearing it leaves Frappe's initial
+            // hidden_due_to_dependency flag stuck on a blank new Opportunity.
+            frm.set_df_property(field, 'depends_on', "eval:['Service','Supply and Installation'].includes(doc.custom_business_type)");
             frm.set_df_property(field, 'mandatory_depends_on', '');
             frm.toggle_display(field, routed);
             frm.toggle_reqd(field, routed);
         }
+        frm.layout.refresh_dependency();
         if (!d.custom_site_survey_request) {
             await frm.set_value({
                 custom_presales_required: routed && d.custom_presales_support === 'Yes' ? 1 : 0,
