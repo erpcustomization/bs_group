@@ -50,6 +50,9 @@ class SiteSurveyRequest(Document):
             self.completed_on = self.completed_by = None
 
     def on_update(self):
+        if self.status == "Completed" and not self.presales_request:
+            from bsgroup.site_survey import create_costing_after_survey
+            create_costing_after_survey(self)
         if self.status == "Completed" and self.presales_request:
             pre = frappe.get_doc("Presales Request", self.presales_request)
             if pre.custom_site_survey_request != self.name:

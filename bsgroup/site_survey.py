@@ -27,8 +27,28 @@ def presales_handoff(name):
         ["status", "results"], as_dict=True) if pre.get("custom_site_survey_request") else None
     label = pre.status
     if pre.status not in ("Cancelled", "Completed", "Won", "Lost", "Submitted to Sales", "Ready for Quotation", "On Hold"):
-        label = "Open with Site Survey" if survey and survey.status not in ("Completed", "Cancelled") else "Open with Presales"
+        label = "Awaiting Site Survey" if survey and survey.status not in ("Completed", "Cancelled") else "Open with Presales"
     return {"label": label, "results": survey.results if survey and survey.status == "Completed" else None}
+
+
+def create_costing_after_survey(survey):
+    """Complete the no-presales handoff in the survey save transaction."""
+    if survey.status != "Completed" or survey.presales_request:
+        return
+    frappe.db.sql("SELECT name FROM `tabOpportunity` WHERE name=%s FOR UPDATE", survey.opportunity)
+    opportunity = frappe.get_doc("Opportunity", survey.opportunity)
+    if opportunity.status in ("Lost", "Closed", "Converted") or cint(opportunity.get("custom_presales_required")):
+        return
+    if frappe.db.exists("Presales Request", {"opportunity": opportunity.name,
+            "docstatus": ["<", 2], "status": ["!=", "Cancelled"]}):
+        return
+    if frappe.db.exists("Site Survey Request", {"opportunity": opportunity.name,
+            "status": ["not in", ["Completed", "Cancelled"]]}):
+        return
+    from bsgroup.opportunity_intake import create_cost_sheet
+    # Survey save already checks write access. This bounded downstream creation
+    # must also work for survey staff who cannot create commercial documents.
+    return create_cost_sheet(opportunity, ignore_permissions=True)
 
 
 def request_details(opportunity):

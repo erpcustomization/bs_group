@@ -45,7 +45,7 @@ function presales_status_panel(frm) {
         bar.find('.presales-status-value').text(__(label));
         frm.page.set_indicator(__(label), ['Completed','Submitted to Sales','Won'].includes(label) ? 'green' : 'blue');
     };
-    show(frm.doc.status === 'Awaiting Site Survey Results' ? 'Open with Site Survey' :
+    show(frm.doc.status === 'Awaiting Site Survey Results' ? 'Awaiting Site Survey' :
         frm.doc.status === 'Site Survey Results Received' ? 'Open with Presales' : frm.doc.status || 'Open with Presales');
     if (!frm.is_new()) {
         const name = frm.doc.name;

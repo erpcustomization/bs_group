@@ -130,19 +130,20 @@ def create_supply_cost_sheet(opportunity):
     return create_cost_sheet(doc)
 
 
-def create_cost_sheet(doc):
+def create_cost_sheet(doc, *, ignore_permissions=False):
     existing = frappe.get_all("Deal Cost Sheet", filters={"opportunity": doc.name, "docstatus": ["<", 2]},
         fields=["name", "custom_record_authority"], order_by="creation desc")
     for row in existing:
         if row.custom_record_authority != "Superseded":
-            frappe.get_doc("Deal Cost Sheet", row.name).check_permission("read")
+            if not ignore_permissions:
+                frappe.get_doc("Deal Cost Sheet", row.name).check_permission("read")
             return {"name": row.name, "created": False}
     sheet = frappe.new_doc("Deal Cost Sheet")
     sheet.update({"opportunity": doc.name, "party_type": doc.opportunity_from,
         "party": doc.party_name, "organisation_name": doc.get("custom_organization_name"),
         "subject": doc.get("custom_subject") or doc.title, "company": doc.company,
         "currency": doc.currency})
-    sheet.insert()
+    sheet.insert(ignore_permissions=ignore_permissions)
     return {"name": sheet.name, "created": True}
 
 

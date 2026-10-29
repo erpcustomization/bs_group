@@ -19,7 +19,7 @@ frappe.listview_settings['Presales Request'] = {
             'Cancelled': 'red'
         };
         var status = doc.status || 'Draft';
-        var label = status === 'Awaiting Site Survey Results' ? 'Open with Site Survey' :
+        var label = status === 'Awaiting Site Survey Results' ? 'Awaiting Site Survey' :
             status === 'Site Survey Results Received' ? 'Open with Presales' : status;
         return [label, color_map[status] || 'grey', 'status,=,' + status];
     }
