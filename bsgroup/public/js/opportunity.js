@@ -70,6 +70,15 @@ function bsi_opportunity_survey_results(frm) {
         // Frappe hides .form-section containers without registered fields as
         // empty-section. This read-only result panel is not a form section.
         section = $('<section class="bsi-survey-results" style="padding:16px"></section>').prependTo(tab.wrapper);
+        // Other layout scripts may insert fields after the results load.
+        const container = tab.wrapper[0];
+        if (!container._surveyOrderObserver) {
+            container._surveyOrderObserver = new MutationObserver(() => {
+                const results = container.querySelector(':scope > .bsi-survey-results');
+                if (results && container.firstElementChild !== results) container.prepend(results);
+            });
+            container._surveyOrderObserver.observe(container, {childList:true});
+        }
         $('<h5></h5>').text(__('Site Survey Results')).appendTo(section);
         r.message.forEach(survey => {
             $('<div class="text-muted"></div>').text(survey.name).appendTo(section);
