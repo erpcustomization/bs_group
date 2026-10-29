@@ -53,10 +53,12 @@ frappe.listview_settings['Presales Request'] = {
     g.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;';
     ALL_STATUSES.forEach(function(s) {
       var cnt = (sd && sd[s.label]) || 0;
+      var displayLabel = s.label === 'Awaiting Site Survey Results' ? 'Awaiting Site Survey' :
+        s.label === 'Site Survey Results Received' ? 'Open with Presales' : s.label;
       var c = document.createElement('div');
       c.style.cssText = 'background:#fff;border-radius:8px;padding:12px 14px;box-shadow:0 1px 4px rgba(0,0,0,.08);border-left:4px solid '+s.color+';cursor:pointer;';
       c.innerHTML = '<div style="font-size:22px;font-weight:700;color:'+s.color+'">'+cnt+'</div>'
-        + '<div style="font-size:11px;color:#555;margin-top:4px;">'+s.label+'</div>';
+        + '<div style="font-size:11px;color:#555;margin-top:4px;">'+displayLabel+'</div>';
       c.onclick = function(){ frappe.set_route('List','Presales Request','List',{status:s.label}); };
       g.appendChild(c);
     });
