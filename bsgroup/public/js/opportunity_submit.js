@@ -5,26 +5,28 @@
     };
     const filled = v => Array.isArray(v) ? v.length > 0 : v !== null && v !== undefined && String(v).trim() !== '';
     function ready(frm) {
-        if (!filled(value(frm,'party_name')) || !filled(value(frm,'custom_subject')) || !(Number(value(frm,'opportunity_amount')) > 0)) return false;
+        if (!filled(value(frm,'custom_enquiry'))) return false;
+        if (!filled(value(frm,'party_name')) || !filled(value(frm,'custom_subject')) || (frm.doc.opportunity_from !== 'Lead' && !(Number(value(frm,'opportunity_amount')) > 0))) return false;
         const kind = value(frm,'custom_business_type');
         if (!kind) return false;
         for (const field of Object.values(frm.fields_dict)) {
+            if (frm.doc.opportunity_from === 'Lead' && field.df.fieldname === 'opportunity_amount') continue;
             // Hidden and read-only defaults are validated by Frappe on save;
             // only fields the user can complete should gate this button.
             if (field.get_status && field.get_status() !== 'Write') continue;
             if (field.df.reqd && !['Section Break','Column Break','Tab Break','HTML','Button'].includes(field.df.fieldtype)
                 && !filled(value(frm,field.df.fieldname))) return false;
         }
+        if (['Service','Supply and Installation'].includes(kind) && (!value(frm,'custom_service_survey') || !value(frm,'custom_presales_support'))) return false;
         if (kind === 'Service' && (!value(frm,'custom_service_type') || !value(frm,'custom_service_survey'))) return false;
-        if (kind === 'Service' && value(frm,'custom_service_survey') === 'No Site Survey Required' && !filled(value(frm,'custom_service_details'))) return false;
         if (kind === 'Supply and Installation') {
             if (!value(frm,'custom_installation_type')) return false;
             if (value(frm,'custom_installation_type') === 'CCTV') {
                 const count=Number(value(frm,'custom_camera_count'));
-                if (!Number.isInteger(count) || count <= 0 || (count >= 30 && !value(frm,'custom_site_survey_needed'))) return false;
+                if (!Number.isInteger(count) || count <= 0) return false;
             }
         }
-        const survey = frm.doc.custom_presales_required && (frm.doc.custom_elv_site_survey_required || frm.doc.custom_technical_site_survey_required);
+        const survey = (frm.doc.custom_elv_site_survey_required || frm.doc.custom_technical_site_survey_required);
         if (survey && (Number(frm.doc.custom_survey_step) !== 3 || !['custom_survey_instructions','custom_survey_location','custom_survey_contact_name','custom_survey_contact_phone'].every(name=>filled(value(frm,name))))) return false;
         return true;
     }
@@ -51,10 +53,7 @@
                     if (frm.is_new() || frm.is_dirty()) return;
                     frappe.show_alert({message:__('Opportunity created.'),indicator:'green'});
                     if (frm.doc.custom_business_type === 'Supply' && frm._supply_open_dcs) {
-                        await frappe.new_doc('Deal Cost Sheet', {
-                            opportunity:frm.doc.name,party_type:frm.doc.opportunity_from,party:frm.doc.party_name,
-                            organisation_name:frm.doc.custom_organization_name,subject:frm.doc.custom_subject || frm.doc.title
-                        });
+                        await frappe.bsi_create_supply_cost_sheet(frm);
                     }
                 } finally { frm._submitting_opportunity=false;button.disabled=false;render(frm); }
             });
@@ -68,6 +67,11 @@
     }
     frappe.ui.form.on('Opportunity',{
         refresh(frm) {
+            for (const name of ['custom_decision_maker_known','custom_competition_known','custom_budget_confirmed']) {
+                const field = frm.fields_dict[name];
+                if (field && field.get_status() === 'Write') frm.toggle_reqd(name, true);
+            }
+            frm.toggle_reqd('custom_enquiry', frm.is_new() || !!((frm.doc.custom_elv_site_survey_required || frm.doc.custom_technical_site_survey_required)));
             render(frm);
             $(frm.wrapper).off('input.bsi_submit change.bsi_submit').on('input.bsi_submit change.bsi_submit','input,textarea,select',()=>{
                 clearTimeout(frm._submit_render_timer);

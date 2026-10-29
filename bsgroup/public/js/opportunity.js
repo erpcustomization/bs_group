@@ -1,5 +1,6 @@
 frappe.ui.form.on("Opportunity", {
     refresh(frm){
+        bsi_opportunity_survey_results(frm);
         hide_create_button(frm);
         reduce_subject_height(frm);
         set_opportunity_status(frm);
@@ -24,13 +25,15 @@ frappe.ui.form.on("Opportunity", {
                     return;
                 }
                 if (frm.is_new() || frm.is_dirty()) {
-                    frappe.msgprint(__('Save the Opportunity first. Selected survey options will create the linked requests automatically.'));
+                    frappe.msgprint(__('Save the Opportunity first to create the selected requests.'));
                     return;
                 }
-                frappe.new_doc("Presales Request", Object.assign({}, party_defaults, {
-                    subject: frm.doc.custom_subject,
-                    expected_close_date: frm.doc.expected_closing,
-                }))
+                frappe.db.get_value('Presales Request', {
+                    opportunity: frm.doc.name, docstatus: ['<', 2], status: ['!=', 'Cancelled']
+                }, 'name').then(r => {
+                    if (r.message?.name) frappe.set_route('Form', 'Presales Request', r.message.name);
+                    else frappe.msgprint(__('Save the Opportunity to create its Presales Request.'));
+                });
             },__("Create"))
         }
         else{
@@ -53,6 +56,29 @@ frappe.ui.form.on("Opportunity", {
         set_lead_name(frm);
     }
 })
+
+function bsi_opportunity_survey_results(frm) {
+    const tab = frm.layout?.tabs.find(t => t.df.fieldname === 'contact_info' ||
+        (t.df.label || '').toLowerCase() === 'additional details');
+    if (!tab || frm.is_new()) return;
+    const name = frm.doc.name;
+    frappe.call({method:'bsgroup.site_survey.opportunity_survey_results', args:{name}}).then(r => {
+        if (frm.doc.name !== name) return;
+        let section = tab.wrapper.children('.bsi-survey-results');
+        section.remove();
+        if (!r.message?.length) return;
+        section = $('<section class="bsi-survey-results form-section" style="padding:16px"></section>').appendTo(tab.wrapper);
+        $('<h5></h5>').text(__('Site Survey Results')).appendTo(section);
+        r.message.forEach(survey => {
+            $('<div class="text-muted"></div>').text(survey.name).appendTo(section);
+            const body = new DOMParser().parseFromString(survey.results || '', 'text/html').body;
+            body.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+            body.querySelectorAll('p,div,li').forEach(el => el.append('\n'));
+            $('<div style="white-space:pre-wrap;padding:12px 0"></div>').text(body.textContent || '').appendTo(section);
+        });
+        tab.refresh();
+    });
+}
 
 function set_lead_name(frm) {
     if (!frm.doc.party_name) return;
@@ -126,7 +152,7 @@ function reduce_subject_height(frm){
 frappe.ui.form.on('Opportunity', {
     onload(frm) {
         if (!frm.is_new()) return;
-        frm.set_df_property('opportunity_amount', 'reqd', 1);
+        frm.set_df_property('opportunity_amount', 'reqd', frm.doc.opportunity_from !== 'Lead');
         const convertedLead = frm.doc.opportunity_from === 'Lead' && !!frm.doc.party_name;
         if (!convertedLead) {
             if (frm.doc.opportunity_from !== 'Customer') {
@@ -152,21 +178,29 @@ frappe.ui.form.on('Opportunity', {
             .bsi-opportunity-form :is(input.form-control,textarea.form-control,select.form-control){background:#f8fafd!important;border:1px solid #dfe7f2!important;border-radius:6px!important;color:#172b4d}
             .bsi-opportunity-form :is(input.form-control,textarea.form-control,select.form-control):focus{background:#fff!important;border-color:#1d5fc4!important;box-shadow:0 0 0 2px rgba(29,95,196,.12)!important}
             .bsi-opportunity-form .btn-primary{background:#1d5fc4!important;border-color:#1d5fc4!important;color:white!important}
+            .bsi-opportunity-form .form-section{padding:10px 14px!important;margin-bottom:8px!important;min-height:0}
+            .bsi-opportunity-form .section-body{margin-top:8px!important}
+            .bsi-opportunity-form .section-head{padding:6px 10px}
+            .bsi-opportunity-form .form-column{padding-left:10px;padding-right:10px}
+            .bsi-opportunity-form .frappe-control{margin-bottom:10px!important}
+            .bsi-opportunity-form .frappe-control .form-group{margin-bottom:0}
+            .bsi-opportunity-form .control-label{margin-bottom:4px!important}
+            .bsi-opportunity-form .bsi-opportunity-status{padding:2px 0 6px}
+            .bsi-opportunity-form .bsi-source-lead{padding:10px 14px!important;margin:6px 0!important}
+            .bsi-opportunity-form .bsi-source-lead h5{margin:0 0 6px}
+            .bsi-opportunity-form .bsi-opportunity-enquiry{padding:10px 14px!important;margin-bottom:8px!important}
+            @media(max-width:767px){
+                .bsi-opportunity-form .form-section{padding:10px!important}
+            }
         `;
         root.append(style);
     }
 });
 
 frappe.ui.form.on('Opportunity', {
-    custom_presales_required(frm) {
-        if (!frm.doc.custom_presales_required && !frm.doc.custom_site_survey_request) {
-            frm.set_value({custom_elv_site_survey_required: 0, custom_technical_site_survey_required: 0});
-        }
-    },
     refresh(frm) {
         frm.remove_custom_button(__('Site Survey Request'), __('Projects'));
-        const selected = frm.doc.custom_presales_required &&
-            (frm.doc.custom_elv_site_survey_required || frm.doc.custom_technical_site_survey_required);
+        const selected = (frm.doc.custom_elv_site_survey_required || frm.doc.custom_technical_site_survey_required);
         if (selected) {
             frm.add_custom_button(__('Site Survey Request'), async () => {
                 if (frm.is_new() || frm.is_dirty()) await frm.save();

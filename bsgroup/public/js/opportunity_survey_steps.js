@@ -1,10 +1,12 @@
 (() => {
     const fields = ['custom_survey_instructions','custom_survey_location','custom_survey_contact_phone'];
-    const selected = d => d.custom_presales_required && (d.custom_elv_site_survey_required || d.custom_technical_site_survey_required);
+    const selected = d => (d.custom_elv_site_survey_required || d.custom_technical_site_survey_required);
     const entered = field => String(field?.$wrapper?.[0]?.querySelector('input,textarea')?.value ?? field?.get_value?.() ?? '').trim();
     function render(frm) {
         if (!frm.fields_dict.custom_survey_step) return;
         const active = !!selected(frm.doc), sent = !!frm.doc.custom_site_survey_request;
+        for (const name of [...fields, 'custom_survey_contact_name']) frm.toggle_reqd(name, active && !sent);
+        frm.toggle_reqd('custom_enquiry', frm.is_new() || active);
         const step = Number(frm.doc.custom_survey_step || 0);
         const contact = frm.fields_dict.custom_survey_contact_name;
         if (contact) {
@@ -44,7 +46,7 @@
                         if (index === 2) await frm.set_value('custom_survey_contact_name',contactName);
                         await frm.set_value('custom_survey_step',index + 1);
                         const draft = frm.is_new();
-                        if (!draft) {
+                        if (!draft && index === 2) {
                             await frm.save();
                             if (frm.is_dirty()) {
                                 await frm.set_value('custom_survey_step',previous);
@@ -53,7 +55,7 @@
                         }
                         frappe.show_alert({message:__(draft
                             ? (index === 2 ? 'Details confirmed. Click Submit Opportunity when ready.' : 'Confirmed. Complete the next step.')
-                            : (index === 2 ? 'Survey request saved and sent to Projects.' : 'Saved. Complete the next step.')),indicator:'green'});
+                            : (index === 2 ? 'Survey request saved and sent to Projects.' : 'Confirmed. Complete the next step before saving.')),indicator:'green'});
                         frm.trigger('bsi_update_submit');
                         render(frm);
                         if (index < 2) (index === 1 && contact ? contact : frm.fields_dict[fields[index+1]]).set_focus();

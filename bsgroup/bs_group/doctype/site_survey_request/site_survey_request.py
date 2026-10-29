@@ -1,20 +1,27 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import now_datetime, strip_html
-from bsgroup.site_survey import WAITING, RECEIVED
+from frappe.utils import getdate, now_datetime, strip_html
+from bsgroup.site_survey import WAITING, RECEIVED, request_details
 
 
 class SiteSurveyRequest(Document):
     def validate(self):
         before = self.get_doc_before_save()
+        if self.status in ("Requested", "Scheduled"):
+            self.status = "Scheduled" if self.assigned_to and self.planned_date else "Requested"
         if before and self.opportunity != before.opportunity:
             frappe.throw(_("The linked Opportunity cannot be changed."))
         if before:
             for field in ("requested_by", "request_date", "presales_request"):
-                if self.get(field) != before.get(field):
+                current, original = self.get(field), before.get(field)
+                if field == "request_date":
+                    current = getdate(current) if current else None
+                    original = getdate(original) if original else None
+                if current != original:
                     frappe.throw(_("The request origin and linked Presales Request cannot be changed."))
         opp = frappe.get_doc("Opportunity", self.opportunity)
+        self.survey_request_details = (before.get("survey_request_details") if before else None) or request_details(opp)
         if self.is_new() and not self.flags.from_opportunity:
             frappe.throw(_("Request the site survey from the Opportunity."))
         for target, source in {
@@ -43,13 +50,19 @@ class SiteSurveyRequest(Document):
             self.completed_on = self.completed_by = None
 
     def on_update(self):
+        if self.status == "Completed" and not self.presales_request:
+            from bsgroup.site_survey import create_costing_after_survey
+            create_costing_after_survey(self)
         if self.status == "Completed" and self.presales_request:
             pre = frappe.get_doc("Presales Request", self.presales_request)
             if pre.custom_site_survey_request != self.name:
                 frappe.throw(_("The Presales Request does not match this survey."))
             if pre.status == WAITING:
                 pre.status = RECEIVED
+                pre.custom_survey_results = self.results
                 pre.save(ignore_permissions=True)
+            elif pre.get("custom_survey_results") != self.results:
+                pre.db_set("custom_survey_results", self.results)
 
     def on_trash(self):
         frappe.throw(_("Cancel the Site Survey Request instead of deleting its history."))
