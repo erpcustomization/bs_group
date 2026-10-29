@@ -96,6 +96,8 @@
             if (section && details.contains(section) && !section.contains(business) && !section.contains(amount)) sections.add(section);
         }
         for (const section of sections) host.append(section);
+        const surveyResults = additional.querySelector('.bsi-survey-results');
+        if (surveyResults) additional.prepend(surveyResults);
     }
     frappe.ui.form.on('Opportunity', {
         refresh(frm) { arrange(frm); return leadDetails(frm); },
