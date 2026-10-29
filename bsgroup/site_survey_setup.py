@@ -3,7 +3,6 @@ import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 from frappe.custom.doctype.property_setter.property_setter import make_property_setter
 from bsgroup.site_survey import WAITING, RECEIVED, DEFERRED_FIELDS
-from bsgroup.opportunity_intake import SERVICE_TYPES, INSTALLATION_TYPES
 
 
 @frappe.whitelist(methods=["POST"])
@@ -19,10 +18,10 @@ def execute():
             dict(fieldname="custom_survey_contact_phone", label="Contact Person Phone Number", fieldtype="Data", insert_after="custom_survey_contact_name", depends_on="eval:doc.custom_presales_required && (doc.custom_elv_site_survey_required || doc.custom_technical_site_survey_required) && doc.custom_survey_step >= 2"),
             dict(fieldname="custom_survey_step", label="Survey Details Confirmed Step", fieldtype="Int", default="0", hidden=1, no_copy=1, insert_after="custom_survey_contact_phone"),
             dict(fieldname="custom_business_type", label="Supply / Service", fieldtype="Select", options="\nSupply\nService\nSupply and Installation", insert_after="sales_stage", mandatory_depends_on="eval:doc.__islocal || doc.custom_business_type"),
-            dict(fieldname="custom_service_type", label="Service Type", fieldtype="Select", options="\n" + "\n".join(SERVICE_TYPES), insert_after="custom_business_type", depends_on="eval:doc.custom_business_type === 'Service'", mandatory_depends_on="eval:doc.custom_business_type === 'Service'"),
-            dict(fieldname="custom_service_survey", label="Site Survey Requirement", fieldtype="Select", options="\nSite Survey by ELV\nSite Survey by Technical Team\nNo Site Survey Required", insert_after="custom_service_type", depends_on="eval:doc.custom_business_type === 'Service' && doc.custom_service_type", mandatory_depends_on="eval:doc.custom_business_type === 'Service'"),
+            dict(fieldname="custom_service_type", label="Service Type", fieldtype="Select", options="\nCCTV\n3CX\nELV", insert_after="custom_business_type", depends_on="eval:doc.custom_business_type === 'Service'", mandatory_depends_on="eval:doc.custom_business_type === 'Service'"),
+            dict(fieldname="custom_service_survey", label="Site Survey Requirement", fieldtype="Select", options="\nSite Survey by ELV\nSite Survey by Technical Team\nNo Site Survey Required", insert_after="custom_service_type", depends_on="eval:doc.custom_business_type === 'Service' && ['CCTV','3CX','ELV'].includes(doc.custom_service_type)", mandatory_depends_on="eval:doc.custom_business_type === 'Service'"),
             dict(fieldname="custom_service_details", label="Service Details", fieldtype="Small Text", insert_after="custom_service_survey", depends_on="eval:doc.custom_business_type === 'Service' && doc.custom_service_survey === 'No Site Survey Required'", mandatory_depends_on="eval:doc.custom_business_type === 'Service' && doc.custom_service_survey === 'No Site Survey Required'"),
-            dict(fieldname="custom_installation_type", label="Installation Type", fieldtype="Select", options="\n" + "\n".join(INSTALLATION_TYPES), insert_after="custom_service_type", depends_on="eval:doc.custom_business_type === 'Supply and Installation'", mandatory_depends_on="eval:doc.custom_business_type === 'Supply and Installation'"),
+            dict(fieldname="custom_installation_type", label="Installation Type", fieldtype="Select", options="\nCCTV\n3CX\nNetworking\nOther", insert_after="custom_service_type", depends_on="eval:doc.custom_business_type === 'Supply and Installation'", mandatory_depends_on="eval:doc.custom_business_type === 'Supply and Installation'"),
             dict(fieldname="custom_camera_count", label="Number of Cameras", fieldtype="Int", insert_after="custom_installation_type", depends_on="eval:doc.custom_business_type === 'Supply and Installation' && doc.custom_installation_type === 'CCTV'", mandatory_depends_on="eval:doc.custom_business_type === 'Supply and Installation' && doc.custom_installation_type === 'CCTV'"),
             dict(fieldname="custom_site_survey_needed", label="Site Survey Required?", fieldtype="Select", options="\nYes\nNo", insert_after="custom_camera_count", depends_on="eval:doc.custom_business_type === 'Supply and Installation' && doc.custom_installation_type === 'CCTV' && doc.custom_camera_count >= 30", mandatory_depends_on="eval:doc.custom_business_type === 'Supply and Installation' && doc.custom_installation_type === 'CCTV' && doc.custom_camera_count >= 30"),
             dict(fieldname="custom_elv_site_survey_required", label="ELV Site Survey Required", fieldtype="Check", default="0",
@@ -59,8 +58,6 @@ def execute():
         make_property_setter("Presales Request", field, "mandatory_depends_on",
             "eval:!doc.custom_site_survey_request || !['Awaiting Site Survey Results','Site Survey Results Received','Cancelled','On Hold'].includes(doc.status)", "Data")
     ensure_navigation()
-    from bsgroup.site_survey import backfill_request_details
-    backfill_request_details()
     frappe.clear_cache()
     return {"status": "ready", "doctype": "Site Survey Request"}
 

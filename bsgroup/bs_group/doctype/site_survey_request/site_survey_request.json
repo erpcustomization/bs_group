@@ -9,8 +9,6 @@
  "sort_field": "creation",
  "sort_order": "DESC",
  "field_order": [
-  "details_tab",
-  "survey_request_details",
   "request_details",
   "opportunity",
   "title",
@@ -40,33 +38,9 @@
   "results",
   "attachment",
   "completed_by",
-  "completed_on",
-  "additional_details",
-  "activity_panel"
+  "completed_on"
  ],
  "fields": [
-  {
-   "fieldname": "activity_panel",
-   "label": "Comments and Activity",
-   "fieldtype": "HTML",
-   "options": "<div class=\"bsi-survey-activity-anchor\"></div>"
-  },
-  {
-   "fieldname": "details_tab",
-   "label": "Details",
-   "fieldtype": "Tab Break"
-  },
-  {
-   "fieldname": "additional_details",
-   "label": "Additional details",
-   "fieldtype": "Tab Break"
-  },
-  {
-   "fieldname": "survey_request_details",
-   "label": "Site Survey Request Details",
-   "fieldtype": "Long Text",
-   "read_only": 1
-  },
   {
    "fieldname": "request_details",
    "label": "Site Survey Request",

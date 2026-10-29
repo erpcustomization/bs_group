@@ -4,11 +4,8 @@ from frappe.utils import get_datetime, now_datetime
 
 
 def timed(label, delayed, started, now):
-    seconds = (now - get_datetime(started)).total_seconds() if started else 0
-    late = seconds >= 86400
-    days = int(seconds // 86400)
-    display = f"{days} days - {delayed}" if late and days >= 2 else delayed if late else label
-    return dict(label=display, color="red" if late else "blue", started=started)
+    late = bool(started and (now - get_datetime(started)).total_seconds() > 86400)
+    return dict(label=delayed if late else label, color="red" if late else "blue", started=started)
 
 
 def resolve(opportunity, surveys, presales, sheets, now=None):
@@ -18,9 +15,7 @@ def resolve(opportunity, surveys, presales, sheets, now=None):
         return dict(label=native, color="red" if native == "Lost" else "green")
     active_surveys = [s for s in surveys if s.status not in ("Completed", "Cancelled")]
     if active_surveys:
-        if active_surveys[0].status == "Scheduled":
-            return dict(label="Site Survey Scheduled", color="blue")
-        return timed("Open with Site Survey Team", "Delayed by Site Survey Team", active_surveys[0].creation, now)
+        return timed("Open with Site Survey Team", "Pending from Site Survey Team", active_surveys[0].creation, now)
     live_sheets = [s for s in sheets if s.docstatus < 2 and s.get("custom_record_authority") != "Superseded"]
     if live_sheets:
         sheet = live_sheets[0]
@@ -33,8 +28,6 @@ def resolve(opportunity, surveys, presales, sheets, now=None):
         survey = next((s for s in surveys if s.name == request.get("custom_site_survey_request")), None)
         if survey and survey.status == "Cancelled":
             return dict(label="Site Survey Cancelled", color="orange")
-        if survey and survey.status == "Completed" and request.status in ("Awaiting Site Survey Results", "Site Survey Results Received"):
-            return dict(label="Site Survey Completed", color="green")
         started = request.creation
         if survey and survey.status == "Completed" and survey.completed_on:
             started = max(get_datetime(request.creation), get_datetime(survey.completed_on))
@@ -42,8 +35,6 @@ def resolve(opportunity, surveys, presales, sheets, now=None):
     finished = next((p for p in presales if p.docstatus < 2 and p.status not in ("Cancelled", "Awaiting Site Survey Results")), None)
     if finished:
         return dict(label=finished.status, color="green")
-    if any(s.status == "Completed" for s in surveys):
-        return dict(label="Site Survey Completed", color="green")
     return dict(label="Open" if native in (None, "", "Open", "Presales Request") else native, color="purple")
 
 
@@ -54,11 +45,6 @@ def statuses(names):
         frappe.throw("Request at most 500 Opportunity statuses.")
     # Permission-filter the requested opportunities before reading any related work.
     opportunities = frappe.get_list("Opportunity", filters={"name": ["in", names]}, fields=["name", "status"], limit_page_length=500)
-    return resolve_many(opportunities)
-
-
-def resolve_many(opportunities):
-    """Resolve a permission-filtered batch using three related-record queries."""
     allowed = [o.name for o in opportunities]
     if not allowed:
         return {}
