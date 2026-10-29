@@ -176,6 +176,22 @@ frappe.ui.form.on('Opportunity', {
             .bsi-opportunity-form :is(input.form-control,textarea.form-control,select.form-control){background:#f8fafd!important;border:1px solid #dfe7f2!important;border-radius:6px!important;color:#172b4d}
             .bsi-opportunity-form :is(input.form-control,textarea.form-control,select.form-control):focus{background:#fff!important;border-color:#1d5fc4!important;box-shadow:0 0 0 2px rgba(29,95,196,.12)!important}
             .bsi-opportunity-form .btn-primary{background:#1d5fc4!important;border-color:#1d5fc4!important;color:white!important}
+            .bsi-opportunity-form .form-section{padding:10px 14px!important;margin-bottom:8px!important;min-height:0}
+            .bsi-opportunity-form .section-body{margin-top:8px!important}
+            .bsi-opportunity-form .section-head{padding:6px 10px}
+            .bsi-opportunity-form .form-column{padding-left:10px;padding-right:10px}
+            .bsi-opportunity-form .frappe-control{margin-bottom:10px!important}
+            .bsi-opportunity-form .frappe-control .form-group{margin-bottom:0}
+            .bsi-opportunity-form .control-label{margin-bottom:4px!important}
+            .bsi-opportunity-form .bsi-opportunity-status{padding:2px 0 6px}
+            .bsi-opportunity-form .bsi-source-lead{padding:10px 14px!important;margin:6px 0!important}
+            .bsi-opportunity-form .bsi-source-lead h5{margin:0 0 6px}
+            .bsi-opportunity-form .bsi-opportunity-enquiry{padding:10px 14px!important;margin-bottom:8px!important}
+            .bsi-opportunity-form [data-fieldname="custom_sales_qualification"] .form-column{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 16px}
+            @media(max-width:767px){
+                .bsi-opportunity-form [data-fieldname="custom_sales_qualification"] .form-column{grid-template-columns:1fr}
+                .bsi-opportunity-form .form-section{padding:10px!important}
+            }
         `;
         root.append(style);
     }
