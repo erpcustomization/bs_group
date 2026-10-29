@@ -1,6 +1,77 @@
 // Copyright (c) 2026, Tridots Tech and contributors
 // For license information, please see license.txt
 
+function presales_move_timeline_to_additional(frm) {
+    const layout = frm.layout;
+    const section = layout?.sections_dict.section_break_btny;
+    if (!section) return;
+    if (!layout.tabs.length) {
+        layout.setup_tabbed_layout();
+        const sections = [...layout.sections];
+        const details = layout.make_tab({fieldname:'presales_details_tab', fieldtype:'Tab Break', label:__('Details')});
+        sections.forEach(item => item.wrapper.appendTo(details.wrapper));
+        layout.fields_list.forEach(field => details.add_field(field));
+        details.set_active();
+    }
+    let additional = layout.tabs.find(tab =>
+        tab.df.fieldname === 'presales_additional_details' ||
+        (tab.df.label || '').toLowerCase() === 'additional details');
+    if (!additional) {
+        additional = layout.make_tab({fieldname:'presales_additional_details', fieldtype:'Tab Break', label:__('Additional details')});
+    }
+    if (section.wrapper.parent()[0] !== additional.wrapper[0]) {
+        section.wrapper.appendTo(additional.wrapper);
+        section.fields_list.forEach(field => additional.add_field(field));
+    }
+    const results = frm.fields_dict.custom_survey_results;
+    if (results && results.$wrapper.parent()[0] !== additional.wrapper[0]) {
+        results.$wrapper.appendTo(additional.wrapper);
+        additional.add_field(results);
+    }
+    const footer = $(frm.page.wrapper).find('.form-footer');
+    if (footer.length && footer.parent()[0] !== additional.wrapper[0]) footer.appendTo(additional.wrapper);
+    layout.refresh_tabs();
+}
+
+function presales_status_panel(frm) {
+    frm.set_df_property('status', 'hidden', 1);
+    const host = frm.layout.tabs[0]?.wrapper || frm.layout.wrapper;
+    let bar = host.children('.presales-status-bar');
+    if (!bar.length) {
+        bar = $('<div class="presales-status-bar" style="display:flex;justify-content:flex-end;align-items:center;gap:12px;padding:12px 16px"><span></span><span class="presales-status-value" style="padding:9px 14px;border-radius:8px;background:#e3edff;color:#174e9b;font-weight:600" role="status"></span></div>').prependTo(host);
+        bar.children().first().text(__('Status'));
+    }
+    const show = label => {
+        bar.find('.presales-status-value').text(__(label));
+        frm.page.set_indicator(__(label), ['Completed','Submitted to Sales','Won'].includes(label) ? 'green' : 'blue');
+    };
+    show(frm.doc.status === 'Awaiting Site Survey Results' ? 'Awaiting Site Survey' :
+        frm.doc.status === 'Site Survey Results Received' ? 'Open with Presales' : frm.doc.status || 'Open with Presales');
+    if (!frm.is_new()) {
+        const name = frm.doc.name;
+        frappe.call({method:'bsgroup.site_survey.presales_handoff', args:{name}}).then(r => {
+            if (frm.doc.name !== name || !r.message) return;
+            show(r.message.label);
+            if (r.message.results != null && frm.fields_dict.custom_survey_results) {
+                frm.doc.custom_survey_results = r.message.results;
+                frm.refresh_field('custom_survey_results');
+            }
+        });
+    }
+}
+
+function presales_show_party(frm) {
+    for (const name of ['party_type', 'customer', 'is_new_customer']) {
+        frm.set_df_property(name, 'hidden', 1);
+    }
+    frm.set_df_property('party', 'label', frm.doc.party_type === 'Lead' ? __('Lead') : __('Customer'));
+    frm.set_df_property('party', 'read_only', 1);
+    frm.set_df_property('party', 'description', '');
+    frm.set_df_property('organisation_name', 'description', '');
+    frm.set_df_property('organisation_name', 'hidden',
+        frm.doc.party_type !== 'Lead' || !frm.doc.organisation_name || frm.doc.organisation_name === frm.doc.party);
+}
+
 frappe.ui.form.on("Presales Request", {
     onload(frm) {
         if (!frm.doc.requested_by) {
@@ -13,35 +84,37 @@ frappe.ui.form.on("Presales Request", {
         if (!frm.doc.opportunity) return;
         frappe.db.get_value("Opportunity", frm.doc.opportunity,
             ["opportunity_from", "party_name", "custom_organization_name"]
-        ).then(r => {
+        ).then(async r => {
             if (!r.message) return;
             let opp = r.message;
             if ((opp.opportunity_from === "Customer" || opp.opportunity_from === "Lead") && opp.party_name) {
-                frm.set_value("party_type", opp.opportunity_from);
-                frm.set_value("party", opp.party_name);
-                frm.set_value("organisation_name", opp.custom_organization_name || "");
-                frm.set_value("is_new_customer", opp.opportunity_from === "Lead" ? 1 : 0);
+                await frm.set_value("party_type", opp.opportunity_from);
+                await frm.set_value("party", opp.party_name);
+                await frm.set_value("is_new_customer", opp.opportunity_from === "Lead" ? 1 : 0);
+                presales_show_party(frm);
             }
         });
     },
     party_type(frm) {
         if (frm.doc.party && frm.doc.party_type) {
             // party is a Dynamic Link: a change of type invalidates the value.
-            frm.set_value("party", "");
+            return frm.set_value("party", "");
         }
     },
     party(frm) {
         if (!frm.doc.party || !frm.doc.party_type) return;
         let field = frm.doc.party_type === "Customer" ? "customer_name" : "company_name";
-        frappe.db.get_value(frm.doc.party_type, frm.doc.party, field).then(r => {
-            if (r.message) frm.set_value("organisation_name", r.message[field] || frm.doc.party);
+        return frappe.db.get_value(frm.doc.party_type, frm.doc.party, field).then(async r => {
+            if (r.message) await frm.set_value("organisation_name", r.message[field] || frm.doc.party);
+            presales_show_party(frm);
         });
     },
     refresh(frm){
+        presales_show_party(frm);
+        presales_move_timeline_to_additional(frm);
         set_completion_date(frm);
-        set_status_indicator(frm);
+        presales_status_panel(frm);
         reduce_subject_height(frm);
-        set_status_value(frm);
         frm.toggle_reqd("site_visit", frm.doc.site_visit_required == 1);
         if(frm.doc.docstatus == 1){
             frm.add_custom_button("Deal Cost Sheet", () => {
@@ -107,11 +180,4 @@ function set_status_indicator(frm){
         "Cancelled": "darkred"
     }[frm.doc.status] || "black";
     frm.page.set_indicator(frm.doc.status, color);
-}
-
-function set_status_value(frm) {
-    if (frm.doc.docstatus == 1 && frm.doc.status != "Submitted to Sales" && frm.doc.status != "Open") {
-        frm.set_value("status", "Open");
-        frm.save("Update");
-    }
 }
