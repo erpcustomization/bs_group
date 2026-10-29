@@ -685,3 +685,5 @@ for _downstream in ("Presales Request", "Deal Cost Sheet", "Quotation", "Site Su
         doc_events[_downstream][_event] = ["bsgroup.opportunity_required.validate"] + ([_prior] if isinstance(_prior, str) else list(_prior))
     _prior = doctype_js.get(_downstream, [])
     doctype_js[_downstream] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["public/js/opportunity_required.js"]
+
+after_migrate.append("bsgroup.sales_qualification.setup")

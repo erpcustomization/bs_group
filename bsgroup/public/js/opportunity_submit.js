@@ -67,6 +67,10 @@
     }
     frappe.ui.form.on('Opportunity',{
         refresh(frm) {
+            for (const name of ['custom_decision_maker_known','custom_competition_known','custom_budget_confirmed']) {
+                const field = frm.fields_dict[name];
+                if (field && field.get_status() === 'Write') frm.toggle_reqd(name, true);
+            }
             frm.toggle_reqd('custom_enquiry', frm.is_new() || !!(frm.doc.custom_presales_required && (frm.doc.custom_elv_site_survey_required || frm.doc.custom_technical_site_survey_required)));
             render(frm);
             $(frm.wrapper).off('input.bsi_submit change.bsi_submit').on('input.bsi_submit change.bsi_submit','input,textarea,select',()=>{

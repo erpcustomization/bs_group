@@ -16,6 +16,8 @@ def no_presales(doc):
 
 
 def validate(doc, method=None):
+    from bsgroup.sales_qualification import validate as validate_qualification
+    validate_qualification(doc)
     if doc.is_new() and not (doc.get("custom_enquiry") or "").strip():
         frappe.throw(_("Enter the customer Enquiry before creating the Opportunity. For a Lead conversion, complete the Lead Requirement first."))
     kind = doc.get("custom_business_type")
