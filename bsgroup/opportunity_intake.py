@@ -86,6 +86,16 @@ def validate_survey_steps(doc, before=None):
             frappe.throw(_("The survey request has already been sent. Update its details in Projects."))
         return
     selected = cint(doc.get("custom_presales_required")) and any(cint(doc.get(f)) for f in ("custom_elv_site_survey_required", "custom_technical_site_survey_required"))
+    if selected:
+        required = (*fields[:3], "custom_survey_contact_name", "custom_enquiry")
+        missing = [doc.meta.get_label(field) for field in required if not (doc.get(field) or "").strip()]
+        if missing:
+            frappe.throw(_("Complete all required site survey details before saving: {0}").format(", ".join(missing)))
+        # A fully qualified save must dispatch the survey, including API saves.
+        doc.custom_survey_step = 3
+        if doc.get("custom_business_type") == "Service":
+            doc.custom_service_details = doc.custom_survey_instructions
+        return
     step = cint(doc.get("custom_survey_step")) if selected else 0
     if step not in (0, 1, 2, 3):
         frappe.throw(_("Invalid survey confirmation step."))

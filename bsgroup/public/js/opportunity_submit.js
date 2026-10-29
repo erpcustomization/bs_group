@@ -67,7 +67,7 @@
     }
     frappe.ui.form.on('Opportunity',{
         refresh(frm) {
-            frm.toggle_reqd('custom_enquiry', frm.is_new());
+            frm.toggle_reqd('custom_enquiry', frm.is_new() || !!(frm.doc.custom_presales_required && (frm.doc.custom_elv_site_survey_required || frm.doc.custom_technical_site_survey_required)));
             render(frm);
             $(frm.wrapper).off('input.bsi_submit change.bsi_submit').on('input.bsi_submit change.bsi_submit','input,textarea,select',()=>{
                 clearTimeout(frm._submit_render_timer);
