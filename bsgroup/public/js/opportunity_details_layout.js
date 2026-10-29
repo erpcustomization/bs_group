@@ -81,6 +81,8 @@
             business.parentElement.append(frm._supply_amount_home);
         }
         if (frm.doc.custom_business_type !== 'Supply' && frm._supply_amount_home) frm._supply_amount_home.after(amount);
+        const presales = frm.fields_dict.custom_presales_support?.$wrapper?.[0];
+        if (presales && amount.nextElementSibling !== presales) amount.after(presales);
         let host = additional.querySelector('.bsi-additional-sections');
         if (!host) {
             host = document.createElement('div');
