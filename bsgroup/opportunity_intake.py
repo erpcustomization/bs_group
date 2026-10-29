@@ -151,10 +151,20 @@ def create_cost_sheet(doc):
 
 
 def create_no_survey_cost_sheet(doc, method=None):
-    if doc.get("custom_business_type") != "Service" or doc.get("custom_service_survey") != "No Site Survey Required":
+    kind = doc.get("custom_business_type")
+    direct = kind == "Supply" or (
+        kind == "Service" and doc.get("custom_service_survey") == "No Site Survey Required"
+    ) or (kind == "Supply and Installation" and not cint(doc.get("custom_presales_required")))
+    if not direct:
         return
-    if doc.get("custom_site_survey_request"):
+    if doc.get("custom_site_survey_request") or any(cint(doc.get(f)) for f in (
+        "custom_presales_required", "custom_elv_site_survey_required", "custom_technical_site_survey_required"
+    )):
         return
+    if frappe.db.exists("Presales Request", {"opportunity": doc.name, "docstatus": ["<", 2], "status": ["!=", "Cancelled"]}):
+        return
+    if not (doc.get("custom_enquiry") or "").strip():
+        frappe.throw(_("Enter the customer Enquiry before creating the Deal Cost Sheet."))
     # The save has already checked enquiry, service type and sales qualification.
     frappe.db.sql("SELECT name FROM `tabOpportunity` WHERE name=%s FOR UPDATE", doc.name)
     create_cost_sheet(doc)
