@@ -113,6 +113,8 @@ def boot_session(bootinfo):
     if not mode:
         return
     allowed = SCREENS[mode]
+    if "BS Lead Intake Manager" in frappe.get_roles():
+        allowed = (*allowed, "Lead Intake")
     bootinfo.bs_scoped_screens = list(allowed)
     # Filter the server-provided sidebar model as well as its rendered navigation.
     for key in ("workspace_sidebar_item", "module_sidebars"):
