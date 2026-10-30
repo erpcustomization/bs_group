@@ -7,15 +7,33 @@ def make_quotation(source_name, target_doc=None):
 	frappe.throw("Create the Quotation from the completed and submitted Deal Cost Sheet, not directly from the Opportunity.")
 
 
-def set_sales_person_from_customer(doc, method=None):
-	"""Quotation has no native Sales Team child table (unlike Sales Order/Sales
-	Invoice/Delivery Note), so mirror the Customer's primary Sales Person
-	(highest allocation row) onto custom_sales_person for permission
-	filtering and reporting. Only applies when quotation_to is Customer.
+def sales_person_for_deal(doc):
+	"""Resolve the selling owner independently of the quotation preparer."""
+	sheet = frappe.db.get_value("Deal Cost Sheet", doc.get("custom_deal_cost_sheet"),
+		["opportunity", "deal_owner"], as_dict=True) if doc.get("custom_deal_cost_sheet") else None
+	opportunity = doc.get("opportunity") or (sheet.opportunity if sheet else None)
+	owner = frappe.db.get_value("Opportunity", opportunity, "opportunity_owner") if opportunity else None
+	for user in dict.fromkeys([owner, sheet.deal_owner if sheet else None]):
+		if not user:
+			continue
+		from bsgroup.permissions import get_user_sales_person
+		person = get_user_sales_person(user)
+		if not person:
+			full_name = frappe.db.get_value("User", user, "full_name")
+			person = frappe.db.get_value("Sales Person", {"name": full_name, "is_group": 0}, "name") if full_name else None
+		if person:
+			return person
+	return None
 
-	Precedence: a valid Customer mapping always wins and overwrites the field;
-	when no mapping exists an existing value is preserved (never cleared) and
-	an empty field stays empty."""
+
+def set_sales_person_from_customer(doc, method=None):
+	"""Use the opportunity/deal owner for linked quotations. Legacy unlinked
+	quotations retain their Customer Sales Team mapping or existing value."""
+	if doc.get("opportunity") or doc.get("custom_deal_cost_sheet"):
+		# The linked deal owns sales attribution, including Lead quotations.
+		# Never attribute an unmapped deal to its Presales preparer or customer.
+		doc.custom_sales_person = sales_person_for_deal(doc)
+		return
 	if doc.quotation_to != "Customer" or not doc.party_name:
 		return
 
