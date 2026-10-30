@@ -98,14 +98,14 @@ def permission(doc, user=None, permission_type=None, ptype=None):
     if sql is None:
         if doc.doctype == "Site Survey Request":
             from bsgroup.site_survey import survey_permission
-            return survey_permission(doc, user, permission_type, ptype)
-        return None
+            return survey_permission(doc, user, permission_type, ptype) is not False
+        return True
     if sql == "1=0":
         return False
     if doc.is_new():
-        return None  # Native create rights and existing intake validations apply.
+        return True  # Native create rights and existing intake validations apply.
     allowed = frappe.db.sql(f"SELECT name FROM `tab{doc.doctype}` WHERE name=%s AND ({sql})", doc.name)
-    return None if allowed else False
+    return bool(allowed)
 
 
 def boot_session(bootinfo):

@@ -39,7 +39,9 @@ try:
                     continue
                 rows = frappe.get_list(dt, fields=['name'], limit_page_length=1000)
                 for row in rows:
-                    assert access.permission(frappe.get_doc(dt,row.name), user) is None
+                    assert access.permission(frappe.get_doc(dt,row.name), user)
+                if rows:
+                    assert frappe.get_doc(dt,rows[0].name).has_permission(user=user), (user,dt,'own record denied')
                 other = frappe.db.sql(f'SELECT name FROM `tab{dt}` WHERE NOT ({access.condition(dt,user)}) LIMIT 1', as_dict=True)
                 if other:
                     assert not frappe.has_permission(dt,'read',doc=frappe.get_doc(dt,other[0].name),user=user), (user,dt,'foreign readable')
