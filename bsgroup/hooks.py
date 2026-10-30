@@ -451,6 +451,8 @@ doc_events = {
 }
 
 override_whitelisted_methods = {
+    "bs_lead_intake.intake.review.record_review": "bsgroup.intake_access.record_review",
+    "bs_lead_intake.intake.metrics.pilot_report": "bsgroup.intake_access.pilot_report",
     "erpnext.controllers.accounts_controller.update_child_qty_rate": "bsgroup.dcs.quotation_control.update_child_qty_rate",
 	"erpnext.selling.doctype.quotation.quotation.make_sales_order": "bsgroup.dcs.quotation_control.make_sales_order",
 	"erpnext.crm.doctype.opportunity.opportunity.make_quotation": "bsgroup.utils.quotation.make_quotation",
