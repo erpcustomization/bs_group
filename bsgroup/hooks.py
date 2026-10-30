@@ -252,6 +252,7 @@ app_license = "mit"
 # on_login = "bsgroup.utils.company_access.validate_company_on_login"
 
 app_include_js = [
+    "/assets/bsgroup/js/scoped_sales_access.js",
     "bsgroup.bundle.js",
     "navbar_custom.bundle.js",
     "bs_sales_theme.bundle.js",
@@ -690,3 +691,10 @@ for _downstream in ("Presales Request", "Deal Cost Sheet", "Quotation", "Site Su
 
 after_migrate.append("bsgroup.sales_qualification.setup")
 after_migrate.append("bsgroup.opportunity_routing_setup.execute")
+
+boot_session = "bsgroup.scoped_sales_access.boot_session"
+for _dt, _query in {"Lead": "lead_query", "Opportunity": "opportunity_query",
+                   "Presales Request": "presales_query", "Deal Cost Sheet": "dcs_query",
+                   "Quotation": "quotation_query", "Site Survey Request": "survey_query"}.items():
+    permission_query_conditions[_dt] = "bsgroup.scoped_sales_access." + _query
+    has_permission[_dt] = "bsgroup.scoped_sales_access.permission"
