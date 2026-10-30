@@ -32,6 +32,13 @@ try:
             assert not frappe.has_permission('Site Survey Request', 'read')
             assert not frappe.has_permission('Sales Order', 'read')
             assert not frappe.has_permission('User', 'write', doc=frappe.get_doc('User','Administrator'))
+            customers = frappe.get_list('Customer', fields=['name'], limit_page_length=10000)
+            assert customers, (user, 'no selectable customers')
+            for customer in customers:
+                doc = frappe.get_doc('Customer', customer.name)
+                assert doc.has_permission('read', user=user), (user, customer.name, 'selectable customer denied')
+                assert not doc.has_permission('write', user=user), (user, 'customer edit granted')
+            print(user, 'selectable customers readable', len(customers), flush=True)
             for dt in ('Lead','Opportunity','Presales Request','Deal Cost Sheet','Quotation'):
                 permitted = dt in access.SCREENS[mode]
                 assert bool(frappe.has_permission(dt, 'read')) == permitted, (user,dt)

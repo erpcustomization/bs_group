@@ -179,6 +179,11 @@ def has_customer_permission(doc, ptype=None, user=None):
     if "System Manager" in roles or "Sales Manager" in roles:
         return True
 
+    if "BS Scoped Sales" in roles or "BS Scoped Presales" in roles:
+        # Match the Customer link/list filter. Returning None here is treated
+        # as a denial by Frappe's controller permission check.
+        return customer_has_sales_team_access(doc.name, user)
+
     if "Sales User" not in roles:
         # Non-sales roles are governed by the standard role permission stack.
         return None
