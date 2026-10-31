@@ -32,14 +32,16 @@ function presales_move_timeline_to_additional(frm) {
     if (footer.length && footer.parent()[0] !== additional.wrapper[0]) footer.appendTo(additional.wrapper);
     layout.refresh_tabs();
     const timing = layout.sections_dict.custom_completion_time_section;
-    if (timing) {
+    const completion = frm.fields_dict.custom_completion_time;
+    const priority = frm.fields_dict.priority;
+    if (completion && priority) {
         const tab = layout.tabs.find(item => item.df.fieldname === 'presales_details_tab') || layout.tabs[0];
-        if (timing.wrapper.parent()[0] !== tab.wrapper[0]) {
-            timing.wrapper.appendTo(tab.wrapper);
-            timing.fields_list.forEach(field => tab.add_field(field));
-        }
+        completion.$wrapper.insertAfter(priority.$wrapper);
+        tab.add_field(completion);
+        frm.set_df_property('priority', 'hidden', 1);
         frm.toggle_reqd('custom_completion_time', !frm.is_new() && frm.doc.docstatus === 0);
         layout.refresh_tabs();
+        if (timing) timing.wrapper.hide();
     }
 }
 
