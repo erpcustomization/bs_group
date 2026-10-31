@@ -39,7 +39,9 @@ function presales_move_timeline_to_additional(frm) {
         completion.$wrapper.insertAfter(priority.$wrapper);
         tab.add_field(completion);
         frm.set_df_property('priority', 'hidden', 1);
-        frm.toggle_reqd('custom_completion_time', !frm.is_new() && frm.doc.docstatus === 0);
+        // Keep dependency refreshes from removing the required marker on drafts.
+        frm.set_df_property('custom_completion_time', 'mandatory_depends_on', 'eval:doc.docstatus !== 2');
+        frm.toggle_reqd('custom_completion_time', frm.doc.docstatus !== 2);
         layout.refresh_tabs();
         if (timing) timing.wrapper.hide();
     }
