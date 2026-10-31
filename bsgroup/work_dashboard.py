@@ -3,6 +3,16 @@ import frappe
 from bsgroup.scoped_sales_access import scope, SCREENS
 
 
+@frappe.whitelist()
+def navigation_script():
+    """Serve navigation from the app when patched static assets are unavailable."""
+    from pathlib import Path
+    content = Path(frappe.get_app_path('bsgroup', 'public', 'js', 'scoped_sales_access.js')).read_text()
+    frappe.local.response.update(type='download', filename='scoped_sales_access.js',
+                                 filecontent=content, content_type='application/javascript',
+                                 display_content_as='inline')
+
+
 def screens():
     mode = scope()
     if mode:
