@@ -6,6 +6,14 @@ from bsgroup.site_survey import WAITING, RECEIVED, request_details
 
 
 class SiteSurveyRequest(Document):
+    def _get_missing_mandatory_fields(self):
+        missing = super()._get_missing_mandatory_fields()
+        # Opportunity intake creates the request before the survey team plans it.
+        # Only that initial server-created record may omit these two fields.
+        if self.is_new() and self.flags.from_opportunity:
+            missing = [item for item in missing if item[0] not in ("assigned_to", "planned_date")]
+        return missing
+
     def validate(self):
         before = self.get_doc_before_save()
         if self.status in ("Requested", "Scheduled"):
