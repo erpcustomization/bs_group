@@ -3,8 +3,17 @@
   function mount(view) {
     if (!fields[view.doctype]) return;
     const area = view.page.wrapper[0] || view.page.wrapper;
-    const filter = area.querySelector('.filter-section .filter-selector');
-    if (!filter || area.querySelector('.bs-sales-search')) return;
+    if (!view._bs_search_observer) {
+      view._bs_search_observer = new MutationObserver(() => mount(view));
+      view._bs_search_observer.observe(area, {childList:true, subtree:true});
+    }
+    const filter = area.querySelector('.standard-actions .filter-button') || area.querySelector('.filter-section .filter-selector');
+    if (!filter) return;
+    const existing = area.querySelector('.bs-sales-search');
+    if (existing) {
+      if (existing.nextElementSibling !== filter) filter.before(existing);
+      return;
+    }
     const input = document.createElement('input');
     input.type = 'search';
     input.className = 'form-control input-sm bs-sales-search';
