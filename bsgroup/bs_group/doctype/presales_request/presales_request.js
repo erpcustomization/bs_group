@@ -71,6 +71,11 @@ function presales_status_panel(frm) {
 }
 
 function presales_compact_layout(frm) {
+    // Keep inherited context visible without editable links or navigation.
+    for (const field of ['opportunity', 'company']) {
+        frm.set_df_property(field, 'read_only', 1);
+        frm.set_df_property(field, 'fieldtype', 'Data');
+    }
     for (const field of ['timeline_defined', 'site_visit_required', 'site_visit', 'decision_maker_known', 'competition_known', 'budget_confirmed', 'opportunity_qualification_mandatory_section']) {
         frm.set_df_property(field, 'hidden', 1);
     }
