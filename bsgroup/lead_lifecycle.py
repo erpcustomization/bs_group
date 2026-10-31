@@ -25,7 +25,21 @@ def linked_outcome(name):
     return None
 
 
+def customer_requirement(lead):
+    """Use the saved requirement, or the enquiry that created this Lead."""
+    requirement = lead.get("custom_requirement") or ""
+    if requirement.strip():
+        return requirement
+    if not lead.name or lead.is_new():
+        return ""
+    rows = frappe.get_all("Lead Intake", filters={"converted_lead": lead.name},
+                          fields=["transcript"], order_by="creation asc", limit_page_length=1)
+    return (rows[0].get("transcript") or "") if rows else ""
+
+
 def before_validate(doc, method=None):
+    if not (doc.get("custom_requirement") or "").strip():
+        doc.custom_requirement = customer_requirement(doc)
     if doc.is_new() and not doc.lead_owner:
         doc.lead_owner = frappe.session.user
     previous = doc.get_doc_before_save()
@@ -109,7 +123,7 @@ def make_opportunity(source_name):
     from erpnext.crm.doctype.lead.lead import make_opportunity as native_mapper
     opportunity = native_mapper(source_name)
     opportunity.custom_subject = lead.title or lead.company_name or lead.lead_name
-    opportunity.custom_enquiry = lead.get("custom_requirement") or ""
+    opportunity.custom_enquiry = customer_requirement(lead)
     opportunity.custom_organization_name = lead.company_name
     opportunity.custom_contact_person_name = lead.lead_name
     opportunity.opportunity_owner = frappe.session.user
