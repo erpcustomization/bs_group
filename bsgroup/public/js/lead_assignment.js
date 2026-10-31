@@ -1,6 +1,20 @@
 // Intake coordinators hand over one Lead to one eligible salesperson.
 frappe.ui.form.on('Lead', {
     refresh(frm) {
+        // Realtime doc_update can arrive before the transfer response. Its delayed
+        // reload must not reopen a record after the sender loses permission.
+        if (!frm._bsi_handover_reload_guard) {
+            frm._bsi_handover_reload_guard = true;
+            const reload = frm.reload_doc.bind(frm);
+            frm.reload_doc = (...args) => {
+                if (frm._bsi_handover_pending || frm._bsi_handed_over === frm.doc.name) return Promise.resolve();
+                return reload(...args);
+            };
+            frm.debounced_reload_doc = () => {
+                clearTimeout(frm._bsi_handover_refresh_timer);
+                frm._bsi_handover_refresh_timer = setTimeout(() => frm.reload_doc(), 1000);
+            };
+        }
         frm._bsi_sales_transfer = null;
         if (frm.is_new() || !frappe.user.has_role('BS Lead Intake Manager') || !frm.perm?.some(p => p.write)) return;
         const transfer = async (to_user) => {
@@ -8,14 +22,25 @@ frappe.ui.form.on('Lead', {
                 frappe.msgprint(__('Save your changes before assigning this Lead.'));
                 return false;
             }
-            const r = await frappe.call({method:'bsgroup.lead_assignment.transfer',
-                args:{name:frm.doc.name,to_user,expected_modified:frm.doc.modified},
-                freeze:true,freeze_message:__('Assigning Lead…')});
-            if (r.exc || !r.message) return false;
-            frappe.show_alert({message:__('Lead assigned successfully'),indicator:'green'});
-            if (r.message.can_read) await frm.reload_doc();
-            else await frappe.set_route('List','Lead');
-            return true;
+            if (frm._bsi_handover_pending) return false;
+            const name = frm.doc.name;
+            frm._bsi_handover_pending = true;
+            clearTimeout(frm._bsi_handover_refresh_timer);
+            try {
+                const r = await frappe.call({method:'bsgroup.lead_assignment.transfer',
+                    args:{name,to_user,expected_modified:frm.doc.modified},
+                    freeze:true,freeze_message:__('Assigning Lead…')});
+                if (r.exc || !r.message) return false;
+                if (!r.message.can_read) frm._bsi_handed_over = name;
+                frm._bsi_handover_pending = false;
+                clearTimeout(frm._bsi_handover_refresh_timer);
+                if (r.message.can_read) await frm.reload_doc();
+                else await frappe.set_route('List','Lead');
+                frappe.show_alert({message:__('Lead assigned successfully'),indicator:'green'});
+                return true;
+            } finally {
+                frm._bsi_handover_pending = false;
+            }
         };
         frm._bsi_sales_transfer = transfer;
         const open = async () => {
