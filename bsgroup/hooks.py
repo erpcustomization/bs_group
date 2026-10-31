@@ -451,6 +451,7 @@ doc_events = {
 }
 
 override_whitelisted_methods = {
+    "frappe.desk.doctype.list_view_settings.list_view_settings.save_listview_settings": "bsgroup.personal_list_settings.save_listview_settings",
     "bs_lead_intake.intake.review.record_review": "bsgroup.intake_access.record_review",
     "bs_lead_intake.intake.metrics.pilot_report": "bsgroup.intake_access.pilot_report",
     "erpnext.controllers.accounts_controller.update_child_qty_rate": "bsgroup.dcs.quotation_control.update_child_qty_rate",
