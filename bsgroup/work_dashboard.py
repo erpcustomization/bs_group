@@ -1,6 +1,6 @@
 """Personal dashboard using the same permissions as each document list."""
 import frappe
-from bsgroup.scoped_sales_access import scope, SCREENS
+from bsgroup.scoped_sales_access import scope, SCREENS, show_lead_intake_navigation
 
 
 @frappe.whitelist()
@@ -20,7 +20,7 @@ def screens():
     mode = scope()
     if mode:
         result = list(SCREENS[mode])
-        if 'BS Lead Intake Manager' in frappe.get_roles():
+        if show_lead_intake_navigation():
             result.append('Lead Intake')
         return result
     if frappe.session.user == 'manikandan@bitssecureit.com':

@@ -123,12 +123,18 @@ def permission(doc, user=None, permission_type=None, ptype=None):
     return bool(allowed)
 
 
+def show_lead_intake_navigation():
+    """Navigation preference only; retain intake and Lead handover permissions."""
+    return (frappe.session.user not in {"gopinath@bitssecureit.com", "paul@bitssecureit.com"}
+            and "BS Lead Intake Manager" in frappe.get_roles())
+
+
 def boot_session(bootinfo):
     mode = scope()
     if not mode:
         return
     allowed = SCREENS[mode]
-    if "BS Lead Intake Manager" in frappe.get_roles():
+    if show_lead_intake_navigation():
         allowed = (*allowed, "Lead Intake")
     bootinfo.bs_scoped_screens = list(allowed)
     # Filter the server-provided sidebar model as well as its rendered navigation.
