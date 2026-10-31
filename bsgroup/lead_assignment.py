@@ -40,15 +40,24 @@ def choices(name):
 
 
 @frappe.whitelist(methods=["POST"])
-def transfer(name, to_user, expected_modified):
+def transfer(name, to_user, expected_modified=None, expected_owner=None):
     _check_actor()
     savepoint = "lead_transfer_" + frappe.generate_hash(length=10)
     frappe.db.savepoint(savepoint)
     try:
         lead = frappe.get_doc("Lead", name, for_update=True)
         lead.check_permission("write")
-        if str(lead.modified) != str(expected_modified):
-            frappe.throw(_("The Lead changed. Refresh it before assigning a salesperson."))
+        # This operation changes ownership only, using the latest locked document.
+        # Unrelated edits must not block handover or be overwritten by stale form data.
+        if expected_owner is not None:
+            if (lead.lead_owner or "") != expected_owner:
+                frappe.throw(_("This Lead has already been reassigned. Open the Lead list to see its current owner."))
+        elif lead.lead_owner != frappe.session.user:
+            # Older clients without an owner snapshot retain the timestamp guard
+            # when a manager is handing over someone else's Lead.
+            from frappe.utils import get_datetime
+            if not expected_modified or get_datetime(lead.modified) != get_datetime(expected_modified):
+                frappe.throw(_("The Lead changed. Refresh it before assigning a salesperson."))
         if not _eligible(to_user, lead.company):
             frappe.throw(_("Select an active salesperson with access to this Lead's company."), frappe.PermissionError)
         previous = lead.lead_owner

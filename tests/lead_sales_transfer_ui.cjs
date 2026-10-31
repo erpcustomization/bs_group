@@ -23,6 +23,7 @@ vm.runInNewContext(fs.readFileSync(require('path').join(__dirname,'../bsgroup/pu
  await dialog.primary_action({person:'paul'});
  assert.equal(calls[1].args.to_user,'paul');
  assert.equal(calls[1].args.expected_modified,'now');
+ assert.equal(calls[1].args.expected_owner,'priya');
  assert.deepEqual(route,['List','Lead']);
  assert.equal(reloads,0,'must not reload a Lead the previous owner no longer has access to');
  frm.debounced_reload_doc();

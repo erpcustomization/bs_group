@@ -67,14 +67,17 @@ try:
             assert {'paul@bitssecureit.com','gopinath@bitssecureit.com'} <= options
             assert 'sanisha@bitssecureit.com' not in options
             denied(lambda:api.transfer(d.name,'sanisha@bitssecureit.com',str(d.modified)))
-            denied(lambda:api.transfer(d.name,'paul@bitssecureit.com','stale'))
+            denied(lambda:api.transfer(d.name,'paul@bitssecureit.com','stale',expected_owner='gopinath@bitssecureit.com'))
             assert frappe.db.get_value('Lead',d.name,'lead_owner')=='priya@bitssecureit.com'
+            # Simulate an unrelated edit after the form loaded: handover preserves it.
+            frappe.db.set_value('Lead',d.name,'company_name','Latest company details')
             frappe.clear_messages()
-            result=api.transfer(d.name,'paul@bitssecureit.com',str(d.modified))
+            result=api.transfer(d.name,'paul@bitssecureit.com',str(d.modified),expected_owner='priya@bitssecureit.com')
             assert not frappe.local.message_log, 'Successful handover must not emit permission warnings'
             assert result['lead_owner']=='paul@bitssecureit.com' and not result['can_read']
             d.reload()
             assert d.owner=='Administrator' and d.status=='Open'
+            assert d.company_name=='Latest company details'
             assert d.has_permission('write',user='paul@bitssecureit.com')
             assert not d.has_permission('read',user='priya@bitssecureit.com')
             assert [r.owner for r in assign_to.get({'doctype':'Lead','name':d.name})]==['paul@bitssecureit.com']
@@ -86,6 +89,11 @@ try:
             denied(lambda:api.transfer(d.name,'gopinath@bitssecureit.com',str(d.modified)))
             frappe.set_user('priya@bitssecureit.com')
             denied(lambda:api.transfer(d.name,'gopinath@bitssecureit.com',str(d.modified)))
+            # Already-open older clients also tolerate changed timestamps for their own Lead.
+            legacy=fixture()
+            frappe.clear_messages()
+            legacy_result=api.transfer(legacy.name,'paul@bitssecureit.com','old-client-timestamp')
+            assert not legacy_result['can_read'] and not frappe.local.message_log
             second=fixture()
             rows=api.assign(doctype='Lead',name=second.name,assign_to=['gopinath@bitssecureit.com'])
             assert [r.owner for r in rows]==['gopinath@bitssecureit.com']

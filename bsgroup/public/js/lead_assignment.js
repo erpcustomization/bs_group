@@ -28,7 +28,7 @@ frappe.ui.form.on('Lead', {
             clearTimeout(frm._bsi_handover_refresh_timer);
             try {
                 const r = await frappe.call({method:'bsgroup.lead_assignment.transfer',
-                    args:{name,to_user,expected_modified:frm.doc.modified},
+                    args:{name,to_user,expected_modified:frm.doc.modified,expected_owner:frm.doc.lead_owner || ""},
                     freeze:true,freeze_message:__('Assigning Lead…')});
                 if (r.exc || !r.message) return false;
                 if (!r.message.can_read) frm._bsi_handed_over = name;
