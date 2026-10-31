@@ -15,3 +15,11 @@ def execute():
     order[index:index] = ["supplier_quotation_section", "supplier_quotations"]
     set_presentation(None, "field_order", json.dumps(order), "Data", for_doctype=True)
     frappe.clear_cache(doctype="Deal Cost Sheet")
+
+@frappe.whitelist(methods=["POST"])
+def install():
+    """Apply this schema update from the administrator console on patched benches."""
+    if frappe.session.user != "Administrator":
+        frappe.throw("Only Administrator can install DCS evidence fields.", frappe.PermissionError)
+    execute()
+    return {"installed": True}
