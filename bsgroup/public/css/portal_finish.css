@@ -27,11 +27,11 @@ body.bs-premium {--bs-navy:#102d59;--bs-blue:#1d5fc4;--bs-ink:#172b4d;--bs-line:
 .bs-premium .body-sidebar {background:#102d59;color:#dce8f8;border-right:0}
 .bs-premium .body-sidebar :is(.sidebar-item-label,.sidebar-label,.sidebar-title,.item-anchor,.standard-sidebar-label,.sidebar-section-title) {color:#dce8f8}
 .bs-premium .body-sidebar .standard-sidebar-item {border-radius:9px;margin:4px 8px}
-.bs-premium .body-sidebar .standard-sidebar-item:hover {background:#ffffff12}
-.bs-premium .body-sidebar .standard-sidebar-item.selected {background:#fff;box-shadow:0 3px 10px #061e3e24}
-.bs-premium .body-sidebar .standard-sidebar-item.selected :is(a,span,.sidebar-item-label) {color:#174c97}
+.bs-premium .body-sidebar .standard-sidebar-item:is(:hover,:focus-within) {background:#eaf1fb}
+.bs-premium .body-sidebar .standard-sidebar-item:is(.selected,.active-sidebar) {background:#fff;box-shadow:0 3px 10px #061e3e24}
 .bs-premium .body-sidebar .icon {stroke:currentColor;color:#bbcee8}
-.bs-premium .body-sidebar .standard-sidebar-item.selected .icon {color:#174c97}
+/* Frappe uses active-sidebar; keep text and icons dark on every light row. */
+.bs-premium .body-sidebar .standard-sidebar-item:is(.selected,.active-sidebar,:hover,:focus-within) :is(.item-anchor,.sidebar-item-label,.sidebar-item-icon,.sidebar-item-suffix,.sidebar-item-control,.icon,.es-icon) {color:#174c97;--icon-stroke:#174c97;--icon-fill:#174c97}
 .bs-premium :is(a,button,input,select,textarea):focus-visible {outline:2px solid #5389e7;outline-offset:3px}
 .bs-work {padding:28px;background:#f4f7fc;color:#172b4d}
 .bs-work-hero {background:linear-gradient(115deg,#102d59,#183e72);border-radius:16px;padding:30px 32px;display:flex;justify-content:space-between;align-items:center;gap:24px;color:#fff;margin-bottom:26px;box-shadow:0 8px 24px #102d5914}
