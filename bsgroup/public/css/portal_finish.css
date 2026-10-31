@@ -85,8 +85,8 @@ body.bs-premium {--bs-navy:#102d59;--bs-blue:#1d5fc4;--bs-ink:#172b4d;--bs-line:
 #desk-dock [aria-label="DCS Governance"] { display:none !important; }
 #desk-dock .sidebar-notification.bs-header-notification { position:fixed!important; width:34px!important; height:34px!important; margin:0!important; z-index:1035; color:#17365e!important; background:transparent!important; border-radius:8px; }
 body:is([data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .page-actions :is(.view-switcher,.standard-actions .page-icon-group,.standard-actions .menu-btn-group) { display:none !important; }
-body:is([data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row-activity,
-body:is([data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row-head .list-liked-by-me { display:none !important; }
+body:is([data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row-activity,
+body:is([data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row-head .list-liked-by-me { display:none !important; }
 @media(min-width:768px) {
-  body:is([data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row > .level-right { display:none !important; }
+  body:is([data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row > .level-right { display:none !important; }
 }
