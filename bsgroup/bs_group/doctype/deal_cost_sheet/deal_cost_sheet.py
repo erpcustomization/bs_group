@@ -66,6 +66,8 @@ class DealCostSheet(Document):
 		dcs_record_authority_guard(self)
 
 	def before_submit(self):
+		from bsgroup.dcs.supplier_evidence import validate_supplier_quotations
+		validate_supplier_quotations(self)
 		from bsgroup.dcs.presales_lineage import amendment_request
 		amendment_request(self)
 		validate_deal_cost(self)

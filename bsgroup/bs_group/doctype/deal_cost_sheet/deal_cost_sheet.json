@@ -31,6 +31,8 @@
   "dcs_costing_tab",
   "dcs_costing_subject_section",
   "subject",
+  "supplier_quotation_section",
+  "supplier_quotations",
   "section_break_jbpa",
   "items",
   "section_break_dsjr",
@@ -1372,6 +1374,18 @@
   {
    "fieldname": "dcs_costing_subject_section",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "supplier_quotation_section",
+   "fieldtype": "Section Break",
+   "label": "Supplier / Vendor Quotation"
+  },
+  {
+   "fieldname": "supplier_quotations",
+   "fieldtype": "Table",
+   "label": "Supplier / Vendor Quotation",
+   "options": "DCS Supplier Quotation",
+   "description": "Attach one or more supplier/vendor quotations as proof of cost price. Required before submission; optional while saving a draft."
   }
  ],
  "grid_page_length": 50,
