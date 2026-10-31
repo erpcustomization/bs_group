@@ -10,7 +10,7 @@ class ListView {
 }
 const frappe = {views:{ListView}, get_user_settings:()=>saved,
   model:{user_settings:{save:(dt,key,value)=>{calls.push({dt,key,value}); saved={...value}; return Promise.resolve();}}}};
-vm.runInNewContext(source, {frappe});
+vm.runInNewContext(source, {frappe, MutationObserver:class {observe(){}}, document:{body:{},querySelectorAll:()=>[]}});
 const first = new ListView();
 first.save_column_width('name', 300);
 assert.equal(nativeCalls, 0);

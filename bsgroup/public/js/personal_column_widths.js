@@ -1,5 +1,29 @@
 // Column resizing is a personal preference, never a shared List View Settings edit.
 (() => {
+  // Compact-list theme rules use !important. Preserve the explicit pixel widths
+  // set by the native drag handler, including while the pointer is moving.
+  const enforce = element => {
+    if (!element.matches?.('.list-row-col')) return;
+    const width = element.style.width;
+    if (!/^\d+(\.\d+)?px$/.test(width)) return;
+    for (const [property, value] of Object.entries({width, flex: `0 0 ${width}`, 'min-width': width, 'max-width': width})) {
+      if (element.style.getPropertyValue(property) !== value || element.style.getPropertyPriority(property) !== 'important') {
+        element.style.setProperty(property, value, 'important');
+      }
+    }
+  };
+  const observer = new MutationObserver(records => {
+    for (const record of records) {
+      if (record.type === 'attributes') enforce(record.target);
+      else for (const node of record.addedNodes) {
+        if (node.nodeType !== 1) continue;
+        enforce(node);
+        node.querySelectorAll('.list-row-col[style]').forEach(enforce);
+      }
+    }
+  });
+  observer.observe(document.body, {subtree:true, childList:true, attributes:true, attributeFilter:['style']});
+  document.querySelectorAll('.list-row-col[style]').forEach(enforce);
   const key = 'bs_column_widths';
   const named = view => view.list_filter?.active_layout_name && view.list_filter.active_layout_name !== 'default_layout';
   function install() {
