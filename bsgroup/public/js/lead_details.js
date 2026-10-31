@@ -293,6 +293,12 @@ const bsi_lead_focus = (() => {
             label.append(select); box.append(label); parent.append(box);
             select.addEventListener('change', async () => {
                 if (!select.value) return;
+                if (frm._bsi_sales_transfer && !frm.is_new()) {
+                    const chosen = select.value;
+                    select.value = frm.doc.lead_owner || '';
+                    if (chosen !== frm.doc.lead_owner) await frm._bsi_sales_transfer(chosen);
+                    return;
+                }
                 await frm.set_value('lead_owner', select.value);
                 frm.trigger('bsi_lead_submission_changed');
             });
@@ -306,7 +312,8 @@ const bsi_lead_focus = (() => {
         if (!editable) return;
         const generation = (frm._owner_picker_generation || 0) + 1;
         frm._owner_picker_generation = generation;
-        frappe.call({method:'bsgroup.lead_lifecycle.owner_choices', args:{name:frm.is_new()?null:frm.doc.name,company:frm.doc.company}}).then(result => {
+        const salesTransfer = !frm.is_new() && frappe.user?.has_role?.('BS Lead Intake Manager');
+        frappe.call({method:salesTransfer?'bsgroup.lead_assignment.choices':'bsgroup.lead_lifecycle.owner_choices', args:{name:frm.is_new()?null:frm.doc.name,company:frm.doc.company}}).then(result => {
             if (frm._owner_picker_generation !== generation || result.exc) return;
             const users = result.message || [], counts = {};
             users.forEach(user => { counts[user.label] = (counts[user.label] || 0) + 1; });

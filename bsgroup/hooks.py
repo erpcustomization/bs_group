@@ -703,3 +703,6 @@ for _dt, _query in {"Lead": "lead_query", "Opportunity": "opportunity_query",
                    "Quotation": "quotation_query", "Site Survey Request": "survey_query"}.items():
     permission_query_conditions[_dt] = "bsgroup.scoped_sales_access." + _query
     has_permission[_dt] = "bsgroup.scoped_sales_access.permission"
+
+doctype_js["Lead"].append("public/js/lead_assignment.js")
+override_whitelisted_methods["frappe.desk.form.assign_to.add"] = "bsgroup.lead_assignment.assign"

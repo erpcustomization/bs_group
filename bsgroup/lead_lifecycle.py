@@ -178,9 +178,11 @@ def sync_assignment(doc, method=None):
     # document to the explicitly selected internal user, not general CRM access.
     frappe.share.add("Lead", doc.name, doc.lead_owner, read=1, write=1,
                      flags={"ignore_share_permission": True})
-    assign_to.add({"doctype": "Lead", "name": doc.name, "assign_to": [doc.lead_owner]})
+    # The save already checked the previous owner's write permission. After
+    # changing ownership that actor may no longer read the persisted record.
+    assign_to._add({"doctype": "Lead", "name": doc.name, "assign_to": [doc.lead_owner]}, ignore_permissions=True)
     if previous and previous.lead_owner:
-        assign_to.remove("Lead", doc.name, previous.lead_owner)
+        assign_to._remove("Lead", doc.name, previous.lead_owner, ignore_permissions=True)
 
 
 def load_responsibility(doc, method=None):
