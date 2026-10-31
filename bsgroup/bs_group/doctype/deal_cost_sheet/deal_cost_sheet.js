@@ -3276,6 +3276,10 @@ function dcs_render_approval(frm, s4) {
 }
 
 function dcs_render_award(frm, s5) {
+	if (!s5 || s5.ok !== 1 || s5.projection !== 'commercial') {
+		dcs_set_html(frm, 'custom_award_history_html', '');
+		return;
+	}
 	var aw = s5.award || {}, fz = s5.frozen_baseline || {}, st = s5.states || {};
 	var body = '<div class="table-responsive"><table class="table table-sm" style="font-size:12px"><tbody>'
 		+ '<tr><td class="text-muted" style="width:36%">Award state</td><td>' + dcs_esc(aw.state || 'Not Awarded') + ' &middot; sequence ' + dcs_esc(st.award_sequence_no || 0) + '</td></tr>'
@@ -3287,11 +3291,8 @@ function dcs_render_award(frm, s5) {
 	var note = fz.note || '';
 	if (st.separation_note) { note = note + ' ' + st.separation_note; }
 	dcs_set_html(frm, 'custom_award_history_html', dcs_panel('Award and frozen baseline', body, note));
-	frappe.call({
-		method: 'frappe.client.get_list',
-		args: { doctype: 'DCS Award Reversal', filters: { dcs: frm.doc.name }, fields: ['name', 'reversal_no', 'reversal_reason', 'status'], limit_page_length: 50 },
-		callback: function (r) {
-			var rows = (r && r.message) || [];
+	(function () {
+			var rows = s5.award_reversals || [];
 			if (!rows.length) { return; }
 			var h = '<div class="table-responsive"><table class="table table-sm" style="font-size:12px"><thead><tr><th>Reversal</th><th>Status</th><th>Reason</th></tr></thead><tbody>'
 				+ rows.map(function (x) {
@@ -3300,8 +3301,7 @@ function dcs_render_award(frm, s5) {
 				}).join('') + '</tbody></table></div>';
 			var f = frm.get_field('custom_award_history_html');
 			if (f && f.$wrapper) { f.$wrapper.append(dcs_panel('Award reversal records', h, 'Award reversal records are immutable and service-owned.')); }
-		}
-	});
+	})();
 }
 
 function dcs_render_handover(frm, s5) {
@@ -3575,6 +3575,11 @@ frappe.ui.form.on('Deal Cost Sheet', {
 
 // Governed submitted BOQ editor. The ordinary form remains locked.
 function dcs_boq_revision_dialog(frm, cap) {
+    // Complete BOQ preparation is distinct from customer-side negotiation.
+    // The server still enforces assignment, per-line authority and approvals.
+    if (cap.can_prepare_boq) {
+        cap = Object.assign({}, cap, {can_customer_side: 1});
+    }
     var both = cap.can_customer_side && cap.can_vendor_side;
     var d;
     var preview = function () {

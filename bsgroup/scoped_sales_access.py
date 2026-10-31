@@ -55,7 +55,13 @@ def condition(doctype, user):
                 f"(SELECT 1 FROM `tabPresales Request` p WHERE p.name={table}.presales_request "
                 f"AND {own('p', 'presales_owner', user)}))")
     if mode == PRESALES:
-        return f"{table}.owner={who}"
+        # The sales owner may create the quotation for a sheet prepared by
+        # Presales. Follow the exact DCS link and its existing work assignment;
+        # matching only a customer or opportunity would expose unrelated work.
+        dcs_scope = condition("Deal Cost Sheet", user)
+        return (f"({table}.owner={who} OR EXISTS (SELECT 1 FROM `tabDeal Cost Sheet` "
+                f"WHERE `tabDeal Cost Sheet`.name={table}.custom_deal_cost_sheet "
+                f"AND ({dcs_scope})))")
     return (f"(EXISTS (SELECT 1 FROM `tabOpportunity` o WHERE o.name={table}.opportunity "
             f"AND {own('o', 'opportunity_owner', user)}) OR "
             f"(COALESCE({table}.opportunity,'')='' AND {table}.owner={who}))")

@@ -16,7 +16,7 @@ import frappe
 from frappe.utils import now_datetime
 
 from bsgroup.api.dcs._common import (
-	CEILING, CUSTOMER_SIDE, MARGIN_FLOOR, MD_THRESHOLD, TECHNICAL_ROLES, VENDOR_SIDE,
+	CEILING, CUSTOMER_SIDE, BOQ_PREPARERS, MARGIN_FLOOR, MD_THRESHOLD, TECHNICAL_ROLES, VENDOR_SIDE,
 	audit_event, dcs_exists_and_open, diff_changes, emit_timeline, get_user_roles,
 	governed_endpoint, has_any, matched, snapshot,
 )
@@ -325,6 +325,7 @@ def dcs_screen3(args):
 
 	cap = {
 		"can_customer_side": can_cust, "can_vendor_side": can_vend, "can_negotiate": 0,
+		"can_prepare_boq": has_any(roles, BOQ_PREPARERS),
 		"roles_matched": matched(roles, ["Sales User", "Presales", "Sales Manager", "Commercial Controller", "Managing Director"]),
 		"denial_reason": "",
 	}

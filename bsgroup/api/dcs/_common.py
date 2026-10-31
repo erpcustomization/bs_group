@@ -32,6 +32,9 @@ COMMERCIAL_ROLES = ["Sales Manager", "Commercial Controller", "Managing Director
 TECHNICAL_ROLES = ["Technical Engineer", "Project Engineer", "Project Manager", "Operations Manager"]
 CUSTOMER_SIDE = ["Sales User", "BS Scoped Sales", "Sales Manager", "Commercial Controller", "Managing Director"]
 VENDOR_SIDE = ["Presales", "BS Scoped Presales", "Sales Manager", "Commercial Controller", "Managing Director"]
+# Scoped Presales prepares the complete BOQ on its assigned sheets. This is
+# proposal authority only, not customer negotiation, approval, award or release.
+BOQ_PREPARERS = ["BS Scoped Presales"]
 
 MD_THRESHOLD = 16.0
 CEILING = 26.0
