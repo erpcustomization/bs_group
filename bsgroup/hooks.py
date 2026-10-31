@@ -693,6 +693,9 @@ for _downstream in ("Presales Request", "Deal Cost Sheet", "Quotation", "Site Su
 
 after_migrate.append("bsgroup.sales_qualification.setup")
 after_migrate.append("bsgroup.opportunity_routing_setup.execute")
+after_migrate.append("bsgroup.presales_duration.setup")
+doc_events["Presales Request"]["validate"].append("bsgroup.presales_duration.validate")
+doc_events["Presales Request"]["before_submit"] = "bsgroup.presales_duration.validate"
 
 boot_session = "bsgroup.scoped_sales_access.boot_session"
 for _dt, _query in {"Lead": "lead_query", "Opportunity": "opportunity_query",

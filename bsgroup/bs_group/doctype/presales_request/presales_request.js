@@ -31,6 +31,17 @@ function presales_move_timeline_to_additional(frm) {
     const footer = $(frm.page.wrapper).find('.form-footer');
     if (footer.length && footer.parent()[0] !== additional.wrapper[0]) footer.appendTo(additional.wrapper);
     layout.refresh_tabs();
+    const timing = layout.sections_dict.custom_completion_time_section;
+    if (timing) {
+        let tab = layout.tabs.find(item => item.df.fieldname === 'presales_completion_time_tab');
+        if (!tab) tab = layout.make_tab({fieldname:'presales_completion_time_tab', fieldtype:'Tab Break', label:__('Completion Time')});
+        if (timing.wrapper.parent()[0] !== tab.wrapper[0]) {
+            timing.wrapper.appendTo(tab.wrapper);
+            timing.fields_list.forEach(field => tab.add_field(field));
+        }
+        frm.toggle_reqd('custom_completion_time', !frm.is_new() && frm.doc.docstatus === 0);
+        layout.refresh_tabs();
+    }
 }
 
 function presales_status_panel(frm) {
