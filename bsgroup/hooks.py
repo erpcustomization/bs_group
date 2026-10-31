@@ -252,7 +252,7 @@ app_license = "mit"
 # on_login = "bsgroup.utils.company_access.validate_company_on_login"
 
 app_include_js = [
-    "/assets/bsgroup/js/scoped_sales_access.js",
+    "/assets/bsgroup/js/scoped_sales_access.js?v=20261031-dashboard",
     "bsgroup.bundle.js",
     "navbar_custom.bundle.js",
     "bs_sales_theme.bundle.js",
