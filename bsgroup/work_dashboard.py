@@ -27,14 +27,17 @@ def data():
         meta = frappe.get_meta(dt)
         status = 'status' if meta.has_field('status') else 'docstatus'
         # get_list applies role, user and custom record permission filters.
-        groups = frappe.get_list(dt, fields=[status, 'count(name) as total'],
-                                 group_by=status, limit_page_length=0)
+        rows = frappe.get_list(dt, fields=['name', status], limit_page_length=0)
+        counts = {}
+        for row in rows:
+            value = row.get(status)
+            counts[value] = counts.get(value, 0) + 1
         recent = frappe.get_list(dt, fields=['name', 'modified'],
                                  order_by='modified desc', limit_page_length=5)
-        cards.append(dict(doctype=dt, total=sum(r.total for r in groups),
-                          statuses=[dict(label=str(r.get(status)) if status == 'status'
-                                         else {0:'Draft',1:'Submitted',2:'Cancelled'}.get(r.docstatus, 'Other'),
-                                         total=r.total) for r in groups], recent=recent))
+        cards.append(dict(doctype=dt, total=len(rows),
+                          statuses=[dict(label=str(value) if status == 'status'
+                                         else {0:'Draft',1:'Submitted',2:'Cancelled'}.get(value, 'Other'),
+                                         total=count) for value, count in counts.items()], recent=recent))
     return dict(user=frappe.session.user, cards=cards)
 
 
