@@ -8,6 +8,9 @@ def navigation_script():
     """Serve navigation from the app when patched static assets are unavailable."""
     from pathlib import Path
     content = Path(frappe.get_app_path('bsgroup', 'public', 'js', 'scoped_sales_access.js')).read_text()
+    import json
+    style = Path(frappe.get_app_path('bsgroup', 'public', 'css', 'portal_finish.css')).read_text()
+    content += '\n(() => { const s=document.createElement("style"); s.textContent=' + json.dumps(style) + '; document.head.append(s); const sync=()=>{const r=document.body.dataset.route||"";document.body.classList.toggle("bs-premium", /^(List|Form)\\/(Lead|Project|Task|Timesheet|Tech Task Scheduler|Site Survey Request)(\\/|$)/.test(r)||r==="my-work-dashboard");};new MutationObserver(sync).observe(document.body,{attributes:true,attributeFilter:["data-route"]});sync();})();'
     frappe.local.response.update(type='download', filename='scoped_sales_access.js',
                                  filecontent=content, content_type='application/javascript',
                                  display_content_as='inline')
