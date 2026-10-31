@@ -67,3 +67,10 @@ body.bs-premium {--bs-navy:#102d59;--bs-blue:#1d5fc4;--bs-ink:#172b4d;--bs-line:
 @media(max-width:700px){.bs-work{padding:16px}.bs-work-hero{padding:24px;align-items:flex-start;flex-direction:column}.bs-work-stamp{text-align:left}.bs-work-grid{grid-template-columns:1fr}.bs-work-hero h2{font-size:24px}.bs-work-section{align-items:flex-start;flex-direction:column}}
 @media(prefers-reduced-motion:reduce){.bs-premium *{transition:none!important}}
 }
+
+/* Keep document lists focused on commercial fields; retain the header count. */
+body:is([data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row-activity,
+body:is([data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row-head .list-liked-by-me { display:none !important; }
+@media(min-width:768px) {
+  body:is([data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row > .level-right { display:none !important; }
+}
