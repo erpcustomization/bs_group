@@ -23,6 +23,15 @@ def own(alias, field, user):
 
 
 def condition(doctype, user):
+    # Desk User has an inherited Lead-create grant. Respect the explicit CRM
+    # block on the shared Help Desk login before any native/owner fallback.
+    if user == "helpdesk@bitssecureit.com" and doctype in (
+        "Lead", "Opportunity", "Presales Request", "Deal Cost Sheet",
+        "Quotation", "Site Survey Request",
+    ) and frappe.db.exists("Block Module", {
+        "parent": user, "parenttype": "User", "module": "CRM",
+    }):
+        return "1=0"
     mode = scope(user)
     if not mode:
         return None
