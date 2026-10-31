@@ -1,8 +1,56 @@
 (() => {
-  const fields = {Lead:['name','lead_name','company_name','title'], Opportunity:['name','customer_name','party_name','custom_subject']};
+  const fields = {
+    Lead:['name','lead_name','company_name','title'],
+    Opportunity:['name','customer_name','party_name','custom_subject'],
+    'Presales Request':['name','organisation_name','customer','subject','opportunity'],
+    'Deal Cost Sheet':['name','organisation_name','customer','subject','opportunity'],
+    Quotation:['name','customer_name','party_name','custom_subject','opportunity']
+  };
+  const extraLists = ['Presales Request','Deal Cost Sheet','Quotation'];
+  const style = document.createElement('style');
+  style.textContent = '.bs-search-header .list-page-form{display:none!important}.bs-search-header .bs-search-filter{display:inline-flex!important;align-items:center;justify-content:center;width:34px;height:34px;padding:0!important;border-radius:8px!important;margin-right:8px}.bs-search-header .bs-search-filter .button-label{display:none!important}.bs-search-header .bs-search-filter .filter-icon{margin:0!important}';
+  document.head.append(style);
   function mount(view) {
     if (!fields[view.doctype]) return;
     const area = view.page.wrapper[0] || view.page.wrapper;
+    if (extraLists.includes(view.doctype)) {
+      const actions = area.querySelector('.standard-actions');
+      const button = area.querySelector('.filter-button');
+      if (actions && button) {
+        if (button.parentElement !== actions) {
+          const primary = actions.querySelector('.primary-action');
+          if (primary) primary.before(button); else actions.append(button);
+        }
+        button.classList.add('bs-search-filter');
+        button.setAttribute('aria-label','Filter');
+        area.classList.add('bs-search-header');
+        const sorter = area.querySelector('.sort-selector');
+        if (sorter && !view._bs_search_sort) {
+          view._bs_search_sort = true;
+          const home = document.createElement('div');
+          home.hidden = true;
+          sorter.before(home);
+          home.append(sorter);
+          $(button).on('shown.bs.popover.bs_search', () => {
+            const body = document.getElementById(button.getAttribute('aria-describedby'))?.querySelector('.popover-body');
+            if (!body) return;
+            let row = body.querySelector('.bs-search-sort');
+            if (!row) {
+              row = document.createElement('div');
+              row.className = 'bs-search-sort';
+              row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:12px;';
+              const label = document.createElement('span');
+              label.textContent = __('Sort by');
+              row.append(label);
+              body.prepend(row);
+            }
+            row.append(sorter);
+            $(button).popover('update');
+          });
+          $(button).on('hide.bs.popover.bs_search', () => home.append(sorter));
+        }
+      }
+    }
     if (!view._bs_search_observer) {
       view._bs_search_observer = new MutationObserver(() => mount(view));
       view._bs_search_observer.observe(area, {childList:true, subtree:true});
