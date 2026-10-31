@@ -1,4 +1,33 @@
 (() => {
+  // Keep the native notification button and its event handlers in the dock,
+  // while positioning it in the top bar above the active list's Filter button.
+  let notificationFrame;
+  function positionNotification() {
+    notificationFrame = null;
+    const bell = document.querySelector('#desk-dock .sidebar-notification');
+    if (!bell) return;
+    const visible = selector => Array.from(document.querySelectorAll(selector)).find(e => e.getClientRects().length);
+    const header = visible('.page-head');
+    if (!header) {
+      bell.classList.remove('bs-header-notification');
+      return;
+    }
+    const filter = visible('.standard-actions .filter-button');
+    const h = header.getBoundingClientRect();
+    const f = filter?.getBoundingClientRect();
+    const left = Math.max(0, Math.min(innerWidth - 42, f ? f.left + f.width / 2 - 17 : innerWidth - 58));
+    const top = Math.max(0, h.top + (h.height - 34) / 2);
+    if (!bell.classList.contains('bs-header-notification')) bell.classList.add('bs-header-notification');
+    if (bell.style.left !== `${left}px`) bell.style.left = `${left}px`;
+    if (bell.style.top !== `${top}px`) bell.style.top = `${top}px`;
+  }
+  const scheduleNotification = () => {
+    if (!notificationFrame) notificationFrame = requestAnimationFrame(positionNotification);
+  };
+  new MutationObserver(scheduleNotification).observe(document.body, {childList:true, subtree:true, attributes:true, attributeFilter:['class','style']});
+  window.addEventListener('resize', scheduleNotification);
+  window.addEventListener('scroll', scheduleNotification, true);
+  scheduleNotification();
   const fields = {
     Lead:['name','lead_name','company_name','title'],
     Opportunity:['name','customer_name','party_name','custom_subject'],
