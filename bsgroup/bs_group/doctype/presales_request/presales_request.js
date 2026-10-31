@@ -33,8 +33,7 @@ function presales_move_timeline_to_additional(frm) {
     layout.refresh_tabs();
     const timing = layout.sections_dict.custom_completion_time_section;
     if (timing) {
-        let tab = layout.tabs.find(item => item.df.fieldname === 'presales_completion_time_tab');
-        if (!tab) tab = layout.make_tab({fieldname:'presales_completion_time_tab', fieldtype:'Tab Break', label:__('Completion Time')});
+        const tab = layout.tabs.find(item => item.df.fieldname === 'presales_details_tab') || layout.tabs[0];
         if (timing.wrapper.parent()[0] !== tab.wrapper[0]) {
             timing.wrapper.appendTo(tab.wrapper);
             timing.fields_list.forEach(field => tab.add_field(field));

@@ -9,7 +9,7 @@ def validate(doc, method=None):
     if value and value not in OPTIONS:
         frappe.throw("Choose a valid Time Required to Complete.")
     if method == "before_submit" and not value:
-        frappe.throw("Select Time Required to Complete in the Completion Time tab before submitting Presales.")
+        frappe.throw("Select Time Required to Complete in Details before submitting Presales.")
 
 
 @frappe.whitelist(methods=["POST"])
