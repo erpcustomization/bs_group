@@ -143,7 +143,8 @@ def create_cost_sheet(doc, *, ignore_permissions=False):
         "party": doc.party_name, "organisation_name": doc.get("custom_organization_name"),
         "subject": doc.get("custom_subject") or doc.title, "company": doc.company,
         "currency": doc.currency})
-    sheet.insert(ignore_permissions=ignore_permissions)
+    from bsgroup.dcs.creation import insert_from_workflow
+    insert_from_workflow(sheet)
     return {"name": sheet.name, "created": True}
 
 

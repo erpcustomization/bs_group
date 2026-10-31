@@ -38,6 +38,8 @@ class DealCostSheet(Document):
 			self.name = frappe.model.naming.make_autoname(f"DCS-{base}-.###")
 
 	def before_insert(self):
+		from bsgroup.dcs.creation import guard_creation
+		guard_creation(self)
 		# Every insertion is a new commercial record, including Duplicate and API copies.
 		# Decisions and revision references belong to the original sheet's history.
 		from bsgroup.dcs.obligation import guard_amendment

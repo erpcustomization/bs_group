@@ -97,7 +97,8 @@ class PresalesRequest(Document):
 			"deal_owner": self.requested_by, "site_visit": self.site_visit})
 		# Submission permission was checked by Frappe. Costing is the bounded
 		# downstream record, including for presales users without DCS create access.
-		sheet.insert(ignore_permissions=True)
+		from bsgroup.dcs.creation import insert_from_workflow
+		insert_from_workflow(sheet)
 
 	def after_insert(self):
 		if self.opportunity:
