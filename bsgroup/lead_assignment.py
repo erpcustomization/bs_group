@@ -1,6 +1,7 @@
 """Audited sales handover for intake coordinators, limited to writable Leads."""
 import frappe
 from frappe import _
+from frappe.permissions import has_permission
 
 SALES_ROLES = {"BS Scoped Sales", "Sales User", "Sales Manager"}
 
@@ -62,7 +63,7 @@ def transfer(name, to_user, expected_modified):
                 share.remove("Lead", name, previous, flags={"ignore_permissions": True, "ignore_share_permission": True})
             lead.add_comment("Info", _("Sales handover by {0}: Lead Owner changed from {1} to {2}. Assignment and access transferred together.").format(
                 frappe.session.user, previous or "Unassigned", to_user))
-        return {"name": name, "lead_owner": to_user, "can_read": lead.has_permission("read")}
+        return {"name": name, "lead_owner": to_user, "can_read": has_permission("Lead", "read", doc=lead, print_logs=False)}
     except Exception:
         frappe.db.rollback(save_point=savepoint)
         raise

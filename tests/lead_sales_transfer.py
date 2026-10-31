@@ -69,7 +69,9 @@ try:
             denied(lambda:api.transfer(d.name,'sanisha@bitssecureit.com',str(d.modified)))
             denied(lambda:api.transfer(d.name,'paul@bitssecureit.com','stale'))
             assert frappe.db.get_value('Lead',d.name,'lead_owner')=='priya@bitssecureit.com'
+            frappe.clear_messages()
             result=api.transfer(d.name,'paul@bitssecureit.com',str(d.modified))
+            assert not frappe.local.message_log, 'Successful handover must not emit permission warnings'
             assert result['lead_owner']=='paul@bitssecureit.com' and not result['can_read']
             d.reload()
             assert d.owner=='Administrator' and d.status=='Open'
