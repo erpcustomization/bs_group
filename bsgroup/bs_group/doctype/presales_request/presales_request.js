@@ -71,7 +71,7 @@ function presales_status_panel(frm) {
 }
 
 function presales_compact_layout(frm) {
-    for (const field of ['timeline_defined', 'site_visit_required', 'decision_maker_known', 'competition_known', 'budget_confirmed', 'opportunity_qualification_mandatory_section']) {
+    for (const field of ['timeline_defined', 'site_visit_required', 'site_visit', 'decision_maker_known', 'competition_known', 'budget_confirmed', 'opportunity_qualification_mandatory_section']) {
         frm.set_df_property(field, 'hidden', 1);
     }
     for (const field of ['decision_maker_known', 'competition_known', 'budget_confirmed']) frm.toggle_reqd(field, false);
