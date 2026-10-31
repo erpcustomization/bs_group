@@ -23,6 +23,11 @@ function presales_move_timeline_to_additional(frm) {
         section.wrapper.appendTo(additional.wrapper);
         section.fields_list.forEach(field => additional.add_field(field));
     }
+    const owner = frm.fields_dict.presales_owner;
+    if (owner && owner.$wrapper.parent()[0] !== additional.wrapper[0]) {
+        owner.$wrapper.insertBefore(section.wrapper);
+        additional.add_field(owner);
+    }
     const results = frm.fields_dict.custom_survey_results;
     if (results && results.$wrapper.parent()[0] !== additional.wrapper[0]) {
         results.$wrapper.appendTo(additional.wrapper);
