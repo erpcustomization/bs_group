@@ -183,6 +183,16 @@ def sync_assignment(doc, method=None):
     assign_to._add({"doctype": "Lead", "name": doc.name, "assign_to": [doc.lead_owner]}, ignore_permissions=True)
     if previous and previous.lead_owner:
         assign_to._remove("Lead", doc.name, previous.lead_owner, ignore_permissions=True)
+    # Direct Lead Owner edits must revoke the same access as the handover API.
+    # Shares override the scoped ownership check, so remove stale sales grants.
+    for user in frappe.get_all("DocShare", filters={
+        "share_doctype": "Lead", "share_name": doc.name,
+        "user": ["!=", doc.lead_owner], "everyone": 0,
+    }, pluck="user"):
+        roles = set(frappe.get_roles(user))
+        if "BS Scoped Sales" in roles and not roles.intersection({"Sales Manager", "System Manager"}):
+            frappe.share.remove("Lead", doc.name, user,
+                flags={"ignore_permissions": True, "ignore_share_permission": True})
 
 
 def load_responsibility(doc, method=None):

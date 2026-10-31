@@ -48,6 +48,20 @@ try:
                 try: fn()
                 except (frappe.PermissionError,frappe.ValidationError): return
                 raise AssertionError('Expected refusal')
+            # Regression: ordinary form saves previously left old sales shares.
+            direct=fixture()
+            frappe.set_user('Administrator')
+            share.add('Lead',direct.name,'gopinath@bitssecureit.com',read=1,write=1)
+            share.add('Lead',direct.name,'Administrator',read=1,write=1)
+            frappe.set_user('priya@bitssecureit.com')
+            direct.lead_owner='paul@bitssecureit.com'
+            direct.flags.ignore_mandatory=True
+            direct.save()
+            assert not direct.has_permission('read',user='priya@bitssecureit.com')
+            assert not direct.has_permission('read',user='gopinath@bitssecureit.com')
+            assert direct.has_permission('read',user='paul@bitssecureit.com')
+            assert frappe.db.exists('DocShare',{'share_doctype':'Lead','share_name':direct.name,'user':'Administrator'})
+            assert not frappe.get_list('Lead',filters={'name':direct.name})
             d=fixture()
             options={r['value'] for r in api.choices(d.name)}
             assert {'paul@bitssecureit.com','gopinath@bitssecureit.com'} <= options
