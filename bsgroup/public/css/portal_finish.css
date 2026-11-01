@@ -113,5 +113,5 @@ body.bs-sales-ui[data-route="List/Opportunity/List"] :is(.list-row,.list-row-hea
  body.bs-sales-ui[data-route="List/Opportunity/List"] .bsi-lead-meta-head { position:absolute!important; left:auto!important; right:10px!important; width:123px!important; display:flex!important; gap:15px!important; }
  body.bs-sales-ui[data-route="List/Opportunity/List"] .bsi-lead-meta-head .date-heading { width:82px!important; flex:0 0 82px!important; }
  body.bs-sales-ui[data-route="List/Opportunity/List"] .bsi-lead-meta-head .owner-heading { width:26px!important; flex:0 0 26px!important; }
- body.bs-sales-ui[data-route="List/Opportunity/List"] .list-row-container { width:max-content!important; min-width:100%!important; }
+ body.bs-sales-ui[data-route="List/Opportunity/List"] .bs-list-shell .list-row-container { width:max-content!important; min-width:100%!important; }
 }
