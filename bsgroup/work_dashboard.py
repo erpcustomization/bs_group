@@ -34,7 +34,20 @@ def screens():
                 'Site Survey Request', 'HD Ticket', 'HD Customer', 'HD Agent', 'Contact']
     if 'System Manager' in frappe.get_roles():
         return ['Lead', 'Opportunity', 'Presales Request', 'Deal Cost Sheet', 'Quotation']
-    return []
+    roles = set(frappe.get_roles())
+    result = []
+    for allowed_roles, doctypes in (
+        ({'Sales User', 'Sales Manager', 'Sales Master Manager'},
+         ['Lead', 'Opportunity', 'Deal Cost Sheet', 'Quotation']),
+        ({'Presales'}, ['Presales Request', 'Deal Cost Sheet', 'Quotation']),
+        ({'Projects User', 'Projects Manager'},
+         ['Project', 'Task', 'Timesheet', 'Tech Task Scheduler', 'Site Survey Request']),
+        ({'Purchase User', 'Purchase Manager'},
+         ['Material Request', 'Purchase Order', 'Purchase Receipt']),
+    ):
+        if roles & allowed_roles:
+            result.extend(dt for dt in doctypes if dt not in result)
+    return result
 
 
 @frappe.whitelist()

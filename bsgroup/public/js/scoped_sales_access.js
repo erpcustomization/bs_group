@@ -2,7 +2,7 @@
     function restrictNavigation() {
         const screens = frappe.boot.bs_scoped_screens;
         if (!screens) {
-            if (frappe.session.user === 'manikandan@bitssecureit.com') {
+            if (frappe.boot.bs_work_dashboard) {
                 document.querySelectorAll('.body-sidebar .sidebar-items, .desk-sidebar .sidebar-items').forEach(host => {
                     if (!host.querySelector('.bs-personal-dashboard')) {
                         const row = document.createElement('div');

@@ -130,6 +130,8 @@ def show_lead_intake_navigation():
 
 
 def boot_session(bootinfo):
+    from bsgroup.work_dashboard import screens
+    bootinfo.bs_work_dashboard = bool(screens())
     mode = scope()
     if not mode:
         return
