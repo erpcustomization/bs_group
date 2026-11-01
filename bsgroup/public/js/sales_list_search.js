@@ -43,6 +43,24 @@
     if (!fields[view.doctype]) return;
     const area = view.page.wrapper[0] || view.page.wrapper;
     if (view.doctype === 'Deal Cost Sheet') {
+      const names = (view.data || []).map(doc => doc.name);
+      const signature = JSON.stringify(names);
+      if (names.length && view._bs_owner_signature !== signature) {
+        view._bs_owner_signature = signature;
+        frappe.call({method:'bsgroup.lead_lifecycle.list_owner_labels', args:{names,doctype:view.doctype}, callback:result => {
+          view._bs_owner_labels = {...view._bs_owner_labels, ...result.message};
+          mount(view);
+        }});
+      }
+      area.querySelectorAll('.list-row [data-fieldname="deal_owner"] a[data-filter]').forEach(link => {
+        const owner = link.getAttribute('data-filter').split(',=,').slice(1).join(',=,');
+        const label = view._bs_owner_labels?.[owner]?.full_name;
+        if (label && link.textContent !== label) {
+          link.textContent = label;
+          link.title = label;
+          if (link.parentElement) link.parentElement.title = `Deal Owner: ${label}`;
+        }
+      });
       const count = area.querySelector('.list-row-head .list-count');
       const heading = area.querySelector('.bs-list-heading h1');
       if (count && heading) {

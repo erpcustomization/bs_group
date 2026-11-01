@@ -295,9 +295,9 @@ def owner_choices(name=None, company=None):
 @frappe.whitelist()
 def list_owner_labels(names, doctype="Lead"):
     """Return profile labels only for owners of Leads the caller can read."""
-    if doctype not in ("Lead", "Opportunity"):
+    if doctype not in ("Lead", "Opportunity", "Deal Cost Sheet"):
         frappe.throw(_("Invalid document type."))
-    owner_field = "lead_owner" if doctype == "Lead" else "opportunity_owner"
+    owner_field = {"Lead": "lead_owner", "Opportunity": "opportunity_owner", "Deal Cost Sheet": "deal_owner"}[doctype]
     names = frappe.parse_json(names)
     if not isinstance(names, list) or len(names) > 2500:
         frappe.throw(_("Invalid Lead list."))
