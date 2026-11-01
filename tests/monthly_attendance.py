@@ -21,3 +21,14 @@ assert calc(day,[(at(9),'IN')],at(10))[0]==60
 assert calc(day,[(at(9),'IN'),(at(9,30),'IN'),(at(18),'OUT')],later)[0]==540
 assert calc(day,[(at(8),'OUT')],later)==(0,None,False)
 print('PASS: 9–6 cap, late arrival, multiple sessions, overtime exclusion, missing checkout, current day, duplicate IN')
+
+arrival=next(n for n in ast.parse(source.read_text(encoding='utf-8')).body if isinstance(n,ast.FunctionDef) and n.name=='arrival_status')
+exec(compile(ast.Module(body=[arrival],type_ignores=[]),str(source),'exec'),ns)
+status=ns['arrival_status']
+assert status(day,at(9,15),[(at(9,15),'IN')],later)=='pending_checkout'
+assert status(day,at(9,15),[(at(9,15),'IN'),(at(18),'OUT')],later)=='late'
+assert status(day,at(9,15),[(at(8),'OUT'),(at(9,15),'IN')],later)=='pending_checkout'
+assert status(day,at(9,15),[(at(9,15),'IN'),(at(18),'OUT')],at(10))=='pending_checkout'
+assert status(day,None,[],later)=='no_checkin'
+assert status(day,at(9),[(at(9),'IN')],later)=='on_time'
+print('PASS: late days require a completed IN/OUT pair; missing and future OUT excluded')
