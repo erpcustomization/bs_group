@@ -19,7 +19,7 @@ def fail(message):
 fake = SimpleNamespace(has_permission=lambda dt, p: dt == 'Lead', get_meta=lambda dt: SimpleNamespace(has_field=lambda f: True),
     get_list=get_list, throw=fail, session=SimpleNamespace(user='sales@example.com'),
     utils=SimpleNamespace(today=lambda:'2024-02-29', getdate=date.fromisoformat))
-ns = {'frappe':fake,'screens':lambda:['Lead','Quotation']}
+ns = {'frappe':fake,'screens':lambda:['Lead','Quotation'], 'scope':lambda:None}
 exec(compile(ast.fix_missing_locations(ast.Module(body=[fn], type_ignores=[])), str(source), 'exec'), ns)
 r = ns['data']('2024-02')
 assert r['end'] == '2024-03-01' and len(r['daily']) == 29
