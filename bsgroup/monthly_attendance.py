@@ -27,6 +27,8 @@ def office_minutes(day, logs, now):
 
 def arrival_status(day, first, logs, now):
     if not first:
+        if now < datetime.combine(day, time(9), TZ):
+            return 'not_started'
         return 'no_checkin'
     if first <= datetime.combine(day, time(9), TZ):
         return 'on_time'
@@ -43,7 +45,8 @@ def get_month(month):
         frappe.throw('Choose a valid month (YYYY-MM).')
     end = date(start.year + (start.month == 12), start.month % 12 + 1, 1)
     now = datetime.now(TZ)
-    key = 'bs-attendance-month-v2:' + frappe.session.user + ':' + month
+    phase = 'before-start' if now.time() < time(9) else 'started'
+    key = f'bs-attendance-month-v3:{frappe.session.user}:{month}:{now.date()}:{phase}'
     cached = frappe.cache.get_value(key)
     if cached is not None:
         return cached
@@ -116,7 +119,7 @@ def get_month(month):
             status = 'leave' if leave == 1 else 'on_duty' if on_duty == 1 else 'no_checkin'
             if remaining:
                 status = arrival_status(day, first, by_day.get(day, []), now)
-                if status != 'pending_checkout':
+                if status not in ('pending_checkout', 'not_started'):
                     totals[status] += remaining
         days.append(dict(date=str(day), status=status, working_minutes=worked,
             incomplete=incomplete, holiday=holiday or ''))

@@ -85,7 +85,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
                     $('<strong>').text(key==='working_minutes'?duration(a.totals[key]):a.totals[key]).appendTo(tile);
                 });
                 const days=$('<div class="bs-att-month-days" aria-label="Daily attendance">').appendTo(attendance);
-                const labels={on_time:'On time',late:'Late',leave:'Leave',off:'Off',on_duty:'On duty / WFH',no_checkin:'No check-in',pending_checkout:'Check-in recorded; checkout pending (not counted as late)'};
+                const labels={on_time:'On time',late:'Late',leave:'Leave',off:'Off',on_duty:'On duty / WFH',not_started:'Not started yet · starts at 9 AM',no_checkin:'No check-in',pending_checkout:'Check-in recorded; checkout pending (not counted as late)'};
                 a.days.forEach(d=>$('<span role="button" tabindex="0">').addClass('bs-att-day-'+d.status).text(Number(d.date.slice(-2)))
                     .attr('title',`${d.date}: ${labels[d.status]} · ${duration(d.working_minutes)}${d.incomplete?' · Missing checkout':''}${d.holiday?' · '+d.holiday:''} · View or apply for leave`)
                     .attr('aria-label',`${d.date}: ${labels[d.status]}. View or apply for leave`)
