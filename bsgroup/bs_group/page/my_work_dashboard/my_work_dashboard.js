@@ -7,48 +7,6 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
     let requestId = 0;
     monthInput.on('change', () => { if (monthInput.val()) refresh(); });
     const openList = dt => frappe.set_route('List',dt);
-    const duration = n => `${Math.floor(n/60)}h ${n%60}m`;
-    async function attendance() {
-        const target=host.find('.bs-today-attendance');
-        if (!target.length || !target.is(':visible')) return;
-        try {
-            const response=await frappe.call('bsgroup.dashboard_attendance.today');
-            if (!target[0].isConnected) return;
-            const a=response.message;
-            target.empty();
-            $('<h3>').text(__('Today’s attendance')).appendTo(target);
-            $('<p class="bs-month-note">').text(__('9:00 AM–6:00 PM · Dubai time · attendance check-ins')).appendTo(target);
-            if (a.remaining_minutes !== undefined) {
-                const clock=$('<div class="bs-workday-clock">').toggleClass('wrap-up',a.remaining_minutes<=30).appendTo(target);
-                const ring=$('<div class="bs-clock-ring" role="img">').attr('aria-label',`${duration(a.remaining_minutes)} remaining until 6 PM`).css('--day-progress',`${Math.max(0,Math.min(100,(540-a.remaining_minutes)/540*100))}%`).appendTo(clock);
-                const face=$('<div class="bs-clock-face">').appendTo(ring);
-                $('<span class="bs-clock-symbol" aria-hidden="true">').text('◷').appendTo(face);
-                $('<strong>').text(duration(a.remaining_minutes)).appendTo(face);
-                $('<small>').text(__('remaining')).appendTo(face);
-                const text=$('<div class="bs-clock-copy">').appendTo(clock);
-                $('<h4>').text(a.remaining_minutes===0 ? __('Workday complete') : a.remaining_minutes<=30 ? __('Time to wrap up') : __('Make the rest of today count')).appendTo(text);
-                $('<p>').text(a.remaining_minutes===0 ? __('Your 6:00 PM working window has ended.') : a.remaining_minutes<=30 ? __('Finish priority tasks, update their status, and prepare to close your day.') : __('Time remaining until 6:00 PM. Focus on your next priority.')).appendTo(text);
-                $('<small>').text(__('9:00 AM start · 5:30 PM wrap-up · 6:00 PM finish')).appendTo(text);
-            }
-            if (['unlinked','ambiguous'].includes(a.state)) {
-                $('<p>').text(a.state==='unlinked' ? __('No active Employee profile is linked to your account.') : __('More than one Employee profile is linked. HR needs to confirm the correct profile.')).appendTo(target);
-                return;
-            }
-            if (!a.check_in) {
-                $('<p>').text(__('No attendance check-in recorded today.')).appendTo(target);
-                return;
-            }
-            const grid=$('<div class="bs-attendance-grid">').appendTo(target);
-            const cells=[['Check-in',a.check_in],['Arrival',a.late_minutes ? `${a.late_minutes} minutes late` : 'On time'],['Working time so far',duration(a.worked_minutes)],['Available from arrival to 6 PM',duration(a.available_minutes)]];
-            cells.forEach(([label,value])=>{const cell=$('<div>').appendTo(grid);$('<small>').text(__(label)).appendTo(cell);$('<strong>').text(value).appendTo(cell);});
-            const note=a.checked_in ? `${duration(a.remaining_minutes)} until 6 PM · projected working time ${duration(a.projected_minutes)} if you remain checked in.` : a.check_out ? `Last check-out: ${a.check_out}.` : 'The 6 PM working window has ended.';
-            $('<p class="bs-month-note">').text(note+' Recorded OUT–IN breaks are excluded. Time is limited to 9 AM–6 PM.').appendTo(target);
-            if(a.unknown_logs) $('<p class="bs-month-note">').text(__('Some punches have no IN/OUT type; these are excluded from this estimate.')).appendTo(target);
-        } catch(error) {
-            target.empty().append($('<p>').text(__('Attendance is unavailable. Please try Refresh.')));
-        }
-    }
-    setInterval(attendance,60000);
     async function refresh() {
         const currentRequest = ++requestId;
         host.empty().append($('<div class="bs-work-empty" role="status">').text(__('Loading your workspace…')));
@@ -65,8 +23,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
             const stamp = $('<div class="bs-work-stamp">').appendTo(hero);
             $('<strong>').text(new Date(data.month+'-01T12:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'})).appendTo(stamp);
             $('<span>').text(__('Updated just now')).appendTo(stamp);
-            $('<section class="bs-today-attendance bs-month-chart">').text(__('Loading today’s attendance…')).appendTo(host);
-            attendance();
+
             const summary = $('<div class="bs-month-summary">').appendTo(host);
             const metrics = data.presales ? [
                 ['open_requests','Open presales requests','All months · not yet handed to Sales'],

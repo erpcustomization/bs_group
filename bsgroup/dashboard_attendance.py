@@ -70,8 +70,9 @@ def wrap_up_reminder():
     now = datetime.now(ZoneInfo('Asia/Dubai'))
     if not time(17,30) <= now.time().replace(tzinfo=None) < time(18):
         return dict(due=False)
-    attendance = today()
-    if not attendance.get('checked_in'):
+    from bsgroup.attendance_widget import get_today_status
+    attendance = get_today_status()
+    if not attendance.get('visible') or attendance.get('is_holiday') or attendance.get('on_leave') or not attendance.get('checked_in'):
         return dict(due=False)
     key = 'wrapup-' + hashlib.sha256((frappe.session.user + str(now.date())).encode()).hexdigest()[:24]
     if not frappe.db.exists('Notification Log', key):
