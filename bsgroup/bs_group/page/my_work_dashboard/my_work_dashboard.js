@@ -25,6 +25,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
         try {
             await loadLeave();
             if (!leaveContext?.visible) return;
+            if (day && (day < leaveContext.today || (day === leaveContext.today && leaveContext.today_locked))) return;
             const existing = day && leaveContext.requests.filter(x=>x.from_date<=day && x.to_date>=day);
             if (existing?.length) {
                 const dialog = new frappe.ui.Dialog({title:__('Leave requests for {0}',[day]),fields:[{fieldname:'requests',fieldtype:'HTML'}]});
@@ -34,7 +35,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
                 return;
             }
             if (!leaveContext.can_create) return frappe.msgprint(__('Please contact HR to request leave access.'));
-            const start = day || frappe.datetime.get_today();
+            const start = day || leaveContext.today;
             const create = ()=>frappe.new_doc('Leave Application', {employee:leaveContext.employee,company:leaveContext.company,from_date:start,to_date:start});
             if (day) frappe.confirm(__('Apply for leave on {0}? You can change the dates in the leave form.',[frappe.datetime.str_to_user(day)]),create);
             else create();
@@ -71,7 +72,8 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
 
             const attendance=$('<section class="bs-month-attendance" aria-label="Monthly attendance">').appendTo(host);
             attendance.text(__('Loading monthly attendance…'));
-            Promise.resolve(frappe.call({method:'bsgroup.monthly_attendance.get_month',args:{month:data.month},quiet:true})).then(r=>{
+            Promise.resolve(frappe.call({method:'bsgroup.monthly_attendance.get_month',args:{month:data.month},quiet:true})).then(async r=>{
+                await loadLeave();
                 if (currentRequest !== requestId) return;
                 const a=r.message;
                 if (!a?.visible) { attendance.remove(); return; }
@@ -86,10 +88,12 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
                 });
                 const days=$('<div class="bs-att-month-days" aria-label="Daily attendance">').appendTo(attendance);
                 const labels={on_time:'On time',late:'Late',leave:'Leave',off:'Off',on_duty:'On duty / WFH',not_started:'Not started yet · starts at 9 AM',no_checkin:'No check-in',pending_checkout:'Check-in recorded; checkout pending (not counted as late)'};
-                a.days.forEach(d=>$('<span role="button" tabindex="0">').addClass('bs-att-day-'+d.status).text(Number(d.date.slice(-2)))
-                    .attr('title',`${d.date}: ${labels[d.status]} · ${duration(d.working_minutes)}${d.incomplete?' · Missing checkout':''}${d.holiday?' · '+d.holiday:''} · View or apply for leave`)
-                    .attr('aria-label',`${d.date}: ${labels[d.status]}. View or apply for leave`)
-                    .on('click',()=>applyLeave(d.date)).on('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();applyLeave(d.date);}}).appendTo(days));
+                a.days.forEach(d=>{
+                    const enabled=leaveContext?.can_create && d.date===leaveContext.today && !leaveContext.today_locked && ['no_checkin','not_started'].includes(d.status);
+                    const label=`${d.date}: ${labels[d.status]} · ${duration(d.working_minutes)}${d.holiday?' · '+d.holiday:''} · ${enabled?'Apply for leave':'Locked · contact HR for corrections'}`;
+                    const cell=$('<span>').addClass('bs-att-day-'+d.status).text(Number(d.date.slice(-2))).attr('title',label).attr('aria-label',label).appendTo(days);
+                    if(enabled) cell.attr({role:'button',tabindex:'0'}).on('click',()=>applyLeave(d.date)).on('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();applyLeave(d.date);}});
+                });
                 $('<p>').text(`9 AM–6 PM only · Recorded IN/OUT pairs; no overtime or assumed on-duty hours. ${a.totals.no_checkin} day(s) without check-in · ${a.totals.incomplete} missing checkout(s). Off days follow the HR holiday calendar.`).appendTo(attendance);
             }).catch(()=>{if(currentRequest===requestId) attendance.text(__('Attendance could not be loaded. Please reload the page.'));});
 

@@ -12,6 +12,8 @@ def validate_medical_certificate(doc, method=None):
 	    total_leave_days exceeds this number.
 	"""
 
+	from bsgroup.dashboard_leave import validate_self_service
+	validate_self_service(doc)
 	settings = frappe.get_cached_doc("BS Group Settings")
 	configured_leave_type = settings.get("select_leave_type")
 	threshold_days = settings.get("attachment_required_after_days")
