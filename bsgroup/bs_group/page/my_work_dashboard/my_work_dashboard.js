@@ -50,7 +50,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
                 a.days.forEach(d=>$('<span>').addClass('bs-att-day-'+d.status).text(Number(d.date.slice(-2)))
                     .attr('title',`${d.date}: ${labels[d.status]} · ${duration(d.working_minutes)}${d.incomplete?' · Missing checkout':''}${d.holiday?' · '+d.holiday:''}`).appendTo(days));
                 $('<p>').text(`9 AM–6 PM only · Recorded IN/OUT pairs; no overtime or assumed on-duty hours. ${a.totals.no_checkin} day(s) without check-in · ${a.totals.incomplete} missing checkout(s). Off days follow the HR holiday calendar.`).appendTo(attendance);
-            }).catch(()=>{if(currentRequest===requestId) attendance.text(__('Attendance could not be loaded. Please use Refresh.'));});
+            }).catch(()=>{if(currentRequest===requestId) attendance.text(__('Attendance could not be loaded. Please reload the page.'));});
 
             const summary = $('<div class="bs-month-summary">').appendTo(host);
             const metrics = data.presales ? [
@@ -116,10 +116,10 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
             if (!response.message.cards.length) host.append($('<p>').text(__('No accessible dashboard records.')));
         } catch (error) {
             if (currentRequest !== requestId) return;
-            host.empty().append($('<div class="bs-work-empty" role="alert">').text(__('Unable to load your dashboard. Please try Refresh.')));
+            host.empty().append($('<div class="bs-work-empty" role="alert">').text(__('Unable to load your dashboard. Please reload the page.')));
         }
     }
-    page.set_primary_action(__('Refresh'),refresh);
+    page.clear_primary_action();
     wrapper.refresh_dashboard = refresh;
 };
 frappe.pages['my-work-dashboard'].on_page_show = wrapper => wrapper.refresh_dashboard();
