@@ -52,7 +52,8 @@
         el.dataset.module=module; refresh(); return el;
     }
     function routeModule() {
-        const route=(frappe.get_route?.()||[]).join('/').toLowerCase();
+        const route=(frappe.get_route?.()||[]).join('/').toLowerCase().replace(/^workspaces?\//,'');
+        if (route==='my-work-dashboard' && !frappe.boot?.bs_scoped_screens && (frappe.user_roles||[]).includes('Projects User')) return 'projects';
         if (/^(workspace\/)?(selling|bs sales)$|^(sales-management-das|presales-request-das|monthly-sales-entry|my-work-dashboard)$/.test(route)) return 'sales';
         if (/^(workspace\/)?(projects|bs project|projects, amc & ppm management)$/.test(route)) return 'projects';
         if (/^(workspace\/)?buying$|^bs-procurement/.test(route)) return 'procurement';
