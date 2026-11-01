@@ -23,6 +23,11 @@ function presales_move_timeline_to_additional(frm) {
         section.wrapper.appendTo(additional.wrapper);
         section.fields_list.forEach(field => additional.add_field(field));
     }
+    const owner = frm.fields_dict.presales_owner;
+    if (owner && owner.$wrapper.parent()[0] !== additional.wrapper[0]) {
+        owner.$wrapper.insertBefore(section.wrapper);
+        additional.add_field(owner);
+    }
     const results = frm.fields_dict.custom_survey_results;
     if (results && results.$wrapper.parent()[0] !== additional.wrapper[0]) {
         results.$wrapper.appendTo(additional.wrapper);
@@ -31,6 +36,20 @@ function presales_move_timeline_to_additional(frm) {
     const footer = $(frm.page.wrapper).find('.form-footer');
     if (footer.length && footer.parent()[0] !== additional.wrapper[0]) footer.appendTo(additional.wrapper);
     layout.refresh_tabs();
+    const timing = layout.sections_dict.custom_completion_time_section;
+    const completion = frm.fields_dict.custom_completion_time;
+    const priority = frm.fields_dict.priority;
+    if (completion && priority) {
+        const tab = layout.tabs.find(item => item.df.fieldname === 'presales_details_tab') || layout.tabs[0];
+        completion.$wrapper.insertAfter(priority.$wrapper);
+        tab.add_field(completion);
+        frm.set_df_property('priority', 'hidden', 1);
+        // Keep dependency refreshes from removing the required marker on drafts.
+        frm.set_df_property('custom_completion_time', 'mandatory_depends_on', 'eval:doc.docstatus !== 2');
+        frm.toggle_reqd('custom_completion_time', frm.doc.docstatus !== 2);
+        layout.refresh_tabs();
+        if (timing) timing.wrapper.hide();
+    }
 }
 
 function presales_status_panel(frm) {
@@ -57,6 +76,35 @@ function presales_status_panel(frm) {
                 frm.refresh_field('custom_survey_results');
             }
         });
+    }
+}
+
+function presales_compact_layout(frm) {
+    // Keep inherited context visible without editable links or navigation.
+    for (const field of ['opportunity', 'company']) {
+        frm.set_df_property(field, 'read_only', 1);
+        frm.set_df_property(field, 'fieldtype', 'Data');
+    }
+    for (const field of ['timeline_defined', 'site_visit_required', 'site_visit', 'decision_maker_known', 'competition_known', 'budget_confirmed', 'opportunity_qualification_mandatory_section']) {
+        frm.set_df_property(field, 'hidden', 1);
+    }
+    for (const field of ['decision_maker_known', 'competition_known', 'budget_confirmed']) frm.toggle_reqd(field, false);
+    const root = $(frm.page.wrapper);
+    root.addClass('bsi-presales-compact');
+    if (!root.children('style.bsi-presales-compact-style').length) {
+        $('<style class="bsi-presales-compact-style"></style>').text(`
+            .bsi-presales-compact .form-layout .form-section { padding:12px 16px; margin-bottom:8px; }
+            .bsi-presales-compact .form-layout .section-head { margin-bottom:10px; }
+            .bsi-presales-compact .form-layout .section-body { margin-top:0; }
+            .bsi-presales-compact .form-layout .frappe-control { margin-bottom:10px; }
+            .bsi-presales-compact .form-layout .control-label { margin-bottom:4px; }
+            .bsi-presales-compact .form-layout .form-column:has(> form):not(:has(> form > .frappe-control:not(.hide-control))) { display:none; }
+            .bsi-presales-compact [data-fieldname="opportunity_qualification_mandatory_section"] .form-column { flex:1; max-width:100%; }
+            .bsi-presales-compact [data-fieldname="opportunity_qualification_mandatory_section"] .form-column > form { display:flex; flex-wrap:wrap; gap:8px 24px; }
+            .bsi-presales-compact [data-fieldname="opportunity_qualification_mandatory_section"] .frappe-control { margin-bottom:0; }
+            .bsi-presales-compact .presales-status-bar { padding:8px 16px!important; }
+            .bsi-presales-compact .form-footer { margin-top:12px; padding-top:8px; }
+        `).appendTo(root);
     }
 }
 
@@ -110,6 +158,7 @@ frappe.ui.form.on("Presales Request", {
         });
     },
     refresh(frm){
+        presales_compact_layout(frm);
         presales_show_party(frm);
         presales_move_timeline_to_additional(frm);
         set_completion_date(frm);

@@ -8,46 +8,24 @@ const bsi_lead_lifecycle = (() => {
         const age = doc.creation ? moment().diff(frappe.datetime.convert_to_user_tz(doc.creation, false), 'hours', true) : 0;
         return doc.status === "Delayed" || (active.has(doc.status) && age >= 24) ? ["Delayed", "orange"] : ["Open", "blue"];
     }
-    function convert(frm) {
-        return frappe.prompt([{fieldname:'subject',fieldtype:'Data',label:__('Opportunity subject'),reqd:1,
-            default:frm.doc.company_name || frm.doc.lead_name || ''},
-            {fieldname:'opportunity_amount',fieldtype:'Currency',label:__('Opportunity Amount'),reqd:1},
-            {fieldname:'custom_business_type',fieldtype:'Select',label:__('Supply / Service'),options:'\nSupply\nService\nSupply and Installation',reqd:1},
-            {fieldname:'custom_service_type',fieldtype:'Select',label:__('Service Type'),options:'\nCCTV\n3CX\nELV',depends_on:"eval:doc.custom_business_type === 'Service'",mandatory_depends_on:"eval:doc.custom_business_type === 'Service'"},
-            {fieldname:'custom_service_survey',fieldtype:'Select',label:__('Site Survey Requirement'),options:'\nSite Survey by ELV\nSite Survey by Technical Team\nNo Site Survey Required',depends_on:"eval:doc.custom_business_type === 'Service' && doc.custom_service_type",mandatory_depends_on:"eval:doc.custom_business_type === 'Service'"},
-            {fieldname:'custom_service_details',fieldtype:'Small Text',label:__('Service Details'),depends_on:"eval:doc.custom_business_type === 'Service' && doc.custom_service_survey === 'No Site Survey Required'",mandatory_depends_on:"eval:doc.custom_business_type === 'Service' && doc.custom_service_survey === 'No Site Survey Required'"},
-            {fieldname:'custom_installation_type',fieldtype:'Select',label:__('Installation Type'),options:'\nCCTV\n3CX\nNetworking\nOther',depends_on:"eval:doc.custom_business_type === 'Supply and Installation'",mandatory_depends_on:"eval:doc.custom_business_type === 'Supply and Installation'"},
-            {fieldname:'custom_camera_count',fieldtype:'Int',label:__('Number of Cameras'),depends_on:"eval:doc.custom_business_type === 'Supply and Installation' && doc.custom_installation_type === 'CCTV'",mandatory_depends_on:"eval:doc.custom_business_type === 'Supply and Installation' && doc.custom_installation_type === 'CCTV'"},
-            {fieldname:'custom_site_survey_needed',fieldtype:'Select',label:__('Site Survey Required?'),options:'\nYes\nNo',depends_on:"eval:doc.custom_business_type === 'Supply and Installation' && doc.custom_installation_type === 'CCTV' && doc.custom_camera_count >= 30",mandatory_depends_on:"eval:doc.custom_business_type === 'Supply and Installation' && doc.custom_installation_type === 'CCTV' && doc.custom_camera_count >= 30"}], async values => {
-            if (frm._bsi_converting) return;
-            frm._bsi_converting = true;
-            try {
-                if (frm.is_new() || frm.is_dirty()) await frm.save();
-                if (frm.is_new() || frm.is_dirty()) return;
-                const result = await frappe.call({method:'bsgroup.lead_lifecycle.confirm_opportunity',
-                    args:{source_name:frm.doc.name,subject:values.subject,opportunity_amount:values.opportunity_amount,intake:values},freeze:true});
-                if (!result.exc && result.message) {
-                    await frm.reload_doc();
-                    frappe.show_alert({message:__('Opportunity created: {0}', [result.message]),indicator:'green'});
-                }
-            } finally { frm._bsi_converting = false; }
-        }, __('Convert to Opportunity'), __('OK'));
-    }
-    function followup(frm) {
-        const field = frm.fields_dict.custom_next_follow_up_date;
-        if (!field?.$wrapper?.[0]) return;
-        let button = field.$wrapper[0].parentElement.querySelector('.bsi-followup-ok');
-        if (!button) {
-            button = document.createElement('button');button.type='button';button.className='btn btn-primary btn-sm bsi-followup-ok';button.textContent=__('OK');
-            field.$wrapper[0].after(button);
-            button.addEventListener('click', async () => {
-                button.disabled=true;
-                try { await frm.save(); if (!frm.is_dirty()) { frm._bsi_saved_followup=frm.doc.custom_next_follow_up_date || ''; button.hidden=true; } }
-                finally {button.disabled=false;}
+    async function convert(frm) {
+        if (frm._bsi_converting) return;
+        frm._bsi_converting = true;
+        try {
+            if (frm.is_dirty()) await frm.save();
+            if (frm.is_new() || frm.is_dirty()) return;
+            const result = await frappe.call({
+                method: 'bsgroup.lead_lifecycle.confirm_opportunity',
+                args: {source_name: frm.doc.name, subject: frm.doc.title || frm.doc.company_name || frm.doc.lead_name},
+                freeze: true, freeze_message: __('Creating Opportunity…')
             });
-        }
-        button.hidden=(frm.doc.custom_next_follow_up_date || '') === (frm._bsi_saved_followup || '') || !frm.perm?.some(p=>p.write);
+            if (!result.exc && result.message) {
+                await frm.reload_doc();
+                frappe.show_alert({message:__('Opportunity created: {0}', [result.message]),indicator:'green'});
+            }
+        } finally { frm._bsi_converting = false; }
     }
+    function followup(frm) { frm.trigger('bsi_lead_submission_changed'); }
     let timer;
     function refresh(frm) {
         // Activation follows the server schema update; old benches remain usable during deployment.
@@ -73,7 +51,7 @@ const bsi_lead_lifecycle = (() => {
         }
         const current=closed.has(frm.doc.status)?'convert':['Dropped','Do Not Contact'].includes(frm.doc.status)?'drop':'open';
         select.value=current;
-        select.disabled=!frm.perm?.some(p=>p.write)||closed.has(frm.doc.status);
+        select.disabled=frm.is_new() || !frm.perm?.some(p=>p.write)||closed.has(frm.doc.status);
         if (closed.has(frm.doc.status)) select.title=__('This Lead is closed through its existing sales document.');
         box.append(select);
         const render=()=>{
@@ -96,7 +74,7 @@ const bsi_lead_lifecycle = (() => {
                     frm.add_child('notes', {note: frappe.utils.escape_html('Dropped: ' + reason), added_by: frappe.session.user, added_on: frappe.datetime.now_datetime()});
                     await frm.set_value('status', 'Dropped');
                     await frm.save();
-                }, __('Drop Lead'), __('OK'));
+                }, __('Drop Lead'), __('Drop Lead'));
             }
         });
     }

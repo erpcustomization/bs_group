@@ -31,3 +31,4 @@ bsgroup.patches.v0_1.dcs_costing_subject
 
 bsgroup.patches.v0_1.dcs_procurement
 bsgroup.patches.v0_1.quotation_won_requirements
+bsgroup.patches.v0_1.dcs_supplier_evidence

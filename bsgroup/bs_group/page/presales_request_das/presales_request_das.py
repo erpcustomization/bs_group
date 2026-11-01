@@ -350,8 +350,7 @@ def get_dashboard_data(selected_user=None, from_date=None, to_date=None, selecte
 		f"""
 		SELECT name, customer, opportunity, status, priority,
 		       estimated_value, expected_close_date, presales_owner,
-		       actual_hours, estimated_hours,
-		       decision_maker_known, budget_confirmed
+		       actual_hours, estimated_hours
 		FROM `tabPresales Request`
 		WHERE estimated_value > 0
 		{_nc_sql}
