@@ -251,8 +251,8 @@ def make_quotation(source_name):
 def refuse_stale_quotation_source(source):
 	"""A Quotation is built from the BOQ rows. Refuse when the living commercial position has moved
 	away from those rows (totals-only negotiation), so a stale price can never be quoted."""
-	if source.docstatus == 2:
-		frappe.throw("This Deal Cost Sheet is cancelled. A Quotation cannot be created from it.")
+	if source.docstatus != 1 or source.custom_superseded_by:
+		frappe.throw("Complete and submit the current Deal Cost Sheet before creating a Quotation.")
 	if not frappe.utils.cint(source.custom_dcs_revision_no):
 		return
 	gap_cost = abs(frappe.utils.flt(source.custom_working_total_cost) - frappe.utils.flt(source.total_cost))

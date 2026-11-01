@@ -76,6 +76,29 @@ class PresalesRequest(Document):
 	def on_cancel(self):
 		self.db_set("status", "Cancelled")
 
+	def on_submit(self):
+		"""Hand submitted presales work to costing in the same transaction."""
+		if not self.opportunity:
+			frappe.throw(_("An Opportunity is required before submitting Presales."))
+		frappe.db.sql("SELECT name FROM `tabOpportunity` WHERE name=%s FOR UPDATE", self.opportunity)
+		if frappe.db.exists("Site Survey Request", {"opportunity": self.opportunity,
+			"status": ["not in", ["Completed", "Cancelled"]]}):
+			frappe.throw(_("Complete the Site Survey before submitting Presales for costing."))
+		existing = frappe.get_all("Deal Cost Sheet", filters={"opportunity": self.opportunity,
+			"docstatus": ["<", 2]}, fields=["name", "custom_record_authority"])
+		if any(row.custom_record_authority != "Superseded" for row in existing):
+			return
+		opportunity = frappe.get_doc("Opportunity", self.opportunity)
+		sheet = frappe.new_doc("Deal Cost Sheet")
+		sheet.update({"opportunity": self.opportunity, "presales_request": self.name,
+			"party_type": self.party_type, "party": self.party,
+			"organisation_name": self.organisation_name, "subject": self.subject,
+			"company": self.company, "currency": opportunity.currency,
+			"deal_owner": self.requested_by, "site_visit": self.site_visit})
+		# Submission permission was checked by Frappe. Costing is the bounded
+		# downstream record, including for presales users without DCS create access.
+		sheet.insert(ignore_permissions=True)
+
 	def after_insert(self):
 		if self.opportunity:
 			frappe.db.set_value(

@@ -7,6 +7,8 @@ frappe.listview_settings['Presales Request'] = {
             'In Progress': 'orange',
             'Awaiting Sales Input': 'yellow',
             'Awaiting Customer Input': 'yellow',
+            'Awaiting Site Survey Results': 'orange',
+            'Site Survey Results Received': 'green',
             'Costing in Progress': 'orange',
             'Ready for Quotation': 'cyan',
             'Submitted to Sales': 'green',
@@ -17,7 +19,9 @@ frappe.listview_settings['Presales Request'] = {
             'Cancelled': 'red'
         };
         var status = doc.status || 'Draft';
-        return [status, color_map[status] || 'grey', 'status,=,' + status];
+        var label = status === 'Awaiting Site Survey Results' ? 'Awaiting Site Survey' :
+            status === 'Site Survey Results Received' ? 'Open with Presales' : status;
+        return [label, color_map[status] || 'grey', 'status,=,' + status];
     }
 };
 
@@ -27,6 +31,7 @@ frappe.listview_settings['Presales Request'] = {
     {label:'Draft',color:'#6c757d'},{label:'Open',color:'#17a2b8'},{label:'Assigned',color:'#007bff'},
     {label:'In Progress',color:'#fd7e14'},{label:'Awaiting Sales Input',color:'#ffc107'},
     {label:'Awaiting Customer Input',color:'#e83e8c'},{label:'Costing in Progress',color:'#20c997'},
+    {label:'Awaiting Site Survey Results',color:'#a35b00'},{label:'Site Survey Results Received',color:'#087f5b'},
     {label:'Ready for Quotation',color:'#6610f2'},{label:'Submitted to Sales',color:'#28a745'},
     {label:'Completed',color:'#155724'},{label:'On Hold',color:'#856404'},{label:'Won',color:'#1a7a4a'},
     {label:'Lost',color:'#dc3545'},{label:'Cancelled',color:'#343a40'}
@@ -48,10 +53,12 @@ frappe.listview_settings['Presales Request'] = {
     g.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;';
     ALL_STATUSES.forEach(function(s) {
       var cnt = (sd && sd[s.label]) || 0;
+      var displayLabel = s.label === 'Awaiting Site Survey Results' ? 'Awaiting Site Survey' :
+        s.label === 'Site Survey Results Received' ? 'Open with Presales' : s.label;
       var c = document.createElement('div');
       c.style.cssText = 'background:#fff;border-radius:8px;padding:12px 14px;box-shadow:0 1px 4px rgba(0,0,0,.08);border-left:4px solid '+s.color+';cursor:pointer;';
       c.innerHTML = '<div style="font-size:22px;font-weight:700;color:'+s.color+'">'+cnt+'</div>'
-        + '<div style="font-size:11px;color:#555;margin-top:4px;">'+s.label+'</div>';
+        + '<div style="font-size:11px;color:#555;margin-top:4px;">'+displayLabel+'</div>';
       c.onclick = function(){ frappe.set_route('List','Presales Request','List',{status:s.label}); };
       g.appendChild(c);
     });

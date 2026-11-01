@@ -6,6 +6,15 @@
  "idx": 0,
  "items": [
   {
+   "type": "Link",
+   "label": "Site Survey Request",
+   "link_type": "DocType",
+   "link_to": "Site Survey Request",
+   "icon": "clipboard-list",
+   "child": 0,
+   "indent": 0
+  },
+  {
    "child": 0,
    "collapsible": 1,
    "icon": "book-lock",

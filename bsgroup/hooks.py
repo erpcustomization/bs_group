@@ -319,6 +319,10 @@ doctype_list_js = {
     "PPM Management": "public/js/ppm_management_list.js",
 }
 
+for _linked_sales_doctype in ("Presales Request", "Deal Cost Sheet", "Quotation"):
+    _prior = doctype_list_js.get(_linked_sales_doctype, [])
+    doctype_list_js[_linked_sales_doctype] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["public/js/opportunity_linked_list.js"]
+
 doc_events = {
     "DCS Governance Event": {
         "before_insert": "bsgroup.dcs.governance_event_guard.before_insert",
@@ -439,6 +443,14 @@ doc_events = {
         "on_trash": "bsgroup.utils.project_cost_baseline.recalculate_labor_preapproval_baseline",
     },
 }
+
+for _downstream in ("Presales Request", "Deal Cost Sheet", "Quotation", "Site Survey Request"):
+    for _event in ("before_insert", "before_validate"):
+        _prior = doc_events.setdefault(_downstream, {}).get(_event, [])
+        doc_events[_downstream][_event] = ["bsgroup.opportunity_required.validate"] + ([_prior] if isinstance(_prior, str) else list(_prior))
+    _prior = doctype_js.get(_downstream, [])
+    doctype_js[_downstream] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["public/js/opportunity_required.js"]
+
 
 override_whitelisted_methods = {
     "erpnext.controllers.accounts_controller.update_child_qty_rate": "bsgroup.dcs.quotation_control.update_child_qty_rate",
@@ -619,3 +631,49 @@ for _dt, _event, _method in (
     _prior = doc_events.setdefault(_dt, {}).get(_event, [])
     doc_events[_dt][_event] = ([_prior] if isinstance(_prior, str) else list(_prior)) + [
         "bsgroup.procurement_payments." + _method]
+
+
+# Lead outcomes extend native hooks without replacing existing integrations.
+for _hook_map, _path in (
+    (doctype_js, "public/js/lead_lifecycle_form.js"),
+    (doctype_list_js, "public/js/lead_lifecycle_list.js"),
+):
+    _prior = _hook_map.get("Lead", [])
+    _hook_map["Lead"] = ([_prior] if isinstance(_prior, str) else list(_prior)) + [_path]
+for _dt, _event, _method in (
+    ("Lead", "before_validate", "before_validate"),
+    ("Lead", "validate", "validate"),
+    ("Opportunity", "before_insert", "guard_conversion"),
+):
+    _prior = doc_events.setdefault(_dt, {}).get(_event, [])
+    doc_events[_dt][_event] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.lead_lifecycle." + _method]
+scheduler_events.setdefault("cron", {}).setdefault("* * * * *", []).append("bsgroup.lead_lifecycle.mark_delayed")
+after_migrate.append("bsgroup.lead_lifecycle.setup")
+
+# Current Lead presentation; keep the lifecycle and native ERPNext handlers intact.
+doctype_js["Lead"] = ["public/js/lead_details.js" if p == "public/js/Lead.js" else p for p in doctype_js["Lead"]]
+doc_events["Lead"]["onload"] = ["bsgroup.lead_lifecycle.load_responsibility"]
+
+_prior = doc_events.setdefault("Opportunity", {}).get("after_delete", [])
+doc_events["Opportunity"]["after_delete"] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.lead_lifecycle.opportunity_deleted"]
+
+# Share the compact sales-list presentation; retain each DocType's native status logic.
+doctype_list_js["Opportunity"] = ["public/js/lead_list_compact.js", "public/js/lead_lifecycle_list.js", "public/js/opportunity_list_setup.js"]
+doctype_list_js["Lead"].append("public/js/lead_list_setup.js")
+doc_events["Opportunity"]["before_insert"].append("bsgroup.utils.opportunity.validate_creation_source")
+
+after_migrate.append("bsgroup.site_survey_setup.execute")
+doc_events["Opportunity"].setdefault("validate", []).append("bsgroup.site_survey.validate_opportunity")
+doc_events["Opportunity"].setdefault("on_update", []).append("bsgroup.site_survey.create_requests")
+doc_events.setdefault("Presales Request", {}).setdefault("validate", []).append("bsgroup.site_survey.validate_presales")
+permission_query_conditions["Site Survey Request"] = "bsgroup.site_survey.survey_query"
+permission_query_conditions["Presales Request"] = "bsgroup.site_survey.presales_query"
+doc_events["Opportunity"]["validate"].insert(0, "bsgroup.opportunity_intake.validate")
+doc_events["Presales Request"]["validate"].append("bsgroup.opportunity_intake.guard_presales")
+doctype_js["Opportunity"] = ["public/js/opportunity.js", "public/js/opportunity_intake.js"]
+has_permission["Site Survey Request"] = "bsgroup.site_survey.survey_permission"
+doctype_js["Opportunity"].append("public/js/opportunity_progress.js")
+doctype_list_js["Opportunity"].append("public/js/opportunity_progress_list.js")
+doctype_js["Opportunity"].append("public/js/opportunity_details_layout.js")
+doctype_js["Opportunity"].append("public/js/opportunity_survey_steps.js")
+doctype_js["Opportunity"].append("public/js/opportunity_submit.js")
