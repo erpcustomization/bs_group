@@ -3,6 +3,44 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
     const host = $('<div class="bs-work"></div>').appendTo(page.main);
     const controls = $('<div class="bs-work-month-controls"><label>Month <input type="month" aria-label="Dashboard month"></label></div>').insertBefore(host);
     const monthInput = controls.find('input');
+    const leaveButton = $('<button type="button" class="btn btn-primary btn-sm">').text(__('Apply for Leave')).hide().appendTo(controls);
+    const leavePanel = $('<div class="bs-dashboard-leave">').insertAfter(controls);
+    let leaveContext;
+    const openLeave = name => frappe.set_route('Form', 'Leave Application', name);
+    async function loadLeave() {
+        const r = await frappe.call({method:'bsgroup.dashboard_leave.context',quiet:true});
+        leaveContext = r.message;
+        leaveButton.toggle(!!leaveContext?.can_create);
+        leavePanel.empty();
+        if (!leaveContext?.visible) return;
+        const upcoming = leaveContext.requests.filter(x=>x.to_date>=leaveContext.today).sort((a,b)=>a.from_date.localeCompare(b.from_date));
+        if (upcoming.length) {
+            $('<strong>').text(__('Upcoming / current leave')).appendTo(leavePanel);
+            upcoming.forEach(x=>$('<button type="button" class="btn btn-default btn-xs">')
+                .text(`${x.from_date} – ${x.to_date} · ${x.leave_type} · ${x.status==='Approved' && x.docstatus===1?'Approved':'Pending'}`)
+                .on('click',()=>openLeave(x.name)).appendTo(leavePanel));
+        }
+    }
+    async function applyLeave(day) {
+        try {
+            await loadLeave();
+            if (!leaveContext?.visible) return;
+            const existing = day && leaveContext.requests.filter(x=>x.from_date<=day && x.to_date>=day);
+            if (existing?.length) {
+                const dialog = new frappe.ui.Dialog({title:__('Leave requests for {0}',[day]),fields:[{fieldname:'requests',fieldtype:'HTML'}]});
+                existing.forEach(x=>$('<button type="button" class="btn btn-default btn-sm">').text(`${x.leave_type} · ${x.status==='Approved' && x.docstatus===1?'Approved':'Pending'}`)
+                    .on('click',()=>{dialog.hide();openLeave(x.name);}).appendTo(dialog.fields_dict.requests.$wrapper));
+                dialog.show();
+                return;
+            }
+            if (!leaveContext.can_create) return frappe.msgprint(__('Please contact HR to request leave access.'));
+            const start = day || frappe.datetime.get_today();
+            const create = ()=>frappe.new_doc('Leave Application', {employee:leaveContext.employee,company:leaveContext.company,from_date:start,to_date:start});
+            if (day) frappe.confirm(__('Apply for leave on {0}? You can change the dates in the leave form.',[frappe.datetime.str_to_user(day)]),create);
+            else create();
+        } catch (e) { frappe.msgprint(__('Leave details could not be loaded. Please try again.')); }
+    }
+    leaveButton.on('click',()=>applyLeave());
     monthInput.val(frappe.datetime.get_today().slice(0,7));
     let requestId = 0;
     monthInput.on('change', () => { if (monthInput.val()) refresh(); });
@@ -13,6 +51,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
         if (hero) window.bsAttendance?.mountDashboard(hero);
     });
     async function refresh() {
+        loadLeave().catch(()=>{leaveButton.hide();leavePanel.text(__('Leave details could not be loaded. Please reload to try again.'));});
         const currentRequest = ++requestId;
         host.empty().append($('<div class="bs-work-empty" role="status">').text(__('Loading your workspace…')));
         try {
@@ -47,8 +86,10 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
                 });
                 const days=$('<div class="bs-att-month-days" aria-label="Daily attendance">').appendTo(attendance);
                 const labels={on_time:'On time',late:'Late',leave:'Leave',off:'Off',on_duty:'On duty / WFH',no_checkin:'No check-in',pending_checkout:'Check-in recorded; checkout pending (not counted as late)'};
-                a.days.forEach(d=>$('<span>').addClass('bs-att-day-'+d.status).text(Number(d.date.slice(-2)))
-                    .attr('title',`${d.date}: ${labels[d.status]} · ${duration(d.working_minutes)}${d.incomplete?' · Missing checkout':''}${d.holiday?' · '+d.holiday:''}`).appendTo(days));
+                a.days.forEach(d=>$('<span role="button" tabindex="0">').addClass('bs-att-day-'+d.status).text(Number(d.date.slice(-2)))
+                    .attr('title',`${d.date}: ${labels[d.status]} · ${duration(d.working_minutes)}${d.incomplete?' · Missing checkout':''}${d.holiday?' · '+d.holiday:''} · View or apply for leave`)
+                    .attr('aria-label',`${d.date}: ${labels[d.status]}. View or apply for leave`)
+                    .on('click',()=>applyLeave(d.date)).on('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();applyLeave(d.date);}}).appendTo(days));
                 $('<p>').text(`9 AM–6 PM only · Recorded IN/OUT pairs; no overtime or assumed on-duty hours. ${a.totals.no_checkin} day(s) without check-in · ${a.totals.incomplete} missing checkout(s). Off days follow the HR holiday calendar.`).appendTo(attendance);
             }).catch(()=>{if(currentRequest===requestId) attendance.text(__('Attendance could not be loaded. Please reload the page.'));});
 
