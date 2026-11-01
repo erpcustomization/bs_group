@@ -35,11 +35,11 @@ def get_today_status():
     return result
 
 
-def _status(now):
+def _status(now, user=None):
     # get_all intentionally bypasses HR permissions ONLY after session ownership
     # is resolved. No employee or user argument is accepted from the browser.
     employees = frappe.get_all('Employee', filters={
-        'user_id': frappe.session.user, 'status': 'Active'},
+        'user_id': user or frappe.session.user, 'status': 'Active'},
         fields=['name', 'default_shift', 'holiday_list'], limit_page_length=2)
     if len(employees) != 1:
         return {'visible': False}
