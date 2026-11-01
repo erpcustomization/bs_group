@@ -4,7 +4,10 @@
   // set by the native drag handler, including while the pointer is moving.
   const enforce = element => {
     if (!element.matches?.('.list-row-col')) return;
-    const width = element.style.width;
+    const defaults = {name:240,status_field:106,customer:180,deal_owner:190,margin_value:130,opportunity:240,total_selling:140,margin_percent:120};
+    const dcs = element.closest('[id="page-List/Deal Cost Sheet/List"]');
+    const fallback = dcs && defaults[element.dataset.fieldname];
+    const width = element.style.width || (fallback ? `${fallback}px` : '');
     if (!/^\d+(\.\d+)?px$/.test(width)) return;
     for (const [property, value] of Object.entries({width, flex: `0 0 ${width}`, 'min-width': width, 'max-width': width})) {
       if (element.style.getPropertyValue(property) !== value || element.style.getPropertyPriority(property) !== 'important') {
@@ -18,12 +21,12 @@
       else for (const node of record.addedNodes) {
         if (node.nodeType !== 1) continue;
         enforce(node);
-        node.querySelectorAll('.list-row-col[style]').forEach(enforce);
+        node.querySelectorAll('.list-row-col').forEach(enforce);
       }
     }
   });
   observer.observe(document.body, {subtree:true, childList:true, attributes:true, attributeFilter:['style']});
-  document.querySelectorAll('.list-row-col[style]').forEach(enforce);
+  document.querySelectorAll('.list-row-col').forEach(enforce);
   const key = 'bs_column_widths';
   const named = view => view.list_filter?.active_layout_name && view.list_filter.active_layout_name !== 'default_layout';
   function install() {
