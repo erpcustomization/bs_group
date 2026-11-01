@@ -16,7 +16,7 @@ def get_list(dt, **kwargs):
     return [row]
 def fail(message):
     raise ValueError(message)
-fake = SimpleNamespace(has_permission=lambda dt, p: dt == 'Lead', get_meta=lambda dt: SimpleNamespace(has_field=lambda f: True),
+fake = SimpleNamespace(get_roles=lambda:[], has_permission=lambda dt, p: dt == 'Lead', get_meta=lambda dt: SimpleNamespace(has_field=lambda f: True),
     get_list=get_list, throw=fail, session=SimpleNamespace(user='sales@example.com'),
     utils=SimpleNamespace(today=lambda:'2024-02-29', getdate=date.fromisoformat))
 ns = {'frappe':fake,'screens':lambda:['Lead','Quotation'], 'scope':lambda:None}

@@ -35,11 +35,16 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
                 ['open_requests','Open presales requests','All months · not yet handed to Sales'],
                 ['pending_dcs','DCS in progress / delayed','All months · awaiting submission'],
                 ['submitted','Submitted to Sales','Selected month · recorded DCS submissions']
-            ] : [['created','Created'],['updated','Last updated'],['active','Records with activity']];
+            ] : data.sales ? [['quoted','Quoted'],['won','Won'],['lost','Lost']] : [['created','Created'],['updated','Last updated'],['active','Records with activity']];
             metrics.forEach(([key,label,note])=>{
                 const tile=$('<div class="bs-month-kpi">').appendTo(summary);
                 $('<span>').text(__(label)).appendTo(tile);
-                $('<strong>').text((data.presales || data.totals)[key].toLocaleString()).appendTo(tile);
+                if (data.sales) {
+                    const metric=data.sales[key];
+                    const amounts=Object.entries(metric.amounts);
+                    $('<strong class="bs-sales-kpi-amount">').text(amounts.length ? amounts.map(([currency,value])=>`${currency} ${Number(value).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`).join(' · ') : '0.00').appendTo(tile);
+                    $('<small>').text(`${metric.count} quotation${metric.count===1?'':'s'} · ${key==='quoted'?'dated in selected month':'current outcome of month’s quotes'}`).css({color:'#60718b',fontSize:'10px'}).appendTo(tile);
+                } else $('<strong>').text((data.presales || data.totals)[key].toLocaleString()).appendTo(tile);
                 if (note) $('<small>').text(__(note)).css({color:'#60718b',fontSize:'11px'}).appendTo(tile);
             });
             const graph=$('<section class="bs-month-chart">').appendTo(host);
