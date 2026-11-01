@@ -78,8 +78,51 @@ def data(month=None):
                                          else {0:'Draft',1:'Submitted',2:'Cancelled'}.get(value, 'Other'),
                                          total=count) for value, count in counts.items()], recent=recent))
     presales = presales_summary(start, end) if scope() == 'BS Scoped Presales' else None
-    return dict(user=frappe.session.user, cards=cards, month=month, totals=totals, presales=presales,
+    sales_roles = {'BS Scoped Sales', 'Sales User', 'Sales Manager', 'Sales Master Manager'}
+    sales = sales_summary(start, end) if not presales and sales_roles.intersection(frappe.get_roles()) else None
+    return dict(user=frappe.session.user, cards=cards, month=month, totals=totals, presales=presales, sales=sales,
                 daily=daily, start=str(start), end=str(end))
+
+
+def aggregate_sales(rows, currencies):
+    result = {key: dict(count=0, amounts={}) for key in ('quoted', 'won', 'lost')}
+    for row in rows:
+        currency = currencies[row.company]
+        stage = row.get('custom_pipeline_stage') or row.get('status')
+        keys = ['quoted']
+        if stage in ('Won', 'Ordered'):
+            keys.append('won')
+        elif stage == 'Lost':
+            keys.append('lost')
+        for key in keys:
+            result[key]['count'] += 1
+            amounts = result[key]['amounts']
+            amounts[currency] = amounts.get(currency, 0) + float(row.base_grand_total or 0)
+    return result
+
+
+def sales_summary(start, end):
+    """Own submitted quotations dated in the month, with their current outcomes.
+
+    Won/Lost are subsets of the quoted cohort, not outcome-event month totals.
+    Revisions cancelled in ERPNext and draft quotes are excluded.
+    """
+    if not frappe.has_permission('Quotation', 'read'):
+        return aggregate_sales([], {})
+    own_opportunities = set(frappe.get_list('Opportunity',
+        filters={'opportunity_owner': frappe.session.user}, pluck='name',
+        limit_page_length=0)) if frappe.has_permission('Opportunity', 'read') else set()
+    fields = ['name', 'owner', 'opportunity', 'company', 'base_grand_total', 'status']
+    if frappe.get_meta('Quotation').has_field('custom_pipeline_stage'):
+        fields.append('custom_pipeline_stage')
+    rows = frappe.get_list('Quotation', fields=fields, filters=[
+        ['docstatus', '=', 1], ['transaction_date', '>=', str(start)],
+        ['transaction_date', '<', str(end)]], limit_page_length=0)
+    rows = [row for row in rows if row.opportunity in own_opportunities or
+            (not row.opportunity and row.owner == frappe.session.user)]
+    currencies = {row.company: frappe.get_cached_value('Company', row.company, 'default_currency')
+                  for row in rows}
+    return aggregate_sales(rows, currencies)
 
 
 def presales_summary(start, end):
