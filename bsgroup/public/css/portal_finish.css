@@ -115,3 +115,12 @@ body.bs-sales-ui[data-route="List/Opportunity/List"] :is(.list-row,.list-row-hea
  body.bs-sales-ui[data-route="List/Opportunity/List"] .bsi-lead-meta-head .owner-heading { width:26px!important; flex:0 0 26px!important; }
  body.bs-sales-ui[data-route="List/Opportunity/List"] .bs-list-shell .list-row-container { width:max-content!important; min-width:100%!important; }
 }
+/* Date and owner use identical tracks in the header and every data row. */
+@media(min-width:768px) {
+ body.bs-sales-ui[data-route="List/Opportunity/List"] .bs-list-shell :is(.list-row,.list-row-head) > .level-right { position:static!important; width:178px!important; min-width:178px!important; flex:0 0 178px!important; padding:0 6px!important; display:flex!important; justify-content:flex-end!important; box-sizing:border-box!important; }
+ body.bs-sales-ui[data-route="List/Opportunity/List"] .bs-list-shell :is(.bsi-lead-meta-head,.list-row-activity) { position:static!important; inset:auto!important; display:grid!important; grid-template-columns:100px 44px!important; gap:12px!important; align-items:center!important; width:156px!important; min-width:156px!important; flex:0 0 156px!important; margin:0!important; padding:0!important; }
+ body.bs-sales-ui[data-route="List/Opportunity/List"] .bs-list-shell :is(.date-heading,.list-row-activity .modified) { width:100px!important; min-width:100px!important; max-width:100px!important; text-align:center!important; justify-self:center!important; margin:0!important; }
+ body.bs-sales-ui[data-route="List/Opportunity/List"] .bs-list-shell .owner-heading { width:44px!important; min-width:44px!important; text-align:center!important; justify-self:center!important; }
+ body.bs-sales-ui[data-route="List/Opportunity/List"] .bs-list-shell .list-row-activity .bsi-lead-owner { justify-self:center!important; margin:0!important; }
+ body.bs-sales-ui[data-route="List/Opportunity/List"] .bs-list-shell .list-row-activity :is(.list-assignments-container,.list-row-like) { display:none!important; }
+}
