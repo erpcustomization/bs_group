@@ -54,11 +54,12 @@
       }
       area.querySelectorAll('.list-row [data-fieldname="deal_owner"] a[data-filter]').forEach(link => {
         const owner = link.getAttribute('data-filter').split(',=,').slice(1).join(',=,');
-        const label = view._bs_owner_labels?.[owner]?.full_name;
+        const profile = view._bs_owner_labels?.[owner];
+        const label = profile?.first_name || profile?.full_name?.split(/\s+/)[0];
         if (label && link.textContent !== label) {
           link.textContent = label;
-          link.title = label;
-          if (link.parentElement) link.parentElement.title = `Deal Owner: ${label}`;
+          link.title = profile.full_name;
+          if (link.parentElement) link.parentElement.title = `Deal Owner: ${profile.full_name}`;
         }
       });
       const count = area.querySelector('.list-row-head .list-count');

@@ -309,4 +309,5 @@ def list_owner_labels(names, doctype="Lead"):
     users = frappe.get_all("User", filters={"name": ["in", owners]},
                            fields=["name", "first_name", "full_name"])
     return {row.name: {"initial": (row.first_name or "").strip()[:1].upper() or "?",
+                       "first_name": row.first_name or (row.full_name or row.name).split()[0],
                        "full_name": row.full_name or row.name} for row in users}
