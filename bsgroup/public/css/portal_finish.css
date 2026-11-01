@@ -99,3 +99,4 @@ body:is([data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sh
 }
 body.bs-sales-ui[data-route="List/Deal Cost Sheet/List"] .list-row-container { padding-left:0!important; padding-right:0!important; }
 body[data-route="List/Deal Cost Sheet/List"] .list-row-col[data-fieldname="margin_percent"] { display:none!important; }
+body.bs-sales-ui[data-route="List/Deal Cost Sheet/List"] .list-row-head > .level-right { display:none!important; }

@@ -42,6 +42,20 @@
   function mount(view) {
     if (!fields[view.doctype]) return;
     const area = view.page.wrapper[0] || view.page.wrapper;
+    if (view.doctype === 'Deal Cost Sheet') {
+      const count = area.querySelector('.list-row-head .list-count');
+      const heading = area.querySelector('.bs-list-heading h1');
+      if (count && heading) {
+        let holder = area.querySelector('.bs-dcs-list-count');
+        if (!holder) {
+          holder = document.createElement('span');
+          holder.className = 'bs-dcs-list-count';
+          holder.style.cssText = 'font-size:11px;font-weight:400;color:#60718b;margin-left:12px;white-space:nowrap;letter-spacing:0;';
+          heading.append(holder);
+        }
+        holder.replaceChildren(count);
+      }
+    }
     if (extraLists.includes(view.doctype)) {
       const actions = area.querySelector('.standard-actions');
       const button = area.querySelector('.filter-button');

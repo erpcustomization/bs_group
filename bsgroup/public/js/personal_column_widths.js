@@ -7,7 +7,8 @@
     const defaults = {name:240,status_field:106,customer:180,deal_owner:190,margin_value:130,opportunity:240,total_selling:140,margin_percent:120};
     const dcs = element.closest('[id="page-List/Deal Cost Sheet/List"]');
     const fallback = dcs && defaults[element.dataset.fieldname];
-    const width = element.style.width || (fallback ? `${fallback}px` : '');
+    let width = element.style.width || (fallback ? `${fallback}px` : '');
+    if (dcs && element.dataset.fieldname === 'total_selling' && parseFloat(width) < 140) width = '140px';
     if (!/^\d+(\.\d+)?px$/.test(width)) return;
     for (const [property, value] of Object.entries({width, flex: `0 0 ${width}`, 'min-width': width, 'max-width': width})) {
       if (element.style.getPropertyValue(property) !== value || element.style.getPropertyPriority(property) !== 'important') {
