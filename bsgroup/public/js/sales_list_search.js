@@ -53,7 +53,7 @@
           holder.style.cssText = 'font-size:11px;font-weight:400;color:#60718b;margin-left:12px;white-space:nowrap;letter-spacing:0;';
           heading.append(holder);
         }
-        holder.replaceChildren(count);
+        if (holder.textContent !== count.textContent) holder.textContent = count.textContent;
       }
     }
     if (extraLists.includes(view.doctype)) {
