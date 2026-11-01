@@ -107,3 +107,4 @@ body.bs-sales-ui[data-route="List/Deal Cost Sheet/List"] .list-row-head > .level
  body.bs-sales-ui[data-route="List/Opportunity/List"] :is(.list-row > .level-left,.list-header-subject) { flex:0 0 auto!important; width:max-content!important; gap:6px!important; }
  body.bs-sales-ui[data-route="List/Opportunity/List"] .list-row-container { padding-left:0!important; padding-right:0!important; }
 }
+body.bs-sales-ui[data-route="List/Opportunity/List"] :is(.list-row,.list-row-head) > .level-right { position:static!important; right:auto!important; }
