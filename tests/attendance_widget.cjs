@@ -6,11 +6,17 @@ async function render(t,extra={},module='sales') {
  const data={visible:true,shift_start:iso('09:00'),shift_end:iso('18:00'),lunch_start:iso('12:30'),lunch_end:iso('13:00'),wrapup_start:iso('17:30'),late_minutes:0,...extra};
  class Clock extends Date {static now(){return now;}}
  const document={body:{},querySelectorAll:s=>s==='.bs-attendance-widget'?elements:[],addEventListener(){},createElement:()=>({dataset:{}})};
- const frappe={utils:{escape_html:s=>s.replaceAll('<','&lt;')},call:async()=>({message:data}),get_route:()=>[],router:{on(){}}};
+ // Frappe returns a jQuery-style thenable, not a native Promise. In
+ // particular it lacks finally(): the original first-load bug needs this.
+ function deferred(promise) {
+  return {then:(yes,no)=>deferred(promise.then(yes,no)),catch:no=>deferred(promise.catch(no))};
+ }
+ const frappe={utils:{escape_html:s=>s.replaceAll('<','&lt;')},call:()=>deferred(Promise.resolve({message:data})),get_route:()=>[],router:{on(){}}};
  const context={window:{},document,frappe,Date:Clock,MutationObserver:class{observe(){}},setInterval(){},setTimeout(){},clearTimeout(){}};
  vm.runInNewContext(source,context);
  context.window.bsAttendance.mount({querySelector:()=>null,prepend:el=>elements.push(el)},module);
- await context.window.bsAttendance.refresh();
+ // Do not call refresh a second time: first mount must render by itself.
+ await new Promise(resolve=>setImmediate(resolve));
  return elements[0];
 }
 (async()=>{

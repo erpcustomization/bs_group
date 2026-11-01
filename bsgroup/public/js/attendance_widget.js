@@ -40,7 +40,9 @@
     }
     async function refresh() {
         if (!data || Date.now()-fetched>=300000) {
-            if (!pending) pending=frappe.call({method:'bsgroup.attendance_widget.get_today_status',quiet:true}).then(r=>{data=r.message;fetched=Date.now();}).catch(()=>{}).finally(()=>{pending=null;});
+            // frappe.call returns a jQuery Deferred, which has no finally().
+            // Assimilate it into a native Promise before chaining cleanup.
+            if (!pending) pending=Promise.resolve(frappe.call({method:'bsgroup.attendance_widget.get_today_status',quiet:true})).then(r=>{data=r.message;fetched=Date.now();}).catch(()=>{}).finally(()=>{pending=null;});
             await pending;
         }
         document.querySelectorAll('.bs-attendance-widget').forEach(el=>render(el,el.dataset.module));
