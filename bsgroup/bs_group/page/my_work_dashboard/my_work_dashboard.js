@@ -20,7 +20,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
             if (currentRequest !== requestId) return;
             const data = response.message;
             host.empty();
-            const hero = $('<header class="bs-work-hero"></header>').appendTo(host);
+            const hero = $('<header class="bs-work-hero"></header>').attr('data-month',data.month).appendTo(host);
             const intro = $('<div>').appendTo(hero);
             $('<div class="bs-work-eyebrow">').text(__('BITS SECURE · YOUR WORKSPACE')).appendTo(intro);
             $('<h2>').text(__('Your month, at a glance')).appendTo(intro);
@@ -29,6 +29,28 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
             $('<strong>').text(new Date(data.month+'-01T12:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'})).appendTo(stamp);
             $('<span>').text(__('Updated just now')).appendTo(stamp);
             window.bsAttendance?.mountDashboard(hero[0]);
+
+            const attendance=$('<section class="bs-month-attendance" aria-label="Monthly attendance">').appendTo(host);
+            attendance.text(__('Loading monthly attendance…'));
+            Promise.resolve(frappe.call({method:'bsgroup.monthly_attendance.get_month',args:{month:data.month},quiet:true})).then(r=>{
+                if (currentRequest !== requestId) return;
+                const a=r.message;
+                if (!a?.visible) { attendance.remove(); return; }
+                attendance.empty();
+                $('<h3>').text(__('Attendance overview')+' · '+data.month+' · '+a.period).appendTo(attendance);
+                const metrics=$('<div class="bs-att-month-metrics">').appendTo(attendance);
+                const duration=n=>`${Math.floor(n/60)}h ${n%60}m`;
+                [['on_time','On-time days'],['late','Late days'],['working_minutes','Working hours · 9–6'],['leave','Leave days'],['off','Off days'],['on_duty','On duty · outside office']].forEach(([key,label])=>{
+                    const tile=$('<div>').addClass('bs-att-month-'+key).appendTo(metrics);
+                    $('<span>').text(__(label)).appendTo(tile);
+                    $('<strong>').text(key==='working_minutes'?duration(a.totals[key]):a.totals[key]).appendTo(tile);
+                });
+                const days=$('<div class="bs-att-month-days" aria-label="Daily attendance">').appendTo(attendance);
+                const labels={on_time:'On time',late:'Late',leave:'Leave',off:'Off',on_duty:'On duty / WFH',no_checkin:'No check-in'};
+                a.days.forEach(d=>$('<span>').addClass('bs-att-day-'+d.status).text(Number(d.date.slice(-2)))
+                    .attr('title',`${d.date}: ${labels[d.status]} · ${duration(d.working_minutes)}${d.incomplete?' · Missing checkout':''}${d.holiday?' · '+d.holiday:''}`).appendTo(days));
+                $('<p>').text(`9 AM–6 PM only · Recorded IN/OUT pairs; no overtime or assumed on-duty hours. ${a.totals.no_checkin} day(s) without check-in · ${a.totals.incomplete} missing checkout(s). Off days follow the HR holiday calendar.`).appendTo(attendance);
+            }).catch(()=>{if(currentRequest===requestId) attendance.text(__('Attendance could not be loaded. Please use Refresh.'));});
 
             const summary = $('<div class="bs-month-summary">').appendTo(host);
             const metrics = data.presales ? [

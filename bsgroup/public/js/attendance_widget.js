@@ -67,6 +67,10 @@
         return null;
     }
     function mountDashboard(hero) {
+        if (hero?.dataset.month && hero.dataset.month !== frappe.datetime.get_today().slice(0,7)) {
+            hero.querySelector('.bs-hero-attendance')?.remove();
+            return;
+        }
         const stamp=hero?.querySelector('.bs-work-stamp');
         if (!stamp) return;
         let slot=hero.querySelector('.bs-hero-attendance');
