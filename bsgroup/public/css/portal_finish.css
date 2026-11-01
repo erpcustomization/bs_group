@@ -216,5 +216,6 @@ body.bs-sales-ui[data-route="List/Opportunity/List"] :is(.list-row,.list-row-hea
 #page-my-work-dashboard .bs-att-month-days .bs-att-day-late{background:#ffe0a8;color:#794700}
 #page-my-work-dashboard .bs-att-month-days .bs-att-day-leave{background:#eadcf6;color:#68458a}
 #page-my-work-dashboard .bs-att-month-days .bs-att-day-on_duty{background:#c2edf2;color:#126c78}
+#page-my-work-dashboard .bs-att-month-days .bs-att-day-no_checkin{background:#fee2e2;color:#b91c1c;font-weight:600;box-shadow:inset 0 0 0 1px #fecaca}
 #page-my-work-dashboard .bs-month-attendance p{font-size:10px;color:#60718b;margin:7px 0 0}
 @media(max-width:800px){#page-my-work-dashboard .bs-att-month-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}
