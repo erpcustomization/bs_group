@@ -197,3 +197,6 @@ body.bs-sales-ui[data-route="List/Opportunity/List"] :is(.list-row,.list-row-hea
  #page-my-work-dashboard .bs-month-note{font-size:10px;margin:4px 0 6px}
 }
 #page-my-work-dashboard .bs-month-kpi .bs-sales-kpi-amount{font-size:20px;line-height:1.35;overflow-wrap:anywhere}
+#page-my-work-dashboard .bs-kpi-note{display:inline-block;margin-top:6px;padding:4px 7px;border-radius:5px;font-size:11px;font-weight:600;line-height:1.4;max-width:100%;background:#eaf2ff;color:#2455a0;border:1px solid #d2e2fa}
+#page-my-work-dashboard .bs-kpi-note-pending_dcs{background:#fff2d9;color:#865400;border-color:#f1d49a}
+#page-my-work-dashboard .bs-kpi-note-submitted{background:#e5f5ee;color:#21694c;border-color:#c5e6d5}

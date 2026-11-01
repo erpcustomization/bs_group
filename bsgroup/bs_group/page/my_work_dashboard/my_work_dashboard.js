@@ -45,7 +45,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
                     $('<strong class="bs-sales-kpi-amount">').text(amounts.length ? amounts.map(([currency,value])=>`${currency} ${Number(value).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`).join(' · ') : '0.00').appendTo(tile);
                     $('<small>').text(`${metric.count} quotation${metric.count===1?'':'s'} · ${key==='quoted'?'dated in selected month':'current outcome of month’s quotes'}`).css({color:'#60718b',fontSize:'10px'}).appendTo(tile);
                 } else $('<strong>').text((data.presales || data.totals)[key].toLocaleString()).appendTo(tile);
-                if (note) $('<small>').text(__(note)).css({color:'#60718b',fontSize:'11px'}).appendTo(tile);
+                if (note) $('<small class="bs-kpi-note">').addClass(`bs-kpi-note-${key}`).text(__(note)).appendTo(tile);
             });
             const graph=$('<section class="bs-month-chart">').appendTo(host);
             $('<h3>').text(__('Records created each day')).appendTo(graph);
