@@ -127,3 +127,39 @@ body.bs-sales-ui[data-route="List/Opportunity/List"] :is(.list-row,.list-row-hea
 .bs-work-month-controls{display:flex;justify-content:flex-end;padding:16px 24px 0}.bs-work-month-controls label{display:flex;align-items:center;gap:12px;color:#24466d;font-size:12px}.bs-work-month-controls input{border:1px solid #cedbeb;border-radius:8px;padding:8px 12px;background:#fff;color:#17365e}.bs-month-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:20px 0}.bs-month-kpi{background:#fff;border:1px solid #dfe7f2;border-top:3px solid #00a6b3;border-radius:10px;padding:18px}.bs-month-kpi span{display:block;font-size:12px;color:#60718b}.bs-month-kpi strong{display:block;font-size:28px;color:#17365e;margin-top:8px}.bs-month-chart{background:#fff;border:1px solid #dfe7f2;border-radius:12px;padding:20px;margin-bottom:12px}.bs-month-chart h3{font-size:14px;margin:0 0 16px;color:#17365e}.bs-day-bars{display:flex;gap:5px;height:140px;align-items:flex-end;overflow-x:auto}.bs-day-column{flex:1;min-width:12px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:7px;height:132px}.bs-day-bar{display:block;width:100%;max-width:24px;border-radius:4px 4px 0 0;background:linear-gradient(#00a6b3,#2363ad)}.bs-day-bar.empty{background:#e7edf5}.bs-day-column small{font-size:9px;color:#60718b}.bs-month-note{font-size:11px;color:#60718b;line-height:1.6}.bs-status-chart{display:flex;height:8px;background:#edf2f8;border-radius:5px;overflow:hidden;margin:14px 0 6px}.bs-status-chart span{display:block;height:100%}@media(max-width:650px){.bs-month-summary{grid-template-columns:1fr}.bs-month-kpi{padding:12px}.bs-work-month-controls{padding:12px}.bs-day-bars{gap:3px}}
 .bs-today-attendance{margin-top:20px;border-top:3px solid #00a6b3}.bs-attendance-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding:12px 0}.bs-attendance-grid small{display:block;color:#60718b;font-size:11px}.bs-attendance-grid strong{display:block;color:#17365e;font-size:19px;margin-top:7px}@media(max-width:750px){.bs-attendance-grid{grid-template-columns:repeat(2,1fr)}}
 .bs-workday-clock{display:flex;align-items:center;gap:28px;padding:22px;margin:16px 0;background:linear-gradient(120deg,#eef7fa,#f4f7fc);border-radius:14px;border:1px solid #dbe8f1}.bs-clock-ring{width:150px;height:150px;flex:0 0 150px;border-radius:50%;background:conic-gradient(from -90deg,#00a6b3 var(--day-progress),#dbe6f1 0);padding:9px;box-shadow:0 6px 20px #17365e12}.bs-clock-face{height:100%;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}.bs-clock-symbol{font-size:25px;color:#00a6b3;line-height:1}.bs-clock-face strong{font-size:24px;color:#17365e}.bs-clock-face small{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#60718b}.bs-clock-copy h4{font-size:19px;font-weight:650;color:#17365e;margin:0 0 8px}.bs-clock-copy p{font-size:12px;color:#48617d;max-width:430px;line-height:1.6}.bs-clock-copy small{font-size:10px;color:#60718b}.bs-workday-clock.wrap-up{background:#fff7e9;border-color:#efdab4}.wrap-up .bs-clock-ring{background:conic-gradient(from -90deg,#d69a32 var(--day-progress),#f2e4ca 0)}.wrap-up .bs-clock-symbol{color:#b77b1b}@media(max-width:600px){.bs-workday-clock{gap:16px;padding:14px;flex-direction:column;text-align:center}}
+/* Compact personal dashboard: preserve every metric and action. */
+#page-my-work-dashboard .bs-work{padding:14px 16px}
+#page-my-work-dashboard .bs-work-month-controls{padding:8px 16px 0}
+#page-my-work-dashboard .bs-work-month-controls input{padding:5px 9px}
+#page-my-work-dashboard .bs-work-hero{padding:16px 20px;gap:14px;margin-bottom:12px;border-radius:12px}
+#page-my-work-dashboard .bs-work-hero h2{font-size:23px;margin-bottom:5px;letter-spacing:-.4px}
+#page-my-work-dashboard .bs-work-eyebrow{font-size:9px;margin-bottom:6px;letter-spacing:1.2px}
+#page-my-work-dashboard .bs-work-hero p{font-size:12px;line-height:1.4}
+#page-my-work-dashboard .bs-work-stamp{font-size:11px;line-height:1.6}
+#page-my-work-dashboard .bs-month-summary{gap:10px;margin:12px 0}
+#page-my-work-dashboard .bs-month-kpi{padding:11px 14px;border-top-width:2px}
+#page-my-work-dashboard .bs-month-kpi strong{font-size:24px;margin-top:4px}
+#page-my-work-dashboard .bs-month-chart{padding:12px 14px;margin-bottom:8px}
+#page-my-work-dashboard .bs-month-chart h3{font-size:13px;margin-bottom:8px}
+#page-my-work-dashboard .bs-day-bars{height:104px;gap:4px}
+#page-my-work-dashboard .bs-day-column{height:100px;gap:5px}
+#page-my-work-dashboard .bs-month-note{font-size:11px;line-height:1.4;margin:6px 0 10px}
+#page-my-work-dashboard .bs-work-section{margin-bottom:10px;gap:8px}
+#page-my-work-dashboard .bs-work-section h3{font-size:14px}
+#page-my-work-dashboard .bs-work-section span{font-size:11px}
+#page-my-work-dashboard .bs-work-grid{grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:12px}
+#page-my-work-dashboard .bs-work-card{padding:14px;border-radius:10px}
+#page-my-work-dashboard .bs-work-card-head{gap:8px;margin-bottom:10px}
+#page-my-work-dashboard .bs-work-icon{width:28px;height:28px;font-size:12px;border-radius:7px}
+#page-my-work-dashboard .bs-work-card-head h4{font-size:13px}
+#page-my-work-dashboard .bs-work-total{font-size:28px;letter-spacing:-.5px}
+#page-my-work-dashboard .bs-work-count-label{margin:4px 0 8px}
+#page-my-work-dashboard .bs-status-chart{margin-top:8px;height:6px}
+#page-my-work-dashboard .bs-work-statuses{margin-bottom:10px;min-height:20px;gap:4px}
+#page-my-work-dashboard .bs-work-status{padding:2px 5px}
+#page-my-work-dashboard .bs-work-recent{padding-top:9px}
+#page-my-work-dashboard .bs-work-recent-title{margin-bottom:4px;letter-spacing:.6px}
+#page-my-work-dashboard .bs-work-record{padding:6px 0}
+#page-my-work-dashboard .bs-work-open{margin-top:10px}
+#page-my-work-dashboard .bs-work-empty{padding:12px}
+@media(max-width:650px){#page-my-work-dashboard .bs-work{padding:10px}#page-my-work-dashboard .bs-work-grid{grid-template-columns:1fr}#page-my-work-dashboard .bs-work-hero{padding:14px}#page-my-work-dashboard .bs-month-summary{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}#page-my-work-dashboard .bs-month-kpi{padding:9px}#page-my-work-dashboard .bs-month-kpi span{font-size:11px}#page-my-work-dashboard .bs-month-kpi strong{font-size:22px}}
