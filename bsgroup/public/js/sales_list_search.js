@@ -1,4 +1,32 @@
 (() => {
+  // Read the authoritative unread total after native read actions and new arrivals.
+  if (!window.bsUnreadBadge) {
+    window.bsUnreadBadge = true;
+    let badgeTimer, pending = false;
+    const refreshUnread = async () => {
+      if (pending || document.hidden || !frappe.session?.user || frappe.session.user === 'Guest') return;
+      pending = true;
+      try {
+        const r = await frappe.call({method:'bsgroup.notification_badge.unread_count',quiet:true});
+        const count = Number(r.message) || 0;
+        document.querySelectorAll('.notification-count').forEach(el => {
+          el.textContent = String(count);
+          el.classList.toggle('hidden', count === 0);
+          el.setAttribute('aria-label', `${count} unread notifications`);
+        });
+      } finally { pending = false; }
+    };
+    const scheduleUnread = () => { clearTimeout(badgeTimer); badgeTimer = setTimeout(() => refreshUnread().catch(()=>{}), 250); };
+    $(document).ajaxComplete((event, xhr, settings) => {
+      const request = String(settings.url || '') + ' ' + String(settings.data || '');
+      if (/notification_log\.(mark_as_read|mark_all_as_read|get_notification_logs)/.test(request)) scheduleUnread();
+    });
+    frappe.realtime?.on('notification', scheduleUnread);
+    window.addEventListener('focus', scheduleUnread);
+    document.addEventListener('visibilitychange', scheduleUnread);
+    setInterval(scheduleUnread, 30000);
+    scheduleUnread();
+  }
   // Keep the native notification button and its event handlers in the dock,
   // while positioning it in the top bar above the active list's Filter button.
   let notificationFrame;
