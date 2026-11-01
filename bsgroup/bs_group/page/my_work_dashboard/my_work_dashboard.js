@@ -42,7 +42,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
             const max=Math.max(1,...data.daily);
             data.daily.forEach((n,i)=>{
                 const bar=$('<div class="bs-day-column">').attr('title',`${data.month}-${String(i+1).padStart(2,'0')}: ${n} created`).appendTo(bars);
-                $('<span class="bs-day-bar">').css('height',`${n ? Math.max(3,n/max*80) : 2}px`).toggleClass('empty',!n).appendTo(bar);
+                $('<span class="bs-day-bar">').css('height',`${n ? Math.max(3,n/max*80) : 2}%`).toggleClass('empty',!n).appendTo(bar);
                 $('<small>').text(i+1).appendTo(bar);
             });
             $('<p class="bs-month-note">').text(__('Current status of accessible records, not a historical month-end snapshot. Last updated counts use each record’s latest update; created and updated totals may overlap.')).appendTo(host);
