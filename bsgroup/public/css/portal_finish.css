@@ -202,13 +202,14 @@ body.bs-sales-ui[data-route="List/Opportunity/List"] :is(.list-row,.list-row-hea
 #page-my-work-dashboard .bs-kpi-note-submitted{background:#e5f5ee;color:#21694c;border-color:#c5e6d5}
 #page-my-work-dashboard .bs-month-attendance{background:#fff;border:1px solid #dce6f2;border-radius:12px;padding:10px 14px;margin:10px 0;color:#18375e}
 #page-my-work-dashboard .bs-month-attendance h3{font-size:13px;margin:0 0 8px}
-#page-my-work-dashboard .bs-att-month-metrics{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+#page-my-work-dashboard .bs-att-month-metrics{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
 #page-my-work-dashboard .bs-att-month-metrics>div{border-radius:8px;padding:8px;background:#eef3fa;display:flex;flex-direction:column;gap:4px}
 #page-my-work-dashboard .bs-att-month-metrics span{font-size:10px}
 #page-my-work-dashboard .bs-att-month-metrics strong{font-size:19px}
 #page-my-work-dashboard .bs-att-month-on_time{background:#e4f5ee!important;color:#176c51}
 #page-my-work-dashboard .bs-att-month-late{background:#fff0d8!important;color:#895707}
 #page-my-work-dashboard .bs-att-month-on_duty{background:#e3f5f7!important;color:#126c78}
+#page-my-work-dashboard .bs-att-month-no_checkin{background:#fff0ed!important;color:#a33629}
 #page-my-work-dashboard .bs-att-month-days{display:flex;gap:4px;margin-top:9px;flex-wrap:wrap}
 #page-my-work-dashboard .bs-att-month-days span{font-size:10px;min-width:21px;text-align:center;padding:3px;border-radius:4px;background:#edf0f5;color:#52627a}
 #page-my-work-dashboard .bs-att-month-days .bs-att-day-on_time{background:#bfe9d8;color:#125c43}

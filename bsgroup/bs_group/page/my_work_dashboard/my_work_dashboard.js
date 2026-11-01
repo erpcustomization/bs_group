@@ -40,7 +40,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
                 $('<h3>').text(__('Attendance overview')+' · '+data.month+' · '+a.period).appendTo(attendance);
                 const metrics=$('<div class="bs-att-month-metrics">').appendTo(attendance);
                 const duration=n=>`${Math.floor(n/60)}h ${n%60}m`;
-                [['on_time','On-time days'],['late','Late days'],['working_minutes','Working hours · 9–6'],['leave','Leave days'],['off','Off days'],['on_duty','On duty · outside office']].forEach(([key,label])=>{
+                [['on_time','On-time days'],['late','Late days'],['working_minutes','Working hours · 9–6'],['leave','Leave days'],['off','Off days'],['on_duty','On duty · outside office'],['no_checkin','Not checked in days']].forEach(([key,label])=>{
                     const tile=$('<div>').addClass('bs-att-month-'+key).appendTo(metrics);
                     $('<span>').text(__(label)).appendTo(tile);
                     $('<strong>').text(key==='working_minutes'?duration(a.totals[key]):a.totals[key]).appendTo(tile);
