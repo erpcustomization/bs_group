@@ -47,12 +47,15 @@
     }
     function mount(parent,module='sales') {
         let el=parent.querySelector(':scope > .bs-attendance-widget');
-        if (el) return el;
+        if (el) {
+            if (el.dataset.module !== module) { el.dataset.module=module; render(el,module); }
+            return el;
+        }
         if (!el) { el=document.createElement('section');el.className='bs-attendance-widget';el.hidden=true;parent.prepend(el); }
         el.dataset.module=module; refresh(); return el;
     }
     function routeModule() {
-        const route=(frappe.get_route?.()||[]).join('/').toLowerCase().replace(/^workspaces?\//,'');
+        const route=(frappe.get_route?.()||[]).join('/').toLowerCase().replace(/^(workspaces?|dashboard-view)\//,'');
         if (route==='my-work-dashboard' && !frappe.boot?.bs_scoped_screens && (frappe.user_roles||[]).includes('Projects User')) return 'projects';
         if (/^(workspace\/)?(selling|bs sales)$|^(sales-management-das|presales-request-das|monthly-sales-entry|my-work-dashboard)$/.test(route)) return 'sales';
         if (/^(workspace\/)?(projects|bs project|projects, amc & ppm management)$/.test(route)) return 'projects';
@@ -62,9 +65,10 @@
         return null;
     }
     function scan() {
-        const module=routeModule(); if (!module) return;
+        const module=routeModule();
         const page=Array.from(document.querySelectorAll('.page-container')).find(el=>el.offsetParent!==null);
         const parent=page?.querySelector('.layout-main-section');
+        if (!module) { parent?.querySelector(':scope > .bs-attendance-widget')?.remove(); return; }
         if (parent) mount(parent,module);
     }
     window.bsAttendance={mount,refresh};
