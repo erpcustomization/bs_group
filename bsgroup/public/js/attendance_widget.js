@@ -69,6 +69,16 @@
         const page=Array.from(document.querySelectorAll('.page-container')).find(el=>el.offsetParent!==null);
         const parent=page?.querySelector('.layout-main-section');
         if (!module) { parent?.querySelector(':scope > .bs-attendance-widget')?.remove(); return; }
+        if ((frappe.get_route?.()||[]).includes('my-work-dashboard')) {
+            parent?.querySelector(':scope > .bs-attendance-widget')?.remove();
+            const hero=parent?.querySelector('.bs-work-hero');
+            const stamp=hero?.querySelector('.bs-work-stamp');
+            if (!stamp) return;
+            let slot=hero.querySelector('.bs-hero-attendance');
+            if (!slot) { slot=document.createElement('div');slot.className='bs-hero-attendance';hero.insertBefore(slot,stamp); }
+            mount(slot,module);
+            return;
+        }
         if (parent) mount(parent,module);
     }
     window.bsAttendance={mount,refresh};
