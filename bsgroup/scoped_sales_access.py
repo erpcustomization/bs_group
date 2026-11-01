@@ -125,7 +125,7 @@ def permission(doc, user=None, permission_type=None, ptype=None):
 
 def show_lead_intake_navigation():
     """Navigation preference only; retain intake and Lead handover permissions."""
-    return (frappe.session.user not in {"gopinath@bitssecureit.com", "paul@bitssecureit.com"}
+    return (frappe.session.user not in {"gopinath@bitssecureit.com", "paul@bitssecureit.com", "rahul@bitssecureit.com"}
             and "BS Lead Intake Manager" in frappe.get_roles())
 
 
