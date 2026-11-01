@@ -60,7 +60,9 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
                 const breakdown=$('<div class="bs-status-chart" role="img">').attr('aria-label',card.statuses.map(s=>`${s.label}: ${s.total}`).join(', ') || 'No activity').appendTo(box);
                 const palette=['#2363ad','#00a6b3','#8e74bf','#d6a64b','#7793b4','#b76d83'];
                 card.statuses.forEach((s,i)=>$('<span>').css({width:`${s.total/Math.max(1,card.total)*100}%`,background:palette[i%palette.length]}).attr('title',`${s.label}: ${s.total}`).appendTo(breakdown));
-                const statuses = $('<div class="bs-work-statuses"></div>').appendTo(box);
+                const details = $('<details class="bs-work-details">').appendTo(box);
+                $('<summary>').text(__('Status & recent activity')).appendTo(details);
+                const statuses = $('<div class="bs-work-statuses"></div>').appendTo(details);
                 card.statuses.forEach(s=>{
                     const label = !s.label || s.label === 'None' ? __('Not set') : __(s.label);
                     const badge = $('<span class="bs-work-status"></span>').text(`${label} · ${s.total}`).appendTo(statuses);
@@ -68,7 +70,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
                     else if (/cancelled|lost|dropped/i.test(label)) badge.addClass('bad');
                     else if (/awaiting|draft|delayed|expired/i.test(label)) badge.addClass('warn');
                 });
-                const recent = $('<div class="bs-work-recent">').appendTo(box);
+                const recent = $('<div class="bs-work-recent">').appendTo(details);
                 $('<div class="bs-work-recent-title">').text(__('Records with activity in this month')).appendTo(recent);
                 for (const record of card.recent.slice(0,3)) {
                     const link = $('<a class="bs-work-record"></a>').attr('href',frappe.utils.get_form_link(card.doctype,record.name)).attr('title',record.name).appendTo(recent);
