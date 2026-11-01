@@ -8,6 +8,10 @@
     const dcs = element.closest('[id="page-List/Deal Cost Sheet/List"]');
     const fallback = dcs && defaults[element.dataset.fieldname];
     let width = element.style.width || (fallback ? `${fallback}px` : '');
+    const opportunity = element.closest('[id="page-List/Opportunity/List"]');
+    const opportunityWidths = {name:220,custom_subject:260,status_field:190,custom_organization_name:200,customer_name:200,opportunity_amount:155};
+    const opportunityMinimum = opportunity && opportunityWidths[element.dataset.fieldname];
+    if (opportunityMinimum) width = `${Math.max(parseFloat(width) || 0, opportunityMinimum)}px`;
     if (dcs && element.dataset.fieldname === 'total_selling' && parseFloat(width) < 140) width = '140px';
     if (!/^\d+(\.\d+)?px$/.test(width)) return;
     for (const [property, value] of Object.entries({width, flex: `0 0 ${width}`, 'min-width': width, 'max-width': width})) {
