@@ -17,6 +17,22 @@
       } finally { pending = false; }
     };
     const scheduleUnread = () => { clearTimeout(badgeTimer); badgeTimer = setTimeout(() => refreshUnread().catch(()=>{}), 250); };
+    const reading = new Set();
+    document.addEventListener('click', event => {
+      const item = event.target.closest?.('.notification-item[data-name]');
+      const name = item?.dataset.name;
+      if (!name || !item.classList.contains('unread') || reading.has(name)) return;
+      reading.add(name);
+      Promise.resolve(frappe.call({
+        method:'frappe.desk.doctype.notification_log.notification_log.mark_as_read',
+        args:{docname:name}
+      })).then(() => {
+        document.querySelectorAll('.notification-item[data-name]').forEach(el => {
+          if (el.dataset.name === name) el.classList.remove('unread');
+        });
+        scheduleUnread();
+      }).catch(()=>{}).finally(() => reading.delete(name));
+    }, true);
     $(document).ajaxComplete((event, xhr, settings) => {
       const request = String(settings.url || '') + ' ' + String(settings.data || '');
       if (/notification_log\.(mark_as_read|mark_all_as_read|get_notification_logs)/.test(request)) scheduleUnread();
