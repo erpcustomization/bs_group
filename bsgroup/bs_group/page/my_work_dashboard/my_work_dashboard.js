@@ -7,6 +7,11 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
     let requestId = 0;
     monthInput.on('change', () => { if (monthInput.val()) refresh(); });
     const openList = dt => frappe.set_route('List',dt);
+    // Support either load order: shared attendance script or dashboard first.
+    document.addEventListener('bs-attendance-ready', () => {
+        const hero=host[0].querySelector('.bs-work-hero');
+        if (hero) window.bsAttendance?.mountDashboard(hero);
+    });
     async function refresh() {
         const currentRequest = ++requestId;
         host.empty().append($('<div class="bs-work-empty" role="status">').text(__('Loading your workspace…')));
@@ -23,6 +28,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
             const stamp = $('<div class="bs-work-stamp">').appendTo(hero);
             $('<strong>').text(new Date(data.month+'-01T12:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'})).appendTo(stamp);
             $('<span>').text(__('Updated just now')).appendTo(stamp);
+            window.bsAttendance?.mountDashboard(hero[0]);
 
             const summary = $('<div class="bs-month-summary">').appendTo(host);
             const metrics = data.presales ? [

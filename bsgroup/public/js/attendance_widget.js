@@ -64,6 +64,13 @@
         if (/^(workspace\/)?(helpdesk|bs helpdesk)$|^hd-ticket-das$/.test(route)) return 'helpdesk';
         return null;
     }
+    function mountDashboard(hero) {
+        const stamp=hero?.querySelector('.bs-work-stamp');
+        if (!stamp) return;
+        let slot=hero.querySelector('.bs-hero-attendance');
+        if (!slot) { slot=document.createElement('div');slot.className='bs-hero-attendance';hero.insertBefore(slot,stamp); }
+        mount(slot,routeModule() || 'sales');
+    }
     function scan() {
         const module=routeModule();
         const page=Array.from(document.querySelectorAll('.page-container')).find(el=>el.offsetParent!==null);
@@ -72,20 +79,19 @@
         if ((frappe.get_route?.()||[]).includes('my-work-dashboard')) {
             parent?.querySelector(':scope > .bs-attendance-widget')?.remove();
             const hero=parent?.querySelector('.bs-work-hero');
-            const stamp=hero?.querySelector('.bs-work-stamp');
-            if (!stamp) return;
-            let slot=hero.querySelector('.bs-hero-attendance');
-            if (!slot) { slot=document.createElement('div');slot.className='bs-hero-attendance';hero.insertBefore(slot,stamp); }
-            mount(slot,module);
+            mountDashboard(hero);
             return;
         }
         if (parent) mount(parent,module);
     }
-    window.bsAttendance={mount,refresh};
+    window.bsAttendance={mount,refresh,mountDashboard};
     let timer;
-    new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(scan,200);}).observe(document.body,{childList:true,subtree:true});
+    // Throttle instead of debouncing: chart/sidebar mutations must not keep
+    // postponing initial attendance mounting on a full browser load.
+    new MutationObserver(()=>{if(!timer) timer=setTimeout(()=>{timer=null;scan();},200);}).observe(document.body,{childList:true,subtree:true});
     frappe.router?.on('change',()=>setTimeout(scan,250));
     setInterval(()=>{if(!document.hidden){scan();refresh();}},60000);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden){scan();refresh();}});
     scan();
+    document.dispatchEvent?.(new Event('bs-attendance-ready'));
 })();
