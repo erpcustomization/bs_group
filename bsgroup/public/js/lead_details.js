@@ -280,9 +280,61 @@ const bsi_customer_brief = (() => {
 
 // Two tabs, using the original controls and their existing save/permission handlers.
 const bsi_lead_focus = (() => {
-    const contact = new Set(["title", "first_name", "last_name", "company_name", "email_id", "mobile_no", "phone", "whatsapp_no"]);
+    function owner_dropdown(frm, parent) {
+        const field = frm.fields_dict.lead_owner;
+        if (!field) return;
+        // Keep the native model field, but replace its navigable Link UI.
+        field.$wrapper[0].style.display = 'none';
+        let box = parent.querySelector('.bsi-owner-picker');
+        if (!box) {
+            box = document.createElement('div'); box.className = 'bsi-owner-picker frappe-control';
+            const label = document.createElement('label'); label.className = 'control-label'; label.textContent = __('Lead Owner');
+            const select = document.createElement('select'); select.className = 'form-control'; select.setAttribute('aria-label', __('Lead Owner'));
+            label.append(select); box.append(label); parent.append(box);
+            select.addEventListener('change', async () => {
+                if (!select.value) return;
+                if (frm._bsi_sales_transfer && !frm.is_new()) {
+                    const chosen = select.value;
+                    select.value = frm.doc.lead_owner || '';
+                    if (chosen !== frm.doc.lead_owner) await frm._bsi_sales_transfer(chosen);
+                    return;
+                }
+                await frm.set_value('lead_owner', select.value);
+                frm.trigger('bsi_lead_submission_changed');
+            });
+        }
+        const select = box.querySelector('select');
+        const editable = frm.perm?.some(p => frm.is_new() ? p.create : p.write);
+        select.disabled = true;
+        select.replaceChildren();
+        const current = document.createElement('option'); current.value = frm.doc.lead_owner || '';
+        current.textContent = frappe.user?.full_name?.(frm.doc.lead_owner) || frm.doc.lead_owner || __('Select owner'); select.append(current);
+        if (!editable) return;
+        const generation = (frm._owner_picker_generation || 0) + 1;
+        frm._owner_picker_generation = generation;
+        const salesTransfer = !frm.is_new() && frappe.user?.has_role?.('BS Lead Intake Manager');
+        frappe.call({method:salesTransfer?'bsgroup.lead_assignment.choices':'bsgroup.lead_lifecycle.owner_choices', args:{name:frm.is_new()?null:frm.doc.name,company:frm.doc.company}}).then(result => {
+            if (frm._owner_picker_generation !== generation || result.exc) return;
+            const users = result.message || [], counts = {};
+            users.forEach(user => { counts[user.label] = (counts[user.label] || 0) + 1; });
+            select.replaceChildren(current);
+            users.forEach(user => {
+                const option = document.createElement('option'); option.value = user.value;
+                option.textContent = counts[user.label] > 1 ? `${user.label} (${user.value})` : user.label;
+                if (user.value === current.value) current.remove();
+                select.append(option);
+            });
+            select.value = frm.doc.lead_owner || ''; select.disabled = false;
+        }).catch(() => { select.title = __('Refresh to load Lead owners.'); });
+    }
+    const contact = new Set(["title", "first_name", "last_name", "company_name", "email_id", "mobile_no", "phone", "whatsapp_no", "lead_owner"]);
     function refresh(frm) {
         const root = frm.wrapper[0] || frm.wrapper;
+        if (frm.fields_dict.lead_owner) {
+            frm.set_df_property('lead_owner', 'label', __('Lead Owner'));
+            frm.set_df_property('lead_owner', 'hidden', 0);
+            frm.set_query('lead_owner', () => ({filters: {enabled: 1, user_type: 'System User'}}));
+        }
         const tabs = frm.layout?.tabs || [];
         const detailsTab = tabs.find(t => t.df.fieldname === "__details") || tabs[0];
         const extraTab = tabs.find(t => t.df.fieldname === "custom_bsi_status_tab");
@@ -329,30 +381,6 @@ const bsi_lead_focus = (() => {
         customer.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:4px 12px';
         const follow = card(details, 'bsi-follow-card', 'Next follow-up date');
         const notes = card(details, 'bsi-notes-card', 'Notes');
-        // Contextual confirmations use native save, including permissions and validation.
-        const saveHosts = [customer.parentElement, requirement.parentElement, extra];
-        for (const host of saveHosts) {
-            let ok = host.querySelector(':scope > .bsi-section-ok');
-            if (!ok) {
-                ok = document.createElement('button'); ok.type = 'button';
-                ok.className = 'btn btn-primary btn-sm bsi-section-ok'; ok.textContent = __('OK');
-                ok.addEventListener('click', async () => {
-                    ok.disabled = true;
-                    try { await frm.save(); updateSaveButtons(); }
-                    finally { ok.disabled = false; }
-                });
-                host.append(ok);
-            }
-        }
-        function updateSaveButtons() {
-            const visible = !!frm.perm?.some(p => p.write || (frm.is_new() && p.create)) && !!frm.is_dirty?.();
-            for (const host of saveHosts) host.querySelector(':scope > .bsi-section-ok').hidden = !visible;
-        }
-        updateSaveButtons();
-        if (frm.$wrapper?.off) {
-            frm.$wrapper.off('dirty.bsi_section_ok').on('dirty.bsi_section_ok', updateSaveButtons);
-        }
-
         let followNotes = details.querySelector('.bsi-follow-notes');
         if (!followNotes) {
             followNotes = document.createElement('div'); followNotes.className = 'bsi-follow-notes';
@@ -364,23 +392,9 @@ const bsi_lead_focus = (() => {
             composer = document.createElement('div'); composer.className = 'bsi-note-composer';
             const input = document.createElement('textarea'); input.className = 'form-control';
             input.placeholder = __('Write a note'); input.setAttribute('aria-label', __('New note')); input.rows = 2;
-            const ok = document.createElement('button'); ok.type = 'button'; ok.className = 'btn btn-primary btn-sm';
-            ok.textContent = __('OK'); ok.hidden = true;
-            input.addEventListener('input', () => { ok.hidden = !input.value.trim(); });
-            ok.addEventListener('click', async () => {
-                const value = input.value.trim(); if (!value || ok.disabled) return;
-                ok.disabled = true;
-                try {
-                    if (frm.is_new() || frm.is_dirty()) await frm.save();
-                    if (frm.is_new() || frm.is_dirty()) return;
-                    const result = await frappe.call({method:'add_note', doc:frm.doc,
-                        args:{note:frappe.utils.escape_html(value).replace(/\n/g, '<br>')}, freeze:true});
-                    if (!result.exc) { input.value = ''; ok.hidden = true; await frm.reload_doc(); }
-                } finally { ok.disabled = false; }
-            });
-            composer.append(input, ok); notes.prepend(composer);
+            composer.append(input); notes.prepend(composer);
         }
-        composer.hidden = !frm.perm?.some(p => p.write);
+        composer.hidden = !frm.perm?.some(p => p.write || (frm.is_new() && p.create));
 
         // Move whole native sections first, retaining section dependencies and controls.
         for (const tab of tabs) {
@@ -419,6 +433,7 @@ const bsi_lead_focus = (() => {
             tab.refresh();
         }
         if (![detailsTab, extraTab].some(t => t.is_active())) detailsTab.set_active();
+        owner_dropdown(frm, customer);
         // The native Date control saves on Lead with its existing permissions and Save action.
         // Task/event dates remain independent in Additional details.
 

@@ -1,0 +1,202 @@
+/* Procurement palette, shared by Lead, Projects and the personal dashboard. */
+@media screen {
+body.bs-premium {--bs-navy:#102d59;--bs-blue:#1d5fc4;--bs-ink:#172b4d;--bs-line:#dfe7f2;--bs-muted:#60718b;--bs-canvas:#f4f7fc;}
+.bs-premium .page-container {background:var(--bs-canvas);color:var(--bs-ink)}
+.bs-premium .page-head {background:#fff;border-bottom:1px solid var(--bs-line)}
+.bs-premium .page-title .title-text {font-weight:650;letter-spacing:-.6px;color:var(--bs-navy)}
+.bs-premium .layout-main-section {border:1px solid var(--bs-line);border-radius:16px;background:#fff;box-shadow:0 8px 30px #102d5908;overflow:clip}
+.bs-premium .layout-main-section .list-row-head {background:#edf3fb;color:#526984;font-size:11px;font-weight:600}
+.bs-premium .list-row-container {border-bottom:1px solid #edf1f7;transition:background .15s}
+.bs-premium .list-row-container:hover {background:#f3f7fd}
+.bs-premium .list-row {min-height:49px;align-items:center}
+.bs-premium .list-row a {color:#1d5fc4;font-weight:550}
+.bs-premium .filter-section {padding:16px 20px;background:#fff;border-bottom:1px solid #edf1f7}
+.bs-premium .page-container :is(.btn,.es-button) {border-radius:9px;font-weight:550;transition:background .15s,box-shadow .15s}
+.bs-premium .page-container :is(.btn-primary,.es-button.primary-action) {background:#1d5fc4;color:#fff;border-color:#1d5fc4;box-shadow:0 3px 8px #1d5fc424}
+.bs-premium .page-container :is(.btn-primary,.es-button.primary-action):hover {background:#174e9f}
+.bs-premium .page-container .btn-default {background:#fff;border:1px solid #dfe7f2;color:#244874}
+.bs-premium .form-control {border:1px solid #d7e2f0;border-radius:8px;background:#fff;color:#172b4d;min-height:36px}
+.bs-premium .form-control:focus {border-color:#1d5fc4;box-shadow:0 0 0 3px #1d5fc412}
+.bs-premium .form-control[readonly],.bs-premium .form-control:disabled {background:#f4f7fc}
+.bs-premium .control-label {color:#526984;font-size:12px;font-weight:550}
+.bs-premium .form-section {border-color:#e5ecf5;padding-top:18px;padding-bottom:18px}
+.bs-premium .section-head {color:#102d59;font-size:14px;font-weight:650}
+.bs-premium .form-tabs-list {background:#fff;border-bottom:1px solid #dfe7f2}
+.bs-premium .form-tabs .nav-link {padding:15px 18px;color:#60718b}
+.bs-premium .form-tabs .nav-link.active {color:#1d5fc4;border-bottom:2px solid #1d5fc4;font-weight:650}
+.bs-premium .body-sidebar {background:#102d59;color:#dce8f8;border-right:0}
+.bs-premium .body-sidebar :is(.sidebar-item-label,.sidebar-label,.sidebar-title,.item-anchor,.standard-sidebar-label,.sidebar-section-title) {color:#dce8f8}
+.bs-premium .body-sidebar .standard-sidebar-item {border-radius:9px;margin:4px 8px}
+.bs-premium .body-sidebar .standard-sidebar-item:is(:hover,:focus-within) {background:#eaf1fb}
+.bs-premium .body-sidebar .standard-sidebar-item:is(.selected,.active-sidebar) {background:#fff;box-shadow:0 3px 10px #061e3e24}
+.bs-premium .body-sidebar .icon {stroke:currentColor;color:#bbcee8}
+/* Frappe uses active-sidebar; keep text and icons dark on every light row. */
+.bs-premium .body-sidebar .standard-sidebar-item:is(.selected,.active-sidebar,:hover,:focus-within) :is(.item-anchor,.sidebar-item-label,.sidebar-item-icon,.sidebar-item-suffix,.sidebar-item-control,.icon,.es-icon) {color:#174c97;--icon-stroke:#174c97;--icon-fill:#174c97}
+.bs-premium :is(a,button,input,select,textarea):focus-visible {outline:2px solid #5389e7;outline-offset:3px}
+.bs-work {padding:28px;background:#f4f7fc;color:#172b4d}
+.bs-work-hero {background:linear-gradient(115deg,#102d59,#183e72);border-radius:16px;padding:30px 32px;display:flex;justify-content:space-between;align-items:center;gap:24px;color:#fff;margin-bottom:26px;box-shadow:0 8px 24px #102d5914}
+.bs-work-eyebrow {font-size:10px;letter-spacing:1.8px;text-transform:uppercase;color:#bbcee8;font-weight:650;margin-bottom:10px}
+.bs-work-hero h2 {font-size:29px;font-weight:600;letter-spacing:-.8px;color:#fff;margin:0 0 8px}
+.bs-work-hero p {margin:0;color:#d0dff2;font-size:13px;line-height:1.6}
+.bs-work-stamp {text-align:right;flex-shrink:0;color:#d0dff2;font-size:12px;line-height:1.9}
+.bs-work-stamp strong {display:block;color:#fff;font-weight:550}
+.bs-work-section {display:flex;align-items:center;justify-content:space-between;margin:0 0 16px;gap:12px}
+.bs-work-section h3 {margin:0;font-size:16px;font-weight:650;color:#102d59;letter-spacing:-.25px}
+.bs-work-section span {font-size:12px;color:#60718b}
+.bs-work-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(285px,1fr));gap:20px}
+.bs-work-card {border:1px solid #dfe7f2;border-radius:14px;background:#fff;box-shadow:0 3px 12px #102d5905;padding:23px;min-width:0;display:flex;flex-direction:column;transition:box-shadow .18s,border-color .18s}
+.bs-work-card:hover {border-color:#bdcfe9;box-shadow:0 8px 24px #102d590b}
+.bs-work-card-head {display:flex;gap:12px;align-items:center;margin-bottom:20px}
+.bs-work-card-head h4 {margin:0;font-size:14px;color:#244874;font-weight:600}
+.bs-work-icon {width:36px;height:36px;border-radius:10px;background:#edf3fc;display:grid;place-items:center;color:#1d5fc4;font-size:16px;font-weight:650}
+.bs-work-total {border:0;background:none;padding:0;text-align:left;color:#102d59;font-size:38px;font-weight:600;letter-spacing:-1.3px;line-height:1.2;align-self:flex-start;cursor:pointer;font-variant-numeric:tabular-nums}
+.bs-work-count-label {font-size:11px;color:#60718b;margin:6px 0 18px}
+.bs-work-statuses {display:flex;gap:6px;flex-wrap:wrap;min-height:26px;margin-bottom:20px}
+.bs-work-status {font-size:10px;line-height:1.6;padding:3px 7px;background:#edf3fc;color:#315d97;border-radius:5px;border:1px solid #dce7f6}
+.bs-work-status.good {color:#226c53;background:#eaf6f2;border-color:#cde8dd}
+.bs-work-status.warn {color:#80530b;background:#fff6e5;border-color:#f1dfb7}
+.bs-work-status.bad {color:#a03c4b;background:#fff0f1;border-color:#f1d3d8}
+.bs-work-recent {border-top:1px solid #edf1f7;padding-top:15px;margin-top:auto}
+.bs-work-recent-title {font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#60718b;margin-bottom:8px;font-weight:600}
+.bs-work-record {display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid #f0f3f8;padding:10px 0;color:#31527e;font-size:12px;text-decoration:none}
+.bs-work-record span:first-child {overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bs-work-record:hover {color:#1d5fc4;text-decoration:none}
+.bs-work-record span:last-child {color:#8093ad}
+.bs-work-open {margin-top:18px;padding:0;background:none;border:0;color:#1d5fc4;font-size:12px;font-weight:650;text-align:left;cursor:pointer}
+.bs-work-empty {padding:22px;border:1px dashed #c9d7eb;border-radius:12px;background:#fff;color:#60718b}
+@media(max-width:700px){.bs-work{padding:16px}.bs-work-hero{padding:24px;align-items:flex-start;flex-direction:column}.bs-work-stamp{text-align:left}.bs-work-grid{grid-template-columns:1fr}.bs-work-hero h2{font-size:24px}.bs-work-section{align-items:flex-start;flex-direction:column}}
+@media(prefers-reduced-motion:reduce){.bs-premium *{transition:none!important}}
+}
+
+/* Keep document lists focused on commercial fields; retain the header count. */
+.sidebar-panel.sidebar-panel-notifications { position:fixed!important; left:auto!important; right:16px!important; top:50px!important; bottom:auto!important; width:min(320px,calc(100vw - 24px))!important; height:min(460px,calc(100dvh - 66px))!important; border:1px solid #dfe7f2!important; border-radius:12px!important; box-shadow:0 12px 36px #102d5926!important; z-index:1040!important; font-size:12px!important; }
+.sidebar-panel-notifications .panel-header { padding:10px 12px!important; }
+.sidebar-panel-notifications .panel-title { font-size:13px!important; font-weight:600!important; }
+.sidebar-panel-notifications .panel-header-top { margin-bottom:8px!important; }
+.sidebar-panel-notifications .es-pill { font-size:11px!important; min-height:26px!important; padding:4px 10px!important; }
+.sidebar-panel-notifications .sidebar-panel-body { min-height:0; overflow:auto!important; }
+.sidebar-panel-notifications .notification-item { padding:9px 12px!important; min-height:0!important; }
+.sidebar-panel-notifications .notification-body { gap:8px!important; }
+.sidebar-panel-notifications .message, .sidebar-panel-notifications .message :is(div,strong,b) { font-size:12px!important; line-height:1.4!important; }
+.sidebar-panel-notifications .notification-timestamp, .sidebar-panel-notifications .frappe-timestamp { font-size:10px!important; line-height:1.3!important; margin-top:3px!important; }
+.sidebar-panel-notifications .avatar { width:26px!important; height:26px!important; flex:0 0 26px!important; }
+.sidebar-panel-notifications .avatar-frame { width:26px!important; height:26px!important; font-size:10px!important; }
+#desk-dock .navbar-modal-search-mobile,
+#desk-dock [aria-label="DCS Governance"] { display:none !important; }
+#desk-dock .sidebar-notification.bs-header-notification { position:fixed!important; width:34px!important; height:34px!important; margin:0!important; z-index:1035; color:#17365e!important; background:transparent!important; border-radius:8px; }
+body:is([data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .page-actions :is(.view-switcher,.standard-actions .page-icon-group,.standard-actions .menu-btn-group) { display:none !important; }
+body:is([data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row-activity,
+body:is([data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row-head .list-liked-by-me { display:none !important; }
+@media(min-width:768px) {
+  body:is([data-route="List/Presales Request/List"],[data-route="List/Deal Cost Sheet/List"],[data-route="List/Quotation/List"]) .list-row > .level-right { display:none !important; }
+}
+/* One scroll surface and matching fixed column tracks for DCS. */
+@media(min-width:768px) {
+ body.bs-sales-ui[data-route="List/Deal Cost Sheet/List"] .result-container { overflow:auto!important; }
+ body.bs-sales-ui[data-route="List/Deal Cost Sheet/List"] .result { overflow:visible!important; }
+ body.bs-sales-ui[data-route="List/Deal Cost Sheet/List"] .bs-list-shell :is(.list-row,.list-row-head) { width:max-content!important; min-width:100%!important; gap:0!important; }
+ body.bs-sales-ui[data-route="List/Deal Cost Sheet/List"] :is(.list-row > .level-left,.list-header-subject) { flex:0 0 auto!important; width:max-content!important; gap:6px!important; }
+}
+body.bs-sales-ui[data-route="List/Deal Cost Sheet/List"] .list-row-container { padding-left:0!important; padding-right:0!important; }
+body[data-route="List/Deal Cost Sheet/List"] .list-row-col[data-fieldname="margin_percent"] { display:none!important; }
+body.bs-sales-ui[data-route="List/Deal Cost Sheet/List"] .list-row-head > .level-right { display:none!important; }
+@media(min-width:768px) {
+ body.bs-sales-ui[data-route="List/Opportunity/List"] .result-container { overflow:auto!important; }
+ body.bs-sales-ui[data-route="List/Opportunity/List"] .result { overflow:visible!important; }
+ body.bs-sales-ui[data-route="List/Opportunity/List"] .bs-list-shell :is(.list-row,.list-row-head) { width:max-content!important; min-width:100%!important; gap:0!important; }
+ body.bs-sales-ui[data-route="List/Opportunity/List"] :is(.list-row > .level-left,.list-header-subject) { flex:0 0 auto!important; width:max-content!important; gap:6px!important; }
+ body.bs-sales-ui[data-route="List/Opportunity/List"] .list-row-container { padding-left:0!important; padding-right:0!important; }
+}
+body.bs-sales-ui[data-route="List/Opportunity/List"] :is(.list-row,.list-row-head) > .level-right { position:static!important; right:auto!important; }
+@media(min-width:768px) {
+ body.bs-sales-ui[data-route="List/Opportunity/List"] .list-row-head > .level-right { position:relative!important; }
+ body.bs-sales-ui[data-route="List/Opportunity/List"] .bsi-lead-meta-head { position:absolute!important; left:auto!important; right:10px!important; width:123px!important; display:flex!important; gap:15px!important; }
+ body.bs-sales-ui[data-route="List/Opportunity/List"] .bsi-lead-meta-head .date-heading { width:82px!important; flex:0 0 82px!important; }
+ body.bs-sales-ui[data-route="List/Opportunity/List"] .bsi-lead-meta-head .owner-heading { width:26px!important; flex:0 0 26px!important; }
+ body.bs-sales-ui[data-route="List/Opportunity/List"] .bs-list-shell .list-row-container { width:max-content!important; min-width:100%!important; }
+}
+/* Date and owner use identical tracks in the header and every data row. */
+@media(min-width:768px) {
+ body.bs-sales-ui[data-route="List/Opportunity/List"] .bs-list-shell :is(.list-row,.list-row-head) > .level-right { position:static!important; width:178px!important; min-width:178px!important; flex:0 0 178px!important; padding:0 6px!important; display:flex!important; justify-content:flex-end!important; box-sizing:border-box!important; }
+ body.bs-sales-ui[data-route="List/Opportunity/List"] .bs-list-shell :is(.bsi-lead-meta-head,.list-row-activity) { position:static!important; inset:auto!important; display:grid!important; grid-template-columns:100px 44px!important; gap:12px!important; align-items:center!important; width:156px!important; min-width:156px!important; flex:0 0 156px!important; margin:0!important; padding:0!important; }
+ body.bs-sales-ui[data-route="List/Opportunity/List"] .bs-list-shell :is(.date-heading,.list-row-activity .modified) { width:100px!important; min-width:100px!important; max-width:100px!important; text-align:center!important; justify-self:center!important; margin:0!important; }
+ body.bs-sales-ui[data-route="List/Opportunity/List"] .bs-list-shell .owner-heading { width:44px!important; min-width:44px!important; text-align:center!important; justify-self:center!important; }
+ body.bs-sales-ui[data-route="List/Opportunity/List"] .bs-list-shell .list-row-activity .bsi-lead-owner { justify-self:center!important; margin:0!important; }
+ body.bs-sales-ui[data-route="List/Opportunity/List"] .bs-list-shell .list-row-activity :is(.list-assignments-container,.list-row-like) { display:none!important; }
+}
+.bs-work-month-controls{display:flex;justify-content:flex-end;padding:16px 24px 0}.bs-work-month-controls label{display:flex;align-items:center;gap:12px;color:#24466d;font-size:12px}.bs-work-month-controls input{border:1px solid #cedbeb;border-radius:8px;padding:8px 12px;background:#fff;color:#17365e}.bs-month-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:20px 0}.bs-month-kpi{background:#fff;border:1px solid #dfe7f2;border-top:3px solid #00a6b3;border-radius:10px;padding:18px}.bs-month-kpi span{display:block;font-size:12px;color:#60718b}.bs-month-kpi strong{display:block;font-size:28px;color:#17365e;margin-top:8px}.bs-month-chart{background:#fff;border:1px solid #dfe7f2;border-radius:12px;padding:20px;margin-bottom:12px}.bs-month-chart h3{font-size:14px;margin:0 0 16px;color:#17365e}.bs-day-bars{display:flex;gap:5px;height:140px;align-items:flex-end;overflow-x:auto}.bs-day-column{flex:1;min-width:12px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:7px;height:132px}.bs-day-bar{display:block;width:100%;max-width:24px;border-radius:4px 4px 0 0;background:linear-gradient(#00a6b3,#2363ad)}.bs-day-bar.empty{background:#e7edf5}.bs-day-column small{font-size:9px;color:#60718b}.bs-month-note{font-size:11px;color:#60718b;line-height:1.6}.bs-status-chart{display:flex;height:8px;background:#edf2f8;border-radius:5px;overflow:hidden;margin:14px 0 6px}.bs-status-chart span{display:block;height:100%}@media(max-width:650px){.bs-month-summary{grid-template-columns:1fr}.bs-month-kpi{padding:12px}.bs-work-month-controls{padding:12px}.bs-day-bars{gap:3px}}
+.bs-today-attendance{margin-top:20px;border-top:3px solid #00a6b3}.bs-attendance-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding:12px 0}.bs-attendance-grid small{display:block;color:#60718b;font-size:11px}.bs-attendance-grid strong{display:block;color:#17365e;font-size:19px;margin-top:7px}@media(max-width:750px){.bs-attendance-grid{grid-template-columns:repeat(2,1fr)}}
+.bs-workday-clock{display:flex;align-items:center;gap:28px;padding:22px;margin:16px 0;background:linear-gradient(120deg,#eef7fa,#f4f7fc);border-radius:14px;border:1px solid #dbe8f1}.bs-clock-ring{width:150px;height:150px;flex:0 0 150px;border-radius:50%;background:conic-gradient(from -90deg,#00a6b3 var(--day-progress),#dbe6f1 0);padding:9px;box-shadow:0 6px 20px #17365e12}.bs-clock-face{height:100%;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}.bs-clock-symbol{font-size:25px;color:#00a6b3;line-height:1}.bs-clock-face strong{font-size:24px;color:#17365e}.bs-clock-face small{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#60718b}.bs-clock-copy h4{font-size:19px;font-weight:650;color:#17365e;margin:0 0 8px}.bs-clock-copy p{font-size:12px;color:#48617d;max-width:430px;line-height:1.6}.bs-clock-copy small{font-size:10px;color:#60718b}.bs-workday-clock.wrap-up{background:#fff7e9;border-color:#efdab4}.wrap-up .bs-clock-ring{background:conic-gradient(from -90deg,#d69a32 var(--day-progress),#f2e4ca 0)}.wrap-up .bs-clock-symbol{color:#b77b1b}@media(max-width:600px){.bs-workday-clock{gap:16px;padding:14px;flex-direction:column;text-align:center}}
+/* Compact personal dashboard: preserve every metric and action. */
+#page-my-work-dashboard .bs-work{padding:14px 16px}
+#page-my-work-dashboard .bs-work-month-controls{padding:8px 16px 0}
+#page-my-work-dashboard .bs-work-month-controls input{padding:5px 9px}
+#page-my-work-dashboard .bs-work-hero{padding:16px 20px;gap:14px;margin-bottom:12px;border-radius:12px}
+#page-my-work-dashboard .bs-work-hero h2{font-size:23px;margin-bottom:5px;letter-spacing:-.4px}
+#page-my-work-dashboard .bs-work-eyebrow{font-size:9px;margin-bottom:6px;letter-spacing:1.2px}
+#page-my-work-dashboard .bs-work-hero p{font-size:12px;line-height:1.4}
+#page-my-work-dashboard .bs-work-stamp{font-size:11px;line-height:1.6}
+#page-my-work-dashboard .bs-month-summary{gap:10px;margin:12px 0}
+#page-my-work-dashboard .bs-month-kpi{padding:11px 14px;border-top-width:2px}
+#page-my-work-dashboard .bs-month-kpi strong{font-size:24px;margin-top:4px}
+#page-my-work-dashboard .bs-month-chart{padding:12px 14px;margin-bottom:8px}
+#page-my-work-dashboard .bs-month-chart h3{font-size:13px;margin-bottom:8px}
+#page-my-work-dashboard .bs-day-bars{height:104px;gap:4px}
+#page-my-work-dashboard .bs-day-column{height:100px;gap:5px}
+#page-my-work-dashboard .bs-month-note{font-size:11px;line-height:1.4;margin:6px 0 10px}
+#page-my-work-dashboard .bs-work-section{margin-bottom:10px;gap:8px}
+#page-my-work-dashboard .bs-work-section h3{font-size:14px}
+#page-my-work-dashboard .bs-work-section span{font-size:11px}
+#page-my-work-dashboard .bs-work-grid{grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:12px}
+#page-my-work-dashboard .bs-work-card{padding:14px;border-radius:10px}
+#page-my-work-dashboard .bs-work-card-head{gap:8px;margin-bottom:10px}
+#page-my-work-dashboard .bs-work-icon{width:28px;height:28px;font-size:12px;border-radius:7px}
+#page-my-work-dashboard .bs-work-card-head h4{font-size:13px}
+#page-my-work-dashboard .bs-work-total{font-size:28px;letter-spacing:-.5px}
+#page-my-work-dashboard .bs-work-count-label{margin:4px 0 8px}
+#page-my-work-dashboard .bs-status-chart{margin-top:8px;height:6px}
+#page-my-work-dashboard .bs-work-statuses{margin-bottom:10px;min-height:20px;gap:4px}
+#page-my-work-dashboard .bs-work-status{padding:2px 5px}
+#page-my-work-dashboard .bs-work-recent{padding-top:9px}
+#page-my-work-dashboard .bs-work-recent-title{margin-bottom:4px;letter-spacing:.6px}
+#page-my-work-dashboard .bs-work-record{padding:6px 0}
+#page-my-work-dashboard .bs-work-open{margin-top:10px}
+#page-my-work-dashboard .bs-work-empty{padding:12px}
+@media(max-width:650px){#page-my-work-dashboard .bs-work{padding:10px}#page-my-work-dashboard .bs-work-grid{grid-template-columns:1fr}#page-my-work-dashboard .bs-work-hero{padding:14px}#page-my-work-dashboard .bs-month-summary{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}#page-my-work-dashboard .bs-month-kpi{padding:9px}#page-my-work-dashboard .bs-month-kpi span{font-size:11px}#page-my-work-dashboard .bs-month-kpi strong{font-size:22px}}
+/* Overview defaults to short summary tiles; details remain expandable. */
+#page-my-work-dashboard .bs-work-grid{grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:8px;align-items:start}
+#page-my-work-dashboard .bs-work-card{padding:10px 12px;gap:0}
+#page-my-work-dashboard .bs-work-card-head{margin-bottom:5px;gap:6px;min-height:24px}
+#page-my-work-dashboard .bs-work-icon{width:22px;height:22px;flex-shrink:0;font-size:10px;border-radius:6px}
+#page-my-work-dashboard .bs-work-card-head h4{font-size:12px;line-height:1.3}
+#page-my-work-dashboard .bs-work-total{font-size:24px}
+#page-my-work-dashboard .bs-work-count-label{font-size:10px;line-height:1.4;margin:3px 0 4px}
+#page-my-work-dashboard .bs-status-chart{margin:4px 0;height:5px;flex-shrink:0}
+#page-my-work-dashboard .bs-work-details{margin:3px 0;color:#536c88;font-size:10px}
+#page-my-work-dashboard .bs-work-details summary{cursor:pointer;padding:3px 0;line-height:1.4}
+#page-my-work-dashboard .bs-work-details[open] summary{margin-bottom:6px}
+#page-my-work-dashboard .bs-work-details .bs-work-recent-title{font-size:9px}
+#page-my-work-dashboard .bs-work-details .bs-work-record{font-size:11px}
+#page-my-work-dashboard .bs-work-open{margin-top:6px;font-size:11px}
+@media(max-width:650px){#page-my-work-dashboard .bs-work-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:380px){#page-my-work-dashboard .bs-work-grid{grid-template-columns:1fr}}
+/* Keep the default overview to a single compact summary row on desktop. */
+#page-my-work-dashboard .bs-work-card{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:8px;row-gap:3px;padding:8px 10px;align-items:center}
+#page-my-work-dashboard .bs-work-card-head{grid-column:1;grid-row:1;margin:0}
+#page-my-work-dashboard .bs-work-total{grid-column:2;grid-row:1;justify-self:end;font-size:22px}
+#page-my-work-dashboard .bs-work-count-label{grid-column:1 / -1;grid-row:2;margin:0}
+#page-my-work-dashboard .bs-status-chart{grid-column:1 / -1;grid-row:3;margin:2px 0}
+#page-my-work-dashboard .bs-work-details{grid-column:1 / -1;grid-row:4;margin:0}
+#page-my-work-dashboard .bs-work-open{grid-column:1 / -1;grid-row:5;margin:0}
+@media(min-width:900px) and (max-height:750px){
+ #page-my-work-dashboard .bs-day-bars{height:56px}
+ #page-my-work-dashboard .bs-day-column{height:52px;gap:3px}
+ #page-my-work-dashboard .bs-work-hero{padding:12px 16px;margin-bottom:8px}
+ #page-my-work-dashboard .bs-month-summary{margin:8px 0}
+ #page-my-work-dashboard .bs-month-chart{padding:8px 12px}
+ #page-my-work-dashboard .bs-month-note{font-size:10px;margin:4px 0 6px}
+}
+#page-my-work-dashboard .bs-month-kpi .bs-sales-kpi-amount{font-size:20px;line-height:1.35;overflow-wrap:anywhere}
+#page-my-work-dashboard .bs-kpi-note{display:inline-block;margin-top:6px;padding:4px 7px;border-radius:5px;font-size:11px;font-weight:600;line-height:1.4;max-width:100%;background:#eaf2ff;color:#2455a0;border:1px solid #d2e2fa}
+#page-my-work-dashboard .bs-kpi-note-pending_dcs{background:#fff2d9;color:#865400;border-color:#f1d49a}
+#page-my-work-dashboard .bs-kpi-note-submitted{background:#e5f5ee;color:#21694c;border-color:#c5e6d5}

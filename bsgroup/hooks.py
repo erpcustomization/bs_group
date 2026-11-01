@@ -252,6 +252,7 @@ app_license = "mit"
 # on_login = "bsgroup.utils.company_access.validate_company_on_login"
 
 app_include_js = [
+    "/api/method/bsgroup.work_dashboard.navigation_script?v=20261101-attendance-shared",
     "bsgroup.bundle.js",
     "navbar_custom.bundle.js",
     "bs_sales_theme.bundle.js",
@@ -260,7 +261,7 @@ app_include_js = [
 app_include_css = [
     "/assets/bsgroup/css/sidebar.css",
     "/assets/bsgroup/css/labor_preapproval.css",
-    "/assets/bsgroup/css/bs_sales_theme.css?v=20261024-list-shell",
+    "/assets/bsgroup/css/bs_sales_theme.css?v=20261024-lead-toolbar-2",
     # "/assets/bsgroup/css/bs_welcome_banner.css",
 ]
 
@@ -314,8 +315,12 @@ doctype_js = {
 }
 
 doctype_list_js = {
+    "Lead": "public/js/lead_list_compact.js",
+    "Opportunity": "public/js/lead_list_compact.js",
+    "Deal Cost Sheet": "public/js/lead_list_compact.js",
+    "Quotation": "public/js/lead_list_compact.js",
     "Project": "public/js/project_list.js",
-    "Presales Request": "public/js/presales_request_list.js",
+    "Presales Request": ["public/js/presales_request_list.js", "public/js/lead_list_compact.js"],
     "PPM Management": "public/js/ppm_management_list.js",
 }
 
@@ -401,6 +406,7 @@ doc_events = {
             "bsgroup.utils.opportunity.set_opportunity_owner",
         ],
         "before_save": [
+            "bsgroup.opportunity_organization.sync",
             "bsgroup.utils.opportunity.set_stage_history",
             "bsgroup.utils.opportunity.set_stage_updates",
             "bsgroup.utils.opportunity.set_last_updates",
@@ -444,15 +450,10 @@ doc_events = {
     },
 }
 
-for _downstream in ("Presales Request", "Deal Cost Sheet", "Quotation", "Site Survey Request"):
-    for _event in ("before_insert", "before_validate"):
-        _prior = doc_events.setdefault(_downstream, {}).get(_event, [])
-        doc_events[_downstream][_event] = ["bsgroup.opportunity_required.validate"] + ([_prior] if isinstance(_prior, str) else list(_prior))
-    _prior = doctype_js.get(_downstream, [])
-    doctype_js[_downstream] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["public/js/opportunity_required.js"]
-
-
 override_whitelisted_methods = {
+    "frappe.desk.doctype.list_view_settings.list_view_settings.save_listview_settings": "bsgroup.personal_list_settings.save_listview_settings",
+    "bs_lead_intake.intake.review.record_review": "bsgroup.intake_access.record_review",
+    "bs_lead_intake.intake.metrics.pilot_report": "bsgroup.intake_access.pilot_report",
     "erpnext.controllers.accounts_controller.update_child_qty_rate": "bsgroup.dcs.quotation_control.update_child_qty_rate",
 	"erpnext.selling.doctype.quotation.quotation.make_sales_order": "bsgroup.dcs.quotation_control.make_sales_order",
 	"erpnext.crm.doctype.opportunity.opportunity.make_quotation": "bsgroup.utils.quotation.make_quotation",
@@ -623,7 +624,7 @@ for _dt, _event, _method in (
     # TEMP DISABLED (re-enable later): ("Journal Entry", "before_submit", "validate_payment"),
     # TEMP DISABLED (re-enable later): ("Journal Entry", "before_update_after_submit", "validate_payment"),
     ("Journal Entry", "before_cancel", "lock_payment_sources"),
-    ("Unreconcile Payment", "before_submit", "prevent_unreconcile"),
+    # TEMP DISABLED (re-enable later): ("Unreconcile Payment", "before_submit", "prevent_unreconcile"),
     ("Purchase Invoice", "validate", "validate_inline_payment"),
     ("Purchase Invoice", "before_update_after_submit", "validate_inline_payment"),
     ("Purchase Invoice", "before_cancel", "before_invoice_cancel"),
@@ -643,6 +644,7 @@ for _hook_map, _path in (
 for _dt, _event, _method in (
     ("Lead", "before_validate", "before_validate"),
     ("Lead", "validate", "validate"),
+    ("Lead", "on_update", "sync_assignment"),
     ("Opportunity", "before_insert", "guard_conversion"),
 ):
     _prior = doc_events.setdefault(_dt, {}).get(_event, [])
@@ -665,6 +667,7 @@ doc_events["Opportunity"]["before_insert"].append("bsgroup.utils.opportunity.val
 after_migrate.append("bsgroup.site_survey_setup.execute")
 doc_events["Opportunity"].setdefault("validate", []).append("bsgroup.site_survey.validate_opportunity")
 doc_events["Opportunity"].setdefault("on_update", []).append("bsgroup.site_survey.create_requests")
+doc_events["Opportunity"]["on_update"].append("bsgroup.opportunity_intake.create_no_survey_cost_sheet")
 doc_events.setdefault("Presales Request", {}).setdefault("validate", []).append("bsgroup.site_survey.validate_presales")
 permission_query_conditions["Site Survey Request"] = "bsgroup.site_survey.survey_query"
 permission_query_conditions["Presales Request"] = "bsgroup.site_survey.presales_query"
@@ -677,3 +680,30 @@ doctype_list_js["Opportunity"].append("public/js/opportunity_progress_list.js")
 doctype_js["Opportunity"].append("public/js/opportunity_details_layout.js")
 doctype_js["Opportunity"].append("public/js/opportunity_survey_steps.js")
 doctype_js["Opportunity"].append("public/js/opportunity_submit.js")
+doctype_js["Lead"].append("public/js/lead_submit.js")
+doctype_list_js["Opportunity"].append("public/js/opportunity_progress_filter.js")
+for _sales_doctype in ("Lead", "Opportunity"):
+    doctype_list_js[_sales_doctype].append("public/js/sales_filter_popup.js")
+
+for _downstream in ("Presales Request", "Deal Cost Sheet", "Quotation", "Site Survey Request"):
+    for _event in ("before_insert", "before_validate"):
+        _prior = doc_events.setdefault(_downstream, {}).get(_event, [])
+        doc_events[_downstream][_event] = ["bsgroup.opportunity_required.validate"] + ([_prior] if isinstance(_prior, str) else list(_prior))
+    _prior = doctype_js.get(_downstream, [])
+    doctype_js[_downstream] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["public/js/opportunity_required.js"]
+
+after_migrate.append("bsgroup.sales_qualification.setup")
+after_migrate.append("bsgroup.opportunity_routing_setup.execute")
+after_migrate.append("bsgroup.presales_duration.setup")
+doc_events["Presales Request"]["validate"].append("bsgroup.presales_duration.validate")
+doc_events["Presales Request"]["before_submit"] = "bsgroup.presales_duration.validate"
+
+boot_session = "bsgroup.scoped_sales_access.boot_session"
+for _dt, _query in {"Lead": "lead_query", "Opportunity": "opportunity_query",
+                   "Presales Request": "presales_query", "Deal Cost Sheet": "dcs_query",
+                   "Quotation": "quotation_query", "Site Survey Request": "survey_query"}.items():
+    permission_query_conditions[_dt] = "bsgroup.scoped_sales_access." + _query
+    has_permission[_dt] = "bsgroup.scoped_sales_access.permission"
+
+doctype_js["Lead"].append("public/js/lead_assignment.js")
+override_whitelisted_methods["frappe.desk.form.assign_to.add"] = "bsgroup.lead_assignment.assign"

@@ -1,6 +1,6 @@
 {
  "actions": [],
- "allow_import": 1,
+ "allow_import": 0,
  "allow_rename": 1,
  "autoname": "DCS-.YYYY.-.####",
  "creation": "2026-01-31 12:06:26.366139",
@@ -28,25 +28,11 @@
   "customer_notes",
   "custom_lifecycle_section",
   "custom_deal_stage",
-  "custom_deal_status_section",
-  "custom_deal_status",
-  "custom_presales_status",
-  "custom_presales_completion_date",
-  "dcs_status_links_column",
-  "custom_quotation",
-  "custom_quotation_status",
-  "custom_sales_order",
-  "dcs_status_owner_column",
-  "custom_presales_owner",
-  "amended_from",
-  "custom_opportunity_status",
-  "custom_lost_reason",
-  "custom_outcome_date",
-  "custom_closure_notes",
-  "workflow_state",
   "dcs_costing_tab",
   "dcs_costing_subject_section",
   "subject",
+  "supplier_quotation_section",
+  "supplier_quotations",
   "section_break_jbpa",
   "items",
   "section_break_dsjr",
@@ -110,6 +96,22 @@
   "custom_superseded_by",
   "custom_supersession_reason",
   "dcs_approval_tab",
+  "custom_deal_status_section",
+  "custom_deal_status",
+  "custom_presales_status",
+  "custom_presales_completion_date",
+  "dcs_status_links_column",
+  "custom_quotation",
+  "custom_quotation_status",
+  "custom_sales_order",
+  "dcs_status_owner_column",
+  "custom_presales_owner",
+  "amended_from",
+  "custom_opportunity_status",
+  "custom_lost_reason",
+  "custom_outcome_date",
+  "custom_closure_notes",
+  "workflow_state",
   "custom_approval_history_section",
   "custom_approval_html",
   "custom_approved_position_section",
@@ -126,7 +128,6 @@
   "custom_approved_on",
   "custom_approval_reason",
   "custom_last_decision_reason",
-  "dcs_award_handover_tab",
   "custom_award_history_section",
   "custom_award_history_html",
   "custom_handover_conditions_section",
@@ -1332,12 +1333,7 @@
   {
    "fieldname": "dcs_approval_tab",
    "fieldtype": "Tab Break",
-   "label": "Approval"
-  },
-  {
-   "fieldname": "dcs_award_handover_tab",
-   "fieldtype": "Tab Break",
-   "label": "Award & Handover"
+   "label": "Additional details"
   },
   {
    "fieldname": "dcs_scope_section",
@@ -1378,6 +1374,18 @@
   {
    "fieldname": "dcs_costing_subject_section",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "supplier_quotation_section",
+   "fieldtype": "Section Break",
+   "label": "Supplier / Vendor Quotation"
+  },
+  {
+   "fieldname": "supplier_quotations",
+   "fieldtype": "Table",
+   "label": "Supplier / Vendor Quotation",
+   "options": "DCS Supplier Quotation",
+   "description": "Attach one or more supplier/vendor quotations as proof of cost price. Required before submission; optional while saving a draft."
   }
  ],
  "grid_page_length": 50,
@@ -1392,7 +1400,7 @@
  "owner": "Administrator",
  "permissions": [
   {
-   "create": 1,
+   "create": 0,
    "delete": 1,
    "email": 1,
    "export": 1,
@@ -1402,10 +1410,11 @@
    "role": "System Manager",
    "share": 1,
    "submit": 1,
-   "write": 1
+   "write": 1,
+   "import": 0
   },
   {
-   "create": 1,
+   "create": 0,
    "delete": 1,
    "email": 1,
    "export": 1,
@@ -1415,10 +1424,11 @@
    "role": "Sales Manager",
    "share": 1,
    "submit": 1,
-   "write": 1
+   "write": 1,
+   "import": 0
   },
   {
-   "create": 1,
+   "create": 0,
    "email": 1,
    "export": 1,
    "print": 1,
@@ -1426,10 +1436,11 @@
    "report": 1,
    "role": "Sales User",
    "share": 1,
-   "write": 1
+   "write": 1,
+   "import": 0
   },
   {
-   "create": 1,
+   "create": 0,
    "email": 1,
    "export": 1,
    "print": 1,
@@ -1437,20 +1448,25 @@
    "report": 1,
    "role": "Presales",
    "share": 1,
-   "write": 1
+   "write": 1,
+   "import": 0
   },
   {
    "email": 1,
    "print": 1,
    "read": 1,
    "report": 1,
-   "role": "Project Manager"
+   "role": "Project Manager",
+   "create": 0,
+   "import": 0
   },
   {
    "role": "Presales",
    "permlevel": 1,
    "read": 1,
-   "write": 1
+   "write": 1,
+   "create": 0,
+   "import": 0
   }
  ],
  "row_format": "Dynamic",

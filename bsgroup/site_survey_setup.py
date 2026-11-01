@@ -61,8 +61,6 @@ def execute():
     ensure_navigation()
     from bsgroup.site_survey import backfill_request_details
     backfill_request_details()
-    from bsgroup.opportunity_routing_setup import execute as configure_routing
-    configure_routing()
     frappe.clear_cache()
     return {"status": "ready", "doctype": "Site Survey Request"}
 

@@ -25,7 +25,33 @@ def linked_outcome(name):
     return None
 
 
+def customer_requirement(lead):
+    """Use the saved requirement, or the enquiry that created this Lead."""
+    requirement = lead.get("custom_requirement") or ""
+    if requirement.strip():
+        return requirement
+    if not lead.name or lead.is_new():
+        return ""
+    rows = frappe.get_all("Lead Intake", filters={"converted_lead": lead.name},
+                          fields=["transcript"], order_by="creation asc", limit_page_length=1)
+    return (rows[0].get("transcript") or "") if rows else ""
+
+
 def before_validate(doc, method=None):
+    if not (doc.get("custom_requirement") or "").strip():
+        doc.custom_requirement = customer_requirement(doc)
+    if doc.is_new() and not doc.lead_owner:
+        doc.lead_owner = frappe.session.user
+    previous = doc.get_doc_before_save()
+    if doc.lead_owner and (not previous or previous.lead_owner != doc.lead_owner):
+        user = frappe.db.get_value("User", doc.lead_owner, ["enabled", "user_type"], as_dict=True)
+        if not user or not user.enabled or user.user_type != "System User":
+            frappe.throw(_("Assign the Lead to an active internal user."))
+        from frappe.permissions import get_user_permissions
+        companies = get_user_permissions(doc.lead_owner).get("Company", [])
+        applicable = [p.doc for p in companies if not p.get("applicable_for") or p.applicable_for == "Lead"]
+        if doc.company and applicable and doc.company not in applicable:
+            frappe.throw(_("The selected person does not have access to this Lead's company."))
     doc.flags.bsi_requested_lead_status = doc.status
     doc.flags.bsi_requested_lead_title = doc.title
 
@@ -79,6 +105,9 @@ def validate(doc, method=None):
 
 def guard_conversion(doc, method=None):
     if doc.opportunity_from == "Lead" and doc.party_name:
+        frappe.db.sql("SELECT name FROM `tabLead` WHERE name=%s FOR UPDATE", doc.party_name)
+        if linked_outcome(doc.party_name):
+            frappe.throw(_("This Lead already has an Opportunity. Open the existing Opportunity."))
         if frappe.db.get_value("Lead", doc.party_name, "status") in ("Dropped", "Do Not Contact"):
             frappe.throw(_("Reopen the Lead before converting it to an Opportunity."))
 
@@ -92,7 +121,16 @@ def make_opportunity(source_name):
     if linked_outcome(lead.name):
         frappe.throw(_("This Lead is already closed. Use its existing Connections."))
     from erpnext.crm.doctype.lead.lead import make_opportunity as native_mapper
-    return native_mapper(source_name)
+    opportunity = native_mapper(source_name)
+    opportunity.custom_subject = lead.title or lead.company_name or lead.lead_name
+    opportunity.custom_enquiry = customer_requirement(lead)
+    opportunity.custom_organization_name = lead.company_name
+    opportunity.custom_contact_person_name = lead.lead_name
+    opportunity.opportunity_owner = frappe.session.user
+    opportunity.company = lead.company
+    if not opportunity.currency and lead.company:
+        opportunity.currency = frappe.db.get_value("Company", lead.company, "default_currency")
+    return opportunity
 
 
 def mark_delayed():
@@ -113,6 +151,7 @@ def mark_delayed():
 
 
 def setup():
+    setup_manual_creation()
     from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
     create_custom_fields({"Lead": [
         {"fieldname": "custom_requirement", "label": "Requirement", "fieldtype": "Small Text", "insert_after": "company_name"},
@@ -126,6 +165,48 @@ def setup():
     make_property_setter("Lead", "status", "options", "\n".join(options), "Text")
     make_property_setter("Lead", "status", "default", "Open", "Text")
     frappe.clear_cache(doctype="Lead")
+
+
+def setup_manual_creation():
+    """Internal users can create and edit their own Leads; other access is unchanged."""
+    from frappe.permissions import setup_custom_perms
+    setup_custom_perms("Lead")
+    filters = {"parent": "Lead", "role": "Desk User", "permlevel": 0, "if_owner": 1}
+    name = frappe.db.exists("Custom DocPerm", filters)
+    permission = frappe.get_doc("Custom DocPerm", name) if name else frappe.get_doc({
+        "doctype": "Custom DocPerm", "parenttype": "DocType", "parentfield": "permissions", **filters
+    })
+    permission.update({"read": 1, "write": 1, "create": 1})
+    permission.save(ignore_permissions=True)
+    frappe.clear_cache(doctype="Lead")
+
+
+def sync_assignment(doc, method=None):
+    """Save the selected owner and native assignment in the same transaction."""
+    previous = doc.get_doc_before_save()
+    if not doc.lead_owner or (previous and previous.lead_owner == doc.lead_owner):
+        return
+    from frappe.desk.form import assign_to
+    import frappe.share
+    # Saving the Lead already required create/write permission. Grant only this
+    # document to the explicitly selected internal user, not general CRM access.
+    frappe.share.add("Lead", doc.name, doc.lead_owner, read=1, write=1,
+                     flags={"ignore_share_permission": True})
+    # The save already checked the previous owner's write permission. After
+    # changing ownership that actor may no longer read the persisted record.
+    assign_to._add({"doctype": "Lead", "name": doc.name, "assign_to": [doc.lead_owner]}, ignore_permissions=True)
+    if previous and previous.lead_owner:
+        assign_to._remove("Lead", doc.name, previous.lead_owner, ignore_permissions=True)
+    # Direct Lead Owner edits must revoke the same access as the handover API.
+    # Shares override the scoped ownership check, so remove stale sales grants.
+    for user in frappe.get_all("DocShare", filters={
+        "share_doctype": "Lead", "share_name": doc.name,
+        "user": ["!=", doc.lead_owner], "everyone": 0,
+    }, pluck="user"):
+        roles = set(frappe.get_roles(user))
+        if "BS Scoped Sales" in roles and not roles.intersection({"Sales Manager", "System Manager"}):
+            frappe.share.remove("Lead", doc.name, user,
+                flags={"ignore_permissions": True, "ignore_share_permission": True})
 
 
 def load_responsibility(doc, method=None):
@@ -161,7 +242,7 @@ def opportunity_deleted(doc, method=None):
 
 @frappe.whitelist()
 def confirm_opportunity(source_name, subject, opportunity_amount=None, intake=None):
-    """Create one real Opportunity only after the salesperson confirms OK."""
+    """Create the linked Opportunity; qualification may follow the Lead conversion."""
     lead = frappe.get_doc("Lead", source_name)
     lead.check_permission("write")
     subject = (subject or "").strip()
@@ -174,6 +255,7 @@ def confirm_opportunity(source_name, subject, opportunity_amount=None, intake=No
     opportunity.opportunity_owner = frappe.session.user
     from bsgroup.opportunity_intake import FIELDS
     intake = frappe.parse_json(intake) if intake else {}
+    opportunity.flags.deferred_lead_intake = not intake
     for field in FIELDS:
         opportunity.set(field, intake.get(field))
     opportunity.company = lead.company
@@ -190,11 +272,32 @@ def confirm_opportunity(source_name, subject, opportunity_amount=None, intake=No
 
 
 @frappe.whitelist()
+def owner_choices(name=None, company=None):
+    """Small internal directory for the in-form owner picker, never a User form link."""
+    if name:
+        lead = frappe.get_doc("Lead", name)
+        lead.check_permission("write")
+        company = lead.company
+    elif not frappe.has_permission("Lead", "create"):
+        frappe.throw(_("Not permitted to create Leads."), frappe.PermissionError)
+    from frappe.permissions import get_user_permissions
+    result = []
+    for user in frappe.get_all("User", filters={"enabled": 1, "user_type": "System User"},
+                              fields=["name", "full_name"], order_by="full_name asc"):
+        companies = get_user_permissions(user.name).get("Company", [])
+        allowed = [p.doc for p in companies if not p.get("applicable_for") or p.applicable_for == "Lead"]
+        if company and allowed and company not in allowed:
+            continue
+        result.append({"value": user.name, "label": user.full_name or user.name})
+    return result
+
+
+@frappe.whitelist()
 def list_owner_labels(names, doctype="Lead"):
     """Return profile labels only for owners of Leads the caller can read."""
-    if doctype not in ("Lead", "Opportunity"):
+    if doctype not in ("Lead", "Opportunity", "Deal Cost Sheet"):
         frappe.throw(_("Invalid document type."))
-    owner_field = "lead_owner" if doctype == "Lead" else "opportunity_owner"
+    owner_field = {"Lead": "lead_owner", "Opportunity": "opportunity_owner", "Deal Cost Sheet": "deal_owner"}[doctype]
     names = frappe.parse_json(names)
     if not isinstance(names, list) or len(names) > 2500:
         frappe.throw(_("Invalid Lead list."))
@@ -206,4 +309,5 @@ def list_owner_labels(names, doctype="Lead"):
     users = frappe.get_all("User", filters={"name": ["in", owners]},
                            fields=["name", "first_name", "full_name"])
     return {row.name: {"initial": (row.first_name or "").strip()[:1].upper() or "?",
+                       "first_name": row.first_name or (row.full_name or row.name).split()[0],
                        "full_name": row.full_name or row.name} for row in users}

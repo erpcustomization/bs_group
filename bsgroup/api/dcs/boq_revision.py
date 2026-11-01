@@ -11,7 +11,7 @@ import frappe
 from frappe.utils import flt, now_datetime
 
 from bsgroup.api.dcs._common import (
-    CUSTOMER_SIDE, VENDOR_SIDE, MD, get_user_roles, has_any, governed_endpoint,
+    CUSTOMER_SIDE, VENDOR_SIDE, BOQ_PREPARERS, MD, get_user_roles, has_any, governed_endpoint,
     audit_event, diff_changes, snapshot, truthy_flag,
 )
 from bsgroup.api.dcs.negotiation import (
@@ -159,7 +159,8 @@ def _proposal(sheet, args, roles):
     history = line_history(sheet, proposed)
     if not history:
         return proposed, history
-    can_sell, can_cost = has_any(roles, CUSTOMER_SIDE), has_any(roles, VENDOR_SIDE)
+    can_sell = has_any(roles, CUSTOMER_SIDE + BOQ_PREPARERS)
+    can_cost = has_any(roles, VENDOR_SIDE)
     for h in history:
         a, b = json.loads(h["before_values"]), json.loads(h["after_values"])
         structure = h["line_type"] == "Item" and (h["operation"] != "Update" or any(a.get(f) != b.get(f) for f in ["item_code", "qty", "description", "position"]))

@@ -216,11 +216,13 @@
    "fieldname": "assigned_to",
    "label": "Assigned To",
    "fieldtype": "Link",
+   "reqd": 1,
    "options": "User"
   },
   {
    "fieldname": "planned_date",
    "label": "Planned Survey Date",
+   "reqd": 1,
    "fieldtype": "Date"
   },
   {

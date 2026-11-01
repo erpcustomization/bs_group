@@ -23,4 +23,11 @@ def validate(doc, method=None):
     if doc.get("company") and source.company and doc.company != source.company:
         frappe.throw(_("The document and its Opportunity must belong to the same company."))
     if not doc.flags.ignore_permissions:
+        from bsgroup.scoped_sales_access import scope, PRESALES
+        if doc.doctype == "Quotation" and scope() == PRESALES:
+            sheet = frappe.get_doc("Deal Cost Sheet", doc.get("custom_deal_cost_sheet"))
+            sheet.check_permission("read")
+            if sheet.opportunity != opportunity:
+                frappe.throw(_("The quotation must use its Deal Cost Sheet's Opportunity."))
+            return
         frappe.get_doc("Opportunity", opportunity).check_permission("read")

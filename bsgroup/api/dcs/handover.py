@@ -642,6 +642,13 @@ def dcs_screen5(args):
 
 	if is_comm == 1:
 		result["projection"] = "commercial"
+		# Read history through the already-authorised parent DCS. Ordinary
+		# workspace users need no independent access to service-owned records.
+		result["award_reversals"] = frappe.get_all(
+			"DCS Award Reversal", filters={"dcs": s.name},
+			fields=["name", "reversal_no", "reversal_reason", "status"],
+			order_by="reversal_no desc", limit_page_length=50,
+		)
 		result["authority"] = {
 			"can_record_award": 1, "can_reconcile_po": 1, "can_set_delivery_owner": 1, "can_release": is_cc + is_md, "can_override": is_md,
 			"can_clear_technical": 0, "can_clear_commercial": 1,

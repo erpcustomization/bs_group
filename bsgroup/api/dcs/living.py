@@ -13,8 +13,8 @@ from bsgroup.dcs.commercial_authority import authorised_position
 
 from bsgroup.api.dcs._common import TECHNICAL_ROLES, get_user_roles, governed_endpoint, has_any
 
-SCREEN2_COMMERCIAL = ["Managing Director", "Commercial Controller", "Sales Manager", "Presales"]
-SCREEN2_REDUCED = ["Sales User"]
+SCREEN2_COMMERCIAL = ["Managing Director", "Commercial Controller", "Sales Manager", "Presales", "BS Scoped Presales"]
+SCREEN2_REDUCED = ["Sales User", "BS Scoped Sales"]
 
 
 def _gate(key, label, state, basis):

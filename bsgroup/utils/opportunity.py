@@ -93,7 +93,7 @@ def set_last_updates(doc, method=None):
 
 def validate_creation_source(doc, method=None):
     """New manual opportunities need an existing Customer; retain linked Lead conversion."""
-    if flt(doc.get("opportunity_amount")) <= 0:
+    if doc.opportunity_from != "Lead" and flt(doc.get("opportunity_amount")) <= 0:
         frappe.throw(frappe._("Enter an Opportunity Amount greater than zero."))
     source, party = doc.opportunity_from, doc.party_name
     if source not in ("Customer", "Lead") or not party or not frappe.db.exists(source, party):

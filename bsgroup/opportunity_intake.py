@@ -14,6 +14,8 @@ def no_presales(doc):
 
 
 def validate(doc, method=None):
+    from bsgroup.sales_qualification import validate as validate_qualification
+    validate_qualification(doc)
     if doc.is_new() and not (doc.get("custom_enquiry") or "").strip():
         frappe.throw(_("Enter the customer Enquiry before creating the Opportunity. For a Lead conversion, complete the Lead Requirement first."))
     kind = doc.get("custom_business_type")
@@ -141,7 +143,8 @@ def create_cost_sheet(doc, *, ignore_permissions=False):
         "party": doc.party_name, "organisation_name": doc.get("custom_organization_name"),
         "subject": doc.get("custom_subject") or doc.title, "company": doc.company,
         "currency": doc.currency})
-    sheet.insert(ignore_permissions=ignore_permissions)
+    from bsgroup.dcs.creation import insert_from_workflow
+    insert_from_workflow(sheet)
     return {"name": sheet.name, "created": True}
 
 
