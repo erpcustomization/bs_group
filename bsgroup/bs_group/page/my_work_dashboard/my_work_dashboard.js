@@ -18,6 +18,18 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
             target.empty();
             $('<h3>').text(__('Today’s attendance')).appendTo(target);
             $('<p class="bs-month-note">').text(__('9:00 AM–6:00 PM · Dubai time · attendance check-ins')).appendTo(target);
+            if (a.remaining_minutes !== undefined) {
+                const clock=$('<div class="bs-workday-clock">').toggleClass('wrap-up',a.remaining_minutes<=30).appendTo(target);
+                const ring=$('<div class="bs-clock-ring" role="img">').attr('aria-label',`${duration(a.remaining_minutes)} remaining until 6 PM`).css('--day-progress',`${Math.max(0,Math.min(100,(540-a.remaining_minutes)/540*100))}%`).appendTo(clock);
+                const face=$('<div class="bs-clock-face">').appendTo(ring);
+                $('<span class="bs-clock-symbol" aria-hidden="true">').text('◷').appendTo(face);
+                $('<strong>').text(duration(a.remaining_minutes)).appendTo(face);
+                $('<small>').text(__('remaining')).appendTo(face);
+                const text=$('<div class="bs-clock-copy">').appendTo(clock);
+                $('<h4>').text(a.remaining_minutes===0 ? __('Workday complete') : a.remaining_minutes<=30 ? __('Time to wrap up') : __('Make the rest of today count')).appendTo(text);
+                $('<p>').text(a.remaining_minutes===0 ? __('Your 6:00 PM working window has ended.') : a.remaining_minutes<=30 ? __('Finish priority tasks, update their status, and prepare to close your day.') : __('Time remaining until 6:00 PM. Focus on your next priority.')).appendTo(text);
+                $('<small>').text(__('9:00 AM start · 5:30 PM wrap-up · 6:00 PM finish')).appendTo(text);
+            }
             if (['unlinked','ambiguous'].includes(a.state)) {
                 $('<p>').text(a.state==='unlinked' ? __('No active Employee profile is linked to your account.') : __('More than one Employee profile is linked. HR needs to confirm the correct profile.')).appendTo(target);
                 return;

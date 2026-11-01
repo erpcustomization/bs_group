@@ -19,4 +19,7 @@ assert calc([('09:15','IN'),('12:00','OUT')],'15:00')['worked_minutes']==165
 assert calc([],'10:00')['state']=='no_checkin'
 assert calc([('11:00','IN')],'10:00')['check_in'] is None
 assert calc([('09:15','')],'10:00')['unknown_logs']
+assert not calc([('09:15','IN')],'17:29')['wrap_up_due']
+assert calc([('09:15','IN')],'17:30')['wrap_up_due']
+assert not calc([('09:15','IN')],'18:00')['wrap_up_due']
 print('PASS: 9:15 example, early arrival, 6 PM cap, breaks, duplicate punches, checkout, empty/future/untyped logs')
