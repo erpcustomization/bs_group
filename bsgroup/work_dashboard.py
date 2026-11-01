@@ -74,8 +74,33 @@ def data(month=None):
                           statuses=[dict(label=str(value) if status == 'status'
                                          else {0:'Draft',1:'Submitted',2:'Cancelled'}.get(value, 'Other'),
                                          total=count) for value, count in counts.items()], recent=recent))
-    return dict(user=frappe.session.user, cards=cards, month=month, totals=totals,
+    presales = presales_summary(start, end) if scope() == 'BS Scoped Presales' else None
+    return dict(user=frappe.session.user, cards=cards, month=month, totals=totals, presales=presales,
                 daily=daily, start=str(start), end=str(end))
+
+
+def presales_summary(start, end):
+    """All-time workload and dated submission events, limited to readable records."""
+    closed = {'Submitted to Sales', 'Completed', 'Won', 'Lost', 'Cancelled'}
+    requests = frappe.get_list('Presales Request', fields=['name', 'status', 'docstatus'],
+                               limit_page_length=0) if frappe.has_permission('Presales Request', 'read') else []
+    sheets = frappe.get_list('Deal Cost Sheet', fields=['name', 'docstatus', 'custom_deal_status'],
+                            limit_page_length=0) if frappe.has_permission('Deal Cost Sheet', 'read') else []
+    open_requests = sum(row.docstatus != 2 and row.status not in closed for row in requests)
+    pending_dcs = sum(row.docstatus == 0 and row.custom_deal_status not in {'Won', 'Lost', 'Cancelled'} for row in sheets)
+    submitted = set()
+    # Query audit events only for documents already returned by permission-filtered get_list.
+    # A later edit or quotation must not move the submission into another month.
+    names = [row.name for row in sheets]
+    for offset in range(0, len(names), 500):
+        events = frappe.get_all('Comment', filters=[
+            ['reference_doctype', '=', 'Deal Cost Sheet'],
+            ['reference_name', 'in', names[offset:offset + 500]],
+            ['comment_type', '=', 'Submitted'],
+            ['creation', '>=', str(start)], ['creation', '<', str(end)]
+        ], fields=['reference_name'], limit_page_length=0)
+        submitted.update(row.reference_name for row in events)
+    return dict(open_requests=open_requests, pending_dcs=pending_dcs, submitted=len(submitted))
 
 
 @frappe.whitelist(methods=['POST'])

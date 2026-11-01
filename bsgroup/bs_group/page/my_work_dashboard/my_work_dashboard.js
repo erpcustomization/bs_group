@@ -24,10 +24,16 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
             $('<strong>').text(new Date(data.month+'-01T12:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'})).appendTo(stamp);
             $('<span>').text(__('Updated just now')).appendTo(stamp);
             const summary = $('<div class="bs-month-summary">').appendTo(host);
-            [['created','Created'],['updated','Last updated'],['active','Records with activity']].forEach(([key,label])=>{
+            const metrics = data.presales ? [
+                ['open_requests','Open presales requests','All months · not yet handed to Sales'],
+                ['pending_dcs','DCS in progress / delayed','All months · awaiting submission'],
+                ['submitted','Submitted to Sales','Selected month · recorded DCS submissions']
+            ] : [['created','Created'],['updated','Last updated'],['active','Records with activity']];
+            metrics.forEach(([key,label,note])=>{
                 const tile=$('<div class="bs-month-kpi">').appendTo(summary);
                 $('<span>').text(__(label)).appendTo(tile);
-                $('<strong>').text(data.totals[key].toLocaleString()).appendTo(tile);
+                $('<strong>').text((data.presales || data.totals)[key].toLocaleString()).appendTo(tile);
+                if (note) $('<small>').text(__(note)).css({color:'#60718b',fontSize:'11px'}).appendTo(tile);
             });
             const graph=$('<section class="bs-month-chart">').appendTo(host);
             $('<h3>').text(__('Records created each day')).appendTo(graph);
