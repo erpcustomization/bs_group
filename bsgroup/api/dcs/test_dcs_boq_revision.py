@@ -188,12 +188,20 @@ class IntegrationTestDCSBOQRevision(IntegrationTestCase):
         with self.assertRaises(frappe.ValidationError):
             self.apply(doc, p)
 
-    def test_sales_user_cannot_change_buying_fields(self):
+    def test_sales_user_can_replace_complete_boq(self):
         doc = self.sheet()
         p = payload(doc)
-        p["items"][0]["cost_rate"] = 900
-        with self.assertRaises(frappe.PermissionError):
-            self.apply(doc, p, user=self.sales)
+        original = doc.items[0].name
+        p["items"] = [{"item_code": doc.items[0].item_code,
+            "description": "Revised sales scope", "qty": 2,
+            "cost_rate": 450, "selling_rate": 750}]
+        self.assertEqual(self.apply(doc, p, user=self.sales)["ok"], 1)
+        doc.reload()
+        self.assertNotEqual(doc.items[0].name, original)
+        self.assertEqual(doc.total_cost, 900)
+        self.assertEqual(doc.total_selling, 1500)
+        revision = frappe.get_doc("DCS Revision", doc.custom_revision_reference)
+        self.assertEqual({r.operation for r in revision.boq_lines}, {"Add", "Remove"})
 
     def test_presales_can_change_cost_but_not_scope_or_selling(self):
         doc = self.sheet()

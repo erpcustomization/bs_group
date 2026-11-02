@@ -160,7 +160,7 @@ def _proposal(sheet, args, roles):
     if not history:
         return proposed, history
     can_sell = has_any(roles, CUSTOMER_SIDE + BOQ_PREPARERS)
-    can_cost = has_any(roles, VENDOR_SIDE)
+    can_cost = has_any(roles, VENDOR_SIDE + BOQ_PREPARERS)
     for h in history:
         a, b = json.loads(h["before_values"]), json.loads(h["after_values"])
         structure = h["line_type"] == "Item" and (h["operation"] != "Update" or any(a.get(f) != b.get(f) for f in ["item_code", "qty", "description", "position"]))

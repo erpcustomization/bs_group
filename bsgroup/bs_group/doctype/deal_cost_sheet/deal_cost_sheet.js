@@ -3578,7 +3578,7 @@ function dcs_boq_revision_dialog(frm, cap) {
     // Complete BOQ preparation is distinct from customer-side negotiation.
     // The server still enforces assignment, per-line authority and approvals.
     if (cap.can_prepare_boq) {
-        cap = Object.assign({}, cap, {can_customer_side: 1});
+        cap = Object.assign({}, cap, {can_customer_side: 1, can_vendor_side: 1});
     }
     var both = cap.can_customer_side && cap.can_vendor_side;
     var d;
