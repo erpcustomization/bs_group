@@ -111,3 +111,21 @@ body.bs-sales-ui:is([data-route="List/Opportunity/List"],[data-route="List/Presa
     }`;
     document.head.appendChild(style);
 })();
+
+// DCS intake must show newly created sheets before older edited sheets.
+(() => {
+    const settings = frappe.listview_settings['Deal Cost Sheet'] ||= {};
+    const previous = settings.onload;
+    settings.onload = function(list) {
+        if (previous) previous.call(this, list);
+        if (list.bs_newest_dcs_first) return;
+        list.bs_newest_dcs_first = true;
+        const getArgs = list.get_args.bind(list);
+        list.get_args = function() {
+            list.sort_by = 'creation';
+            list.sort_order = 'desc';
+            if (list.sort_selector) list.sort_selector.set_value('creation', 'desc');
+            return Object.assign(getArgs(), {order_by: '`tabDeal Cost Sheet`.`creation` desc, `tabDeal Cost Sheet`.`name` desc'});
+        };
+    };
+})();
