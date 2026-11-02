@@ -26,7 +26,9 @@ def presales_handoff(name):
     survey = frappe.db.get_value("Site Survey Request", pre.get("custom_site_survey_request"),
         ["status", "results"], as_dict=True) if pre.get("custom_site_survey_request") else None
     label = pre.status
-    if pre.status not in ("Cancelled", "Completed", "Won", "Lost", "Submitted to Sales", "Ready for Quotation", "On Hold"):
+    if pre.status == "Costing in Progress":
+        label = "Deal Cost Sheet in Progress"
+    elif pre.status not in ("Cancelled", "Completed", "Won", "Lost", "Submitted to Sales", "Ready for Quotation", "On Hold"):
         label = "Awaiting Site Survey" if survey and survey.status not in ("Completed", "Cancelled") else "Open with Presales"
     return {"label": label, "results": survey.results if survey and survey.status == "Completed" else None}
 

@@ -87,6 +87,8 @@ class PresalesRequest(Document):
 		existing = frappe.get_all("Deal Cost Sheet", filters={"opportunity": self.opportunity,
 			"docstatus": ["<", 2]}, fields=["name", "custom_record_authority"])
 		if any(row.custom_record_authority != "Superseded" for row in existing):
+			if self.status in ("Draft", "Open", "Assigned", "In Progress"):
+				self.db_set("status", "Costing in Progress")
 			return
 		opportunity = frappe.get_doc("Opportunity", self.opportunity)
 		sheet = frappe.new_doc("Deal Cost Sheet")
@@ -99,6 +101,7 @@ class PresalesRequest(Document):
 		# downstream record, including for presales users without DCS create access.
 		from bsgroup.dcs.creation import insert_from_workflow
 		insert_from_workflow(sheet)
+		self.db_set("status", "Costing in Progress")
 
 	def after_insert(self):
 		if self.opportunity:
