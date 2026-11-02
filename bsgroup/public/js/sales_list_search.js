@@ -188,7 +188,13 @@
     if(proto._bs_search_installed) return true;
     proto._bs_search_installed=true;
     const render=proto.before_render, args=proto.get_args;
-    proto.before_render=function(...a){const result=render.apply(this,a);mount(this);return result;};
+    proto.before_render=function(...a){
+      if(this.doctype === 'Presales Request') {
+        this.settings.has_indicator_for_draft = true;
+        (frappe.listview_settings['Presales Request'] ||= {}).has_indicator_for_draft = true;
+      }
+      const result=render.apply(this,a);mount(this);return result;
+    };
     proto.get_args=function(...a){
       const result=args.apply(this,a);
       if(this.doctype === 'Deal Cost Sheet') {

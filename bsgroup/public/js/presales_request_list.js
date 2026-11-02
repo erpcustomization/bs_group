@@ -1,4 +1,5 @@
 frappe.listview_settings['Presales Request'] = {
+    has_indicator_for_draft: true,
     get_indicator: function(doc) {
         var color_map = {
             'Draft': 'red',
