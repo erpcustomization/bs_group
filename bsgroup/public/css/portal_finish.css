@@ -228,3 +228,6 @@ body.bs-sales-ui[data-route="List/Opportunity/List"] :is(.list-row,.list-row-hea
 #page-Opportunity .inner-group-button[data-label="Create"],
 #page-Opportunity button[data-label="Close"],
 #page-Opportunity button.menu-more-button{display:none!important}
+
+/* Hide the retired manual DCS group even in cached Presales forms. */
+[id="page-Presales Request"] .inner-group-button[data-label="Create"] { display:none!important; }

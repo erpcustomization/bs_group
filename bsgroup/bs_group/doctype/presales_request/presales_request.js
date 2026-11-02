@@ -165,20 +165,8 @@ frappe.ui.form.on("Presales Request", {
         presales_status_panel(frm);
         reduce_subject_height(frm);
         frm.toggle_reqd("site_visit", frm.doc.site_visit_required == 1);
-        if(frm.doc.docstatus == 1){
-            frm.add_custom_button("Deal Cost Sheet", () => {
-                frappe.new_doc("Deal Cost Sheet", {
-                    opportunity: frm.doc.opportunity,
-                    presales_request : frm.doc.name,
-                    party_type: frm.doc.party_type,
-                    party: frm.doc.party,
-                    organisation_name: frm.doc.organisation_name,
-                    deal_owner: frm.doc.requested_by,
-                    company: frm.doc.company,
-                    subject: frm.doc.subject
-                })
-            },__("Create"))
-        }
+        // Submission creates the DCS on the server; no manual duplicate action.
+        frm.remove_custom_button(__('Deal Cost Sheet'), __('Create'));
     },
     status(frm){
         set_completion_date(frm)
