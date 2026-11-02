@@ -226,4 +226,5 @@ body.bs-sales-ui[data-route="List/Opportunity/List"] :is(.list-row,.list-row-hea
 .bs-work-month-controls{gap:12px;align-items:center;flex-wrap:wrap}.bs-dashboard-leave{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:8px 0;font-size:11px}.bs-dashboard-leave:empty{display:none}.bs-att-month-days [role=button]{cursor:pointer}.bs-att-month-days [role=button]:focus-visible{outline:2px solid #00a8b5;outline-offset:2px}
 /* Opportunity uses its saved workflow rather than manual creation/closure. */
 #page-Opportunity .inner-group-button[data-label="Create"],
-#page-Opportunity button[data-label="Close"]{display:none!important}
+#page-Opportunity button[data-label="Close"],
+#page-Opportunity button.menu-more-button{display:none!important}
