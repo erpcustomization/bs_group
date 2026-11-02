@@ -122,12 +122,17 @@ def create_requests(doc, method=None):
         "opportunity": doc.name, "docstatus": ["<", 2], "status": ["!=", "Cancelled"]})
     if presales_name:
         pre = frappe.get_doc("Presales Request", presales_name)
+        if not pre.presales_owner and pre.docstatus == 0:
+            recipient = default_presales_owner()
+            if recipient:
+                pre.db_set("presales_owner", recipient)
         if not survey_name or pre.custom_site_survey_request == survey_name:
             return
         if pre.docstatus or pre.status not in ("Draft", "Open", "Assigned", WAITING):
             frappe.throw(_("This Opportunity already has a Presales Request in progress. Arrange its survey from that request."))
     else:
         pre = frappe.get_doc({"doctype": "Presales Request", "opportunity": doc.name,
+            "presales_owner": default_presales_owner(),
             "party_type": doc.opportunity_from, "party": doc.party_name,
             "company": doc.company, "subject": doc.get("custom_subject") or doc.title or doc.name,
             "estimated_value": doc.opportunity_amount, "requested_by": frappe.session.user,
@@ -143,6 +148,14 @@ def create_requests(doc, method=None):
     if survey_name:
         frappe.db.set_value("Site Survey Request", survey_name, "presales_request", pre.name, update_modified=False)
     doc.db_set("status", "Presales Request", update_modified=False)
+
+
+def default_presales_owner():
+    """Route intake independently of its creator; retain explicit assignments."""
+    user = frappe.conf.get("bsg_default_presales_owner") or "sanisha@bitssecureit.com"
+    if frappe.db.get_value("User", user, "enabled") and set(frappe.get_roles(user)) & {"BS Scoped Presales", "Presales"}:
+        return user
+    return None
 
 
 def validate_presales(doc, method=None):
