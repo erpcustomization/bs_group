@@ -128,7 +128,7 @@ def make_opportunity(source_name):
     opportunity.custom_enquiry = customer_requirement(lead)
     opportunity.custom_organization_name = lead.company_name
     opportunity.custom_contact_person_name = lead.lead_name
-    opportunity.opportunity_owner = frappe.session.user
+    opportunity.opportunity_owner = lead.lead_owner or frappe.session.user
     opportunity.company = lead.company
     if not opportunity.currency and lead.company:
         opportunity.currency = frappe.db.get_value("Company", lead.company, "default_currency")
@@ -254,7 +254,7 @@ def confirm_opportunity(source_name, subject, opportunity_amount=None, intake=No
     frappe.db.sql("SELECT name FROM `tabLead` WHERE name=%s FOR UPDATE", source_name)
     opportunity = make_opportunity(source_name)
     opportunity.opportunity_amount = opportunity_amount
-    opportunity.opportunity_owner = frappe.session.user
+    opportunity.opportunity_owner = lead.lead_owner or frappe.session.user
     from bsgroup.opportunity_intake import FIELDS
     intake = frappe.parse_json(intake) if intake else {}
     opportunity.flags.deferred_lead_intake = not intake
