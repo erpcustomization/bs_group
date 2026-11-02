@@ -191,6 +191,12 @@
     proto.before_render=function(...a){const result=render.apply(this,a);mount(this);return result;};
     proto.get_args=function(...a){
       const result=args.apply(this,a);
+      if(this.doctype === 'Deal Cost Sheet') {
+        this.sort_by = 'creation';
+        this.sort_order = 'desc';
+        this.sort_selector?.set_value('creation', 'desc');
+        result.order_by = '`tabDeal Cost Sheet`.`creation` desc, `tabDeal Cost Sheet`.`name` desc';
+      }
       if(fields[this.doctype] && this._bs_search){
         const available=fields[this.doctype].filter(f=>f==='name'||frappe.meta.has_field(this.doctype,f));
         result.or_filters=[...(result.or_filters||[]),...available.map(f=>[this.doctype,f,'like',`%${this._bs_search}%`])];
