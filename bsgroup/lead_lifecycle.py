@@ -38,6 +38,8 @@ def customer_requirement(lead):
 
 
 def before_validate(doc, method=None):
+    from bsgroup.lead_email_limit import validate as validate_email_limit
+    validate_email_limit(doc)
     if not (doc.get("custom_requirement") or "").strip():
         doc.custom_requirement = customer_requirement(doc)
     if doc.is_new() and not doc.lead_owner:
