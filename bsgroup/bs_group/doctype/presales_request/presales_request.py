@@ -86,7 +86,20 @@ class PresalesRequest(Document):
 			frappe.throw(_("Complete the Site Survey before submitting Presales for costing."))
 		existing = frappe.get_all("Deal Cost Sheet", filters={"opportunity": self.opportunity,
 			"docstatus": ["<", 2]}, fields=["name", "custom_record_authority"])
-		if any(row.custom_record_authority != "Superseded" for row in existing):
+		active = [row for row in existing if row.custom_record_authority != "Superseded"]
+		if active:
+			if len(active) != 1:
+				frappe.throw(_("Multiple active Deal Cost Sheets require review before the Presales handoff."))
+			sheet = frappe.get_doc("Deal Cost Sheet", active[0].name, for_update=True)
+			if sheet.presales_request and sheet.presales_request != self.name:
+				frappe.throw(_("The existing Deal Cost Sheet belongs to another Presales Request. Please review its link."))
+			if not sheet.presales_request:
+				if sheet.docstatus != 0 or any(sheet.get(f) != self.get(f) for f in ("company", "party_type", "party")):
+					frappe.throw(_("The existing Deal Cost Sheet requires review before linking this Presales Request."))
+				sheet.db_set("presales_request", self.name)
+				sheet.add_comment("Info", _("Linked to Presales Request {0} during submission.").format(self.name))
+				from bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet import dcs_presales_sync
+				dcs_presales_sync(self.name, source="interactive")
 			if self.status in ("Draft", "Open", "Assigned", "In Progress"):
 				self.db_set("status", "Costing in Progress")
 			return
