@@ -54,6 +54,25 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
         if (hero) window.bsAttendance?.mountDashboard(hero);
     });
     function mountTeamOverview() {
+        function numberDetails(element, title, rows, unavailable=false) {
+            const items=rows || [];
+            const empty=unavailable?'You do not have access to these records.':'No matching records for this number.';
+            element.attr({title:`${title}\n${items.length?items.join('\n'):empty}\nClick to keep details open.`,role:'button',tabindex:0,'aria-label':`${title}: ${items.length} records. Show details`})
+                .css({cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted',textUnderlineOffset:'4px'});
+            const show=()=>{
+                const dialog=new frappe.ui.Dialog({title,fields:[{fieldname:'details',fieldtype:'HTML'}]});
+                const content=dialog.fields_dict.details.$wrapper;
+                $('<p>').text(`${managementDay} · ${items.length} matching record(s)`).appendTo(content);
+                const list=$('<div>').css({maxHeight:'55vh',overflowY:'auto'}).appendTo(content);
+                if(!items.length) $('<p>').text(empty).appendTo(list);
+                items.forEach(item=>$('<div>').text(item).css({padding:'8px 0',borderBottom:'1px solid #e6edf5',whiteSpace:'normal',overflowWrap:'anywhere'}).appendTo(list));
+                dialog.show();
+            };
+            element.on('click',show).on('keydown',event=>{
+                if(event.key==='Enter'||event.key===' '){event.preventDefault();show();}
+            });
+            return element;
+        }
         const section=$('<section class="bs-team-daily" aria-label="Daily team overview">').css({background:'#fff',border:'1px solid #dbe5f1',borderRadius:'12px',padding:'14px',marginBottom:'12px'}).appendTo(host);
         const heading=$('<div>').css({display:'flex',justifyContent:'space-between',alignItems:'center',gap:'12px',flexWrap:'wrap',marginBottom:'10px'}).appendTo(section);
         $('<h3>').text('Management overview').css({margin:0,fontSize:'16px'}).appendTo(heading);
@@ -93,7 +112,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
                         const amounts=Object.entries(metric.amounts);
                         value=amounts.length?amounts.map(([currency,amount])=>`${currency} ${Number(amount).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`).join(' · '):'0.00';
                     }
-                    $('<strong>').text(value).css({display:'block',fontSize:'22px',lineHeight:'1.35',margin:'6px 0',overflowWrap:'anywhere',color:key==='won'?'#13754e':'#16365f'}).appendTo(tile);
+                    numberDetails($('<strong>').text(value).css({display:'block',fontSize:'22px',lineHeight:'1.35',margin:'6px 0',overflowWrap:'anywhere',color:key==='won'?'#13754e':'#16365f'}).appendTo(tile),title,data.details?.[key],metric===null);
                     $('<small>').text(metric && typeof metric==='object'?`${metric.count} quotation(s) · ${note}`:note).css({display:'block',fontSize:'11px',color:'#526781'}).appendTo(tile);
                 }
                 const attendance=data.attendance;
@@ -104,7 +123,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
                     if(['not_started','partial_day','unconfigured'].includes(key) && !attendance.totals[key]) continue;
                     const tile=$('<div>').css({background:color,borderRadius:'8px',padding:'10px'}).appendTo(attendanceGrid);
                     $('<span>').text(title).css({fontSize:'11px',display:'block'}).appendTo(tile);
-                    $('<strong>').text(attendance.totals[key]).css({fontSize:'23px',color:key==='no_checkin'?'#b42318':'#16365f'}).appendTo(tile);
+                    numberDetails($('<strong>').text(attendance.totals[key]).css({display:'inline-block',fontSize:'23px',color:key==='no_checkin'?'#b42318':'#16365f'}).appendTo(tile),title,attendance.details?.[key]);
                 }
                 $('<p>').text('Employee headcounts for the selected day. Actual check-ins only; manual Present records are excluded. Late arrivals awaiting checkout are shown separately. Approved leave, on-duty requests and holiday calendars are respected.').css({fontSize:'11px',color:'#60718b',margin:'8px 0 0'}).appendTo(teamAttendance);
                 $('<h4>').text('Team contribution · selected day').css({fontSize:'13px',margin:'0 0 8px'}).appendTo(contribution);
@@ -117,7 +136,8 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
                     const money=metric=>Object.entries(metric.amounts).map(([currency,value])=>`${currency} ${Number(value).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`).join(' · ') || '—';
                     data.people.forEach(person=>{
                         const row=$('<tr>').appendTo(body);
-                        [person.name,person.leads,person.opportunities,money(person.quoted),money(person.won)].forEach(value=>$('<td>').text(value).appendTo(row));
+                        $('<td>').text(person.name).appendTo(row);
+                        [['leads',person.leads],['opportunities',person.opportunities],['quoted',money(person.quoted)],['won',money(person.won)]].forEach(([key,value])=>numberDetails($('<td>').text(value).appendTo(row),`${person.name} · ${key}`,person.details?.[key]));
                     });
                 }
                 $('<p>').text('Quoted and won values include quotation taxes. Currencies are shown separately. Cancelled records are excluded; DCS workload shows the current position, even when viewing an earlier day.').css({fontSize:'11px',color:'#60718b',margin:'8px 0 0'}).appendTo(contribution);

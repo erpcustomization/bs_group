@@ -31,14 +31,16 @@ def overview(day):
         frappe.throw('This employee overview is available to Mohan only.', frappe.PermissionError)
     # The chairman requested aggregate employee attendance. His employee-level
     # self-service restriction must not narrow the company headcount to himself.
-    # Resolve readable companies first; never return individual HR documents.
+    # Resolve readable companies first; return only names and punch times for
+    # the requested headcount drilldown, never full HR documents or leave reasons.
     companies = frappe.get_list('Company', pluck='name', limit_page_length=0)
     totals = dict(on_time=0, late=0, pending_checkout=0, no_checkin=0,
                   leave=0, on_duty=0, off=0, not_started=0, partial_day=0, unconfigured=0)
+    details = {key:[] for key in totals}
     if not companies:
-        return dict(total=0, totals=totals, day=str(day))
+        return dict(total=0, totals=totals, details=details, day=str(day))
     employees = frappe.get_all('Employee', filters={'company':['in',companies]},
-        fields=['name','status','date_of_joining','relieving_date','default_shift','holiday_list'],
+        fields=['name','employee_name','status','date_of_joining','relieving_date','default_shift','holiday_list'],
         limit_page_length=0)
     employees = [e for e in employees
         if (not e.date_of_joining or frappe.utils.getdate(e.date_of_joining) <= day)
@@ -46,7 +48,7 @@ def overview(day):
         and (e.status == 'Active' or bool(e.relieving_date))]
     names = [e.name for e in employees]
     if not names:
-        return dict(total=0, totals=totals, day=str(day))
+        return dict(total=0, totals=totals, details=details, day=str(day))
     now = datetime.now(TZ)
     site = ZoneInfo(frappe.utils.get_system_timezone())
     lower = datetime.combine(day, time(), TZ)
@@ -97,4 +99,14 @@ def overview(day):
         status = classify(start,now,first,last_out,holiday_list in off_lists,
                           leave_by_employee.get(employee.name,0),duty_by_employee.get(employee.name,0))
         totals[status] += 1
-    return dict(total=len(employees),totals=totals,day=str(day))
+        label = f"{employee.employee_name or employee.name} ({employee.name})"
+        if first:
+            label += ' · IN ' + first.strftime('%I:%M %p')
+        if last_out:
+            label += ' · OUT ' + last_out.strftime('%I:%M %p')
+        if start:
+            label += ' · Shift starts ' + start.strftime('%I:%M %p')
+        details[status].append(label)
+    for rows in details.values():
+        rows.sort(key=str.casefold)
+    return dict(total=len(employees),totals=totals,details=details,day=str(day))

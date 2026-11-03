@@ -54,6 +54,13 @@ assert data['quoted'] == {'count':2,'amounts':{'AED':105,'OMR':20}}
 assert data['won'] == {'count':1,'amounts':{'AED':300}}
 assert [p['user'] for p in data['people']] == ['sales-a','sales-b']
 assert data['people'][0]['won']['amounts']['AED'] == 300
+for key in ('leads','opportunities','presales','dcs'):
+    assert len(data['details'][key]) == data[key]
+for key in ('quoted','won'):
+    assert len(data['details'][key]) == data[key]['count']
+assert data['details']['dcs'] == ['D1']
+assert data['people'][0]['details']['quoted'] == ['Q1 · AED 105.00']
+assert data['people'][1]['details']['quoted'] == ['Q2 · OMR 20.00']
 for dt, filters in queries:
     if dt in ('Lead','Presales Request'):
         assert ['creation','>=','2026-11-03'] in filters

@@ -30,14 +30,14 @@ def daily(day=None):
         return frappe.get_list(doctype, fields=fields or ["name"],
                                filters=filters, limit_page_length=0)
 
-    result = {"day": start, "today": frappe.utils.today()}
+    result = {"day": start, "today": frappe.utils.today(), "details": {}}
     people = {}
 
     def person(user):
         user = user or "Unassigned"
         if user not in people:
             people[user] = dict(user=user, name=frappe.get_cached_value("User", user, "full_name") or user,
-                                leads=0, opportunities=0, quoted=[], won=[])
+                                leads=0, opportunities=0, quoted=[], won=[], details={"leads":[],"opportunities":[],"quoted":[],"won":[]})
         return people[user]
     for key, doctype in (("leads", "Lead"), ("opportunities", "Opportunity"),
                          ("presales", "Presales Request")):
@@ -46,15 +46,20 @@ def daily(day=None):
                                  ["docstatus", "!=", 2]],
                        ["name", "owner", owner_field] if owner_field else ["name"])
         result[key] = len(rows) if rows is not None else None
+        result["details"][key] = [row.name for row in rows or []]
         if owner_field:
             for row in rows or []:
                 person(row.get(owner_field) or row.owner)[key] += 1
+                person(row.get(owner_field) or row.owner)["details"][key].append(row.name)
     sheets = records("Deal Cost Sheet", [["docstatus", "=", 0]],
                      ["name", "custom_deal_status", "custom_record_authority"])
     result["dcs"] = sum(
         row.custom_deal_status not in {"Won", "Lost", "Cancelled"}
         and row.custom_record_authority != "Superseded" for row in sheets
     ) if sheets is not None else None
+    result["details"]["dcs"] = [row.name for row in sheets or []
+        if row.custom_deal_status not in {"Won", "Lost", "Cancelled"}
+        and row.custom_record_authority != "Superseded"]
     # Quoted cohort and win-event cohort are deliberately separate. An older
     # quotation won on the selected day belongs in Won for that day.
     fields = ["name", "currency", "grand_total", "owner", "opportunity"]
@@ -64,6 +69,7 @@ def daily(day=None):
     ):
         rows = records("Quotation", [["docstatus", "=", 1]] + filters, fields)
         result[key] = quotation_total(rows) if rows is not None else None
+        result["details"][key] = [f"{row.name} · {row.currency} {float(row.grand_total or 0):,.2f}" for row in rows or []]
         names = list({row.opportunity for row in rows or [] if row.opportunity})
         opportunities = records("Opportunity", [["name", "in", names]],
                                 ["name", "opportunity_owner", "owner"]) if names else []
@@ -72,6 +78,8 @@ def daily(day=None):
             # Do not attribute a presales-created quote to the preparer when
             # the linked Opportunity supplies the actual sales owner.
             person(owners.get(row.opportunity) if row.opportunity else row.owner)[key].append(row)
+            person(owners.get(row.opportunity) if row.opportunity else row.owner)["details"][key].append(
+                f"{row.name} · {row.currency} {float(row.grand_total or 0):,.2f}")
     result["people"] = []
     for row in sorted(people.values(), key=lambda row: row["name"].lower()):
         row["quoted"] = quotation_total(row["quoted"])
