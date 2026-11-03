@@ -1,6 +1,8 @@
 frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
     const page = frappe.ui.make_app_page({parent:wrapper,title:__('My Dashboard'),single_column:true});
     const host = $('<div class="bs-work"></div>').appendTo(page.main);
+    const management = frappe.session.user === 'mohan@bitssecureit.com';
+    let managementDay = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Dubai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
     const controls = $('<div class="bs-work-month-controls"><label>Month <input type="month" aria-label="Dashboard month"></label></div>').insertBefore(host);
     const monthInput = controls.find('input');
     const leaveButton = $('<button type="button" class="btn btn-primary btn-sm">').text(__('Apply for Leave')).hide().appendTo(controls);
@@ -51,6 +53,72 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
         const hero=host[0].querySelector('.bs-work-hero');
         if (hero) window.bsAttendance?.mountDashboard(hero);
     });
+    function mountTeamOverview() {
+        const section=$('<section class="bs-team-daily" aria-label="Daily team overview">').css({background:'#fff',border:'1px solid #dbe5f1',borderRadius:'12px',padding:'14px',marginBottom:'12px'}).appendTo(host);
+        const heading=$('<div>').css({display:'flex',justifyContent:'space-between',alignItems:'center',gap:'12px',flexWrap:'wrap',marginBottom:'10px'}).appendTo(section);
+        $('<h3>').text('Management overview').css({margin:0,fontSize:'16px'}).appendTo(heading);
+        const label=$('<label>').text('Day ').css({margin:0}).appendTo(heading);
+        const day=$('<input type="date" aria-label="Team overview date">').val(managementDay).css({border:'1px solid #cbd8e8',borderRadius:'6px',padding:'5px 8px'}).appendTo(label);
+        const status=$('<p role="status">').css({fontSize:'12px',color:'#60718b',margin:'0 0 10px'}).appendTo(section);
+        const grid=$('<div>').css({display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(145px,1fr))',gap:'10px'}).appendTo(section);
+        const contribution=$('<div>').css({marginTop:'12px',overflowX:'auto'}).appendTo(section);
+        let sequence=0;
+        async function load() {
+            const request=++sequence;
+            status.text('Loading team figures…');
+            grid.empty();
+            contribution.empty();
+            try {
+                const r=await frappe.call({method:'bsgroup.management_dashboard.daily',args:{day:managementDay},quiet:true});
+                if(request!==sequence || !section[0].isConnected) return;
+                const data=r.message;
+                day.attr('max',data.today);
+                status.text(`${data.day} · UAE team records you can access · Updated ${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`);
+                const cards=[
+                    ['leads','Leads created','Created on this day','#eef4fc'],
+                    ['opportunities','Opportunities created','Created on this day','#edf5ff'],
+                    ['presales','Presales received','Requests created on this day','#e5f5f7'],
+                    ['dcs','DCS in progress','Current outstanding drafts · all dates','#fff2da'],
+                    ['quoted','Quoted value','Submitted quotations dated this day','#e9f3ff'],
+                    ['won','Won value','Submitted quotations · recorded win date','#e3f5ed']
+                ];
+                for(const [key,title,note,color] of cards) {
+                    const tile=$('<div>').css({background:color,borderRadius:'9px',padding:'12px',minWidth:0}).appendTo(grid);
+                    $('<div>').text(title).css({fontSize:'12px',color:'#294867'}).appendTo(tile);
+                    const metric=data[key];
+                    let value=metric===null?'Unavailable':Number(metric).toLocaleString();
+                    if(metric && typeof metric==='object') {
+                        const amounts=Object.entries(metric.amounts);
+                        value=amounts.length?amounts.map(([currency,amount])=>`${currency} ${Number(amount).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`).join(' · '):'0.00';
+                    }
+                    $('<strong>').text(value).css({display:'block',fontSize:'22px',lineHeight:'1.35',margin:'6px 0',overflowWrap:'anywhere',color:key==='won'?'#13754e':'#16365f'}).appendTo(tile);
+                    $('<small>').text(metric && typeof metric==='object'?`${metric.count} quotation(s) · ${note}`:note).css({display:'block',fontSize:'11px',color:'#526781'}).appendTo(tile);
+                }
+                $('<h4>').text('Team contribution · selected day').css({fontSize:'13px',margin:'0 0 8px'}).appendTo(contribution);
+                if(!data.people.length) $('<p>').text('No sales activity recorded for this day.').appendTo(contribution);
+                else {
+                    const table=$('<table class="table table-sm">').css({fontSize:'12px',marginBottom:0}).appendTo(contribution);
+                    const head=$('<tr>').appendTo($('<thead>').appendTo(table));
+                    ['Sales owner','Leads','Opportunities','Quoted value','Won value'].forEach(title=>$('<th>').text(title).appendTo(head));
+                    const body=$('<tbody>').appendTo(table);
+                    const money=metric=>Object.entries(metric.amounts).map(([currency,value])=>`${currency} ${Number(value).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`).join(' · ') || '—';
+                    data.people.forEach(person=>{
+                        const row=$('<tr>').appendTo(body);
+                        [person.name,person.leads,person.opportunities,money(person.quoted),money(person.won)].forEach(value=>$('<td>').text(value).appendTo(row));
+                    });
+                }
+                $('<p>').text('Quoted and won values include quotation taxes. Currencies are shown separately. Cancelled records are excluded; DCS workload shows the current position, even when viewing an earlier day.').css({fontSize:'11px',color:'#60718b',margin:'8px 0 0'}).appendTo(contribution);
+            } catch(e) {
+                if(request===sequence && section[0].isConnected) status.text('Unable to load team figures. Select a valid date or reload the page.');
+            }
+        }
+        day.on('change',()=>{if(day.val()){managementDay=day.val();load();}});
+        wrapper.refresh_team_overview=load;
+        load();
+    }
+    if(management) setInterval(()=>{
+        if(host[0].isConnected && host.is(':visible')) wrapper.refresh_team_overview?.();
+    },300000);
     async function refresh() {
         loadLeave().catch(()=>{leaveButton.hide();leavePanel.text(__('Leave details could not be loaded. Please reload to try again.'));});
         const currentRequest = ++requestId;
@@ -63,12 +131,13 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
             const hero = $('<header class="bs-work-hero"></header>').attr('data-month',data.month).appendTo(host);
             const intro = $('<div>').appendTo(hero);
             $('<div class="bs-work-eyebrow">').text(__('BITS SECURE · YOUR WORKSPACE')).appendTo(intro);
-            $('<h2>').text(__('Your month, at a glance')).appendTo(intro);
-            $('<p>').text(__('Records created or last updated in the selected month.')).appendTo(intro);
+            $('<h2>').text(__(management?'Company performance, at a glance':'Your month, at a glance')).appendTo(intro);
+            $('<p>').text(__(management?'Daily sales activity and current costing workload.':'Records created or last updated in the selected month.')).appendTo(intro);
             const stamp = $('<div class="bs-work-stamp">').appendTo(hero);
             $('<strong>').text(new Date(data.month+'-01T12:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'})).appendTo(stamp);
             $('<span>').text(__('Updated just now')).appendTo(stamp);
             window.bsAttendance?.mountDashboard(hero[0]);
+            if(management) mountTeamOverview();
 
             const attendance=$('<section class="bs-month-attendance" aria-label="Monthly attendance">').appendTo(host);
             attendance.text(__('Loading monthly attendance…'));
@@ -98,6 +167,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
             }).catch(()=>{if(currentRequest===requestId) attendance.text(__('Attendance could not be loaded. Please reload the page.'));});
 
             const summary = $('<div class="bs-month-summary">').appendTo(host);
+            if(management) summary.hide();
             const metrics = data.presales ? [
                 ['open_requests','Open presales requests','All months · not yet handed to Sales'],
                 ['pending_dcs','DCS in progress / delayed','All months · awaiting submission'],
