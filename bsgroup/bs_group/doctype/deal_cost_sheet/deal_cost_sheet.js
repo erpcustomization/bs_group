@@ -1426,7 +1426,7 @@ frappe.ui.form.on('Deal Cost Sheet', {
     onload_post_render: function(frm) { dcsInit(frm); if (window.dcsLiveCalc) window.dcsLiveCalc(frm); }
 ,
     onload: function(frm) {
-        dcs_fetch_party_details(frm);
+        if (frm.is_new()) dcs_fetch_party_details(frm);
         // Default Deal Owner to current user on new DCS
         if (frm.is_new() && !frm.doc.deal_owner) {
             frm.set_value('deal_owner', frappe.session.user);

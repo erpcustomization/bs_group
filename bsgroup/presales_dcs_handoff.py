@@ -12,6 +12,10 @@ def link_back(request, sheet):
     if current and current != sheet.name:
         frappe.throw('Presales already links to another DCS. Review the existing link first.')
     request.custom_deal_cost_sheet = sheet.name
+    # Creation copied the earlier draft state; submission has now persisted
+    # Costing in Progress. Refresh the canonical projection after that change.
+    from bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet import dcs_presales_sync
+    dcs_presales_sync(request.name, source='interactive')
     if current == sheet.name:
         return
     request.db_set('custom_deal_cost_sheet', sheet.name)
@@ -49,3 +53,22 @@ def backfill(names):
         link_back(request, sheet)
         result.append({'presales_request':name,'dcs':sheet.name})
     return result
+
+
+@frappe.whitelist(methods=['POST'])
+def repair_statuses():
+    if frappe.session.user != 'Administrator':
+        frappe.throw('Administrator required', frappe.PermissionError)
+    from bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet import dcs_presales_sync
+    drafts = []
+    if not frappe.db.exists('Workflow', {'document_type':'Deal Cost Sheet','is_active':1}):
+        for row in frappe.get_all('Deal Cost Sheet', filters={'docstatus':0}, fields=['name','workflow_state']):
+            if not row.workflow_state:
+                frappe.db.set_value('Deal Cost Sheet', row.name, 'workflow_state', 'Draft')
+                drafts.append(row.name)
+    requests = frappe.db.sql("""select distinct p.name from `tabPresales Request` p
+        join `tabDeal Cost Sheet` d on d.presales_request=p.name
+        where d.docstatus<2 and coalesce(d.custom_presales_status,'')<>coalesce(p.status,'')""",as_dict=True)
+    for row in requests:
+        dcs_presales_sync(row.name, source='interactive')
+    return {'draft_defaults':drafts, 'presales_statuses_synced':[r.name for r in requests]}

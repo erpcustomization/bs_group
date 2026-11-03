@@ -40,6 +40,8 @@ class DealCostSheet(Document):
 	def before_insert(self):
 		from bsgroup.dcs.creation import guard_creation
 		guard_creation(self)
+		if self.meta.has_field("workflow_state") and not self.get("workflow_state") and not frappe.db.exists("Workflow", {"document_type":"Deal Cost Sheet", "is_active":1}):
+			self.workflow_state = "Draft"
 		# Every insertion is a new commercial record, including Duplicate and API copies.
 		# Decisions and revision references belong to the original sheet's history.
 		from bsgroup.dcs.obligation import guard_amendment
