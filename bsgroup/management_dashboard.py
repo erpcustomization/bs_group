@@ -88,3 +88,58 @@ def daily(day=None):
     from bsgroup.management_attendance import overview
     result["attendance"] = overview(selected)
     return result
+
+
+@frappe.whitelist()
+def executive(day=None):
+    """Executive presentation data; no additional access or workflow writes."""
+    result = daily(day)  # Enforces the same user and date boundary.
+    selected = date.fromisoformat(result['day'])
+    first = selected - timedelta(days=6)
+    end = selected + timedelta(days=1)
+    series = {str(first + timedelta(days=i)):dict(day=str(first + timedelta(days=i)),
+        leads=0, opportunities=0, presales=0, quoted={}, won={}) for i in range(7)}
+    available = {}
+    for key, dt, date_field, extra in (
+        ('leads','Lead','creation',[]),
+        ('opportunities','Opportunity','creation',[]),
+        ('presales','Presales Request','creation',[]),
+        ('quoted','Quotation','transaction_date',[['docstatus','=',1]]),
+        ('won','Quotation','custom_won_date',[['docstatus','=',1],['custom_pipeline_stage','=','Won']]),
+    ):
+        available[key] = bool(frappe.has_permission(dt,'read'))
+        if not available[key]:
+            continue
+        money = key in ('quoted','won')
+        fields = ['name',date_field] + (['currency','grand_total'] if money else [])
+        rows = frappe.get_list(dt, fields=fields, filters=[
+            [date_field,'>=',str(first)],[date_field,'<',str(end)],['docstatus','!=',2]]+extra,
+            limit_page_length=0)
+        for row in rows:
+            stamp = str(frappe.utils.getdate(row.get(date_field)))
+            if stamp not in series:
+                continue
+            if money:
+                values = series[stamp][key]
+                values[row.currency] = values.get(row.currency,0) + float(row.grand_total or 0)
+            else:
+                series[stamp][key] += 1
+    result['series'] = list(series.values())
+    result['series_available'] = available
+    result['dcs_age'] = []
+    if result['dcs'] is not None:
+        names = result['details']['dcs']
+        rows = frappe.get_list('Deal Cost Sheet',filters={'name':['in',names]},
+            fields=['name','creation','deal_owner'],limit_page_length=0) if names else []
+        buckets = [('0–7 days',0,7),('8–14 days',8,14),('15–30 days',15,30),('Over 30 days',31,None)]
+        today = date.fromisoformat(result['today'])
+        for label,low,high in buckets:
+            matches = [r.name for r in rows if (age := (today-frappe.utils.getdate(r.creation)).days)>=low
+                       and (high is None or age<=high)]
+            result['dcs_age'].append(dict(label=label,count=len(matches),details=matches))
+    result['currencies'] = sorted({currency for point in result['series']
+                                  for key in ('quoted','won') for currency in point[key]})
+    if not result['currencies']:
+        companies = frappe.get_list('Company',fields=['default_currency'],limit_page_length=0)
+        result['currencies'] = sorted({c.default_currency for c in companies if c.default_currency})
+    return result

@@ -81,3 +81,31 @@ try:
 except PermissionError:
     pass
 print('PASS: daily cohorts, older quotes won today, currency separation, attribution, workload exclusions, permissions and date validation')
+
+# Seven-day charts and workload age must use real event dates and distinct currencies.
+from datetime import date
+fake.utils.getdate=lambda value:date.fromisoformat(str(value)[:10])
+fake.has_permission=lambda *args:True
+base=dict(day='2026-11-03',today='2026-11-03',dcs=2,details={'dcs':['D1','D2']})
+module.daily=lambda day:dict(base)
+def trend_rows(dt, fields, filters=None, limit_page_length=0):
+    if dt=='Deal Cost Sheet':
+        return [Row(name='D1',creation='2026-11-01'),Row(name='D2',creation='2026-09-01')]
+    if dt=='Company':
+        return [Row(default_currency='AED')]
+    if dt=='Quotation':
+        stamp='custom_won_date' if 'custom_won_date' in fields else 'transaction_date'
+        return [Row(name='Q1',currency='AED',grand_total=100,**{stamp:'2026-11-02'}),
+                Row(name='Q2',currency='OMR',grand_total=20,**{stamp:'2026-11-03'})]
+    return [Row(name='A',creation='2026-10-28 09:00:00'),Row(name='B',creation='2026-11-03 10:00:00')]
+fake.get_list=trend_rows
+report=module.executive('2026-11-03')
+assert len(report['series'])==7
+assert report['series'][0]['day']=='2026-10-28'
+assert report['series'][-1]['leads']==1
+assert report['series'][-2]['quoted']=={'AED':100}
+assert report['series'][-1]['won']=={'OMR':20}
+assert report['currencies']==['AED','OMR']
+assert [b['count'] for b in report['dcs_age']]==[1,0,0,1]
+assert report['dcs_age'][-1]['details']==['D2']
+print('PASS: seven-day chart buckets, previous-day values, currency separation and current DCS aging')
