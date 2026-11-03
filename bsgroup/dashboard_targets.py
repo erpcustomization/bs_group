@@ -67,5 +67,5 @@ def overview(day):
             card['warning'] = 'Multiple performance entries; results need review.'
         card.update(sales=progress(revenue,actual_revenue),gp=progress(gp,actual_gp))
         cards.append(card)
-    return dict(visible=bool(cards),team=team,cards=sorted(cards,key=lambda x:x['name'].casefold()),
+    return dict(visible=bool(cards),team=team,cards=sorted(cards,key=lambda x:({'mohan@bitssecureit.com':0,'gopinath@bitssecureit.com':1}.get(x['user'],2),x['name'].casefold())),
         basis='Recorded invoiced sales and gross profit from Monthly Sales Performance Entry; full fiscal year. Not quotations or open pipeline.')
