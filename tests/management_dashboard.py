@@ -43,6 +43,7 @@ fake = NS(session=NS(user='mohan@bitssecureit.com'), whitelist=lambda:lambda f:f
           get_list=get_list, get_cached_value=lambda dt,user,field:user,
           throw=throw, PermissionError=PermissionError)
 sys.modules['frappe'] = fake
+sys.modules['bsgroup.management_attendance'] = NS(overview=lambda day:dict(day=str(day),total=0,totals={}))
 path = Path(__file__).parents[1] / 'bsgroup/management_dashboard.py'
 spec = importlib.util.spec_from_file_location('management_dashboard', path)
 module = importlib.util.module_from_spec(spec)

@@ -61,12 +61,14 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
         const day=$('<input type="date" aria-label="Team overview date">').val(managementDay).css({border:'1px solid #cbd8e8',borderRadius:'6px',padding:'5px 8px'}).appendTo(label);
         const status=$('<p role="status">').css({fontSize:'12px',color:'#60718b',margin:'0 0 10px'}).appendTo(section);
         const grid=$('<div>').css({display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(145px,1fr))',gap:'10px'}).appendTo(section);
+        const teamAttendance=$('<div aria-label="Employee attendance overview">').css({marginTop:'14px'}).appendTo(section);
         const contribution=$('<div>').css({marginTop:'12px',overflowX:'auto'}).appendTo(section);
         let sequence=0;
         async function load() {
             const request=++sequence;
             status.text('Loading team figures…');
             grid.empty();
+            teamAttendance.empty();
             contribution.empty();
             try {
                 const r=await frappe.call({method:'bsgroup.management_dashboard.daily',args:{day:managementDay},quiet:true});
@@ -94,6 +96,17 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
                     $('<strong>').text(value).css({display:'block',fontSize:'22px',lineHeight:'1.35',margin:'6px 0',overflowWrap:'anywhere',color:key==='won'?'#13754e':'#16365f'}).appendTo(tile);
                     $('<small>').text(metric && typeof metric==='object'?`${metric.count} quotation(s) · ${note}`:note).css({display:'block',fontSize:'11px',color:'#526781'}).appendTo(tile);
                 }
+                const attendance=data.attendance;
+                $('<h4>').text(`Employee attendance · ${attendance.day} · ${attendance.total} employees`).css({fontSize:'14px',margin:'0 0 8px'}).appendTo(teamAttendance);
+                const attendanceGrid=$('<div>').css({display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(125px,1fr))',gap:'8px'}).appendTo(teamAttendance);
+                const attendanceCards=[['on_time','On time','#e3f5ed'],['late','Late · IN/OUT recorded','#fff2da'],['pending_checkout','Late arrival · checkout pending','#fff2da'],['no_checkin','Not checked in','#ffe9e9'],['leave','On leave','#eef0ff'],['on_duty','On duty / WFH','#e5f5f7'],['off','Day off','#edf1f6'],['not_started','Shift not started','#edf1f6'],['partial_day','Half-day leave / duty','#eef0ff'],['unconfigured','Shift not assigned','#fff2da']];
+                for(const [key,title,color] of attendanceCards) {
+                    if(['not_started','partial_day','unconfigured'].includes(key) && !attendance.totals[key]) continue;
+                    const tile=$('<div>').css({background:color,borderRadius:'8px',padding:'10px'}).appendTo(attendanceGrid);
+                    $('<span>').text(title).css({fontSize:'11px',display:'block'}).appendTo(tile);
+                    $('<strong>').text(attendance.totals[key]).css({fontSize:'23px',color:key==='no_checkin'?'#b42318':'#16365f'}).appendTo(tile);
+                }
+                $('<p>').text('Employee headcounts for the selected day. Actual check-ins only; manual Present records are excluded. Late arrivals awaiting checkout are shown separately. Approved leave, on-duty requests and holiday calendars are respected.').css({fontSize:'11px',color:'#60718b',margin:'8px 0 0'}).appendTo(teamAttendance);
                 $('<h4>').text('Team contribution · selected day').css({fontSize:'13px',margin:'0 0 8px'}).appendTo(contribution);
                 if(!data.people.length) $('<p>').text('No sales activity recorded for this day.').appendTo(contribution);
                 else {
@@ -139,6 +152,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
             window.bsAttendance?.mountDashboard(hero[0]);
             if(management) mountTeamOverview();
 
+            if(!management) {
             const attendance=$('<section class="bs-month-attendance" aria-label="Monthly attendance">').appendTo(host);
             attendance.text(__('Loading monthly attendance…'));
             Promise.resolve(frappe.call({method:'bsgroup.monthly_attendance.get_month',args:{month:data.month},quiet:true})).then(async r=>{
@@ -165,6 +179,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
                 });
                 $('<p>').text(`9 AM–6 PM only · Recorded IN/OUT pairs; no overtime or assumed on-duty hours. ${a.totals.no_checkin} day(s) without check-in · ${a.totals.incomplete} missing checkout(s). Off days follow the HR holiday calendar.`).appendTo(attendance);
             }).catch(()=>{if(currentRequest===requestId) attendance.text(__('Attendance could not be loaded. Please reload the page.'));});
+            }
 
             const summary = $('<div class="bs-month-summary">').appendTo(host);
             if(management) summary.hide();

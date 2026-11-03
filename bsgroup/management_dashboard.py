@@ -77,4 +77,6 @@ def daily(day=None):
         row["quoted"] = quotation_total(row["quoted"])
         row["won"] = quotation_total(row["won"])
         result["people"].append(row)
+    from bsgroup.management_attendance import overview
+    result["attendance"] = overview(selected)
     return result
