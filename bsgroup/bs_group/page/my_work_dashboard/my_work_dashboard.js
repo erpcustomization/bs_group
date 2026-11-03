@@ -194,7 +194,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
                 const labels={on_time:'On time',late:'Late',leave:'Leave',off:'Off',on_duty:'On duty / WFH',not_started:'Not started yet · starts at 9 AM',no_checkin:'No check-in',pending_checkout:'Check-in recorded; checkout pending (not counted as late)'};
                 a.days.forEach(d=>{
                     const enabled=leaveContext?.can_create && d.date===leaveContext.today && !leaveContext.today_locked && ['no_checkin','not_started'].includes(d.status);
-                    const label=`${d.date}: ${labels[d.status]} · ${duration(d.working_minutes)}${d.holiday?' · '+d.holiday:''} · ${enabled?'Apply for leave':'Locked · contact HR for corrections'}`;
+                    const label=`${d.date}: ${labels[d.status]}\nCheck-in: ${d.check_in || 'Not recorded'}\nCheck-out: ${d.check_out || 'Not recorded'}\nDubai time · ${duration(d.working_minutes)}${d.holiday?' · '+d.holiday:''} · ${enabled?'Apply for leave':'Locked · contact HR for corrections'}`;
                     const cell=$('<span>').addClass('bs-att-day-'+d.status).text(Number(d.date.slice(-2))).attr('title',label).attr('aria-label',label).appendTo(days);
                     if(enabled) cell.attr({role:'button',tabindex:'0'}).on('click',()=>applyLeave(d.date)).on('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();applyLeave(d.date);}});
                 });
@@ -317,7 +317,7 @@ function bsChairmanDashboard(wrapper) {
     const money=value=>Number(value || 0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
     const short=value=>Math.abs(value)>=1e6?(value/1e6).toFixed(1)+'m':Math.abs(value)>=1e3?(value/1e3).toFixed(0)+'k':number(value);
     const formatted=metric=>metric===null?'Unavailable':Object.entries(metric?.amounts || {}).map(([c,v])=>`${c} ${money(v)}`).join(' · ') || '—';
-    function details(button,title,items) {
+    function details(button,title,items,hoverTarget) {
         items=items || [];
         button.attr({'aria-label':`${title}. Show ${items.length} matching records.`});
         const hide=()=>tooltip.hide();
@@ -329,6 +329,7 @@ function bsChairmanDashboard(wrapper) {
             const box=button[0].getBoundingClientRect();
             tooltip.css({left:Math.max(8,Math.min(box.left,window.innerWidth-410)),top:Math.max(8,Math.min(box.bottom+8,window.innerHeight-300))}).show();
         };
+        if(hoverTarget) hoverTarget.on('mouseenter',show).on('mouseleave',hide);
         button.on('mouseenter focus',show).on('mouseleave blur',hide).on('click',()=>{
             hide();const dialog=new frappe.ui.Dialog({title,fields:[{fieldname:'records',fieldtype:'HTML'}]});
             const panel=dialog.fields_dict.records.$wrapper;
@@ -420,7 +421,7 @@ function bsChairmanDashboard(wrapper) {
         const rows=$('<div>').appendTo(layout);
         categories.forEach(([key,label,color])=>{
             if(!att.totals[key] && !['on_time','late','pending_checkout','no_checkin','leave','on_duty'].includes(key))return;
-            const row=$('<div class="ex-att-row">').appendTo(rows);$('<span class="ex-dot">').css('background',color).appendTo(row);$('<span>').text(label).appendTo(row);details($('<button type="button">').text(att.totals[key]).appendTo(row),label,att.details[key]);
+            const row=$('<div class="ex-att-row">').appendTo(rows);$('<span class="ex-dot">').css('background',color).appendTo(row);$('<span>').text(label).appendTo(row);details($('<button type="button">').text(att.totals[key]).appendTo(row),label,att.details[key],row);
         });
         if(att.totals.no_checkin || att.totals.unconfigured) $('<div class="ex-alert">').text(`${att.totals.no_checkin} without check-in · ${att.totals.unconfigured} missing shift assignments`).appendTo(attendance.box);
         $('<p class="ex-note">').text('Actual punches only. Manual Present records excluded. Late arrivals without checkout are separated.').appendTo(attendance.box);

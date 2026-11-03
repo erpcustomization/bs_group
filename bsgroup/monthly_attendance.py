@@ -46,7 +46,7 @@ def get_month(month):
     end = date(start.year + (start.month == 12), start.month % 12 + 1, 1)
     now = datetime.now(TZ)
     phase = 'before-start' if now.time() < time(9) else 'started'
-    key = f'bs-attendance-month-v3:{frappe.session.user}:{month}:{now.date()}:{phase}'
+    key = f'bs-attendance-month-v4:{frappe.session.user}:{month}:{now.date()}:{phase}'
     cached = frappe.cache.get_value(key)
     if cached is not None:
         return cached
@@ -121,7 +121,11 @@ def get_month(month):
                 status = arrival_status(day, first, by_day.get(day, []), now)
                 if status not in ('pending_checkout', 'not_started'):
                     totals[status] += remaining
+        recorded = sorted((stamp, kind) for stamp, kind in by_day.get(day, []) if stamp <= now)
+        last_out = next((stamp for stamp, kind in reversed(recorded) if kind == 'OUT'), None)
         days.append(dict(date=str(day), status=status, working_minutes=worked,
+            check_in=first.strftime('%I:%M %p') if first else None,
+            check_out=last_out.strftime('%I:%M %p') if last_out else None,
             incomplete=incomplete, holiday=holiday or ''))
         day += timedelta(days=1)
     result = dict(visible=True, month=month, totals=totals, days=days,

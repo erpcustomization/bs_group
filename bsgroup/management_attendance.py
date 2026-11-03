@@ -100,10 +100,8 @@ def overview(day):
                           leave_by_employee.get(employee.name,0),duty_by_employee.get(employee.name,0))
         totals[status] += 1
         label = f"{employee.employee_name or employee.name} ({employee.name})"
-        if first:
-            label += ' · IN ' + first.strftime('%I:%M %p')
-        if last_out:
-            label += ' · OUT ' + last_out.strftime('%I:%M %p')
+        label += ' · Check-in: ' + (first.strftime('%I:%M %p') if first else 'Not recorded')
+        label += ' · Check-out: ' + (last_out.strftime('%I:%M %p') if last_out else 'Not recorded')
         if start:
             label += ' · Shift starts ' + start.strftime('%I:%M %p')
         details[status].append(label)
