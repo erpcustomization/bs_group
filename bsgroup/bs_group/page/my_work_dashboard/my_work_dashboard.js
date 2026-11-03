@@ -482,12 +482,13 @@ function bsAnnualTargets(parent, day) {
             const tile=$('<article>').css({border:'1px solid #e6edf2',borderRadius:'12px',padding:'15px'}).appendTo(grid);
             $('<strong>').text(card.name).css({fontSize:'14px',color:'#17354b'}).appendTo(tile);
             $('<div>').text(`FY ${card.fiscal_year} · ${card.currency}`).css({fontSize:'11px',color:'#63778b',margin:'4px 0 12px'}).appendTo(tile);
+            const metrics=$('<div>').css(data.team?{}:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,230px),1fr))',columnGap:'20px'}).appendTo(tile);
             const money=n=>`${card.currency} ${Number(n).toLocaleString('en-US',{maximumFractionDigits:2})}`;
             [['sales','Sales', '#198578'],['gp','Gross profit','#486c97']].forEach(([key,label,color])=>{
                 const m=card[key], valid=m.percent!==null && card.actual_available && !card.warning;
                 const pct=valid?Math.max(0,Math.min(100,m.percent)):0;
                 const text=`${label}: target ${money(m.target)}; ${card.actual_available?'recorded '+money(m.achieved):'performance not entered'}; ${m.percent===null?'target not set':'remaining '+money(m.remaining)}`;
-                const row=$('<div>').css({display:'flex',alignItems:'center',gap:'13px',margin:'10px 0'}).attr('title',text).appendTo(tile);
+                const row=$('<div>').css({display:'flex',alignItems:'center',gap:'13px',margin:'10px 0'}).attr('title',text).appendTo(metrics);
                 const ring=$('<div role="img">').attr('aria-label',text).css({width:'76px',height:'76px',flexShrink:0,borderRadius:'50%',background:`conic-gradient(${color} ${pct}%, #eaf0f4 0)`,display:'grid',placeItems:'center'}).appendTo(row);
                 $('<span>').text(valid?`${m.percent}%`:'—').css({width:'59px',height:'59px',borderRadius:'50%',background:'#fff',display:'grid',placeItems:'center',fontSize:'13px',color:'#17354b'}).appendTo(ring);
                 const lines=$('<div>').css({fontSize:'11px',lineHeight:1.8,color:'#63778b'}).appendTo(row);
