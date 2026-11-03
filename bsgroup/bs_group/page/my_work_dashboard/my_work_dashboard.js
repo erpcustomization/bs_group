@@ -172,6 +172,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
             $('<span>').text(__('Updated just now')).appendTo(stamp);
             window.bsAttendance?.mountDashboard(hero[0]);
             if(management) mountTeamOverview();
+            bsAnnualTargets(host, data.month+"-01");
 
             if(!management) {
             const attendance=$('<section class="bs-month-attendance" aria-label="Monthly attendance">').appendTo(host);
@@ -425,6 +426,7 @@ function bsChairmanDashboard(wrapper) {
         });
         if(att.totals.no_checkin || att.totals.unconfigured) $('<div class="ex-alert">').text(`${att.totals.no_checkin} without check-in · ${att.totals.unconfigured} missing shift assignments`).appendTo(attendance.box);
         $('<p class="ex-note">').text('Actual punches only. Manual Present records excluded. Late arrivals without checkout are separated.').appendTo(attendance.box);
+        bsAnnualTargets(content, day);
         const bottom=$('<div class="ex-grid">').appendTo(content);
         const team=panel(bottom,'Team performance','Contribution by sales owner · selected day');
         if(!data.people.length) $('<p class="ex-empty">').text('No sales activity recorded for this day. Choose another date to review performance.').appendTo(team.box);
@@ -464,4 +466,37 @@ function bsChairmanDashboard(wrapper) {
     dayInput.on('change',()=>{if(dayInput.val()){day=dayInput.val();refresh();}});refreshButton.on('click',refresh);
     wrapper.refresh_dashboard=refresh;
     setInterval(()=>{if(root[0].isConnected && root.is(':visible') && !document.hidden)refresh();},300000);
+}
+
+function bsAnnualTargets(parent, day) {
+    const section=$('<section aria-label="Annual sales targets">').css({background:'#fff',border:'1px solid #dfe7ef',borderRadius:'14px',padding:'18px',margin:'12px 0'}).appendTo(parent);
+    $('<h3>').text('Annual target progress').css({fontSize:'16px',margin:'0 0 6px',color:'#17354b'}).appendTo(section);
+    const status=$('<p role="status">').text('Loading annual targets…').css({fontSize:'12px',color:'#63778b'}).appendTo(section);
+    frappe.call({method:'bsgroup.dashboard_targets.overview',args:{day},quiet:true}).then(r=>{
+        if(!section[0].isConnected)return;
+        const data=r.message;
+        if(!data?.visible){section.remove();return;}
+        status.text(data.basis);
+        const grid=$('<div>').css({display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:'14px'}).appendTo(section);
+        data.cards.forEach(card=>{
+            const tile=$('<article>').css({border:'1px solid #e6edf2',borderRadius:'12px',padding:'15px'}).appendTo(grid);
+            $('<strong>').text(card.name).css({fontSize:'14px',color:'#17354b'}).appendTo(tile);
+            $('<div>').text(`FY ${card.fiscal_year} · ${card.currency}`).css({fontSize:'11px',color:'#63778b',margin:'4px 0 12px'}).appendTo(tile);
+            const money=n=>`${card.currency} ${Number(n).toLocaleString('en-US',{maximumFractionDigits:2})}`;
+            [['sales','Sales', '#198578'],['gp','Gross profit','#486c97']].forEach(([key,label,color])=>{
+                const m=card[key], valid=m.percent!==null && card.actual_available && !card.warning;
+                const pct=valid?Math.max(0,Math.min(100,m.percent)):0;
+                const text=`${label}: target ${money(m.target)}; ${card.actual_available?'recorded '+money(m.achieved):'performance not entered'}; ${m.percent===null?'target not set':'remaining '+money(m.remaining)}`;
+                const row=$('<div>').css({display:'flex',alignItems:'center',gap:'13px',margin:'10px 0'}).attr('title',text).appendTo(tile);
+                const ring=$('<div role="img">').attr('aria-label',text).css({width:'76px',height:'76px',flexShrink:0,borderRadius:'50%',background:`conic-gradient(${color} ${pct}%, #eaf0f4 0)`,display:'grid',placeItems:'center'}).appendTo(row);
+                $('<span>').text(valid?`${m.percent}%`:'—').css({width:'59px',height:'59px',borderRadius:'50%',background:'#fff',display:'grid',placeItems:'center',fontSize:'13px',color:'#17354b'}).appendTo(ring);
+                const lines=$('<div>').css({fontSize:'11px',lineHeight:1.8,color:'#63778b'}).appendTo(row);
+                $('<strong>').text(label).css({display:'block',color:'#17354b',fontSize:'12px'}).appendTo(lines);
+                $('<div>').text(m.target>0?`Target: ${money(m.target)}`:'Target not set').appendTo(lines);
+                $('<div>').text(card.actual_available?`Recorded: ${money(m.achieved)}`:'Performance not entered').appendTo(lines);
+                if(valid)$('<div>').text(m.achieved>m.target?`Above target: ${money(m.achieved-m.target)}`:`Remaining: ${money(m.remaining)}`).appendTo(lines);
+            });
+            if(card.warning)$('<p>').text(card.warning).css({fontSize:'11px',color:'#96662d',margin:'8px 0 0'}).appendTo(tile);
+        });
+    }).catch(()=>{if(section[0].isConnected)status.text('Annual targets could not be loaded. Please refresh.');});
 }
