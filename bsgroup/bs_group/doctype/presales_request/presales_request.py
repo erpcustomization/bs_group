@@ -78,6 +78,7 @@ class PresalesRequest(Document):
 
 	def on_submit(self):
 		"""Hand submitted presales work to costing in the same transaction."""
+		from bsgroup.presales_dcs_handoff import link_back
 		if not self.opportunity:
 			frappe.throw(_("An Opportunity is required before submitting Presales."))
 		frappe.db.sql("SELECT name FROM `tabOpportunity` WHERE name=%s FOR UPDATE", self.opportunity)
@@ -102,6 +103,7 @@ class PresalesRequest(Document):
 				dcs_presales_sync(self.name, source="interactive")
 			if self.status in ("Draft", "Open", "Assigned", "In Progress"):
 				self.db_set("status", "Costing in Progress")
+			link_back(self, sheet)
 			return
 		opportunity = frappe.get_doc("Opportunity", self.opportunity)
 		sheet = frappe.new_doc("Deal Cost Sheet")
@@ -115,6 +117,7 @@ class PresalesRequest(Document):
 		from bsgroup.dcs.creation import insert_from_workflow
 		insert_from_workflow(sheet)
 		self.db_set("status", "Costing in Progress")
+		link_back(self, sheet)
 
 	def after_insert(self):
 		if self.opportunity:
