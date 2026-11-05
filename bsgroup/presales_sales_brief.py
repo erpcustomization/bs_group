@@ -1,5 +1,6 @@
 """Read-only sales brief, resolved through a readable Presales Request."""
 import frappe
+from frappe.utils import getdate
 
 SALES_FIELDS = (
     'opportunity', 'party_type', 'party', 'organisation_name', 'customer',
@@ -17,6 +18,14 @@ SOURCE_FIELDS = (
 )
 
 
+def sales_field_value(field, value):
+    # Browser JSON supplies dates as strings; database documents use date objects.
+    # Empty dates must stay empty (getdate(None) would otherwise mean today).
+    if field in ('request_date', 'expected_close_date'):
+        return getdate(value) if value not in (None, '') else None
+    return value
+
+
 def protect_sales_fields(doc):
     if doc.is_new():
         return
@@ -26,7 +35,8 @@ def protect_sales_fields(doc):
     before = doc.get_doc_before_save()
     if not before:
         before = frappe.get_doc(doc.doctype, doc.name)
-    changed = [f for f in SALES_FIELDS if doc.get(f) != before.get(f)]
+    changed = [f for f in SALES_FIELDS
+               if sales_field_value(f, doc.get(f)) != sales_field_value(f, before.get(f))]
     if changed:
         frappe.throw('Sales request details are read-only for Presales. Ask Sales to correct the source Opportunity.', frappe.PermissionError)
 
