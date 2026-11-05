@@ -19,11 +19,17 @@ class PresalesRequest(Document):
 	CLOSED_STATUSES = ("Completed", "Won", "Lost", "Cancelled")
 
 	def validate(self):
+		from bsgroup.presales_sales_brief import protect_sales_fields
+		protect_sales_fields(self)
 		apply_party_model(self)
 		self._validate_customer_before_award()
 		self._validate_unique_per_opportunity()
 		self._validate_site_visit_required()
 		self._validate_effort_logged_before_closing()
+
+	def before_update_after_submit(self):
+		from bsgroup.presales_sales_brief import protect_sales_fields
+		protect_sales_fields(self)
 
 	def autoname(self):
 		# Named after the organisation (D2); identical slug rule to the historical

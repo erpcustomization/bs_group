@@ -161,6 +161,7 @@ frappe.ui.form.on("Presales Request", {
         presales_compact_layout(frm);
         presales_show_party(frm);
         presales_move_timeline_to_additional(frm);
+        presales_sales_brief(frm);
         set_completion_date(frm);
         presales_status_panel(frm);
         reduce_subject_height(frm);
@@ -175,6 +176,62 @@ frappe.ui.form.on("Presales Request", {
         frm.toggle_reqd("site_visit", frm.doc.site_visit_required == 1);
     }
 });
+
+async function presales_sales_brief(frm) {
+    const salesFields = ['opportunity', 'party_type', 'party', 'organisation_name', 'customer',
+        'is_new_customer', 'subject', 'company', 'estimated_value', 'requested_by',
+        'request_date', 'expected_close_date', 'custom_service_details',
+        'decision_maker_known', 'competition_known', 'budget_confirmed', 'timeline_defined'];
+    if ((frappe.user.has_role('Presales') || frappe.user.has_role('BS Scoped Presales')) &&
+        !frappe.user.has_role('System Manager')) {
+        salesFields.forEach(field => {
+            if (frm.fields_dict[field]) frm.set_df_property(field, 'read_only', 1);
+        });
+    }
+    if (frm.is_new()) return;
+    const host = frm.layout.tabs[0]?.wrapper || frm.layout.wrapper;
+    let panel = host.children('.bs-sales-request-brief');
+    if (!panel.length) {
+        panel = $('<section class="bs-sales-request-brief" style="margin:12px 16px;padding:18px;border:1px solid #dce5ef;border-radius:10px;background:#f7faff"></section>');
+        const status = host.children('.presales-status-bar');
+        if (status.length) panel.insertAfter(status); else panel.prependTo(host);
+    }
+    panel.empty().append($('<h4>').text(__('Sales requirement')),
+        $('<p>').css('color', '#62748a').text(__('Provided by Sales · read-only')),
+        $('<p>').text(__('Loading sales details…')));
+    const requestName = frm.doc.name;
+    try {
+        const r = await frappe.call({method: 'bsgroup.presales_sales_brief.get_brief', args: {name: requestName}});
+        if (frm.doc.name !== requestName) return;
+        const data = r.message || {};
+        panel.empty().append($('<h4>').text(__('Sales requirement')),
+            $('<p>').css('color', '#62748a').text(__('Provided by Sales · read-only')),
+            $('<div>').css({'white-space': 'pre-wrap', 'font-size': '15px', 'margin-bottom': '16px'})
+                .text(data.requirement || __('No enquiry recorded on the source Opportunity. Ask Sales to complete it.')));
+        const grid = $('<div>').css({display:'grid', 'grid-template-columns':'repeat(auto-fit,minmax(220px,1fr))',gap:'12px'}).appendTo(panel);
+        (data.details || []).forEach(row => $('<div>').append(
+            $('<div>').css({color:'#62748a','font-size':'12px'}).text(__(row.label)),
+            $('<div>').css('white-space','pre-wrap').text(row.value)).appendTo(grid));
+        if ((data.items || []).length) {
+            panel.append($('<h5>').css('margin-top','16px').text(__('Items requested by Sales')));
+            const table = $('<table class="table table-bordered">').appendTo($('<div style="overflow:auto">').appendTo(panel));
+            table.append($('<thead>').append($('<tr>').append(...['Item','Description','Quantity','UOM','Rate','Amount'].map(label => $('<th>').text(__(label))))));
+            const body = $('<tbody>').appendTo(table);
+            data.items.forEach(row => body.append($('<tr>').append(...[
+                row.item_name || row.item_code || '', row.description || '', row.qty ?? '', row.uom || '', row.rate ?? '', row.amount ?? ''
+            ].map(value => $('<td>').text(value)))));
+        }
+        if ((data.files || []).length) {
+            panel.append($('<h5>').css('margin-top','16px').text(__('Sales attachments')));
+            data.files.forEach(file => {
+                const query = new URLSearchParams({doctype:'Presales Request',name:requestName,file:file.name});
+                panel.append($('<div>').append($('<a>').attr('href','/api/method/bsgroup.opportunity_attachments.download?'+query).text(file.file_name)));
+            });
+        }
+    } catch (error) {
+        if (frm.doc.name === requestName) panel.append($('<p role="alert">').text(__('Sales details could not be loaded. Refresh to retry.')));
+    }
+}
 
 function set_completion_date(frm) {
     if (frm.doc.status === "Completed") {
