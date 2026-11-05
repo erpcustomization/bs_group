@@ -35,6 +35,15 @@ def condition(doctype, user):
     mode = scope(user)
     if not mode:
         return None
+    if mode == PRESALES and doctype == "Lead":
+        # Quotation validation reads its source Lead. Honour only an explicit,
+        # individual read share; never expose all Leads or implicit team shares.
+        who = frappe.db.escape(user)
+        return ("EXISTS (SELECT 1 FROM `tabDocShare` lead_share "
+                "WHERE lead_share.share_doctype='Lead' "
+                "AND lead_share.share_name=`tabLead`.name "
+                f"AND lead_share.user={who} AND lead_share.`read`=1 "
+                "AND COALESCE(lead_share.everyone,0)=0)")
     if doctype not in SCREENS[mode]:
         return "1=0"
     table = f"`tab{doctype}`"
@@ -109,6 +118,9 @@ def survey_query(user=None):
 
 def permission(doc, user=None, permission_type=None, ptype=None):
     user = user or frappe.session.user
+    if scope(user) == PRESALES and doc.doctype == "Lead":
+        if doc.is_new() or (permission_type or ptype or 'read') not in ('read', 'select'):
+            return False
     sql = condition(doc.doctype, user)
     if sql is None:
         if doc.doctype == "Site Survey Request":
