@@ -89,7 +89,7 @@ function bsEmployeeServices(parent) {
         ['Shift & Attendance','/desk/shift-and-attendance/shift-&-attendance','<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
     ]) {
         const link=$('<a class="bs-employee-service">').attr('href',url).appendTo(grid);
-        if(title==='Time Off') link.on('click',event=>{event.preventDefault();bsOpenTimeOff();});
+        if(title==='Time Off') link.on('click',event=>{event.preventDefault();event.stopPropagation();bsOpenTimeOff();return false;});
         $('<span class="bs-service-icon" aria-hidden="true">').html('<svg viewBox="0 0 24 24">'+icon+'</svg>').appendTo(link);
         $('<strong>').text(__(title)).appendTo(link);
     }
