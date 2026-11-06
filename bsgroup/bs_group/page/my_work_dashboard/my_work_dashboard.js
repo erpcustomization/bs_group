@@ -2,41 +2,33 @@ function bsEmployeeServices(parent) {
     if ($(parent).children('.bs-employee-services').length) return;
     if (!document.getElementById('bs-employee-services-style')) {
         $('<style id="bs-employee-services-style">').text(`
-            .bs-employee-services{margin:16px 0 24px;padding:24px;border:1px solid #dfe7ee;border-radius:18px;background:var(--card-bg,#fff);box-shadow:0 4px 20px rgba(20,42,65,.04)}
-            .bs-employee-services h2{font-size:19px;font-weight:650;letter-spacing:-.35px;margin:0 0 6px;color:var(--text-color,#152b41)}
-            .bs-employee-services p{font-size:13px;color:var(--text-muted,#65778a);margin:0 0 22px}
-            .bs-employee-service-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}
-            .bs-employee-service{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-width:0;padding:20px 16px;border:1px solid #e3e9ef;border-radius:14px;background:var(--card-bg,#fff);text-decoration:none!important;box-shadow:0 2px 5px rgba(20,42,65,.025);transition:transform .18s,box-shadow .18s,border-color .18s}
-            .bs-employee-service strong{color:var(--text-color,#152b41);font-size:14px;font-weight:600;line-height:1.4;letter-spacing:-.15px}
-            .bs-employee-service .bs-service-description{color:var(--text-muted,#65778a);font-size:12px;line-height:1.6}
-            .bs-service-icon{display:grid;place-items:center;width:42px;height:42px;margin-bottom:9px;border-radius:12px;color:#127e79;background:#edf7f5;border:1px solid #deeeeb}
-            .bs-service-icon svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-            .bs-service-arrow{position:absolute;right:16px;top:22px;width:18px;height:18px;color:#8a9bab;transition:color .18s,transform .18s}
+            .bs-employee-services{margin:12px 0 20px;padding:16px;border:1px solid #dfe7ee;border-radius:18px;background:var(--card-bg,#fff);box-shadow:0 4px 20px rgba(20,42,65,.04)}
+            .bs-employee-services h2{font-size:15px;font-weight:600;letter-spacing:-.15px;margin:0 0 12px;color:var(--text-color,#152b41)}
+            .bs-employee-service-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+            .bs-employee-service{position:relative;display:flex;flex-direction:row;align-items:center;gap:10px;min-width:0;padding:12px;border:1px solid #e3e9ef;border-radius:14px;background:var(--card-bg,#fff);text-decoration:none!important;box-shadow:0 2px 5px rgba(20,42,65,.025);transition:transform .18s,box-shadow .18s,border-color .18s}
+            .bs-employee-service strong{color:var(--text-color,#152b41);font-size:13px;font-weight:600;line-height:1.4;letter-spacing:-.15px}
+            .bs-service-icon{display:grid;place-items:center;width:32px;height:32px;flex-shrink:0;border-radius:9px;color:#127e79;background:#edf7f5;border:1px solid #deeeeb}
+            .bs-service-icon svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
             .bs-employee-service:hover{border-color:#8fbeb8;box-shadow:0 8px 20px rgba(20,42,65,.08);transform:translateY(-3px)}
-            .bs-employee-service:hover .bs-service-arrow{color:#127e79;transform:translateX(2px)}
             .bs-employee-service:focus-visible{outline:3px solid #66bdb2;outline-offset:3px}
-            @media(prefers-reduced-motion:reduce){.bs-employee-service,.bs-service-arrow{transition:none}.bs-employee-service:hover{transform:none}}
             @media(max-width:1000px){.bs-employee-service-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
             @media(max-width:600px){.bs-employee-service-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
         `).appendTo(document.head);
     }
     const section=$('<section class="bs-employee-services" aria-label="Employee services">').appendTo(parent);
     $('<h2>').text(__('Employee services')).appendTo(section);
-    $('<p>').text(__('Everything you need for your workday.')).appendTo(section);
     const grid=$('<nav class="bs-employee-service-grid" aria-label="HR services">').appendTo(section);
     // Navigation only: destination workspaces retain their existing permission checks.
-    for(const [title,description,url,icon] of [
-        ['Expenses','Claims, advances and reimbursements','/desk/expenses','<path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 7h6M9 11h6M9 15h3"/>'],
-        ['Leaves','Applications, balances and approvals','/desk/leaves','<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 10h18m-13 5 3 3 5-5"/>'],
-        ['Payroll','Payslips and payroll services','/desk/payroll','<rect x="3" y="5" width="18" height="15" rx="3"/><path d="M3 9h18m-5 5h5M7 16h4"/><circle cx="16" cy="14" r=".5"/>'],
-        ['Performance','Goals, appraisals and reviews','/desk/performance','<path d="M4 4v16h16M8 15l4-5 4 2 4-7m-5 0h5v5"/>'],
-        ['Shift & Attendance','Shifts, check-ins and attendance','/desk/shift-and-attendance/shift-&-attendance','<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
+    for(const [title,url,icon] of [
+        ['Expenses','/desk/expenses','<path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 7h6M9 11h6M9 15h3"/>'],
+        ['Leaves','/desk/leaves','<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 10h18m-13 5 3 3 5-5"/>'],
+        ['Payroll','/desk/payroll','<rect x="3" y="5" width="18" height="15" rx="3"/><path d="M3 9h18m-5 5h5M7 16h4"/><circle cx="16" cy="14" r=".5"/>'],
+        ['Performance','/desk/performance','<path d="M4 4v16h16M8 15l4-5 4 2 4-7m-5 0h5v5"/>'],
+        ['Shift & Attendance','/desk/shift-and-attendance/shift-&-attendance','<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
     ]) {
         const link=$('<a class="bs-employee-service">').attr('href',url).appendTo(grid);
         $('<span class="bs-service-icon" aria-hidden="true">').html('<svg viewBox="0 0 24 24">'+icon+'</svg>').appendTo(link);
-        link.append('<svg class="bs-service-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>');
         $('<strong>').text(__(title)).appendTo(link);
-        $('<span class="bs-service-description">').text(__(description)).appendTo(link);
     }
 }
 
