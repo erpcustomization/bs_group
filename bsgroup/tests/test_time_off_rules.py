@@ -126,6 +126,14 @@ class TimeOffRules(unittest.TestCase):
         with self.assertRaises(ValueError):self.policy.calendar_parts('Maternity Leave','2026-11-06','2027-01-05','2026-11-06')
         with self.assertRaises(ValueError):self.policy.calendar_parts('Maternity Leave','2026-11-06','2026-11-07')
 
+    def test_automatic_entitlements_accept_only_explicit_enabled_values(self):
+        for value in (True, 1):
+            self.fake.conf={'bs_auto_special_leave_allocations':value}
+            self.assertTrue(self.policy.automatic_entitlements_enabled())
+        for value in (None, False, 0, '1', 'true', 'false', 2, 1.0):
+            self.fake.conf={'bs_auto_special_leave_allocations':value}
+            self.assertFalse(self.policy.automatic_entitlements_enabled())
+
     def test_automatic_entitlements_are_disabled_by_default(self):
         self.fake.conf={}
         self.fake.get_all=lambda *a,**kw:[]

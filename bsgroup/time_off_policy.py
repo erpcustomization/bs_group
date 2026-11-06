@@ -107,6 +107,11 @@ def plan(employee,category,start,end,period_start=None):
     return parts
 
 
+def automatic_entitlements_enabled():
+    value = frappe.conf.get('bs_auto_special_leave_allocations')
+    return value is True or (type(value) is int and value == 1)
+
+
 def ensure_entitlements(employee,parts):
     """Provision only the fixed new policy allowances; never modify existing allocations.
 
@@ -126,7 +131,7 @@ def ensure_entitlements(employee,parts):
             if len(existing)!=1 or existing[0].docstatus!=1 or getdate(existing[0].from_date)>getdate(part['from_date']) or getdate(existing[0].to_date)<getdate(part['to_date']):
                 frappe.throw('An existing or draft leave allocation needs HR review; no allowance was changed.')
             continue
-        if frappe.conf.get('bs_auto_special_leave_allocations') is not True:
+        if not automatic_entitlements_enabled():
             frappe.throw('HR must allocate this paid leave allowance before you apply. Automatic policy allocations are not enabled.')
         allocation=frappe.new_doc('Leave Allocation')
         allocation.update(dict(employee=employee,leave_type=leave_type,from_date=part['allocation_from'],to_date=part['allocation_to'],
@@ -164,7 +169,7 @@ def validate(doc):
 
 
 def entitlements_ready(employee,parts):
-    if frappe.conf.get('bs_auto_special_leave_allocations') is True:
+    if automatic_entitlements_enabled():
         return True
     for part in parts:
         if part['leave_type']==STUDY:
