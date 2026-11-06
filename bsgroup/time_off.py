@@ -8,7 +8,7 @@ from bsgroup.dashboard_leave import dubai_today, has_records
 ANNUAL = 'Annual Vacation'
 SICK = 'Sick Leave'
 UNPAID = 'Leave Without Pay'
-CATEGORIES = ('Annual Leave', 'Sick Leave', 'Emergency Leave')
+CATEGORIES = ('Annual Leave', 'Sick Leave', 'Emergency Leave', 'Hajj Leave', 'Study Leave', 'Maternity Leave')
 
 
 def own_employee():
@@ -81,13 +81,16 @@ def split_emergency(day_rows):
     return merged
 
 
-def make_plan(employee, category, start, end):
+def make_plan(employee, category, start, end, maternity_period_start=None):
     from hrms.hr.doctype.leave_application.leave_application import get_number_of_leave_days, get_leave_allocation_records
     if category not in CATEGORIES:
-        frappe.throw('Choose Annual Leave, Sick Leave or Emergency Leave.')
+        frappe.throw('Choose a valid Time Off category.')
     start, end = dates(start, end)
     available, remaining, pending, approver = annual_available(employee.name, start)
-    if category != 'Emergency Leave':
+    from bsgroup import time_off_policy as policy
+    if category in policy.SPECIAL_CATEGORIES:
+        parts = policy.plan(employee.name, category, start, end, maternity_period_start)
+    elif category != 'Emergency Leave':
         leave_type = ANNUAL if category == 'Annual Leave' else SICK
         days = flt(get_number_of_leave_days(employee.name, leave_type, str(start), str(end)))
         parts = [dict(leave_type=leave_type, from_date=str(start), to_date=str(end), days=days, half_day=0)]
@@ -115,24 +118,26 @@ def make_plan(employee, category, start, end):
             frappe.throw(str(exc))
     if not parts or sum(p['days'] for p in parts) <= 0:
         frappe.throw('The selected dates contain no leave days under your HR holiday calendar.')
-    return dict(parts=parts, annual_available=available, annual_balance=remaining, pending_annual=pending,
+    return dict(parts=parts, allocation_required=category in policy.SPECIAL_CATEGORIES and not policy.entitlements_ready(employee.name,parts), annual_available=available, annual_balance=remaining, pending_annual=pending,
                 annual_days=sum(p['days'] for p in parts if p['leave_type'] == ANNUAL),
-                unpaid_days=sum(p['days'] for p in parts if p['leave_type'] == UNPAID),
+                unpaid_days=sum(p['days'] for p in parts if p['leave_type'] in (UNPAID, policy.STUDY)),
+                full_pay_days=sum(p['days'] for p in parts if p['leave_type'] == policy.MATERNITY_FULL),
+                half_pay_days=sum(p['days'] for p in parts if p['leave_type'] in (policy.HAJJ, policy.MATERNITY_HALF)),
                 total_days=sum(p['days'] for p in parts), leave_approver=approver,
                 certificate_required=category == 'Sick Leave' and sum(p['days'] for p in parts) > 1)
 
 
 @frappe.whitelist()
-def preview(category='Annual Leave', from_date=None, to_date=None):
+def preview(category='Annual Leave', from_date=None, to_date=None, maternity_period_start=None):
     employee = own_employee()
     start = from_date or dubai_today()
-    result = make_plan(employee, category, start, to_date or start)
+    result = make_plan(employee, category, start, to_date or start, maternity_period_start)
     result.update(employee_name=employee.employee_name, today=dubai_today())
     return result
 
 
 @frappe.whitelist(methods=['POST'])
-def apply(category, from_date, to_date, request_id, expected_plan, reason='', contact_name='', contact_phone='', certificate=None):
+def apply(category, from_date, to_date, request_id, expected_plan, reason='', contact_name='', contact_phone='', certificate=None, maternity_period_start=None):
     employee = own_employee()
     if not re.fullmatch(r'[a-zA-Z0-9-]{16,64}', request_id or ''):
         frappe.throw('Please reopen Time Off and try again.')
@@ -143,7 +148,7 @@ def apply(category, from_date, to_date, request_id, expected_plan, reason='', co
         return {'names': existing}
     if has_records(employee.name, from_date, to_date):
         frappe.throw('These dates already have attendance or leave records. Please contact HR for an approved correction.')
-    plan = make_plan(employee, category, from_date, to_date)
+    plan = make_plan(employee, category, from_date, to_date, maternity_period_start)
     if frappe.parse_json(expected_plan) != plan['parts']:
         frappe.throw('Your balance or leave calculation changed. Reopen Time Off to review the updated paid/unpaid split.')
     if category == 'Annual Leave' and plan['total_days'] > plan['annual_available']:
@@ -160,13 +165,17 @@ def apply(category, from_date, to_date, request_id, expected_plan, reason='', co
             frappe.throw('Upload your medical certificate as a private attachment.', frappe.PermissionError)
         if frappe.db.get_value('File', files[0], 'attached_to_name'):
             frappe.throw('Please upload a new certificate copy for this request; existing document attachments are preserved.')
+    from bsgroup import time_off_policy as policy
+    if category in policy.SPECIAL_CATEGORIES:
+        policy.ensure_entitlements(employee.name, plan['parts'])
     names = []
     for part in plan['parts']:
         doc = frappe.new_doc('Leave Application')
         doc.update(dict(employee=employee.name, company=employee.company, leave_type=part['leave_type'],
             from_date=part['from_date'], to_date=part['to_date'], half_day=part['half_day'],
             half_day_date=part.get('half_day_date'), status='Open', leave_approver=plan['leave_approver'],
-            description=reason, custom_time_off_category=category, custom_time_off_reference=request_id,
+            description=reason, custom_time_off_category=category,
+            custom_maternity_period_start=maternity_period_start if category == 'Maternity Leave' else None, custom_time_off_reference=request_id,
             custom_emergency_contact_name=contact_name.strip() if category == 'Emergency Leave' else '',
             custom_emergency_contact_phone=contact_phone.strip() if category == 'Emergency Leave' else '',
             custom_medical_certificate=certificate if category == 'Sick Leave' else None))

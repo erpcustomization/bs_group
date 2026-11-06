@@ -31,6 +31,10 @@ class TimeOffRules(unittest.TestCase):
         cls.modules.start()
         spec=importlib.util.spec_from_file_location('time_off_under_test',Path(__file__).parents[1]/'time_off.py')
         cls.module=importlib.util.module_from_spec(spec);spec.loader.exec_module(cls.module)
+        pkg=types.ModuleType('bsgroup');sys.modules['bsgroup']=pkg
+        ps=importlib.util.spec_from_file_location('bsgroup.time_off_policy',Path(__file__).parents[1]/'time_off_policy.py')
+        cls.policy=importlib.util.module_from_spec(ps);ps.loader.exec_module(cls.policy)
+        sys.modules['bsgroup.time_off_policy']=cls.policy;pkg.time_off_policy=cls.policy
     @classmethod
     def tearDownClass(cls): cls.modules.stop()
     def rows(self,balance,count=3):
@@ -95,5 +99,44 @@ class TimeOffRules(unittest.TestCase):
         with patch.object(self.module,'own_employee',return_value=Obj(name='EMP-SELF')), patch.object(self.module,'make_plan',return_value={'parts':[{'days':1}]}):
             with self.assertRaisesRegex(ValueError,'calculation changed'):
                 self.module.apply('Emergency Leave','2026-11-09','2026-11-10','a'*32,'[]')
+
+
+    def test_study_requires_strictly_more_than_four_years(self):
+        self.assertFalse(self.policy.study_eligible('2022-11-06','2026-11-06'))
+        self.assertTrue(self.policy.study_eligible('2022-11-06','2026-11-07'))
+        self.assertFalse(self.policy.study_eligible(None,'2026-11-07'))
+        self.assertFalse(self.policy.study_eligible('2096-02-29','2100-02-28'))
+        self.assertTrue(self.policy.study_eligible('2096-02-29','2100-03-01'))
+
+    def test_hajj_limit_and_year_boundary(self):
+        parts=self.policy.calendar_parts('Hajj Leave','2026-12-25','2027-01-05')
+        self.assertEqual([p['days'] for p in parts],[7,5])
+        with self.assertRaises(ValueError):self.policy.calendar_parts('Hajj Leave','2026-11-06','2026-11-21')
+
+    def test_study_ten_calendar_days_includes_weekends(self):
+        parts=self.policy.calendar_parts('Study Leave','2026-11-06','2026-11-15')
+        self.assertEqual(parts[0]['days'],10)
+        with self.assertRaises(ValueError):self.policy.calendar_parts('Study Leave','2026-11-06','2026-11-16')
+
+    def test_maternity_45_full_15_half(self):
+        parts=self.policy.calendar_parts('Maternity Leave','2026-11-06','2027-01-04','2026-11-06')
+        self.assertEqual([(p['leave_type'],p['days']) for p in parts],[(self.policy.MATERNITY_FULL,45),(self.policy.MATERNITY_HALF,15)])
+        continuation=self.policy.calendar_parts('Maternity Leave','2026-12-21','2027-01-04','2026-11-06')
+        self.assertEqual(continuation[0]['leave_type'],self.policy.MATERNITY_HALF)
+        with self.assertRaises(ValueError):self.policy.calendar_parts('Maternity Leave','2026-11-06','2027-01-05','2026-11-06')
+        with self.assertRaises(ValueError):self.policy.calendar_parts('Maternity Leave','2026-11-06','2026-11-07')
+
+    def test_automatic_entitlements_are_disabled_by_default(self):
+        self.fake.conf={}
+        self.fake.get_all=lambda *a,**kw:[]
+        self.fake.new_doc=lambda *a: (_ for _ in ()).throw(AssertionError('No allocation without confirmation'))
+        parts=self.policy.calendar_parts('Hajj Leave','2026-11-06','2026-11-10')
+        with self.assertRaisesRegex(ValueError,'not enabled'):self.policy.ensure_entitlements('EMP-SELF',parts)
+
+
+    def test_pending_and_approved_usage_is_counted_by_calendar_year(self):
+        self.fake.get_all=lambda *a,**kw:[Obj(from_date='2026-12-28',to_date='2027-01-03',half_day=0)]
+        self.assertEqual(self.policy.used_days('EMP',self.policy.HAJJ,'2026-01-01','2026-12-31'),4)
+        self.assertEqual(self.policy.used_days('EMP',self.policy.HAJJ,'2027-01-01','2027-12-31'),3)
 
 if __name__=='__main__':unittest.main()

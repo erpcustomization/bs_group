@@ -3,8 +3,9 @@ async function bsOpenTimeOff(day) {
     const requestId = crypto.randomUUID();
     let dialog;
     dialog = new frappe.ui.Dialog({title:__('Time Off'), fields:[
-        {fieldname:'category',label:__('Request type'),fieldtype:'Select',options:['Annual Leave','Sick Leave','Emergency Leave'],default:'Annual Leave',reqd:1,onchange:update},
+        {fieldname:'category',label:__('Request type'),fieldtype:'Select',options:['Annual Leave','Sick Leave','Emergency Leave','Hajj Leave','Study Leave','Maternity Leave'],default:'Annual Leave',reqd:1,onchange:update},
         {fieldname:'balance',fieldtype:'HTML'},
+        {fieldname:'maternity_period_start',label:__('First day of maternity period'),fieldtype:'Date',hidden:1,description:__('Use the same first day when applying for this maternity period in separate parts. Maximum 60 calendar days.'),onchange:update},
         {fieldname:'from_date',label:__('From'),fieldtype:'Date',default:day || frappe.datetime.get_today(),reqd:1,onchange:update},
         {fieldname:'to_date',label:__('To'),fieldtype:'Date',default:day || frappe.datetime.get_today(),reqd:1,onchange:update},
         {fieldname:'summary',fieldtype:'HTML'},
@@ -34,19 +35,28 @@ async function bsOpenTimeOff(day) {
         if (!dialog?.fields_dict.summary) return;
         const category=dialog.get_value('category'),from_date=dialog.get_value('from_date'),to_date=dialog.get_value('to_date');
         const emergency=category==='Emergency Leave';
+        const maternity=category==='Maternity Leave';
+        const special=['Hajj Leave','Study Leave','Maternity Leave'].includes(category);
+        dialog.set_df_property('maternity_period_start','hidden',!maternity);
+        dialog.set_df_property('maternity_period_start','reqd',maternity);
+        dialog.fields_dict.balance.$wrapper.toggle(!special);
+        const maternity_period_start=dialog.get_value('maternity_period_start');
         ['contact_name','contact_phone'].forEach(f=>{dialog.set_df_property(f,'hidden',!emergency);dialog.set_df_property(f,'reqd',emergency);});
         dialog.set_df_property('reason','reqd',emergency);
         dialog.set_df_property('certificate','hidden',category!=='Sick Leave');
         dialog.set_df_property('certificate','reqd',false);
         dialog.get_primary_btn()?.prop('disabled',true);
         if (!from_date || !to_date) return;
+        if(maternity && !maternity_period_start){message('summary',__('Enter the first day of the maternity period to calculate full-pay and half-pay days.'));return;}
         message('summary',__('Checking HRMS balance and dates…'));
         try {
-            const r=await frappe.call({method:'bsgroup.time_off.preview',args:{category,from_date,to_date},quiet:true});
+            const r=await frappe.call({method:'bsgroup.time_off.preview',args:{category,from_date,to_date,maternity_period_start},quiet:true});
             if(ticket!==revision)return;
             plan=r.message;
             message('balance',__('Annual leave available: {0} days · Pending annual requests: {1} days',[plan.annual_available,plan.pending_annual]));
             message('summary',emergency?__('Annual leave: {0} days · Unpaid: {1} days. Both follow HR approval.',[plan.annual_days,plan.unpaid_days]):__('Requested: {0} leave day(s).',[plan.total_days]));
+            if(special) message('summary',__('Calendar days: {0} · Full pay: {1} · Half pay: {2} · Unpaid: {3}. HR approval is required.',[plan.total_days,plan.full_pay_days,plan.half_pay_days,plan.unpaid_days]));
+            if(plan.allocation_required){message('summary',__('The pay split is calculated. HR must allocate this paid leave allowance before you can apply.'),true);plan=null;return;}
             if(category==='Annual Leave' && plan.total_days>plan.annual_available){message('summary',__('Insufficient annual leave balance. Please choose fewer days or contact HR.'),true);plan=null;return;}
             dialog.set_df_property('certificate','reqd',!!plan.certificate_required);
             dialog.get_primary_btn().prop('disabled',false);

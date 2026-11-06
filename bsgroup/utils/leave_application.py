@@ -14,6 +14,8 @@ def validate_medical_certificate(doc, method=None):
 
 	from bsgroup.dashboard_leave import validate_self_service
 	validate_self_service(doc)
+	from bsgroup.time_off_policy import validate as validate_policy
+	validate_policy(doc)
 	if doc.get('custom_time_off_category') == 'Emergency Leave':
 		if doc.is_new() and not doc.flags.get('time_off_request'):
 			frappe.throw('Please apply for Emergency Leave through Time Off on your dashboard so the paid/unpaid split is calculated.')

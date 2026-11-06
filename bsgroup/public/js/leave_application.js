@@ -15,6 +15,7 @@ frappe.ui.form.on("Leave Application", {
 
 function toggle_medical_certificate(frm) {
     const leaveType = frm.doc.leave_type;
+    frm.toggle_display('custom_maternity_period_start', frm.doc.custom_time_off_category === 'Maternity Leave');
     frm.toggle_display(['custom_emergency_contact_name', 'custom_emergency_contact_phone'], frm.doc.custom_time_off_category === 'Emergency Leave');
     if (frm.doc.leave_type === 'Sick Leave') {
         frm.toggle_reqd('custom_medical_certificate', (frm.doc.total_leave_days || 0) > 1);
