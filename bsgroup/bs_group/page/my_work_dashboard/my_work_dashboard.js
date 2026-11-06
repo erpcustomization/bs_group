@@ -1,6 +1,42 @@
+function bsEmployeeServices(parent) {
+    if ($(parent).children('.bs-employee-services').length) return;
+    if (!document.getElementById('bs-employee-services-style')) {
+        $('<style id="bs-employee-services-style">').text(`
+            .bs-employee-services{margin:8px 0 20px;padding:18px;border:1px solid #e1e8ef;border-radius:14px;background:var(--card-bg,#fff)}
+            .bs-employee-services h2{font-size:16px;font-weight:600;margin:0 0 4px;color:var(--text-color,#152b41)}
+            .bs-employee-services p{font-size:12px;color:var(--text-muted,#65778a);margin:0 0 14px}
+            .bs-employee-service-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+            .bs-employee-service{display:flex;flex-direction:column;gap:5px;padding:14px;border:1px solid #e1e8ef;border-radius:10px;background:var(--control-bg,#f7f9fc);text-decoration:none!important;transition:border-color .15s,background .15s}
+            .bs-employee-service strong{color:var(--text-color,#152b41);font-size:13px}
+            .bs-employee-service span{color:var(--text-muted,#65778a);font-size:11px;line-height:1.5}
+            .bs-employee-service:hover{border-color:#178579;background:var(--card-bg,#fff)}
+            .bs-employee-service:focus-visible{outline:3px solid #66bdb2;outline-offset:2px}
+            @media(max-width:1000px){.bs-employee-service-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+            @media(max-width:600px){.bs-employee-service-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+        `).appendTo(document.head);
+    }
+    const section=$('<section class="bs-employee-services" aria-label="Employee services">').appendTo(parent);
+    $('<h2>').text(__('Employee services')).appendTo(section);
+    $('<p>').text(__('Your HR services, using your existing ERP access.')).appendTo(section);
+    const grid=$('<nav class="bs-employee-service-grid" aria-label="HR services">').appendTo(section);
+    // Navigation only: destination workspaces retain their existing permission checks.
+    for(const [title,description,url] of [
+        ['Expenses','Claims, advances and reimbursements','/desk/expenses'],
+        ['Leaves','Applications, balances and approvals','/desk/leaves'],
+        ['Payroll','Payslips and payroll services','/desk/payroll'],
+        ['Performance','Goals, appraisals and reviews','/desk/performance'],
+        ['Shift & Attendance','Shifts, check-ins and attendance','/desk/shift-and-attendance/shift-&-attendance'],
+    ]) {
+        const link=$('<a class="bs-employee-service">').attr('href',url).appendTo(grid);
+        $('<strong>').text(__(title)).appendTo(link);
+        $('<span>').text(__(description)).appendTo(link);
+    }
+}
+
 frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
     if(frappe.session.user==='mohan@bitssecureit.com' || (frappe.session.user==='Administrator' && new URLSearchParams(location.search).get('executive_preview')==='1')) return bsChairmanDashboard(wrapper);
     const page = frappe.ui.make_app_page({parent:wrapper,title:__('My Dashboard'),single_column:true});
+    bsEmployeeServices(page.main);
     const host = $('<div class="bs-work"></div>').appendTo(page.main);
     const management = frappe.session.user === 'mohan@bitssecureit.com';
     let managementDay = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Dubai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -279,6 +315,7 @@ frappe.pages['my-work-dashboard'].on_page_show = wrapper => wrapper.refresh_dash
 function bsChairmanDashboard(wrapper) {
     const page=frappe.ui.make_app_page({parent:wrapper,title:'Executive Overview',single_column:true});
     page.clear_primary_action();
+    bsEmployeeServices(page.main);
     const root=$('<div class="bs-exec">').appendTo(page.main);
     const css=`
     .bs-exec{--ink:#152b41;--muted:#65778a;--line:#e1e8ef;--teal:#178579;--navy:#152f49;font-family:Inter,"Segoe UI",Arial,sans-serif;color:var(--ink);padding:4px 0 24px;line-height:1.5;font-weight:400;letter-spacing:normal;-webkit-font-smoothing:antialiased}
