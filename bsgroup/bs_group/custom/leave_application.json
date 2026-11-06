@@ -67,6 +67,54 @@
    "translatable": 0,
    "unique": 0,
    "width": null
+  },
+  {
+   "dt": "Leave Application",
+   "name": "Leave Application-custom_time_off_category",
+   "fieldname": "custom_time_off_category",
+   "label": "Time Off Category",
+   "fieldtype": "Data",
+   "insert_after": "leave_type",
+   "read_only": 1,
+   "no_copy": 1,
+   "permlevel": 0,
+   "reqd": 0
+  },
+  {
+   "dt": "Leave Application",
+   "name": "Leave Application-custom_time_off_reference",
+   "fieldname": "custom_time_off_reference",
+   "label": "Time Off Reference",
+   "fieldtype": "Data",
+   "insert_after": "custom_time_off_category",
+   "read_only": 1,
+   "no_copy": 1,
+   "permlevel": 0,
+   "reqd": 0
+  },
+  {
+   "dt": "Leave Application",
+   "name": "Leave Application-custom_emergency_contact_name",
+   "fieldname": "custom_emergency_contact_name",
+   "label": "Emergency Contact Name",
+   "fieldtype": "Data",
+   "insert_after": "custom_medical_certificate",
+   "read_only": 0,
+   "no_copy": 1,
+   "permlevel": 0,
+   "reqd": 0
+  },
+  {
+   "dt": "Leave Application",
+   "name": "Leave Application-custom_emergency_contact_phone",
+   "fieldname": "custom_emergency_contact_phone",
+   "label": "Emergency Contact Phone",
+   "fieldtype": "Data",
+   "insert_after": "custom_emergency_contact_name",
+   "read_only": 0,
+   "no_copy": 1,
+   "permlevel": 0,
+   "reqd": 0
   }
  ],
  "custom_perms": [],
@@ -94,7 +142,7 @@
    "property": "field_order",
    "property_type": "Data",
    "row_name": null,
-   "value": "[\"naming_series\", \"employee\", \"employee_name\", \"column_break_4\", \"leave_type\", \"company\", \"department\", \"section_break_5\", \"from_date\", \"to_date\", \"half_day\", \"half_day_date\", \"total_leave_days\", \"column_break1\", \"description\", \"leave_balance\", \"custom_medical_certificate\", \"section_break_7\", \"leave_approver\", \"leave_approver_name\", \"follow_via_email\", \"column_break_18\", \"posting_date\", \"status\", \"sb_other_details\", \"salary_slip\", \"color\", \"column_break_17\", \"letter_head\", \"amended_from\"]"
+   "value": "[\"naming_series\", \"employee\", \"employee_name\", \"column_break_4\", \"leave_type\", \"custom_time_off_category\", \"custom_time_off_reference\", \"company\", \"department\", \"section_break_5\", \"from_date\", \"to_date\", \"half_day\", \"half_day_date\", \"total_leave_days\", \"column_break1\", \"description\", \"leave_balance\", \"custom_medical_certificate\", \"custom_emergency_contact_name\", \"custom_emergency_contact_phone\", \"section_break_7\", \"leave_approver\", \"leave_approver_name\", \"follow_via_email\", \"column_break_18\", \"posting_date\", \"status\", \"sb_other_details\", \"salary_slip\", \"color\", \"column_break_17\", \"letter_head\", \"amended_from\"]"
   }
  ],
  "sync_on_migrate": 1

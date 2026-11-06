@@ -14,6 +14,10 @@ frappe.ui.form.on("Leave Application", {
 });
 
 function toggle_medical_certificate(frm) {
+    if (frm.doc.leave_type === 'Sick Leave') {
+        frm.toggle_reqd('custom_medical_certificate', (frm.doc.total_leave_days || 0) > 1);
+        return;
+    }
     frappe.db.get_singles_value("BS Group Settings", "select_leave_type").then((configured_leave_type) => {
         frappe.db.get_singles_value("BS Group Settings", "attachment_required_after_days").then((threshold_days) => {
             let mandatory = (

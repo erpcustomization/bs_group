@@ -9,7 +9,7 @@ def dubai_today():
     return str(datetime.now(ZoneInfo('Asia/Dubai')).date())
 
 
-def has_records(employee, start, end, exclude=None):
+def has_records(employee, start, end, exclude=None, siblings=None):
     start, end = frappe.utils.getdate(start), frappe.utils.getdate(end)
     site = ZoneInfo(frappe.utils.get_system_timezone())
     lower = datetime.combine(start, time(), ZoneInfo('Asia/Dubai')).astimezone(site).replace(tzinfo=None)
@@ -24,6 +24,8 @@ def has_records(employee, start, end, exclude=None):
             filters.append(['status', '!=', 'Rejected'])
             if exclude:
                 filters.append(['name', '!=', exclude])
+            if siblings:
+                filters.append(['name', 'not in', siblings])
         if frappe.db.exists(dt, filters):
             return True
     return False
@@ -35,13 +37,15 @@ def validate_self_service(doc):
     previous = doc.get_doc_before_save()
     fields = ('employee', 'from_date', 'to_date', 'leave_type', 'half_day', 'half_day_date', 'description')
     # Preserve the existing approval flow for requests already filed.
-    if previous and all(previous.get(f) == doc.get(f) for f in fields):
+    def comparable(field, value):
+        return frappe.utils.getdate(value) if value and field in ('from_date', 'to_date', 'half_day_date') else (value or None)
+    if previous and all(comparable(f, previous.get(f)) == comparable(f, doc.get(f)) for f in fields):
         return
     if not doc.from_date or not doc.to_date or not doc.employee:
         return
     if frappe.utils.getdate(doc.from_date) < frappe.utils.getdate(dubai_today()) or (previous and frappe.utils.getdate(previous.from_date) < frappe.utils.getdate(dubai_today())):
         frappe.throw('Past dates are locked. Please contact HR for an approved correction.')
-    if has_records(doc.employee, doc.from_date, doc.to_date, doc.name):
+    if has_records(doc.employee, doc.from_date, doc.to_date, doc.name, doc.flags.get('time_off_siblings')):
         frappe.throw('These dates already have attendance or leave records. Please contact HR for an approved correction.')
 
 

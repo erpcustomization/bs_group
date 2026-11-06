@@ -14,6 +14,15 @@ def validate_medical_certificate(doc, method=None):
 
 	from bsgroup.dashboard_leave import validate_self_service
 	validate_self_service(doc)
+	if doc.get('custom_time_off_category') == 'Emergency Leave':
+		if doc.is_new() and not doc.flags.get('time_off_request'):
+			frappe.throw('Please apply for Emergency Leave through Time Off on your dashboard so the paid/unpaid split is calculated.')
+		if not (doc.get('custom_emergency_contact_name') or '').strip() or not (doc.get('custom_emergency_contact_phone') or '').strip():
+			frappe.throw('Emergency contact name and phone number are required.')
+	if doc.leave_type == 'Sick Leave':
+		if (doc.total_leave_days or 0) > 1 and not doc.get('custom_medical_certificate'):
+			frappe.throw('A medical certificate is required for sick leave exceeding one day.')
+		return
 	settings = frappe.get_cached_doc("BS Group Settings")
 	configured_leave_type = settings.get("select_leave_type")
 	threshold_days = settings.get("attachment_required_after_days")

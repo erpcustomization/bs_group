@@ -1,3 +1,65 @@
+async function bsOpenTimeOff(day) {
+    let plan = null, revision = 0, busy = false;
+    const requestId = crypto.randomUUID();
+    let dialog;
+    dialog = new frappe.ui.Dialog({title:__('Time Off'), fields:[
+        {fieldname:'category',label:__('Request type'),fieldtype:'Select',options:['Annual Leave','Sick Leave','Emergency Leave'],default:'Annual Leave',reqd:1,onchange:update},
+        {fieldname:'balance',fieldtype:'HTML'},
+        {fieldname:'from_date',label:__('From'),fieldtype:'Date',default:day || frappe.datetime.get_today(),reqd:1,onchange:update},
+        {fieldname:'to_date',label:__('To'),fieldtype:'Date',default:day || frappe.datetime.get_today(),reqd:1,onchange:update},
+        {fieldname:'summary',fieldtype:'HTML'},
+        {fieldname:'certificate',label:__('Medical certificate'),fieldtype:'Attach',hidden:1,description:__('Upload as a private attachment. Required for sick leave over one day.')},
+        {fieldname:'contact_name',label:__('Emergency contact name'),fieldtype:'Data',hidden:1},
+        {fieldname:'contact_phone',label:__('Emergency contact phone'),fieldtype:'Data',hidden:1},
+        {fieldname:'reason',label:__('Reason / notes'),fieldtype:'Small Text'},
+    ], primary_action_label:__('Apply for Time Off'), primary_action:async values=>{
+        if (busy || !plan) return;
+        busy=true; dialog.get_primary_btn().prop('disabled',true);
+        try {
+            const r=await frappe.call({method:'bsgroup.time_off.apply',args:{...values,request_id:requestId,expected_plan:JSON.stringify(plan.parts)},freeze:true,freeze_message:__('Sending your request for approval…')});
+            dialog.hide();
+            const names=r.message.names;
+            const result=new frappe.ui.Dialog({title:__('Time Off requested'),fields:[{fieldtype:'HTML',fieldname:'result'}]});
+            const area=result.fields_dict.result.$wrapper;
+            $('<p>').text(__('Your request has been sent through the HR approval process.')).appendTo(area);
+            names.forEach(name=>$('<button class="btn btn-default btn-sm" type="button">').text(name).css('margin','4px').on('click',()=>{result.hide();frappe.set_route('Form','Leave Application',name);}).appendTo(area));
+            result.show();
+        } finally {busy=false;dialog.get_primary_btn().prop('disabled',!plan);}
+    }});
+    function message(field,text,error=false) {
+        dialog.fields_dict[field].$wrapper.empty().append($('<p>').text(text).css({padding:'10px 12px',background:error?'#fff1ee':'#edf7f5',borderRadius:'8px',color:error?'#8e3328':'#175750'}));
+    }
+    async function update() {
+        const ticket=++revision;plan=null;
+        if (!dialog?.fields_dict.summary) return;
+        const category=dialog.get_value('category'),from_date=dialog.get_value('from_date'),to_date=dialog.get_value('to_date');
+        const emergency=category==='Emergency Leave';
+        ['contact_name','contact_phone'].forEach(f=>{dialog.set_df_property(f,'hidden',!emergency);dialog.set_df_property(f,'reqd',emergency);});
+        dialog.set_df_property('reason','reqd',emergency);
+        dialog.set_df_property('certificate','hidden',category!=='Sick Leave');
+        dialog.set_df_property('certificate','reqd',false);
+        dialog.get_primary_btn()?.prop('disabled',true);
+        if (!from_date || !to_date) return;
+        message('summary',__('Checking HRMS balance and dates…'));
+        try {
+            const r=await frappe.call({method:'bsgroup.time_off.preview',args:{category,from_date,to_date},quiet:true});
+            if(ticket!==revision)return;
+            plan=r.message;
+            message('balance',__('Annual leave available: {0} days · Pending annual requests: {1} days',[plan.annual_available,plan.pending_annual]));
+            message('summary',emergency?__('Annual leave: {0} days · Unpaid: {1} days. Both follow HR approval.',[plan.annual_days,plan.unpaid_days]):__('Requested: {0} leave day(s).',[plan.total_days]));
+            if(category==='Annual Leave' && plan.total_days>plan.annual_available){message('summary',__('Insufficient annual leave balance. Please choose fewer days or contact HR.'),true);plan=null;return;}
+            dialog.set_df_property('certificate','reqd',!!plan.certificate_required);
+            dialog.get_primary_btn().prop('disabled',false);
+        } catch(e) {
+            if(ticket!==revision)return;
+            plan=null;
+            message('summary',__('Unable to prepare this request. Check the HRMS message, dates and employee setup.'),true);
+        }
+    }
+    dialog.show();
+    await update();
+}
+
 function bsEmployeeServices(parent) {
     if ($(parent).children('.bs-employee-services').length) return;
     if (!document.getElementById('bs-employee-services-style')) {
@@ -21,12 +83,13 @@ function bsEmployeeServices(parent) {
     // Navigation only: destination workspaces retain their existing permission checks.
     for(const [title,url,icon] of [
         ['Expenses','/desk/expenses','<path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 7h6M9 11h6M9 15h3"/>'],
-        ['Leaves','/desk/leaves','<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 10h18m-13 5 3 3 5-5"/>'],
+        ['Time Off','/desk/leaves','<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 10h18m-13 5 3 3 5-5"/>'],
         ['Payroll','/desk/payroll','<rect x="3" y="5" width="18" height="15" rx="3"/><path d="M3 9h18m-5 5h5M7 16h4"/><circle cx="16" cy="14" r=".5"/>'],
         ['Performance','/desk/performance','<path d="M4 4v16h16M8 15l4-5 4 2 4-7m-5 0h5v5"/>'],
         ['Shift & Attendance','/desk/shift-and-attendance/shift-&-attendance','<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
     ]) {
         const link=$('<a class="bs-employee-service">').attr('href',url).appendTo(grid);
+        if(title==='Time Off') link.on('click',event=>{event.preventDefault();bsOpenTimeOff();});
         $('<span class="bs-service-icon" aria-hidden="true">').html('<svg viewBox="0 0 24 24">'+icon+'</svg>').appendTo(link);
         $('<strong>').text(__(title)).appendTo(link);
     }
@@ -41,7 +104,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
     let managementDay = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Dubai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
     const controls = $('<div class="bs-work-month-controls"><label>Month <input type="month" aria-label="Dashboard month"></label></div>').insertBefore(host);
     const monthInput = controls.find('input');
-    const leaveButton = $('<button type="button" class="btn btn-primary btn-sm">').text(__('Apply for Leave')).hide().appendTo(controls);
+    const leaveButton = $('<button type="button" class="btn btn-primary btn-sm">').text(__('Time Off')).hide().appendTo(controls);
     const leavePanel = $('<div class="bs-dashboard-leave">').insertAfter(controls);
     let leaveContext;
     const openLeave = name => frappe.set_route('Form', 'Leave Application', name);
@@ -74,7 +137,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
             }
             if (!leaveContext.can_create) return frappe.msgprint(__('Please contact HR to request leave access.'));
             const start = day || leaveContext.today;
-            const create = ()=>frappe.new_doc('Leave Application', {employee:leaveContext.employee,company:leaveContext.company,from_date:start,to_date:start});
+            const create = ()=>bsOpenTimeOff(start);
             if (day) frappe.confirm(__('Apply for leave on {0}? You can change the dates in the leave form.',[frappe.datetime.str_to_user(day)]),create);
             else create();
         } catch (e) { frappe.msgprint(__('Leave details could not be loaded. Please try again.')); }
