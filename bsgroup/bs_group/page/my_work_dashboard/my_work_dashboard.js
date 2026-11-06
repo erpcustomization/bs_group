@@ -36,8 +36,8 @@ function bsEmployeeServices(parent) {
 frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
     if(frappe.session.user==='mohan@bitssecureit.com' || (frappe.session.user==='Administrator' && new URLSearchParams(location.search).get('executive_preview')==='1')) return bsChairmanDashboard(wrapper);
     const page = frappe.ui.make_app_page({parent:wrapper,title:__('My Dashboard'),single_column:true});
-    bsEmployeeServices(page.main);
     const host = $('<div class="bs-work"></div>').appendTo(page.main);
+    bsEmployeeServices(page.main);
     const management = frappe.session.user === 'mohan@bitssecureit.com';
     let managementDay = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Dubai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
     const controls = $('<div class="bs-work-month-controls"><label>Month <input type="month" aria-label="Dashboard month"></label></div>').insertBefore(host);
@@ -315,8 +315,8 @@ frappe.pages['my-work-dashboard'].on_page_show = wrapper => wrapper.refresh_dash
 function bsChairmanDashboard(wrapper) {
     const page=frappe.ui.make_app_page({parent:wrapper,title:'Executive Overview',single_column:true});
     page.clear_primary_action();
-    bsEmployeeServices(page.main);
     const root=$('<div class="bs-exec">').appendTo(page.main);
+    bsEmployeeServices(page.main);
     const css=`
     .bs-exec{--ink:#152b41;--muted:#65778a;--line:#e1e8ef;--teal:#178579;--navy:#152f49;font-family:Inter,"Segoe UI",Arial,sans-serif;color:var(--ink);padding:4px 0 24px;line-height:1.5;font-weight:400;letter-spacing:normal;-webkit-font-smoothing:antialiased}
     .bs-exec *{box-sizing:border-box}.bs-exec button,.bs-exec input,.bs-exec select{font:inherit}.bs-exec button:focus-visible,.bs-exec input:focus-visible,.bs-exec select:focus-visible{outline:3px solid #66bdb2;outline-offset:3px}
