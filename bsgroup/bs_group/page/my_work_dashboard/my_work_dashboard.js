@@ -56,7 +56,7 @@ async function bsOpenTimeOff(day) {
             message('balance',__('Annual leave available: {0} days · Pending annual requests: {1} days',[plan.annual_available,plan.pending_annual]));
             message('summary',emergency?__('Annual leave: {0} days · Unpaid: {1} days. Both follow HR approval.',[plan.annual_days,plan.unpaid_days]):__('Requested: {0} leave day(s).',[plan.total_days]));
             if(special) message('summary',__('Calendar days: {0} · Full pay: {1} · Half pay: {2} · Unpaid: {3}. HR approval is required.',[plan.total_days,plan.full_pay_days,plan.half_pay_days,plan.unpaid_days]));
-            if(plan.allocation_required){message('summary',__('The pay split is calculated. HR must allocate this paid leave allowance before you can apply.'),true);plan=null;return;}
+            if(plan.allocation_required){message('summary',__('Calendar days: {0} · Full pay: {1} · Half pay: {2} · Unpaid: {3}. HR must allocate this paid leave allowance before you can apply.',[plan.total_days,plan.full_pay_days,plan.half_pay_days,plan.unpaid_days]),true);plan=null;return;}
             if(category==='Annual Leave' && plan.total_days>plan.annual_available){message('summary',__('Insufficient annual leave balance. Please choose fewer days or contact HR.'),true);plan=null;return;}
             dialog.set_df_property('certificate','reqd',!!plan.certificate_required);
             dialog.get_primary_btn().prop('disabled',false);
