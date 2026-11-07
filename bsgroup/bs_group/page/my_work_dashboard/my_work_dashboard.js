@@ -109,6 +109,28 @@ async function bsOpenTimeOff(day) {
     await update();
 }
 
+function bsAnnualLeaveBalance(parent) {
+    const box=$('<div class="bs-annual-leave-balance" role="status">').css({display:'flex',gap:'8px',alignItems:'baseline',flexWrap:'wrap',margin:'0 0 12px',fontSize:'13px'}).appendTo(parent);
+    $('<strong>').text(__('Annual leave')).appendTo(box);
+    const value=$('<span>').text(__('Loading…')).appendTo(box);
+    const note=$('<small>').css('color','var(--text-muted)').appendTo(box);
+    async function refresh() {
+        try {
+            const data=(await frappe.call({method:'bsgroup.dashboard_leave_balance.context',quiet:true})).message;
+            if(data.source==='hrms') {
+                value.text(__('{0} days available',[data.available]));
+                note.text(data.pending?__('HRMS balance: {0} · Pending: {1} days',[data.balance,data.pending]):__('Current HRMS balance'));
+            } else if(data.source==='reference') {
+                const dash=['-','–'].includes(String(data.balance));
+                value.text(dash?'–':__('{0} days',[data.balance]));
+                note.text(dash?__('Excel balance not specified · HR confirmation pending'):__('Excel balance · HRMS reconciliation pending'));
+            } else {value.text('–');note.text(__('Ask HR to confirm your annual leave balance.'));}
+        } catch(e) {value.text('–');note.text(__('Balance unavailable. Please reload or contact HR.'));}
+    }
+    refresh();
+    const timer=setInterval(()=>{if(!box[0].isConnected)clearInterval(timer);else if(box.is(':visible'))refresh();},60000);
+}
+
 function bsEmployeeServices(parent) {
     if ($(parent).children('.bs-employee-services').length) return;
     if (!document.getElementById('bs-employee-services-style')) {
@@ -128,6 +150,7 @@ function bsEmployeeServices(parent) {
     }
     const section=$('<section class="bs-employee-services" aria-label="Employee services">').appendTo(parent);
     $('<h2>').text(__('Employee services')).appendTo(section);
+    bsAnnualLeaveBalance(section);
     const grid=$('<nav class="bs-employee-service-grid" aria-label="HR services">').appendTo(section);
     // Navigation only: destination workspaces retain their existing permission checks.
     for(const [title,url,icon] of [
