@@ -42,7 +42,7 @@ def _section(spec):
     if key == "attendance":
         filters["time"] = ["between", [nowdate() + " 00:00:00", nowdate() + " 23:59:59"]]
     # Native list permission filters apply to both totals and returned records.
-    count = frappe.get_list(dt, filters=filters, fields=["count(name) as total"])[0].total
+    count = frappe.get_list(dt, filters=filters, fields=[{"COUNT": "name", "as": "total"}])[0].total
     rows = frappe.get_list(dt, filters=filters, fields=fields,
                            order_by="modified desc", limit_page_length=10)
     result.update(available=True, count=count, can_create=frappe.has_permission(dt, "create"),

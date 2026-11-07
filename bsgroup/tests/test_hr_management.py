@@ -18,7 +18,7 @@ class HRManagementTests(unittest.TestCase):
         self.f.db = types.SimpleNamespace(exists=lambda *args: True)
         self.f.has_permission = lambda *args: True
         self.f.get_meta = lambda *args: types.SimpleNamespace(has_field=lambda f: True)
-        self.f.get_list = Mock(side_effect=lambda dt, **kw: [types.SimpleNamespace(total=3)] if 'count(name) as total' in kw['fields'] else [])
+        self.f.get_list = Mock(side_effect=lambda dt, **kw: [types.SimpleNamespace(total=3)] if any(isinstance(f, dict) and f.get('COUNT') for f in kw['fields']) else [])
         utils = types.ModuleType('frappe.utils')
         utils.nowdate = lambda: '2026-11-07'
         self.patch = patch.dict(sys.modules, {'frappe':self.f, 'frappe.utils':utils})
