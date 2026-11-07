@@ -2,7 +2,9 @@
 (() => {
     const sections=[['dashboard','Dashboard','layout-dashboard'],['organization','Organization Structure','network'],['employees','Employee Profiles','users'],['onboarding','Onboarding','user-plus'],['attendance','Attendance','clock'],['leave','Leave Approvals','calendar-check'],['policies','Policies','file-text'],['warnings','Warnings','shield-alert'],['exit','Exit Interviews','message-circle'],['offboarding','Offboarding','log-out'],['requests','HR Requests','inbox']];
     function update() {
-        if(!frappe.boot.bs_hr_management)return;
+        // Existing sessions may retain boot data from before this menu was installed.
+        // Server endpoints independently enforce the same audience and document permissions.
+        if(!(frappe.boot.bs_hr_management || ['Administrator','muskan@bitssecureit.com'].includes(frappe.session.user) || frappe.user.has_role('System Manager')))return;
         const hosts=document.querySelectorAll('.body-sidebar .sidebar-items, .desk-sidebar .sidebar-items');
         for(const host of hosts) {
             let group=host.querySelector('.sidebar-item-container[data-id="BS HR"]');
