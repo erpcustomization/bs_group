@@ -126,7 +126,12 @@ window.bsHRManagement = async function (parent) {
             $('<button class="btn btn-default btn-sm">').text('Review Muskan access').on('click',async()=>{
                 const r=await frappe.call({method:'bsgroup.hr_management.muskan_access_review'});
                 const a=r.message;
-                frappe.msgprint({title:'BS HR access review',message:`<p><b>${esc(a.full_name)}</b> · ${esc(a.user)}</p><p>Existing roles: ${esc(a.roles.join(', '))}</p><table class="hrm-table"><tr><th>Section</th><th>Read</th><th>Edit</th><th>Create</th></tr>${a.current.map(x=>`<tr><td>${esc(x.doctype)}</td><td>${x.read?'Yes':'No'}</td><td>${x.write?'Yes':'No'}</td><td>${x.create?'Yes':'No'}</td></tr>`).join('')}</table><p>Prepared addition: BS HR Management — read, create and edit Warnings, HR Requests and Organization Documents; read policy categories. No System Manager, deletion, sharing or approval bypass rights will be added.</p><p>Access changes await confirmation.</p>`,wide:true});
+                frappe.msgprint({title:'BS HR access review',message:`<p><b>${esc(a.full_name)}</b> · ${esc(a.user)}</p><p>Existing roles: ${esc(a.roles.join(', '))}</p><table class="hrm-table"><tr><th>Section</th><th>Read</th><th>Edit</th><th>Create</th></tr>${a.current.map(x=>`<tr><td>${esc(x.doctype)}</td><td>${x.read?'Yes':'No'}</td><td>${x.write?'Yes':'No'}</td><td>${x.create?'Yes':'No'}</td></tr>`).join('')}</table><p>Prepared addition: BS HR Management — read, create and edit Warnings, HR Requests and Organization Documents; read policy categories. No System Manager, deletion, sharing or approval bypass rights will be added.</p><p>Access changes await confirmation.</p>`,wide:true,primary_action:{label:'Apply access',action:()=>{
+                    frappe.confirm('Grant Muskan read, create and edit access to Organization Documents, HR Warnings and HR Service Requests, plus read access to policy categories? Existing company restrictions and approvals remain in force.',async()=>{
+                        await frappe.call({method:'bsgroup.hr_management.grant_muskan_access',type:'POST',freeze:true});
+                        frappe.msgprint('BS HR access has been added to Muskan. Her existing roles were preserved.');
+                    });
+                }}});
             }).appendTo(admin);
         }
         if(data.setup_pending && data.can_setup) {
