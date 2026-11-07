@@ -1,3 +1,42 @@
+function bsDashboardPunches(parent, afterPunch) {
+    const group=$('<span class="bs-dashboard-punches">').css({display:'inline-flex',gap:'6px',alignItems:'center',flexWrap:'wrap'}).appendTo(parent);
+    const status=$('<small role="status">').css({color:'var(--text-muted)',maxWidth:'260px'}).appendTo(group);
+    let state=null,busy=false;
+    const buttons={};
+    for(const [kind,label] of [['IN','Check In'],['OUT','Check Out']]) {
+        buttons[kind]=$('<button type="button" class="btn btn-sm">').addClass(kind==='IN'?'btn-primary':'btn-default').text(__(label)).prop('disabled',true).appendTo(group).on('click',()=>{
+            if(busy || !state?.allowed)return;
+            frappe.confirm(__('Record {0} now? This uses the current time.',[__(label)]),()=>submit(kind));
+        });
+    }
+    async function refresh() {
+        try {
+            state=(await frappe.call({method:'bsgroup.dashboard_punch.context',quiet:true})).message;
+            status.text(state.allowed?(state.last_time?__('Last {0}: {1}',[state.last_type==='IN'?__('Check In'):__('Check Out'),frappe.datetime.str_to_user(state.last_time)]):__('No attendance punches yet')):__('Contact HR to enable check-in access.'));
+            buttons.IN.prop('disabled',busy || !state.allowed || state.last_type==='IN');
+            buttons.OUT.prop('disabled',busy || !state.allowed || state.last_type!=='IN');
+        } catch(e) {state=null;Object.values(buttons).forEach(b=>b.prop('disabled',true));status.text(__('Attendance unavailable. Please contact HR or reload.'));}
+    }
+    async function submit(kind) {
+        busy=true;Object.values(buttons).forEach(b=>b.prop('disabled',true));
+        try {
+            let coords={};
+            if(state.location_required) {
+                status.text(__('Getting your current location…'));
+                const position=await new Promise((resolve,reject)=>navigator.geolocation?navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,timeout:20000,maximumAge:0}):reject(new Error('Location is unavailable')));
+                coords={latitude:position.coords.latitude,longitude:position.coords.longitude};
+            }
+            await frappe.call({method:'bsgroup.dashboard_punch.punch',args:{log_type:kind,expected_last:state.last_name,...coords},freeze:true,freeze_message:__('Recording attendance…')});
+            frappe.show_alert({message:__(kind==='IN'?'Check In recorded':'Check Out recorded'),indicator:'green'});
+            afterPunch?.();
+        } catch(e) {if(e?.code || e?.message==='Location is unavailable')frappe.msgprint(__('Unable to get your location. Allow location access and try again.'));}
+        finally {busy=false;await refresh();}
+    }
+    refresh();
+    const timer=setInterval(()=>{if(!group[0].isConnected)clearInterval(timer);else if(group.is(':visible')&&!busy)refresh();},60000);
+    return {refresh};
+}
+
 async function bsOpenTimeOff(day) {
     let plan = null, revision = 0, busy = false;
     const requestId = crypto.randomUUID();
@@ -114,14 +153,14 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
     let managementDay = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Dubai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
     const controls = $('<div class="bs-work-month-controls"><label>Month <input type="month" aria-label="Dashboard month"></label></div>').insertBefore(host);
     const monthInput = controls.find('input');
-    const leaveButton = $('<button type="button" class="btn btn-primary btn-sm">').text(__('Time Off')).hide().appendTo(controls);
+    bsDashboardPunches(controls,()=>refresh());
     const leavePanel = $('<div class="bs-dashboard-leave">').insertAfter(controls);
     let leaveContext;
     const openLeave = name => frappe.set_route('Form', 'Leave Application', name);
     async function loadLeave() {
         const r = await frappe.call({method:'bsgroup.dashboard_leave.context',quiet:true});
         leaveContext = r.message;
-        leaveButton.toggle(!!leaveContext?.can_create);
+
         leavePanel.empty();
         if (!leaveContext?.visible) return;
         const upcoming = leaveContext.requests.filter(x=>x.to_date>=leaveContext.today).sort((a,b)=>a.from_date.localeCompare(b.from_date));
@@ -152,7 +191,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
             else create();
         } catch (e) { frappe.msgprint(__('Leave details could not be loaded. Please try again.')); }
     }
-    leaveButton.on('click',()=>applyLeave());
+
     monthInput.val(frappe.datetime.get_today().slice(0,7));
     let requestId = 0;
     monthInput.on('change', () => { if (monthInput.val()) refresh(); });
@@ -262,7 +301,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
         if(host[0].isConnected && host.is(':visible')) wrapper.refresh_team_overview?.();
     },300000);
     async function refresh() {
-        loadLeave().catch(()=>{leaveButton.hide();leavePanel.text(__('Leave details could not be loaded. Please reload to try again.'));});
+        loadLeave().catch(()=>{leavePanel.text(__('Leave details could not be loaded. Please reload to try again.'));});
         const currentRequest = ++requestId;
         host.empty().append($('<div class="bs-work-empty" role="status">').text(__('Loading your workspace…')));
         try {
@@ -416,6 +455,7 @@ function bsChairmanDashboard(wrapper) {
     const controls=$('<div class="ex-controls">').appendTo(hero);
     const dayLabel=$('<label>').text('Reporting date ').appendTo(controls);
     const dayInput=$('<input type="date" aria-label="Executive reporting date">').appendTo(dayLabel);
+    bsDashboardPunches(controls,()=>refresh());
     const refreshButton=$('<button class="ex-button" type="button">').text('↻ Refresh').appendTo(controls);
     const updated=$('<div class="ex-update" role="status" aria-live="polite">').appendTo(root);
     const content=$('<div>').appendTo(root);
