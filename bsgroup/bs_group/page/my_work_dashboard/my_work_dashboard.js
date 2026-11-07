@@ -42,7 +42,7 @@ async function bsOpenTimeOff(day) {
     const requestId = crypto.randomUUID();
     let dialog;
     dialog = new frappe.ui.Dialog({title:__('Time Off'), fields:[
-        {fieldname:'category',label:__('Request type'),fieldtype:'Select',options:['Annual Leave','Sick Leave','Emergency Leave','Hajj Leave','Study Leave','Maternity Leave'],default:'Annual Leave',reqd:1,onchange:update},
+        {fieldname:'category',label:__('Request type'),fieldtype:'Select',options:['Annual Leave','Unpaid Leave','Sick Leave','Emergency Leave','Hajj Leave','Study Leave','Maternity Leave'],default:'Annual Leave',reqd:1,onchange:update},
         {fieldname:'balance',fieldtype:'HTML'},
         {fieldname:'maternity_period_start',label:__('First day of maternity period'),fieldtype:'Date',hidden:1,description:__('Use the same first day when applying for this maternity period in separate parts. Maximum 60 calendar days.'),onchange:update},
         {fieldname:'from_date',label:__('From'),fieldtype:'Date',default:day || frappe.datetime.get_today(),reqd:1,onchange:update},
@@ -69,6 +69,11 @@ async function bsOpenTimeOff(day) {
     function message(field,text,error=false) {
         dialog.fields_dict[field].$wrapper.empty().append($('<p>').text(text).css({padding:'10px 12px',background:error?'#fff1ee':'#edf7f5',borderRadius:'8px',color:error?'#8e3328':'#175750'}));
     }
+    function recommendUnpaid(text, linked=true) {
+        message('summary',text,true);
+        if(linked) $('<button type="button" class="btn btn-default btn-sm">').text(__('Choose Unpaid Leave')).appendTo(dialog.fields_dict.summary.$wrapper).on('click',()=>dialog.set_value('category','Unpaid Leave'));
+        else $('<p>').text(__('HR must link your login to an Employee record before you can apply for any leave.')).appendTo(dialog.fields_dict.summary.$wrapper);
+    }
     async function update() {
         const ticket=++revision;plan=null;
         if (!dialog?.fields_dict.summary) return;
@@ -89,14 +94,30 @@ async function bsOpenTimeOff(day) {
         if(maternity && !maternity_period_start){message('summary',__('Enter the first day of the maternity period to calculate full-pay and half-pay days.'));return;}
         message('summary',__('Checking HRMS balance and dates…'));
         try {
+            if(category==='Annual Leave') {
+                const balance=(await frappe.call({method:'bsgroup.dashboard_leave_balance.context',args:{date:from_date},quiet:true})).message;
+                if(ticket!==revision)return;
+                const known=balance.balance!==null && balance.balance!==undefined;
+                message('balance',known?__('Annual leave balance: {0}{1}',[balance.balance,['-','–'].includes(String(balance.balance))?'':__(' days')]):__('No annual leave allocation is available in HRMS for these dates.'));
+                if(balance.annual_status==='empty') {
+                    recommendUnpaid(__('You do not have available annual leave for these dates. Please apply for Unpaid Leave instead. HR approval is required.'),balance.employee_linked);
+                    return;
+                }
+                if(balance.annual_status==='pending' || balance.annual_status==='unknown' || !balance.employee_linked) {
+                    message('summary',balance.annual_status==='pending'?__('Your Excel balance is shown above, but HR must reconcile it in HRMS before you can apply for annual leave.'):__('Your annual leave balance has not been confirmed. Please contact HR.'),true);
+                    if(!balance.employee_linked) $('<p>').text(__('HR must link your login to an Employee record before you can apply for any leave.')).appendTo(dialog.fields_dict.summary.$wrapper);
+                    return;
+                }
+            }
             const r=await frappe.call({method:'bsgroup.time_off.preview',args:{category,from_date,to_date,maternity_period_start},quiet:true});
             if(ticket!==revision)return;
             plan=r.message;
             message('balance',__('Annual leave available: {0} days · Pending annual requests: {1} days',[plan.annual_available,plan.pending_annual]));
             message('summary',emergency?__('Annual leave: {0} days · Unpaid: {1} days. Both follow HR approval.',[plan.annual_days,plan.unpaid_days]):__('Requested: {0} leave day(s).',[plan.total_days]));
+            if(category==='Unpaid Leave') message('summary',__('Requested: {0} unpaid day(s). This is Leave Without Pay and requires HR approval.',[plan.total_days]));
             if(special) message('summary',__('Calendar days: {0} · Full pay: {1} · Half pay: {2} · Unpaid: {3}. HR approval is required.',[plan.total_days,plan.full_pay_days,plan.half_pay_days,plan.unpaid_days]));
             if(plan.allocation_required){message('summary',__('Calendar days: {0} · Full pay: {1} · Half pay: {2} · Unpaid: {3}. HR must allocate this paid leave allowance before you can apply.',[plan.total_days,plan.full_pay_days,plan.half_pay_days,plan.unpaid_days]),true);plan=null;return;}
-            if(category==='Annual Leave' && plan.total_days>plan.annual_available){message('summary',__('Insufficient annual leave balance. Please choose fewer days or contact HR.'),true);plan=null;return;}
+            if(category==='Annual Leave' && plan.total_days>plan.annual_available){recommendUnpaid(plan.annual_available<=0?__('You do not have available annual leave for these dates. Please apply for Unpaid Leave instead. HR approval is required.'):__('Your request exceeds your available annual leave. Choose fewer days or apply for Unpaid Leave, subject to HR approval.'));plan=null;return;}
             dialog.set_df_property('certificate','reqd',!!plan.certificate_required);
             dialog.get_primary_btn().prop('disabled',false);
         } catch(e) {
@@ -118,8 +139,8 @@ function bsAnnualLeaveBalance(parent) {
         try {
             const data=(await frappe.call({method:'bsgroup.dashboard_leave_balance.context',quiet:true})).message;
             if(data.source==='hrms') {
-                value.text(__('{0} days available',[data.available]));
-                note.text(data.pending?__('HRMS balance: {0} · Pending: {1} days',[data.balance,data.pending]):__('Current HRMS balance'));
+                value.text(__('{0} days',[data.balance]));
+                note.text(data.pending?__('Available to apply: {0} · Pending: {1} days',[data.available,data.pending]):__('Current HRMS balance'));
             } else if(data.source==='reference') {
                 const dash=['-','–'].includes(String(data.balance));
                 value.text(dash?'–':__('{0} days',[data.balance]));

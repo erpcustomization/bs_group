@@ -92,6 +92,29 @@ class TimeOffRules(unittest.TestCase):
         with patch.object(self.module,'own_employee',return_value=Obj(name='EMP-SELF')):
             self.assertEqual(self.module.apply('Annual Leave','2026-11-09','2026-11-10','a'*32,'[]'),{'names':['HR-LAP-existing']})
 
+    def test_zero_annual_balance_blocks_insert_and_recommends_unpaid(self):
+        self.fake.db=Obj(sql=lambda *a:None)
+        self.fake.get_list=lambda *a,**kw:[]
+        self.fake.parse_json=json.loads
+        self.fake.new_doc=lambda *a: self.fail('No annual application may be inserted')
+        plan=dict(parts=[], total_days=1, annual_available=0)
+        with patch.object(self.module,'own_employee',return_value=Obj(name='EMP-SELF')), patch.object(self.module,'make_plan',return_value=plan):
+            with self.assertRaisesRegex(ValueError,'do not have available annual leave.*Unpaid Leave'):
+                self.module.apply('Annual Leave','2026-11-09','2026-11-09','b'*32,'[]')
+
+    def test_unpaid_plan_uses_native_leave_without_pay(self):
+        native=types.ModuleType('hrms.hr.doctype.leave_application.leave_application')
+        seen=[]
+        native.get_number_of_leave_days=lambda emp, kind, start, end: seen.append(kind) or 2
+        native.get_leave_allocation_records=lambda *a:{}
+        self.fake.db=Obj(get_value=lambda *a:1)
+        with patch.dict(sys.modules, {'hrms.hr.doctype.leave_application.leave_application':native}), patch.object(self.module,'annual_available',return_value=(0,0,0,'HR')):
+            plan=self.module.make_plan(Obj(name='EMP-SELF'),'Unpaid Leave','2026-11-09','2026-11-10')
+        self.assertEqual(seen,['Leave Without Pay'])
+        self.assertEqual(plan['unpaid_days'],2)
+        self.assertEqual(plan['annual_days'],0)
+        self.assertEqual(plan['leave_approver'],'HR')
+
     def test_changed_split_requires_new_review(self):
         self.fake.db=Obj(sql=lambda *a:None)
         self.fake.get_list=lambda *a,**kw:[]

@@ -7,7 +7,7 @@ import json
 from decimal import Decimal, InvalidOperation
 
 import frappe
-from frappe.utils import flt
+from frappe.utils import flt, getdate
 from bsgroup.dashboard_leave import dubai_today
 
 SOURCE_FILE = 'annual-leave-dashboard-2026.json'
@@ -43,12 +43,22 @@ def imported_reference(user, today):
     return reference_row(json.loads(content.lstrip('\ufeff')), user, today)
 
 
+def request_status(source, balance, available=0):
+    if source == 'hrms':
+        return 'available' if available > 0 else 'empty'
+    if source == 'reference':
+        if str(balance) in ('-', '–'):
+            return 'unknown'
+        return 'empty' if Decimal(str(balance)) <= 0 else 'pending'
+    return 'unknown'
+
+
 @frappe.whitelist()
-def context():
+def context(date=None):
     user = frappe.session.user
     if user == 'Guest':
         frappe.throw('Please sign in.', frappe.PermissionError)
-    today = str(dubai_today())
+    today = str(getdate(date or dubai_today()))
     employees = frappe.get_all('Employee', filters={'user_id': user, 'status': 'Active'},
                                fields=['name'], limit_page_length=2)
     if len(employees) == 1:
@@ -58,7 +68,11 @@ def context():
         if allocation is not None:
             balance = flt(allocation.get('remaining_leaves'))
             pending = flt(allocation.get('leaves_pending_approval'))
-            return dict(balance=balance, pending=pending, available=max(0, balance-pending), source='hrms')
+            available = max(0, balance-pending)
+            return dict(balance=balance, pending=pending, available=available, source='hrms',
+                        employee_linked=True, annual_status=request_status('hrms', balance, available))
     reference = imported_reference(user, today)
-    return dict(balance=reference, source='reference' if reference is not None else 'unavailable',
-                employee_linked=len(employees) == 1)
+    source = 'reference' if reference is not None else 'unavailable'
+    return dict(balance=reference, source=source, employee_linked=len(employees) == 1,
+                annual_status=request_status(source, reference) if reference is not None else
+                ('empty' if len(employees) == 1 else 'unknown'))

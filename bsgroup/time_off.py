@@ -8,7 +8,7 @@ from bsgroup.dashboard_leave import dubai_today, has_records
 ANNUAL = 'Annual Vacation'
 SICK = 'Sick Leave'
 UNPAID = 'Leave Without Pay'
-CATEGORIES = ('Annual Leave', 'Sick Leave', 'Emergency Leave', 'Hajj Leave', 'Study Leave', 'Maternity Leave')
+CATEGORIES = ('Annual Leave', 'Unpaid Leave', 'Sick Leave', 'Emergency Leave', 'Hajj Leave', 'Study Leave', 'Maternity Leave')
 
 
 def own_employee():
@@ -91,7 +91,9 @@ def make_plan(employee, category, start, end, maternity_period_start=None):
     if category in policy.SPECIAL_CATEGORIES:
         parts = policy.plan(employee.name, category, start, end, maternity_period_start)
     elif category != 'Emergency Leave':
-        leave_type = ANNUAL if category == 'Annual Leave' else SICK
+        leave_type = {'Annual Leave': ANNUAL, 'Unpaid Leave': UNPAID, 'Sick Leave': SICK}[category]
+        if category == 'Unpaid Leave' and not frappe.db.get_value('Leave Type', UNPAID, 'is_lwp'):
+            frappe.throw('HR must configure Leave Without Pay before unpaid leave requests can be processed.')
         days = flt(get_number_of_leave_days(employee.name, leave_type, str(start), str(end)))
         parts = [dict(leave_type=leave_type, from_date=str(start), to_date=str(end), days=days, half_day=0)]
     else:
@@ -152,7 +154,9 @@ def apply(category, from_date, to_date, request_id, expected_plan, reason='', co
     if frappe.parse_json(expected_plan) != plan['parts']:
         frappe.throw('Your balance or leave calculation changed. Reopen Time Off to review the updated paid/unpaid split.')
     if category == 'Annual Leave' and plan['total_days'] > plan['annual_available']:
-        frappe.throw('The requested annual leave exceeds your available balance after pending requests.')
+        if plan['annual_available'] <= 0:
+            frappe.throw('You do not have available annual leave for these dates. Please apply for Unpaid Leave instead. HR approval is required.')
+        frappe.throw('The requested annual leave exceeds your available balance after pending requests. Choose fewer days or apply for Unpaid Leave, subject to HR approval.')
     if category == 'Emergency Leave' and (not contact_name.strip() or not contact_phone.strip() or not reason.strip()):
         frappe.throw('Enter the emergency reason, contact name and phone number.')
     if plan['certificate_required'] and not certificate:

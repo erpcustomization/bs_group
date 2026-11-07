@@ -2,6 +2,7 @@ import importlib.util
 import sys
 import types
 import unittest
+from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
@@ -16,6 +17,7 @@ class BalanceTests(unittest.TestCase):
         self.fake.get_all = lambda *args, **kw: []
         utils = types.ModuleType('frappe.utils')
         utils.flt = lambda v: float(v or 0)
+        utils.getdate = lambda v: date.fromisoformat(str(v))
         leave = types.ModuleType('bsgroup.dashboard_leave')
         leave.dubai_today = lambda: '2026-11-07'
         self.modules = patch.dict(sys.modules, {'frappe': self.fake, 'frappe.utils': utils,
@@ -72,7 +74,20 @@ class BalanceTests(unittest.TestCase):
         with patch.dict(sys.modules, {'hrms.hr.doctype.leave_application.leave_application': native}):
             result = self.m.context()
         self.assertEqual(calls, [('OWN-EMPLOYEE', '2026-11-07')])
-        self.assertEqual(result, dict(balance=15, pending=2, available=13, source='hrms'))
+        self.assertEqual(result, dict(balance=15, pending=2, available=13, source='hrms', employee_linked=True, annual_status='available'))
+
+    def test_zero_negative_unknown_and_pending_are_distinct(self):
+        for value in ('0', '-8', '-19'):
+            self.assertEqual(self.m.request_status('reference', value), 'empty')
+        self.assertEqual(self.m.request_status('reference', '-'), 'unknown')
+        self.assertEqual(self.m.request_status('reference', '39.5'), 'pending')
+        self.assertEqual(self.m.request_status('hrms', 5, 0), 'empty')
+
+    def test_selected_date_is_used_for_balance_and_expiry(self):
+        calls=[]
+        self.m.imported_reference=lambda user, day: calls.append(day) or None
+        self.m.context(date='2027-01-01')
+        self.assertEqual(calls, ['2027-01-01'])
 
 
 if __name__ == '__main__':
