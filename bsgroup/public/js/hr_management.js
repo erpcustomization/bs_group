@@ -5,7 +5,7 @@ window.bsHRManagement = async function (parent) {
     const descriptions = {
         organization: 'Reporting relationships recorded in HRMS',
         employees: 'Employee records and employment details', onboarding: 'Joining tasks and onboarding checklists',
-        attendance: 'Recorded check-ins and check-outs for today', leave: 'Open applications awaiting review',
+        attendance: 'Monthly employee calendar, recorded punches and leave decisions', leave: 'Open applications awaiting review',
         policies: 'Organization documents, rules and policies', warnings: 'Confidential warning reviews and responses',
         exit: 'Exit feedback and interview records', offboarding: 'Separation tasks and handover checklists',
         requests: 'Letters, document updates and HR enquiries'
@@ -105,6 +105,8 @@ window.bsHRManagement = async function (parent) {
         $('<button class="btn btn-default btn-sm">').text('Refresh').on('click',load).appendTo(top);
         if(selected==='organization') {
             organization(main);
+        } else if(selected==='attendance') {
+            window.bsHRAttendance(main);
         } else if(section) {
             if(['warnings','requests'].includes(section.key)) $('<p class="hrm-muted">').text('Confidential administrator register. Saving a record does not issue a warning, notify an employee or change employment status.').appendTo(main);
             main.append(table(section));
