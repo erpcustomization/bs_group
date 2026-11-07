@@ -69,6 +69,28 @@ class HRManagementTests(unittest.TestCase):
             self.assertFalse(doc['permissions'][0].get('share'))
             self.assertFalse(doc['permissions'][0].get('delete'))
 
+    def test_organization_keeps_reporting_lines_and_masks_hidden_managers(self):
+        class Row(dict):
+            __getattr__ = dict.get
+        self.f.get_list = Mock(return_value=[
+            Row(name='manager', reports_to=None),
+            Row(name='staff', reports_to='manager'),
+            Row(name='restricted', reports_to='outside-permission-scope'),
+        ])
+        rows = self.m.organization()['employees']
+        self.assertEqual(rows[1]['reports_to'], 'manager')
+        self.assertIsNone(rows[2]['reports_to'])
+        self.assertTrue(rows[2]['manager_outside_view'])
+        args = self.f.get_list.call_args.kwargs
+        self.assertEqual(args['filters'], {'status': 'Active'})
+        self.assertEqual(args['limit_page_length'], 0)
+        self.assertNotIn('ignore_permissions', args)
+
+    def test_organization_denies_employee_access_before_reading(self):
+        self.f.has_permission = lambda *args: False
+        with self.assertRaises(PermissionError): self.m.organization()
+        self.f.get_list.assert_not_called()
+
 
 if __name__ == '__main__':
     unittest.main()

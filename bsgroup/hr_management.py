@@ -59,6 +59,23 @@ def overview():
                 setup_pending=any(s.get("reason") == "Setup pending" and s["key"] in ("warnings", "requests") for s in sections))
 
 
+@frappe.whitelist()
+def organization():
+    """Read the recorded reporting lines without exposing inaccessible managers."""
+    _guard()
+    if not frappe.has_permission("Employee", "read"):
+        frappe.throw("Employee records are restricted by your existing access.", frappe.PermissionError)
+    rows = frappe.get_list("Employee", filters={"status": "Active"},
+                           fields=["name", "employee_name", "designation", "department", "company", "reports_to"],
+                           order_by="employee_name asc", limit_page_length=0)
+    visible = {row.name for row in rows}
+    for row in rows:
+        row["manager_outside_view"] = bool(row.get("reports_to") and row.reports_to not in visible)
+        if row["manager_outside_view"]:
+            row["reports_to"] = None
+    return dict(employees=rows)
+
+
 @frappe.whitelist(methods=["POST"])
 def setup_registers():
     """Install new empty registers. No user roles or existing permissions change."""
