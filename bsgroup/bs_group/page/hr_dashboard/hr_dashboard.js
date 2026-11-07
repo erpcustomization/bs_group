@@ -1,5 +1,5 @@
 const HRD_METHOD = "bsgroup.bs_group.page.hr_dashboard.hr_dashboard";
-const _hrd_state = { tab: "employee" };
+const _hrd_state = { tab: null };
 
 frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({
@@ -85,7 +85,9 @@ function hrd_boot() {
 			const ctx = r.message || {};
 			const tabs = [{ key: "employee", label: "My Dashboard" }];
 			if (ctx.is_manager) tabs.push({ key: "manager", label: "Manager" });
-			if (ctx.is_hr) tabs.push({ key: "hr", label: "HR" });
+			if (ctx.is_hr) tabs.unshift({ key: "hr", label: "HR Management" });
+            if (!_hrd_state.tab) _hrd_state.tab = ctx.is_hr ? "hr" : "employee";
+            if (ctx.is_hr) $(".hrd-header h1").text("HR Management");
 
 			$("#hrd-subtitle").text("BS Group · " + (ctx.employee_name || frappe.session.user));
 			$("#hrd-tabs").html(
@@ -107,7 +109,7 @@ function hrd_render(tab) {
 	$("#hrd-body").html('<div class="hrd-loading">Fetching live data…</div>');
 	if (tab === "employee") hrd_render_employee();
 	else if (tab === "manager") hrd_render_manager();
-	else if (tab === "hr") hrd_render_hr();
+	else if (tab === "hr") window.bsHRManagement($("#hrd-body"));
 }
 
 function hrd_render_employee() {

@@ -15,6 +15,7 @@ def navigation_script():
     content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'attendance_widget.js')).read_text()
     content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'opportunity_attachments.js')).read_text()
     content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'presales_dcs_handoff.js')).read_text()
+    content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'hr_management.js')).read_text()
     import json
     style = Path(frappe.get_app_path('bsgroup', 'public', 'css', 'portal_finish.css')).read_text()
     style += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'css', 'attendance_widget.css')).read_text()

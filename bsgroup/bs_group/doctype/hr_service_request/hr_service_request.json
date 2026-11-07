@@ -1,0 +1,100 @@
+{
+ "doctype": "DocType",
+ "name": "HR Service Request",
+ "module": "BS Group",
+ "custom": 0,
+ "autoname": "format:HR-REQ-{YYYY}-{#####}",
+ "field_order": [
+  "subject",
+  "employee",
+  "employee_name",
+  "company",
+  "record_date",
+  "status",
+  "request_type",
+  "details",
+  "resolution"
+ ],
+ "fields": [
+  {
+   "fieldname": "subject",
+   "label": "Subject",
+   "fieldtype": "Data",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "employee",
+   "label": "Employee",
+   "fieldtype": "Link",
+   "options": "Employee",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "employee_name",
+   "label": "Employee Name",
+   "fieldtype": "Data",
+   "fetch_from": "employee.employee_name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "company",
+   "label": "Company",
+   "fieldtype": "Link",
+   "options": "Company",
+   "fetch_from": "employee.company",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "record_date",
+   "label": "Record Date",
+   "fieldtype": "Date",
+   "default": "Today",
+   "reqd": 1
+  },
+  {
+   "fieldname": "status",
+   "label": "Status",
+   "fieldtype": "Select",
+   "options": "Draft\nUnder Review\nClosed",
+   "default": "Draft",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "request_type",
+   "label": "Request Type",
+   "fieldtype": "Select",
+   "options": "Employment Letter\nDocument Update\nHR Enquiry\nOther",
+   "reqd": 1
+  },
+  {
+   "fieldname": "details",
+   "label": "Request Details",
+   "fieldtype": "Text Editor",
+   "reqd": 1
+  },
+  {
+   "fieldname": "resolution",
+   "label": "Response / Resolution",
+   "fieldtype": "Text Editor"
+  }
+ ],
+ "track_changes": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "title_field": "subject",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1
+  }
+ ],
+ "allow_rename": 0,
+ "engine": "InnoDB"
+}
