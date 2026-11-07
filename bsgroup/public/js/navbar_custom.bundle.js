@@ -1,5 +1,5 @@
 // Company Badge — Frappe v16 desk.
-// Shows the current user's default company as a static read-only pill.
+// Shows the Bits Secure logo with the current company in its tooltip.
 // No switching logic — display only.
 
 (function () {
@@ -63,34 +63,21 @@
         _buildBadge(_companyData, content);
     }
 
-    /* ── 4. Build static pill ───────────────────────────────────────────── */
+    /* Display branding only; company access and switching remain unchanged. */
     function _buildBadge(item, content) {
-        var abbr = (item.abbr || '').trim();
-        var name = item.name || '';
-
         var wrapper = document.createElement('div');
         wrapper.className = 'bs-co-badge';
-        wrapper.style.cssText = 'display:inline-flex;align-items:center;flex-shrink:0;';
+        wrapper.title = item.name || 'Bits Secure IT Infrastructure';
+        wrapper.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;padding:0 8px;';
 
-        var pill = document.createElement('span');
-        pill.title = name;
-        pill.style.setProperty('display',         'inline-flex', 'important');
-        pill.style.setProperty('align-items',     'center',      'important');
-        pill.style.setProperty('padding',         '8px 14px',    'important');
-        pill.style.setProperty('border-radius',   '999px',       'important');
-        pill.style.setProperty('background',      '#00AFC1',     'important');
-        pill.style.setProperty('color',           '#fff',        'important');
-        pill.style.setProperty('font-size',       '12px',        'important');
-        pill.style.setProperty('font-weight',     '700',         'important');
-        pill.style.setProperty('letter-spacing',  '.04em',       'important');
-        pill.style.setProperty('white-space',     'nowrap',      'important');
-        pill.style.setProperty('box-shadow',      '0 1px 4px rgba(0,0,0,.2)', 'important');
-        pill.style.setProperty('line-height',     '1',           'important');
-        pill.style.setProperty('user-select',     'none',        'important');
-
-        pill.textContent = 'Bits Secure' + (abbr ? ' - ' + abbr : '');
-
-        wrapper.appendChild(pill);
+        var logo = document.createElement('img');
+        logo.src = '/assets/bsgroup/img/logo.png';
+        logo.alt = 'Bits Secure IT Infrastructure';
+        logo.width = 126;
+        logo.height = 44;
+        logo.style.cssText = 'display:block;width:126px;height:44px;object-fit:contain;background:transparent;';
+        logo.draggable = false;
+        wrapper.appendChild(logo);
 
         var stdSection = content.querySelector('.standard-items-section');
         content.insertBefore(wrapper, stdSection || null);
