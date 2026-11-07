@@ -52,7 +52,7 @@ class HRManagementTests(unittest.TestCase):
 
     def test_access_setup_requires_system_manager_before_any_changes(self):
         self.f.only_for = Mock(side_effect=PermissionError())
-        for action in (self.m.grant_muskan_access, self.m.configure_navigation, self.m.muskan_access_review):
+        for action in (self.m.grant_muskan_access, self.m.muskan_access_review):
             with self.assertRaises(PermissionError): action()
 
     def test_denied_doctype_is_not_queried_or_counted(self):

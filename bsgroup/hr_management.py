@@ -95,20 +95,6 @@ def setup_registers():
     return dict(installed=True)
 
 
-@frappe.whitelist(methods=["POST"])
-def configure_navigation():
-    """Update only BS HR navigation; no document or user permission changes."""
-    import json
-    from pathlib import Path
-    frappe.only_for("System Manager")
-    data = json.loads(Path(frappe.get_app_path("bsgroup", "workspace_sidebar", "bs_hr.json")).read_text())
-    sidebar = frappe.get_doc("Workspace Sidebar", "BS HR")
-    sidebar.set("items", data["items"])
-    sidebar.save()
-    frappe.clear_cache()
-    return {"updated": True}
-
-
 ACCESS_ADDITIONS = {
     "HR Warning": {"read": 1, "write": 1, "create": 1, "report": 1},
     "HR Service Request": {"read": 1, "write": 1, "create": 1, "report": 1},

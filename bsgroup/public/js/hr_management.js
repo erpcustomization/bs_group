@@ -123,10 +123,6 @@ window.bsHRManagement = async function (parent) {
         }
         if(data.can_setup) {
             const admin=$('<div class="hrm-actions">').appendTo(main);
-            $('<button class="btn btn-default btn-sm">').text('Update BS HR sidebar').on('click',async()=>{
-                await frappe.call({method:'bsgroup.hr_management.configure_navigation',type:'POST',freeze:true});
-                window.location.reload();
-            }).appendTo(admin);
             $('<button class="btn btn-default btn-sm">').text('Review Muskan access').on('click',async()=>{
                 const r=await frappe.call({method:'bsgroup.hr_management.muskan_access_review'});
                 const a=r.message;
