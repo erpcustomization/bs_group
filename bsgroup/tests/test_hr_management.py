@@ -13,7 +13,7 @@ class HRManagementTests(unittest.TestCase):
         self.f.whitelist = lambda **kw: lambda f: f
         self.f.PermissionError = PermissionError
         self.f.throw = lambda *args: (_ for _ in ()).throw(PermissionError())
-        self.f.session = types.SimpleNamespace(user='hr@example.com')
+        self.f.session = types.SimpleNamespace(user='muskan@bitssecureit.com')
         self.f.get_roles = lambda: ['HR User']
         self.f.db = types.SimpleNamespace(exists=lambda *args: True)
         self.f.has_permission = lambda *args: True
@@ -31,12 +31,29 @@ class HRManagementTests(unittest.TestCase):
         self.patch.stop()
 
     def test_employee_and_guest_cannot_read_management_data(self):
+        self.f.session.user = 'employee@example.com'
         self.f.get_roles = lambda: ['Employee']
         with self.assertRaises(PermissionError): self.m.overview()
         self.f.get_roles = lambda: ['System Manager']
         self.f.session.user = 'Guest'
         with self.assertRaises(PermissionError): self.m.overview()
         self.f.get_list.assert_not_called()
+
+    def test_bs_hr_is_limited_to_muskan_and_system_administrators(self):
+        self.assertTrue(self.m.can_manage())
+        self.f.session.user = 'another-hr@example.com'
+        self.f.get_roles = lambda: ['HR Manager']
+        self.assertFalse(self.m.can_manage())
+        self.f.get_roles = lambda: ['System Manager']
+        self.assertTrue(self.m.can_manage())
+        self.f.session.user = 'Administrator'
+        self.f.get_roles = lambda: []
+        self.assertTrue(self.m.can_manage())
+
+    def test_access_setup_requires_system_manager_before_any_changes(self):
+        self.f.only_for = Mock(side_effect=PermissionError())
+        for action in (self.m.grant_muskan_access, self.m.configure_navigation, self.m.muskan_access_review):
+            with self.assertRaises(PermissionError): action()
 
     def test_denied_doctype_is_not_queried_or_counted(self):
         self.f.has_permission = lambda *args: False

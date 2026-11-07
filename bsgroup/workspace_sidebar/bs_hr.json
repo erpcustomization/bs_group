@@ -6,48 +6,114 @@
  "idx": 0,
  "items": [
   {
+   "type": "Link",
+   "link_type": "URL",
+   "label": "Dashboard",
+   "url": "/desk/bs-group/hr-dashboard?hr_section=dashboard",
+   "icon": "layout-dashboard",
+   "open_in_new_tab": 0,
    "child": 0,
-   "collapsible": 1,
-   "indent": 0,
-   "keep_closed": 0,
-   "label": "Employee",
-   "link_to": "Employee",
-   "link_type": "DocType",
-   "show_arrow": 0,
-   "type": "Link"
+   "indent": 0
   },
   {
+   "type": "Link",
+   "link_type": "URL",
+   "label": "Organization Structure",
+   "url": "/desk/bs-group/hr-dashboard?hr_section=organization",
+   "icon": "network",
+   "open_in_new_tab": 0,
    "child": 0,
-   "collapsible": 1,
-   "indent": 0,
-   "keep_closed": 0,
-   "label": "Employee Checkin Report",
-   "link_to": "Employee Checkin Report",
-   "link_type": "Report",
-   "show_arrow": 0,
-   "type": "Link"
+   "indent": 0
   },
   {
+   "type": "Link",
+   "link_type": "URL",
+   "label": "Employee Profiles",
+   "url": "/desk/bs-group/hr-dashboard?hr_section=employees",
+   "icon": "users",
+   "open_in_new_tab": 0,
    "child": 0,
-   "collapsible": 1,
-   "indent": 0,
-   "keep_closed": 0,
-   "label": "Employee Monthly Attendance",
-   "link_to": "Employee Monthly Attendance",
-   "link_type": "Report",
-   "show_arrow": 0,
-   "type": "Link"
+   "indent": 0
   },
   {
+   "type": "Link",
+   "link_type": "URL",
+   "label": "Onboarding",
+   "url": "/desk/bs-group/hr-dashboard?hr_section=onboarding",
+   "icon": "user-plus",
+   "open_in_new_tab": 0,
    "child": 0,
-   "collapsible": 1,
-   "indent": 0,
-   "keep_closed": 0,
-   "label": "HR Dashboard",
-   "link_to": "hr-dashboard",
-   "link_type": "Page",
-   "show_arrow": 0,
-   "type": "Link"
+   "indent": 0
+  },
+  {
+   "type": "Link",
+   "link_type": "URL",
+   "label": "Attendance",
+   "url": "/desk/bs-group/hr-dashboard?hr_section=attendance",
+   "icon": "clock",
+   "open_in_new_tab": 0,
+   "child": 0,
+   "indent": 0
+  },
+  {
+   "type": "Link",
+   "link_type": "URL",
+   "label": "Leave Approvals",
+   "url": "/desk/bs-group/hr-dashboard?hr_section=leave",
+   "icon": "calendar-check",
+   "open_in_new_tab": 0,
+   "child": 0,
+   "indent": 0
+  },
+  {
+   "type": "Link",
+   "link_type": "URL",
+   "label": "Policies",
+   "url": "/desk/bs-group/hr-dashboard?hr_section=policies",
+   "icon": "file-text",
+   "open_in_new_tab": 0,
+   "child": 0,
+   "indent": 0
+  },
+  {
+   "type": "Link",
+   "link_type": "URL",
+   "label": "Warnings",
+   "url": "/desk/bs-group/hr-dashboard?hr_section=warnings",
+   "icon": "shield-alert",
+   "open_in_new_tab": 0,
+   "child": 0,
+   "indent": 0
+  },
+  {
+   "type": "Link",
+   "link_type": "URL",
+   "label": "Exit Interviews",
+   "url": "/desk/bs-group/hr-dashboard?hr_section=exit",
+   "icon": "message-circle",
+   "open_in_new_tab": 0,
+   "child": 0,
+   "indent": 0
+  },
+  {
+   "type": "Link",
+   "link_type": "URL",
+   "label": "Offboarding",
+   "url": "/desk/bs-group/hr-dashboard?hr_section=offboarding",
+   "icon": "log-out",
+   "open_in_new_tab": 0,
+   "child": 0,
+   "indent": 0
+  },
+  {
+   "type": "Link",
+   "link_type": "URL",
+   "label": "HR Requests",
+   "url": "/desk/bs-group/hr-dashboard?hr_section=requests",
+   "icon": "inbox",
+   "open_in_new_tab": 0,
+   "child": 0,
+   "indent": 0
   }
  ],
  "modified": "2026-08-25 15:14:03.806416",

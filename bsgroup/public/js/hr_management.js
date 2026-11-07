@@ -20,7 +20,7 @@ window.bsHRManagement = async function (parent) {
     };
     const icon = key => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[key] || paths.file}"/></svg>`;
     if (!document.getElementById('hrm-styles')) $('<style id="hrm-styles">').text(`
-      .hrm-host{color:#193047}.hrm-layout{display:grid;grid-template-columns:190px minmax(0,1fr);gap:20px}
+      .hrm-host{color:#193047}.hrm-layout{display:block}
       .hrm-org{padding:18px}.hrm-org ul{list-style:none;padding:0;margin:0}.hrm-org ul ul{margin:8px 0 12px 18px;padding-left:18px;border-left:1px solid #d9e5eb}.hrm-org li{margin:8px 0}.hrm-person{padding:12px 14px;border:1px solid #dfe7ed;border-radius:10px;background:#fafcfd;display:flex;align-items:center;gap:12px;flex-wrap:wrap}.hrm-person a{font-size:13px;font-weight:650;color:#215b79}.hrm-person .hrm-muted{margin-top:3px}.hrm-avatar{width:34px;height:34px;border-radius:10px;background:#e4f0ed;color:#24716b;display:grid;place-items:center;font-weight:650}.hrm-org summary{cursor:pointer;list-style:none}.hrm-org summary::-webkit-details-marker{display:none}.hrm-org summary .hrm-person:after{content:'−';margin-left:auto;color:#728295}.hrm-org details:not([open])>summary .hrm-person:after{content:'+'}.hrm-org-note{font-size:11px;color:#906519;margin-top:4px}
       .hrm-nav{display:flex;flex-direction:column;gap:4px}.hrm-nav button{display:flex;align-items:center;gap:10px;text-align:left;background:transparent;border:0;border-radius:9px;padding:11px 12px;color:#526579;font-size:13px;cursor:pointer}
       .hrm-nav button.active{background:#e5f2f0;color:#126d66;font-weight:650}.hrm-nav button:hover{background:#eef2f5}.hrm-host svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
@@ -30,7 +30,12 @@ window.bsHRManagement = async function (parent) {
       @media(max-width:1050px){.hrm-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.hrm-modules{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:700px){.hrm-layout{grid-template-columns:1fr}.hrm-nav{flex-direction:row;overflow:auto}.hrm-nav button{white-space:nowrap}.hrm-top{align-items:flex-start}.hrm-modules{grid-template-columns:1fr}.hrm-kpi{padding:12px}}
     `).appendTo(document.head);
     root.html('<div class="hrd-loading">Loading HR Management…</div>');
-    let data, selected='dashboard';
+    let data, selected=new URLSearchParams(location.search).get('hr_section') || 'dashboard';
+    window.bsHRSelectSection = key => {
+        const valid=['dashboard','organization',...(data?.sections || []).map(s=>s.key)];
+        selected=valid.includes(key)?key:'dashboard';
+        if(data && root[0].isConnected)render();
+    };
     const openList = section => {
         frappe.route_options = section.filters || {};
         frappe.set_route('List',section.doctype);
@@ -93,11 +98,6 @@ window.bsHRManagement = async function (parent) {
     function render() {
         root.empty();
         const layout=$('<div class="hrm-layout">').appendTo(root);
-        const nav=$('<nav class="hrm-nav" aria-label="HR Management sections">').appendTo(layout);
-        [{key:'dashboard',label:'Dashboard'},{key:'organization',label:'Organization Structure'},...data.sections].forEach(s=>{
-            $('<button type="button">').toggleClass('active',s.key===selected).attr('aria-current',s.key===selected?'page':null)
-                .html(icon(symbols[s.key]||'inbox')+`<span>${esc(s.label)}</span>`).on('click',()=>{selected=s.key;render();}).appendTo(nav);
-        });
         const main=$('<div class="hrm-main">').appendTo(layout);
         const section=selected==='organization'?{key:'organization',label:'Organization Structure'}:data.sections.find(s=>s.key===selected);
         const top=$('<div class="hrm-top">').appendTo(main);
@@ -113,13 +113,25 @@ window.bsHRManagement = async function (parent) {
             const labels={employees:['Active employees','Active profiles'],leave:['Leave approvals','Open applications'],onboarding:['Onboarding','Non-cancelled records'],offboarding:['Offboarding','Non-cancelled records']};
             Object.entries(labels).forEach(([key,[label,foot]])=>{
                 const s=data.sections.find(x=>x.key===key);
-                $('<button class="hrm-kpi">').html(`<span>${esc(label)}</span><strong>${s.available?esc(s.count):'—'}</strong><small>${esc(s.available?foot:s.reason)}</small>`).on('click',()=>{selected=key;render();}).appendTo(cards);
+                $('<button class="hrm-kpi">').html(`<span>${esc(label)}</span><strong>${s.available?esc(s.count):'—'}</strong><small>${esc(s.available?foot:s.reason)}</small>`).on('click',()=>frappe.set_route('hr-dashboard',{hr_section:key})).appendTo(cards);
             });
             main.append(table(data.sections.find(s=>s.key==='leave')));
             const modules=$('<div class="hrm-modules">').appendTo(main);
             data.sections.filter(s=>s.key!=='leave').forEach(s=>{
-                $('<button class="hrm-module">').html(`${icon(symbols[s.key])}<strong>${esc(s.label)}</strong><small>${esc(s.available?descriptions[s.key]:s.reason)}</small>`).on('click',()=>{selected=s.key;render();}).appendTo(modules);
+                $('<button class="hrm-module">').html(`${icon(symbols[s.key])}<strong>${esc(s.label)}</strong><small>${esc(s.available?descriptions[s.key]:s.reason)}</small>`).on('click',()=>frappe.set_route('hr-dashboard',{hr_section:s.key})).appendTo(modules);
             });
+        }
+        if(data.can_setup) {
+            const admin=$('<div class="hrm-actions">').appendTo(main);
+            $('<button class="btn btn-default btn-sm">').text('Update BS HR sidebar').on('click',async()=>{
+                await frappe.call({method:'bsgroup.hr_management.configure_navigation',type:'POST',freeze:true});
+                window.location.reload();
+            }).appendTo(admin);
+            $('<button class="btn btn-default btn-sm">').text('Review Muskan access').on('click',async()=>{
+                const r=await frappe.call({method:'bsgroup.hr_management.muskan_access_review'});
+                const a=r.message;
+                frappe.msgprint({title:'BS HR access review',message:`<p><b>${esc(a.full_name)}</b> · ${esc(a.user)}</p><p>Existing roles: ${esc(a.roles.join(', '))}</p><table class="hrm-table"><tr><th>Section</th><th>Read</th><th>Edit</th><th>Create</th></tr>${a.current.map(x=>`<tr><td>${esc(x.doctype)}</td><td>${x.read?'Yes':'No'}</td><td>${x.write?'Yes':'No'}</td><td>${x.create?'Yes':'No'}</td></tr>`).join('')}</table><p>Prepared addition: BS HR Management — read, create and edit Warnings, HR Requests and Organization Documents; read policy categories. No System Manager, deletion, sharing or approval bypass rights will be added.</p><p>Access changes await confirmation.</p>`,wide:true});
+            }).appendTo(admin);
         }
         if(data.setup_pending && data.can_setup) {
             $('<button class="btn btn-default btn-sm">').text('Set up confidential registers').on('click',async function(){

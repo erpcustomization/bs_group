@@ -4,12 +4,6 @@
         if (!screens) {
             if (frappe.boot.bs_work_dashboard) {
                 document.querySelectorAll('.body-sidebar .sidebar-items, .desk-sidebar .sidebar-items').forEach(host => {
-                    if (['HR User','HR Manager','System Manager'].some(role => frappe.user.has_role(role)) && !host.querySelector('.bs-hr-management')) {
-                        const row = document.createElement('div');
-                        row.className = 'standard-sidebar-item bs-hr-management';
-                        row.innerHTML = '<a class="item-anchor" href="/desk/hr-dashboard">HR Management</a>';
-                        host.prepend(row);
-                    }
                     if (!host.querySelector('.bs-personal-dashboard')) {
                         const row = document.createElement('div');
                         row.className = 'standard-sidebar-item bs-personal-dashboard';

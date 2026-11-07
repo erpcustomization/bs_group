@@ -6,6 +6,8 @@ import frappe
 from frappe.utils import nowdate
 
 HR_ROLES = {"HR User", "HR Manager", "System Manager"}
+HR_ACCESS_ROLE = "BS HR Management"
+HR_ACCESS_USER = "muskan@bitssecureit.com"
 SECTIONS = (
     ("employees", "Employee Profiles", "Employee", "employee_name", "status", {"status": "Active"}),
     ("onboarding", "Onboarding", "Employee Onboarding", "employee_name", "boarding_status", {"docstatus": ["!=", 2]}),
@@ -19,9 +21,14 @@ SECTIONS = (
 )
 
 
+def can_manage():
+    return frappe.session.user != "Guest" and (
+        frappe.session.user in ("Administrator", HR_ACCESS_USER) or "System Manager" in frappe.get_roles())
+
+
 def _guard():
-    if frappe.session.user == "Guest" or not HR_ROLES.intersection(frappe.get_roles()):
-        frappe.throw("HR Management is available to existing HR administrators only.", frappe.PermissionError)
+    if not can_manage():
+        frappe.throw("BS HR is available to Muskan and system administrators.", frappe.PermissionError)
 
 
 def _section(spec):
@@ -86,3 +93,77 @@ def setup_registers():
         if not frappe.db.exists("DocType", dt):
             frappe.reload_doc("bs_group", "doctype", name, force=True)
     return dict(installed=True)
+
+
+@frappe.whitelist(methods=["POST"])
+def configure_navigation():
+    """Update only BS HR navigation; no document or user permission changes."""
+    import json
+    from pathlib import Path
+    frappe.only_for("System Manager")
+    data = json.loads(Path(frappe.get_app_path("bsgroup", "workspace_sidebar", "bs_hr.json")).read_text())
+    sidebar = frappe.get_doc("Workspace Sidebar", "BS HR")
+    sidebar.set("items", data["items"])
+    sidebar.save()
+    frappe.clear_cache()
+    return {"updated": True}
+
+
+ACCESS_ADDITIONS = {
+    "HR Warning": {"read": 1, "write": 1, "create": 1, "report": 1},
+    "HR Service Request": {"read": 1, "write": 1, "create": 1, "report": 1},
+    "Organization Document": {"read": 1, "write": 1, "create": 1, "report": 1},
+    "Organization Document Category": {"read": 1, "select": 1},
+}
+
+
+@frappe.whitelist()
+def muskan_access_review():
+    frappe.only_for("System Manager")
+    user = frappe.get_doc("User", HR_ACCESS_USER)
+    return dict(user=user.name, full_name=user.full_name, roles=frappe.get_roles(user.name),
+                additions=ACCESS_ADDITIONS,
+                current=[dict(doctype=s[2], read=frappe.has_permission(s[2], "read", user=user.name),
+                              write=frappe.has_permission(s[2], "write", user=user.name),
+                              create=frappe.has_permission(s[2], "create", user=user.name)) for s in SECTIONS])
+
+
+@frappe.whitelist(methods=["POST"])
+def grant_muskan_access():
+    """Explicit administrator action, called only after access confirmation."""
+    frappe.only_for("System Manager")
+    from frappe.permissions import setup_custom_perms
+    user = frappe.get_doc("User", HR_ACCESS_USER)
+    if not user.enabled:
+        frappe.throw("Muskan's account is disabled. No access changes were made.")
+    other_holders = frappe.get_all("Has Role", filters={"role": HR_ACCESS_ROLE, "parenttype": "User"}, pluck="parent")
+    if any(u != HR_ACCESS_USER and "System Manager" not in frappe.get_roles(u) for u in other_holders):
+        frappe.throw("The BS HR Management role is already used by another account. Review its scope before granting access.")
+    if not frappe.db.exists("Role", HR_ACCESS_ROLE):
+        frappe.get_doc(dict(doctype="Role", role_name=HR_ACCESS_ROLE, desk_access=1)).insert()
+    for dt, values in ACCESS_ADDITIONS.items():
+        setup_custom_perms(dt)
+        name = frappe.db.get_value("Custom DocPerm", {"parent": dt, "role": HR_ACCESS_ROLE, "permlevel": 0, "if_owner": 0})
+        rule = frappe.get_doc("Custom DocPerm", name) if name else frappe.get_doc(dict(
+            doctype="Custom DocPerm", parent=dt, parenttype="DocType", parentfield="permissions",
+            role=HR_ACCESS_ROLE, permlevel=0, if_owner=0))
+        rule.update(values)
+        rule.save()
+        frappe.clear_cache(doctype=dt)
+    if not frappe.db.exists("Role Profile", HR_ACCESS_ROLE):
+        frappe.get_doc(dict(doctype="Role Profile", role_profile=HR_ACCESS_ROLE,
+                            roles=[dict(role=HR_ACCESS_ROLE)])).insert()
+    else:
+        profile = frappe.get_doc("Role Profile", HR_ACCESS_ROLE)
+        if {r.role for r in profile.roles} != {HR_ACCESS_ROLE}:
+            frappe.throw("The BS HR Management profile has unexpected roles. Review it before proceeding.")
+    # Preserve the existing HR profile and every existing role.
+    if user.meta.has_field("role_profiles") and user.get("role_profiles"):
+        if not any(r.role_profile == HR_ACCESS_ROLE for r in user.role_profiles):
+            user.append("role_profiles", {"role_profile": HR_ACCESS_ROLE})
+    elif not any(r.role == HR_ACCESS_ROLE for r in user.roles):
+        user.append("roles", {"role": HR_ACCESS_ROLE})
+    user.save()
+    user.add_comment("Info", "BS HR Management access added for confidential HR registers and organization policies. Existing HR roles, company restrictions and approvals retained.")
+    frappe.clear_cache(user=user.name)
+    return {"user": user.name, "role": HR_ACCESS_ROLE}

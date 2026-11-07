@@ -143,6 +143,13 @@ def show_lead_intake_navigation():
 
 def boot_session(bootinfo):
     from bsgroup.work_dashboard import screens
+    from bsgroup.hr_management import can_manage
+    bootinfo.bs_hr_management = can_manage()
+    if not bootinfo.bs_hr_management:
+        for key in ("workspace_sidebar_item", "module_sidebars"):
+            for name, sidebar in (bootinfo.get(key) or {}).items():
+                if isinstance(sidebar, dict) and (name.lower().replace("-", " ") == "bs hr" or sidebar.get("title") == "BS HR"):
+                    sidebar["items"] = []
     bootinfo.bs_work_dashboard = bool(screens())
     mode = scope()
     if not mode:

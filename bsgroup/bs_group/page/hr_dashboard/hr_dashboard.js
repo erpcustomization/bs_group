@@ -87,7 +87,7 @@ function hrd_boot() {
 			if (ctx.is_manager) tabs.push({ key: "manager", label: "Manager" });
 			if (ctx.is_hr) tabs.unshift({ key: "hr", label: "HR Management" });
             if (!_hrd_state.tab) _hrd_state.tab = ctx.is_hr ? "hr" : "employee";
-            if (ctx.is_hr) $(".hrd-header h1").text("HR Management");
+            if (ctx.is_hr) {$(".hrd-header h1").text("BS HR"); $("#hrd-tabs").hide();}
 
 			$("#hrd-subtitle").text("BS Group · " + (ctx.employee_name || frappe.session.user));
 			$("#hrd-tabs").html(
@@ -220,3 +220,7 @@ function hrd_render_hr() {
 		},
 	});
 }
+
+frappe.pages["hr-dashboard"].on_page_show = function () {
+    if (window.bsHRSelectSection) window.bsHRSelectSection(new URLSearchParams(location.search).get('hr_section') || 'dashboard');
+};

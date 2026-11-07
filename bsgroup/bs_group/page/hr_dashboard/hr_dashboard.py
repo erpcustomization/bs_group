@@ -48,6 +48,7 @@ def _get_direct_reports(employee_name, user):
 
 @frappe.whitelist()
 def get_dashboard_context():
+	from bsgroup.hr_management import can_manage
 	user = frappe.session.user
 	roles = frappe.get_roles(user)
 	employee = _get_employee(user)
@@ -58,7 +59,7 @@ def get_dashboard_context():
 		"employee_name": employee.employee_name if employee else user,
 		"has_employee": bool(employee),
 		"is_manager": bool(reports) or bool(MANAGER_ROLES & set(roles)),
-		"is_hr": _is_hr(roles),
+		"is_hr": can_manage(),
 	}
 
 
