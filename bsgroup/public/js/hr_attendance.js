@@ -46,6 +46,14 @@ window.bsHRAttendance = function(main) {
         body.empty();
         if(!data.employees.length){body.html('<div class="hrm-empty">No employee profiles are available in your permitted view.</div>');return;}
         const days=data.days;
+        if(data.repair_mithun) $('<button class="btn btn-default btn-sm">').text('Correct reviewed absences: 6–7 November').on('click',async function(){
+            $(this).prop('disabled',true);
+            try {
+                const r=await frappe.call({method:'bsgroup.hr_attendance.repair_mithun_november',type:'POST',freeze:true});
+                frappe.msgprint({title:'Attendance corrected',message:r.message.map(x=>`${esc(x.date)}: ${link('Attendance',x.name,x.status+' · '+x.name)}`).join('<br>')});
+                await load();
+            } finally {$(this).prop('disabled',false);}
+        }).appendTo(body);
         const summary=$('<div class="hrcal-summary">').appendTo(body);
         const approved=days.filter(d=>d.leaves.some(l=>l.approved)).length;
         const pending=days.filter(d=>d.leaves.some(l=>!l.approved && !['Rejected','Cancelled'].includes(l.status))).length;

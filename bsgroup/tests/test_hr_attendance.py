@@ -18,6 +18,7 @@ class HRCalendarTests(unittest.TestCase):
         self.f.PermissionError = PermissionError
         self.f.throw = lambda message, exc=ValueError: (_ for _ in ()).throw(exc(message))
         self.f.has_permission = Mock(return_value=True)
+        self.f.get_roles = lambda: ['System Manager']
         self.f.get_list = Mock(return_value=[])
         self.f.db = types.SimpleNamespace(exists=Mock(return_value=False), get_value=Mock())
         self.employee = Mock(company='UAE')
@@ -116,6 +117,16 @@ class HRCalendarTests(unittest.TestCase):
         self.assertIn('REQ-1',self.doc.add_comment.call_args.args[1])
         self.assertIn('verified by HR',self.doc.add_comment.call_args.args[1])
         self.assertEqual(self.f.get_doc.call_args.args[0]['doctype'],'Attendance')
+
+    def test_targeted_repair_rejects_non_admin_before_mutation(self):
+        self.f.only_for=Mock(side_effect=PermissionError())
+        with self.assertRaises(PermissionError): self.m.repair_mithun_november()
+        self.f.get_doc.assert_not_called()
+
+    def test_repair_is_scoped_to_reviewed_original_pairs(self):
+        self.assertEqual([x[0] for x in self.m.MITHUN_REPAIR],['2026-11-06','2026-11-07'])
+        self.assertEqual([x[1] for x in self.m.MITHUN_REPAIR],['HR-ATT-2026-03642','HR-ATT-2026-03658'])
+        self.assertTrue(all([p[1] for p in x[2]]==['IN','OUT'] for x in self.m.MITHUN_REPAIR))
 
 
 if __name__=='__main__': unittest.main()
