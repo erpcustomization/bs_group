@@ -712,3 +712,10 @@ for _dt, _query in {"Lead": "lead_query", "Opportunity": "opportunity_query",
 
 doctype_js["Lead"].append("public/js/lead_assignment.js")
 override_whitelisted_methods["frappe.desk.form.assign_to.add"] = "bsgroup.lead_assignment.assign"
+
+# Project expenses retain native HRMS approvals, accounting and cost-overrun hooks.
+doctype_js["Project"] = ["public/js/project.js", "public/js/project_expenses.js"]
+doctype_js["Expense Claim"] = "public/js/project_expense_claim.js"
+doctype_list_js["Expense Claim"] = "public/js/project_expense_list.js"
+doc_events["Expense Claim"]["before_validate"] = "bsgroup.project_expenses.validate"
+doc_events["Expense Claim"]["before_update_after_submit"] = "bsgroup.project_expenses.validate"

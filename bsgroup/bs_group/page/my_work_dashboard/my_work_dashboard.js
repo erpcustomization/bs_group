@@ -161,7 +161,7 @@ function bsEmployeeServices(parent) {
         $('<style id="bs-employee-services-style">').text(`
             .bs-employee-services{margin:12px 0 20px;padding:16px;border:1px solid #dfe7ee;border-radius:18px;background:var(--card-bg,#fff);box-shadow:0 4px 20px rgba(20,42,65,.04)}
             .bs-employee-services h2{font-size:15px;font-weight:600;letter-spacing:-.15px;margin:0 0 12px;color:var(--text-color,#152b41)}
-            .bs-employee-service-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+            .bs-employee-service-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
             .bs-employee-service{position:relative;display:flex;flex-direction:row;align-items:center;gap:10px;min-width:0;padding:12px;border:1px solid #e3e9ef;border-radius:14px;background:var(--card-bg,#fff);text-decoration:none!important;box-shadow:0 2px 5px rgba(20,42,65,.025);transition:transform .18s,box-shadow .18s,border-color .18s}
             .bs-employee-service strong{color:var(--text-color,#152b41);font-size:13px;font-weight:600;line-height:1.4;letter-spacing:-.15px}
             .bs-service-icon{display:grid;place-items:center;width:32px;height:32px;flex-shrink:0;border-radius:9px;color:#127e79;background:#edf7f5;border:1px solid #deeeeb}
@@ -178,7 +178,6 @@ function bsEmployeeServices(parent) {
     const grid=$('<nav class="bs-employee-service-grid" aria-label="HR services">').appendTo(section);
     // Navigation only: destination workspaces retain their existing permission checks.
     for(const [title,url,icon] of [
-        ['Expense Claims','/desk/expense-claim','<path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 7h6M9 11h6M9 15h3"/>'],
         ['Time Off','/desk/leaves','<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 10h18m-13 5 3 3 5-5"/>'],
         ['Payroll','/desk/payroll','<rect x="3" y="5" width="18" height="15" rx="3"/><path d="M3 9h18m-5 5h5M7 16h4"/><circle cx="16" cy="14" r=".5"/>'],
         ['Performance','/desk/performance','<path d="M4 4v16h16M8 15l4-5 4 2 4-7m-5 0h5v5"/>'],
