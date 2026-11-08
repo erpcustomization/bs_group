@@ -2,7 +2,7 @@ import importlib.util
 import sys
 import types
 import unittest
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -127,6 +127,52 @@ class HRCalendarTests(unittest.TestCase):
         self.assertEqual([x[0] for x in self.m.MITHUN_REPAIR],['2026-11-06','2026-11-07'])
         self.assertEqual([x[1] for x in self.m.MITHUN_REPAIR],['HR-ATT-2026-03642','HR-ATT-2026-03658'])
         self.assertTrue(all([p[1] for p in x[2]]==['IN','OUT'] for x in self.m.MITHUN_REPAIR))
+
+    def test_repair_uses_native_row_calculator_and_preserves_original_punches(self):
+        utils=sys.modules['frappe.utils']
+        utils.getdate=lambda v: date.fromisoformat(str(v)[:10])
+        utils.get_datetime=lambda v: datetime.fromisoformat(str(v))
+        self.f.only_for=Mock()
+        self.f._dict=Row
+        shift=Mock(allow_check_out_after_shift_end_time=360,working_hours_threshold_for_absent=2,working_hours_threshold_for_half_day=8)
+        shift.name='General - UAE'
+        def calculate(rows,*thresholds):
+            # HRMS requires both dictionary indexing and attribute access, unlike Document.
+            self.assertEqual([r['log_type'] for r in rows],['IN','OUT'])
+            hours=round((rows[1].time-rows[0].time).total_seconds()/3600,2)
+            return ('Present',hours,False,False,rows[0].time,rows[1].time)
+        shift.get_attendance.side_effect=calculate
+        objects={('Shift Type',shift.name):shift}
+        logs=[]
+        for day,old_name,punches in self.m.MITHUN_REPAIR:
+            old=Mock(docstatus=1,employee='1047',attendance_date=day,status='Absent',shift=shift.name,company='UAE')
+            old.name=old_name
+            objects[('Attendance',old_name)]=old
+            for name,kind,stamp in punches:
+                data=Row(name=name,employee='1047',log_type=kind,time=datetime.fromisoformat(stamp))
+                log=Mock(**data,skip_auto_attendance=0,attendance=old_name if kind=='IN' else None,offshift=0,shift=shift.name)
+                log.name=name
+                log.as_dict.return_value=data
+                objects[('Employee Checkin',name)]=log
+                logs.append(log)
+        created=[]
+        def get_doc(dt,*args,**kwargs):
+            if not isinstance(dt,dict):return objects[(dt,args[0])]
+            d=Mock(**dt);d.name='NEW-'+dt['attendance_date'];created.append(d);return d
+        self.f.get_doc.side_effect=get_doc
+        self.f.get_list.side_effect=[[x[0] for x in pair[2]] for pair in self.m.MITHUN_REPAIR]
+        native=types.ModuleType('hrms.hr.doctype.employee_checkin.employee_checkin')
+        native.update_attendance_in_checkins=Mock()
+        with patch.dict(sys.modules,{'hrms.hr.doctype.employee_checkin.employee_checkin':native}):
+            results=self.m.repair_mithun_november()
+        self.assertEqual([r['working_hours'] for r in results],[12.27,10.38])
+        self.assertEqual(len(created),2)
+        for d in created:
+            d.insert.assert_called_once_with();d.submit.assert_called_once_with()
+        self.assertEqual(native.update_attendance_in_checkins.call_count,2)
+        for log in logs:
+            self.assertEqual(log.time,log.as_dict.return_value.time)
+            log.save.assert_called_once_with()
 
 
 if __name__=='__main__': unittest.main()
