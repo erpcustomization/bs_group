@@ -9,7 +9,7 @@ window.bsHROrganization = async function (main) {
       .org-canvas{overflow:auto;max-height:720px;padding:28px 22px;background-color:#f9fbfd;background-image:radial-gradient(#dce5eb .7px,transparent .7px);background-size:18px 18px;min-height:200px}
       .org-forest,.org-branch{list-style:none!important;margin:0!important;padding:0!important;display:flex;flex-direction:column;gap:0;width:max-content}
       .org-node{display:flex;align-items:center;position:relative;padding:10px 0!important;margin:0!important}
-      .org-branch{padding-left:36px!important;position:relative}.org-branch:before{content:'';position:absolute;left:0;top:50%;width:18px;border-top:1.5px solid #99b5c6}
+      .org-branch{padding-left:36px!important;position:relative}.org-branch:before{content:'';position:absolute;left:0;top:50%;width:36px;border-top:1.5px solid #99b5c6}
       .org-branch>.org-node{padding-left:18px!important}.org-branch>.org-node:before{content:'';position:absolute;left:0;top:0;bottom:0;border-left:1.5px solid #99b5c6}
       .org-branch>.org-node:first-child:before{top:50%}.org-branch>.org-node:last-child:before{bottom:50%}.org-branch>.org-node:only-child:before{display:none}
       .org-branch>.org-node:after{content:'';position:absolute;left:0;top:50%;width:18px;border-top:1.5px solid #99b5c6}
