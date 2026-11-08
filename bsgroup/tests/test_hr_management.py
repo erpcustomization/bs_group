@@ -16,7 +16,7 @@ class HRManagementTests(unittest.TestCase):
         self.f.session = types.SimpleNamespace(user='muskan@bitssecureit.com')
         self.f.get_roles = lambda: ['HR User']
         self.f.db = types.SimpleNamespace(exists=lambda *args: True)
-        self.f.has_permission = lambda *args: True
+        self.f.has_permission = lambda *args, **kwargs: True
         self.f.get_meta = lambda *args: types.SimpleNamespace(has_field=lambda f: True)
         self.f.get_list = Mock(side_effect=lambda dt, **kw: [types.SimpleNamespace(total=3)] if any(isinstance(f, dict) and f.get('COUNT') for f in kw['fields']) else [])
         utils = types.ModuleType('frappe.utils')

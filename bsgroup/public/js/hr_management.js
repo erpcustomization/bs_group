@@ -62,39 +62,6 @@ window.bsHRManagement = async function (parent) {
         box.append(`<div class="hrm-table-wrap"><table class="hrm-table"><thead><tr><th>Record</th><th>Status</th><th>${section.key==='attendance'?'Check-in / out time':section.key==='leave'?'Leave dates':'Details'}</th><th>Updated</th></tr></thead><tbody>${body}</tbody></table></div>`);
         return box;
     }
-    async function organization(main) {
-        const panel=$('<section class="hrm-panel"><div class="hrm-empty">Loading organization structure…</div></section>').appendTo(main);
-        try {
-            const response=await frappe.call({method:'bsgroup.hr_management.organization'});
-            if(!panel[0].isConnected) return;
-            const employees=response.message.employees || [];
-            panel.empty();
-            $('<div class="hrm-panel-head">').html(`<h3>Organization Structure</h3><span class="hrm-muted">${employees.length} active employees in your view</span>`).appendTo(panel);
-            if(!employees.length) {$('<div class="hrm-empty">').text('No active employee profiles are available in your view.').appendTo(panel);return;}
-            const byId=new Map(employees.map(e=>[e.name,e])), children=new Map(), shown=new Set();
-            employees.forEach(e=>{if(e.reports_to && byId.has(e.reports_to)){if(!children.has(e.reports_to))children.set(e.reports_to,[]);children.get(e.reports_to).push(e);}});
-            const chart=$('<div class="hrm-org">').appendTo(panel), tree=$('<ul aria-label="Employee reporting structure">').appendTo(chart);
-            function node(employee,list,review=false) {
-                if(shown.has(employee.name))return;
-                shown.add(employee.name);
-                const reports=(children.get(employee.name)||[]).filter(e=>!shown.has(e.name));
-                const li=$('<li>').appendTo(list);
-                const holder=reports.length?$('<summary>').appendTo($('<details open>').appendTo(li)):li;
-                const card=$('<div class="hrm-person">').appendTo(holder);
-                $('<span class="hrm-avatar" aria-hidden="true">').text((employee.employee_name||employee.name).split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase()).appendTo(card);
-                const text=$('<div>').appendTo(card);
-                $('<a>').attr('href','/desk/employee/'+encodeURIComponent(employee.name)).text(employee.employee_name||employee.name).on('click',e=>e.stopPropagation()).appendTo(text);
-                $('<div class="hrm-muted">').text([employee.designation,employee.department,employee.company].filter(Boolean).join(' · ')).appendTo(text);
-                let note=review?'Reporting relationships need HR review.':employee.manager_outside_view?'Reporting manager is outside this active employee view.':!employee.reports_to?'No reporting manager recorded.':'';
-                if(note)$('<div class="hrm-org-note">').text(note).appendTo(text);
-                if(reports.length){$('<span class="hrm-tag">').text(`${reports.length} direct report${reports.length===1?'':'s'}`).appendTo(card);const sub=$('<ul>').appendTo(holder.parent());reports.forEach(e=>node(e,sub));}
-            }
-            employees.filter(e=>!e.reports_to).forEach(e=>node(e,tree));
-            // Cyclic or otherwise inconsistent relationships remain visible, never recurse forever.
-            employees.filter(e=>!shown.has(e.name)).forEach(e=>node(e,tree,true));
-            $('<p class="hrm-foot">').text('Select a manager to expand or collapse their team. Missing reporting lines are shown as recorded; no relationships have been assumed.').appendTo(chart);
-        } catch(e) {if(panel[0].isConnected)panel.html('<div class="hrm-empty">Organization structure is unavailable. Check your Employee access or try Refresh.</div>');}
-    }
     function render() {
         root.empty();
         const layout=$('<div class="hrm-layout">').appendTo(root);
@@ -104,7 +71,7 @@ window.bsHRManagement = async function (parent) {
         $('<div>').html(`<h2>${esc(section?.label || 'People & operations')}</h2><div class="hrm-muted">${esc(section?descriptions[selected]:'Live HRMS records · '+data.date)}</div>`).appendTo(top);
         $('<button class="btn btn-default btn-sm">').text('Refresh').on('click',load).appendTo(top);
         if(selected==='organization') {
-            organization(main);
+            window.bsHROrganization(main);
         } else if(selected==='attendance') {
             window.bsHRAttendance(main);
         } else if(section) {

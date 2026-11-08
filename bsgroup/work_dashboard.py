@@ -16,6 +16,7 @@ def navigation_script():
     content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'opportunity_attachments.js')).read_text()
     content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'presales_dcs_handoff.js')).read_text()
     content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'hr_management.js')).read_text()
+    content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'hr_organization.js')).read_text()
     content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'hr_attendance.js')).read_text()
     content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'hr_sidebar.js')).read_text()
     import json

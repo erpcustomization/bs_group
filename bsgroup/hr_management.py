@@ -77,10 +77,13 @@ def organization():
                            order_by="employee_name asc", limit_page_length=0)
     visible = {row.name for row in rows}
     for row in rows:
+        row["can_edit"] = frappe.has_permission("Employee", "write", doc=row.name)
         row["manager_outside_view"] = bool(row.get("reports_to") and row.reports_to not in visible)
         if row["manager_outside_view"]:
             row["reports_to"] = None
-    return dict(employees=rows)
+    return dict(employees=rows, can_create=frappe.has_permission("Employee", "create"),
+                can_create_team=frappe.has_permission("Department", "create"),
+                can_read_teams=frappe.has_permission("Department", "read"))
 
 
 @frappe.whitelist(methods=["POST"])
