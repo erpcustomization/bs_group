@@ -31,6 +31,32 @@ window.bsHRMonthlyReview=async function(main){
         return{subject,message:`<p>${esc(opening)}</p>${daily}<p>Regards,<br>HR</p>`};
     }
     function actions(e,holder){
+        $('<button class="btn btn-default btn-sm">').text('Edit annual allocation').on('click',async()=>{
+            const result=(await frappe.call({method:'bsgroup.hr_annual_allocation.context',args:{employee:e.employee,date:e.annual.as_of||data.as_of.slice(0,10)}})).message;
+            const d=new frappe.ui.Dialog({title:`Annual allocation · ${e.employee_name}`,fields:[{fieldname:'allocations',fieldtype:'HTML'}]});
+            const box=d.fields_dict.allocations.$wrapper;
+            $('<p>').text('Maximum allocation: 26 days, including carried-forward days. Changes update HRMS and the employee’s available balance. Approved leave stays deducted; pending requests reserve days.').appendTo(box);
+            for(const a of result.allocations){
+                const row=$('<div style="border:1px solid #dce5ed;border-radius:8px;padding:12px;margin:10px 0">').appendTo(box);
+                $('<p>').text(`${a.name} · ${a.from_date} to ${a.to_date} · ${a.total_leaves_allocated} allocated days${a.docstatus===0?' · Draft':''}`).appendTo(row);
+                if(a.docstatus===1&&a.can_edit)$('<button class="btn btn-primary btn-sm">').text('Edit allocated days').on('click',()=>{
+                    d.hide();const edit=new frappe.ui.Dialog({title:`Edit annual allocation · ${e.employee_name}`,fields:[
+                        {fieldtype:'Float',fieldname:'total_days',label:'Total allocated days (maximum 26)',default:a.total_leaves_allocated,reqd:1},
+                        {fieldtype:'Small Text',fieldname:'reason',label:'Reason for change',reqd:1}],primary_action_label:'Save allocation',primary_action:async values=>{
+                            if(!Number.isFinite(Number(values.total_days))||values.total_days<0||values.total_days>26){frappe.msgprint('Annual-leave allocation must be between 0 and 26 days.');return;}
+                            edit.get_primary_btn().prop('disabled',true);
+                            try{await frappe.call({method:'bsgroup.hr_annual_allocation.save',args:{allocation:a.name,modified:a.modified,...values}});edit.hide();frappe.show_alert({message:'HRMS annual allocation updated',indicator:'green'});await load();}
+                            finally{edit.get_primary_btn().prop('disabled',false);}
+                        }});edit.show();
+                }).appendTo(row);
+                $('<button class="btn btn-default btn-sm" style="margin-left:6px">').text('Open HRMS record').on('click',()=>{d.hide();frappe.set_route('Form','Leave Allocation',a.name);}).appendTo(row);
+            }
+            if(!result.allocations.length){
+                $('<p>').text('No allocation exists for this date. Imported reference balances do not grant leave.').appendTo(box);
+                if(result.can_create)$('<button class="btn btn-primary btn-sm">').text('Create annual allocation').on('click',()=>{d.hide();frappe.new_doc('Leave Allocation',{employee:e.employee,company:e.company,leave_type:'Annual Vacation',from_date:result.date,to_date:result.date.slice(0,4)+'-12-31'});}).appendTo(box);
+            }
+            d.show();
+        }).appendTo(holder);
         if(data.can_warning)$('<button class="btn btn-default btn-sm">').text('Prepare attendance warning').on('click',()=>{
             const draft=evidence(e,'warning');frappe.new_doc('HR Warning',{employee:e.employee,company:e.company,subject:draft.subject,status:'Draft',warning_type:'Attendance',details:draft.message});
         }).appendTo(holder);

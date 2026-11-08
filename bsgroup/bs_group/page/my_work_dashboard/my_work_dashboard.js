@@ -139,8 +139,8 @@ function bsAnnualLeaveBalance(parent) {
         try {
             const data=(await frappe.call({method:'bsgroup.dashboard_leave_balance.context',quiet:true})).message;
             if(data.source==='hrms') {
-                value.text(__('{0} days',[data.balance]));
-                note.text(data.pending?__('Available to apply: {0} · Pending: {1} days',[data.available,data.pending]):__('Current HRMS balance'));
+                value.text(__('{0} days available',[data.available]));
+                note.text(__('Allocated: {0} · Remaining: {1} · Pending: {2} days',[data.allocated,data.balance,data.pending]));
             } else if(data.source==='reference') {
                 const dash=['-','–'].includes(String(data.balance));
                 value.text(dash?'–':__('{0} days',[data.balance]));

@@ -70,6 +70,7 @@ def context(date=None):
             pending = flt(allocation.get('leaves_pending_approval'))
             available = max(0, balance-pending)
             return dict(balance=balance, pending=pending, available=available, source='hrms',
+                        allocated=flt(allocation.get('total_leaves')), used=flt(allocation.get('leaves_taken')),
                         employee_linked=True, annual_status=request_status('hrms', balance, available))
     reference = imported_reference(user, today)
     source = 'reference' if reference is not None else 'unavailable'

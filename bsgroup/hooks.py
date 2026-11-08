@@ -355,6 +355,10 @@ doc_events = {
     "Leave Application": {
         "validate": "bsgroup.utils.leave_application.validate_medical_certificate",
     },
+    "Leave Allocation": {
+        "validate": "bsgroup.hr_annual_allocation.validate_allocation",
+        "before_update_after_submit": "bsgroup.hr_annual_allocation.validate_allocation",
+    },
     "Sales Person": {
         "validate": "bsgroup.utils.sales_person.validate_targets",
     },

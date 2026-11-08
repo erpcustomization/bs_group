@@ -74,7 +74,7 @@ class BalanceTests(unittest.TestCase):
         with patch.dict(sys.modules, {'hrms.hr.doctype.leave_application.leave_application': native}):
             result = self.m.context()
         self.assertEqual(calls, [('OWN-EMPLOYEE', '2026-11-07')])
-        self.assertEqual(result, dict(balance=15, pending=2, available=13, source='hrms', employee_linked=True, annual_status='available'))
+        self.assertEqual(result, dict(balance=15, pending=2, available=13, allocated=0, used=0, source='hrms', employee_linked=True, annual_status='available'))
 
     def test_zero_negative_unknown_and_pending_are_distinct(self):
         for value in ('0', '-8', '-19'):
