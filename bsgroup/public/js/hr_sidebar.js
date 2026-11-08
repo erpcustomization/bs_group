@@ -1,6 +1,6 @@
 /* BS HR uses the main application sidebar, without changing native HR permissions. */
 (() => {
-    const sections=[['dashboard','Dashboard','layout-dashboard'],['organization','Organization Structure','network'],['employees','Employee Profiles','users'],['onboarding','Onboarding','user-plus'],['attendance','Attendance','clock'],['leave','Leave Approvals','calendar-check'],['policies','Policies','file-text'],['warnings','Warnings','shield-alert'],['exit','Exit Interviews','message-circle'],['offboarding','Offboarding','log-out'],['requests','HR Requests','inbox']];
+    const sections=[['dashboard','Dashboard','layout-dashboard'],['organization','Organization Structure','network'],['employees','Employee Profiles','users'],['onboarding','Onboarding','user-plus'],['attendance','Attendance','clock'],['leave','Leave Approvals','calendar-check'],['review','Attendance and Leave Management','calendar'],['policies','Policies','file-text'],['warnings','Warnings','shield-alert'],['exit','Exit Interviews','message-circle'],['offboarding','Offboarding','log-out'],['requests','HR Requests','inbox']];
     function update() {
         // Existing sessions may retain boot data from before this menu was installed.
         // Server endpoints independently enforce the same audience and document permissions.
@@ -17,7 +17,7 @@
             }
             const children=group.querySelector(':scope > .sidebar-child-item');
             if(!children)continue;
-            if(!children.querySelector('.bs-hr-sidebar-link')) {
+            if(!children.querySelector('.bs-hr-sidebar-link[data-hr-section="review"]')) {
                 children.replaceChildren();
                 for(const [key,label,icon] of sections) {
                     const row=document.createElement('div');row.className='sidebar-item-container';

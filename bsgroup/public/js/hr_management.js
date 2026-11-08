@@ -4,6 +4,7 @@ window.bsHRManagement = async function (parent) {
     const esc = value => frappe.utils.escape_html(String(value ?? ''));
     const descriptions = {
         organization: 'Reporting relationships recorded in HRMS',
+        review: 'Monthly leave balances, attendance evidence and HR follow-up',
         employees: 'Employee records and employment details', onboarding: 'Joining tasks and onboarding checklists',
         attendance: 'Monthly employee calendar, recorded punches and leave decisions', leave: 'Open applications awaiting review',
         policies: 'Organization documents, rules and policies', warnings: 'Confidential warning reviews and responses',
@@ -32,7 +33,7 @@ window.bsHRManagement = async function (parent) {
     root.html('<div class="hrd-loading">Loading HR Management…</div>');
     let data, selected=new URLSearchParams(location.search).get('hr_section') || 'dashboard';
     window.bsHRSelectSection = key => {
-        const valid=['dashboard','organization',...(data?.sections || []).map(s=>s.key)];
+        const valid=['dashboard','organization','review',...(data?.sections || []).map(s=>s.key)];
         selected=valid.includes(key)?key:'dashboard';
         if(data && root[0].isConnected)render();
     };
@@ -66,12 +67,14 @@ window.bsHRManagement = async function (parent) {
         root.empty();
         const layout=$('<div class="hrm-layout">').appendTo(root);
         const main=$('<div class="hrm-main">').appendTo(layout);
-        const section=selected==='organization'?{key:'organization',label:'Organization Structure'}:data.sections.find(s=>s.key===selected);
+        const section=selected==='organization'?{key:'organization',label:'Organization Structure'}:selected==='review'?{key:'review',label:'Attendance and Leave Management'}:data.sections.find(s=>s.key===selected);
         const top=$('<div class="hrm-top">').appendTo(main);
         $('<div>').html(`<h2>${esc(section?.label || 'People & operations')}</h2><div class="hrm-muted">${esc(section?descriptions[selected]:'Live HRMS records · '+data.date)}</div>`).appendTo(top);
         $('<button class="btn btn-default btn-sm">').text('Refresh').on('click',load).appendTo(top);
         if(selected==='organization') {
             window.bsHROrganization(main);
+        } else if(selected==='review') {
+            window.bsHRMonthlyReview(main);
         } else if(selected==='attendance') {
             window.bsHRAttendance(main);
         } else if(section) {

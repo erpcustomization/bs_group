@@ -68,6 +68,16 @@
   {
    "type": "Link",
    "link_type": "URL",
+   "label": "Attendance and Leave Management",
+   "url": "/desk/bs-group/hr-dashboard?hr_section=review",
+   "icon": "calendar",
+   "open_in_new_tab": 0,
+   "child": 0,
+   "indent": 0
+  },
+  {
+   "type": "Link",
+   "link_type": "URL",
    "label": "Policies",
    "url": "/desk/bs-group/hr-dashboard?hr_section=policies",
    "icon": "file-text",
