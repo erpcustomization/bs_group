@@ -103,6 +103,8 @@ def day_metrics(day, now, pairs, punches, issues, schedule=None, holiday=False, 
                 leave_days=leave if day<=now.date() else 0, on_duty=duty, holiday=holiday,
                 hr_absent=int(hr_absent and day<=now.date()), missing_checkin=int(missing) if start else None,
                 flags=flags, punches=[{k:v for k,v in r.items() if k!='stamp'} for r in raw],
+                completed_pairs=[dict(check_in=a.isoformat(),check_out=b.isoformat()) for a,b in pairs
+                    if a<lower+timedelta(days=1) and b>lower],
                 attendance=attendance, future=day>now.date(),
                 shift_start=start.strftime('%H:%M') if start else None,
                 shift_end=end.strftime('%H:%M') if end else None)
