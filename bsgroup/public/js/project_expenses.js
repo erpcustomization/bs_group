@@ -3,7 +3,7 @@
     const esc = value => frappe.utils.escape_html(String(value ?? ''));
     frappe.ui.form.on('Project', {
         refresh(frm) {
-            if (!frm.is_new()) frm.add_custom_button(__('Expenses'), () => openExpenses(frm));
+            if (!frm.is_new()) frm.add_custom_button(__('Expenses'), () => openExpenses(frm), __('Project Requests'));
         }
     });
     async function openExpenses(frm) {

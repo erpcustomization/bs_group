@@ -9,8 +9,8 @@
     frappe.ui.form.on('Project', {
         refresh(frm) {
             if (frm.is_new()) return;
-            frm.add_custom_button(__('Advance'), () => openRequests(frm,'advance'));
-            frm.add_custom_button(__('Labour Approval'), () => openRequests(frm,'labor'));
+            frm.add_custom_button(__('Advance'), () => openRequests(frm,'advance'), __('Project Requests'));
+            frm.add_custom_button(__('Labour Approval'), () => openRequests(frm,'labor'), __('Project Requests'));
         }
     });
     async function openRequests(frm,kind) {
