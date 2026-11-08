@@ -87,5 +87,8 @@ def save_project(q, sheet, modules, details=None):
     for key in selected:
         project.set(MODULES[key][1], 1)
     project.custom_boq = (project.get("custom_boq") or "") + scope
-    project.save()
+    from bsgroup.project_boq_schedule import append_quotation, importing
+    append_quotation(project, q)
+    with importing():
+        project.save()
     return project.name

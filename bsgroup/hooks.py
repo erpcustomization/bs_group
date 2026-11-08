@@ -725,3 +725,6 @@ for _project_request_dt in ("Employee Advance", "Labor Preapproval"):
     doctype_js[_project_request_dt] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["public/js/project_request_form.js"]
 
 after_migrate.append("bsgroup.project_modules.install")
+after_migrate.append("bsgroup.project_boq_schedule.install")
+_prior = doc_events["Project"].get("before_validate", [])
+doc_events["Project"]["before_validate"] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.project_boq_schedule.validate"]

@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 import importlib.util
 import json
 import re
@@ -32,7 +33,9 @@ class ProjectHandoverTests(unittest.TestCase):
         utils.strip_html = lambda value: re.sub('<[^>]*>', '', value)
         modules = types.ModuleType('bsgroup.project_modules')
         modules.MODULES = {key: (key, 'custom_bs_'+key+'_projects') for key in ('supply','elv','infra','3cx')}
-        self.p = patch.dict(sys.modules, {'frappe':self.f,'frappe.utils':utils,'bsgroup.project_modules':modules})
+        schedule = types.ModuleType('bsgroup.project_boq_schedule')
+        schedule.append_quotation = Mock(); schedule.importing = nullcontext
+        self.p = patch.dict(sys.modules, {'frappe':self.f,'frappe.utils':utils,'bsgroup.project_modules':modules,'bsgroup.project_boq_schedule':schedule})
         self.p.start()
         spec = importlib.util.spec_from_file_location('handover_test',Path(__file__).resolve().parents[1]/'project_handover.py')
         self.m = importlib.util.module_from_spec(spec); spec.loader.exec_module(self.m)

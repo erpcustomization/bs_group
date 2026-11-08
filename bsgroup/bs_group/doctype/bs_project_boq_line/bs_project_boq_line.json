@@ -1,0 +1,23 @@
+{
+ "doctype": "DocType",
+ "name": "BS Project BOQ Line",
+ "module": "BS Group",
+ "istable": 1,
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": ["item_code", "item_name", "description", "qty", "uom", "start_date", "end_date", "source_quotation", "source_item"],
+ "fields": [
+  {"fieldname":"item_code","label":"Item","fieldtype":"Data","read_only":1,"in_list_view":1,"columns":2},
+  {"fieldname":"item_name","label":"Item Name","fieldtype":"Data","read_only":1},
+  {"fieldname":"description","label":"Description","fieldtype":"Small Text","read_only":1,"in_list_view":1,"columns":3},
+  {"fieldname":"qty","label":"Quantity","fieldtype":"Float","read_only":1,"in_list_view":1,"columns":1},
+  {"fieldname":"uom","label":"UOM","fieldtype":"Data","read_only":1},
+  {"fieldname":"start_date","label":"Start Date","fieldtype":"Date","in_list_view":1,"columns":2},
+  {"fieldname":"end_date","label":"End Date","fieldtype":"Date","in_list_view":1,"columns":2},
+  {"fieldname":"source_quotation","label":"Source Quotation","fieldtype":"Data","read_only":1},
+  {"fieldname":"source_item","label":"Source Quotation Item","fieldtype":"Data","read_only":1,"hidden":1}
+ ],
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}
