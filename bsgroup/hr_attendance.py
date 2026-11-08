@@ -190,7 +190,8 @@ def repair_mithun_november():
                 frappe.throw("A punch is still outside the corrected shift window.")
             log.save()
         status,hours,late,early,in_time,out_time=shift.get_attendance(
-            logs,shift.working_hours_threshold_for_absent,shift.working_hours_threshold_for_half_day)
+            [frappe._dict(log.as_dict()) for log in logs],
+            shift.working_hours_threshold_for_absent,shift.working_hours_threshold_for_half_day)
         if status != "Present" or not in_time or not out_time:
             frappe.throw("Original punches do not meet the unchanged Present threshold.")
         corrected=frappe.get_doc(dict(doctype="Attendance",employee=old.employee,company=old.company,
