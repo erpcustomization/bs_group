@@ -74,7 +74,7 @@ class MonthlyHRReviewTests(unittest.TestCase):
 
     def test_missing_schedule_is_unknown_not_zero_expected(self):
         d=self.m.day_metrics(self.day,self.now,[],[],set())
-        self.assertIsNone(d['scheduled_minutes']);self.assertEqual(d['late_day'],0);self.assertEqual(d['missing_checkin'],0)
+        self.assertIsNone(d['scheduled_minutes']);self.assertIsNone(d['late_day']);self.assertIsNone(d['missing_checkin'])
 
     def test_access_guard_before_queries(self):
         self.guard.side_effect=PermissionError()
