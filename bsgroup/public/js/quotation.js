@@ -342,6 +342,19 @@ frappe.ui.form.on("Quotation", {
                 const additional = data.resources || data.additional_charges
                     ? `<p>${data.resources} labour/resource rows and ${data.additional_charges} additional charge rows
                        remain in the attached costing evidence. Only the Item lines below become purchasing lines.</p>` : "";
+                const modules = [['supply','Supply Only'],['elv','ELV'],['3cx','3CX'],['infra','Infra']];
+                const projectFields = data.project ? [
+                    {fieldtype:'HTML',fieldname:'project_info',options:`<p>Project: <strong>${esc(data.project)}</strong>. The quotation BOQ will be added without prices. Existing BOQ content is retained.</p>`}
+                ] : [
+                    {fieldtype:'HTML',fieldname:'project_info',options:'<p>A project will be created with the quotation BOQ without prices. Complete the existing required project details below.</p>'},
+                    {fieldname:'project_type',label:__('Project Type'),fieldtype:'Link',options:'Project Type',reqd:1},
+                    {fieldname:'project_template',label:__('From Template'),fieldtype:'Link',options:'Project Template'},
+                    {fieldname:'custom_project_manager',label:__('Project Manager'),fieldtype:'Link',options:'Employee',reqd:1},
+                    {fieldname:'expected_start_date',label:__('Project Start Date'),fieldtype:'Date',reqd:1,default:data.required_by},
+                    {fieldname:'expected_end_date',label:__('Project End Date'),fieldtype:'Date',reqd:1},
+                    {fieldname:'customer',label:__('Customer'),fieldtype:'Link',options:'Customer',reqd:1,default:data.project_customer,read_only:!!data.project_customer},
+                    {fieldname:'custom_project_description',label:__('Project Description'),fieldtype:'Small Text',reqd:1,default:data.project_description}
+                ];
                 const dialog = new frappe.ui.Dialog({
                     title:__("Send to Procurement"),
                     fields:[
@@ -355,15 +368,22 @@ frappe.ui.form.on("Quotation", {
                         {fieldname:"schedule_date",label:__("Required By"),fieldtype:"Date",reqd:1,default:data.required_by},
                         {fieldname:"warehouse",label:__("Target Warehouse"),fieldtype:"Select",options:["",...data.warehouses],
                          reqd:data.items.some(row=>row.is_stock_item)?1:0,
-                         default:data.warehouses.length===1?data.warehouses[0]:""}
+                         default:data.warehouses.length===1?data.warehouses[0]:""},
+                        {fieldname:'project_section',fieldtype:'Section Break',label:__('Project Modules — choose one or more')},
+                        ...modules.map(([key,label])=>({fieldname:'module_'+key,fieldtype:'Check',label:__(label),default:(data.project_modules||[]).includes(key)?1:0})),
+                        ...projectFields
                     ],
                     primary_action_label:__("Create Purchase Requisition"),
                     async primary_action(values) {
+                        const selected=modules.filter(([key])=>values['module_'+key]).map(([key])=>key);
+                        if(!selected.length){frappe.msgprint(__('Choose at least one project module.'));return;}
+                        const projectDetails=Object.fromEntries(['project_type','project_template','custom_project_manager','expected_start_date','expected_end_date','customer','custom_project_description'].map(key=>[key,values[key]]));
                         dialog.disable_primary_action();
                         try {
                             const result = await frappe.call({
                                 method:"bsgroup.dcs.procurement.send_to_procurement",
-                                args:{quotation:frm.doc.name,...values},freeze:true,
+                                args:{quotation:frm.doc.name,schedule_date:values.schedule_date,warehouse:values.warehouse,
+                                    project_modules:JSON.stringify(selected),project_details:JSON.stringify(projectDetails)},freeze:true,
                                 freeze_message:__("Creating requisition and preserving sales documents…")
                             });
                             if (!result.message) return;

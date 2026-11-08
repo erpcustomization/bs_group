@@ -34,7 +34,7 @@ vm.runInContext(source.slice(source.indexOf(marker)), context);
 const flow=handlers.at(-1);
 let buttons={},properties={};
 const frm={doc:{docstatus:1,custom_deal_cost_sheet:'DCS-1',custom_pipeline_stage:'Won',name:'Q-1'},
-    is_dirty:()=>false, set_df_property:(name,property,value)=>properties[name]=value,
+    toggle_reqd:()=>{}, is_dirty:()=>false, set_df_property:(name,property,value)=>properties[name]=value,
     add_custom_button:(label,fn)=>buttons[label]=fn, reload_doc:async()=>{},set_intro:()=>{}};
 (async()=>{
     flow.refresh(frm);
@@ -55,9 +55,10 @@ const frm={doc:{docstatus:1,custom_deal_cost_sheet:'DCS-1',custom_pipeline_stage
     check(summary.includes('Only the Item lines below become purchasing lines'),
         'Non-item costs remain visible as attached evidence');
     response={name:'PR-1',doctype:'Material Request'};
-    await dialog.options.primary_action({schedule_date:'2026-10-27',warehouse:'Stores - AE'});
+    await dialog.options.primary_action({schedule_date:'2026-10-27',warehouse:'Stores - AE',module_supply:1,module_elv:1});
     check(calls.at(-1).method.endsWith('.send_to_procurement')&&calls.at(-1).args.warehouse==='Stores - AE',
         'Creation carries source quotation, date and warehouse');
+    check(calls.at(-1).args.project_modules==='["supply","elv"]','Selected project modules reach server');
     check(routes.at(-1).args[0]==='bs-procurement'&&routes.at(-1).options.bsp_request==='PR-1',
         'Created standard PR opens in BS Procurement');
     check(dialog.hidden&&!dialog.disabled,'Creation closes dialog and restores action');
@@ -77,7 +78,7 @@ const frm={doc:{docstatus:1,custom_deal_cost_sheet:'DCS-1',custom_pipeline_stage
     response={existing:'PR-2'};await buttons['Send to Procurement']();
     check(routes.at(-1).options.bsp_request==='PR-2','Server-side replay opens existing PR');
     failure=new Error('Validation rejected');
-    await assert.rejects(dialog.options.primary_action({schedule_date:'2026-10-27'}),/Validation rejected/);
+    await assert.rejects(dialog.options.primary_action({schedule_date:'2026-10-27',module_supply:1}),/Validation rejected/);
     check(!dialog.disabled,'Failed create restores the dialog action');
     console.log(JSON.stringify({passed:checks,failed:0}));
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -64,8 +64,9 @@ class ProcurementTests(unittest.TestCase):
 
     def send(self):
         with patch.object(frappe,'get_print',return_value=sample_pdf()), \
-             patch.object(p,'costing_pdf',return_value=sample_pdf()):
-            return p.send_to_procurement(self.q.name,add_days(nowdate(),7),"Stores - AE")
+             patch.object(p,'costing_pdf',return_value=sample_pdf()), \
+             patch("bsgroup.project_handover.save_project", return_value=self.dcs.project):
+            return p.send_to_procurement(self.q.name,add_days(nowdate(),7),"Stores - AE", project_modules=["supply"])
 
     def test_won_requires_po_and_has_no_award_side_effect(self):
         self.q.custom_pipeline_stage='Won'
@@ -161,7 +162,7 @@ class ProcurementTests(unittest.TestCase):
     def test_print_failure_does_not_create_partial_request(self):
         self.win()
         with patch.object(frappe,'get_print',side_effect=RuntimeError('Synthetic PDF failure')):
-            with self.assertRaises(RuntimeError): p.send_to_procurement(self.q.name,add_days(nowdate(),7),"Stores - AE")
+            with self.assertRaises(RuntimeError): p.send_to_procurement(self.q.name,add_days(nowdate(),7),"Stores - AE", project_modules=["supply"])
         self.assertEqual(frappe.db.count(buying.MR,{'custom_deal_cost_sheet':self.dcs.name}),0)
         self.assertFalse(frappe.db.get_value('Quotation',self.q.name,'custom_bsp_material_request'))
 

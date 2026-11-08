@@ -1,7 +1,8 @@
 """Awarded sales handover into standard ERPNext Material Requests.
 
 The old DCS Purchase Request controller remains read-only for historical packets.
-New sends create only a standard Material Request and private source evidence.
+New sends create a standard Material Request, private source evidence and a
+price-free quotation BOQ in the selected project modules.
 """
 import hashlib
 import importlib.util
@@ -253,17 +254,19 @@ Respect explicit Warehouse user restrictions and expose names only.
 @frappe.whitelist()
 def handover_context(quotation):
     q, sheet = source_documents(quotation)
+    from bsgroup.project_handover import context
     existing = frappe.db.get_value(buying.MR, {"custom_bsp_key": handover_key(sheet)}, "name")
     return dict(quotation=q.name, dcs=sheet.name, company=sheet.company, currency=sheet.currency,
                 customer_po=q.custom_customer_po_reference, revision=sheet.custom_revision_reference,
                 existing=existing, items=source_items(sheet), required_by=nowdate(),
                 warehouses=handover_warehouses(sheet.company),
-                resources=len(sheet.resources or []), additional_charges=len(sheet.addtional_charges or []))
+                resources=len(sheet.resources or []), additional_charges=len(sheet.addtional_charges or []),
+                **(context(q, sheet) if not existing else {}))
 
 
 @frappe.whitelist(methods=["POST"])
 @buying.transaction_conflicts
-def send_to_procurement(quotation, schedule_date=None, warehouse=None):
+def send_to_procurement(quotation, schedule_date=None, warehouse=None, project_modules=None, project_details=None):
     q, sheet = source_documents(quotation, lock=True)
     key = handover_key(sheet)
     existing = frappe.db.get_value(buying.MR, {"custom_bsp_key": key}, "name", for_update=True)
@@ -284,17 +287,20 @@ def send_to_procurement(quotation, schedule_date=None, warehouse=None):
     # Render before inserting: a rendering failure cannot leave a half-created PR.
     quote_pdf = frappe.get_print("Quotation", q.name, as_pdf=True, no_letterhead=1)
     cost_pdf = costing_pdf(data)
+    from bsgroup.project_handover import save_project, selections
+    selected_modules = selections(project_modules)
+    project = save_project(q, sheet, selected_modules, project_details)
     manifest = dict(costing=data, items=rows, files=[], source_po=source.name,
                     schedule_date=str(schedule_date),
                     customer_po_reference=q.custom_customer_po_reference,
                     customer=q.party_name if q.quotation_to == "Customer" else sheet.customer,
-                    project=sheet.project, quotation=q.name)
+                    project=project, project_modules=selected_modules, quotation=q.name)
     request = frappe.new_doc(buying.MR)
     request.update(dict(material_request_type="Purchase", company=sheet.company,
                         transaction_date=nowdate(), schedule_date=schedule_date,
                         custom_bsp_managed=1, custom_bsp_key=key,
                         custom_deal_cost_sheet=sheet.name, custom_bsp_quotation=q.name,
-                        custom_project=sheet.project, custom_bsp_customer=manifest["customer"],
+                        custom_project=project, custom_bsp_customer=manifest["customer"],
                         title=("Purchase · " + (sheet.subject or sheet.name))[:140],
                         custom_bsp_customer_po=q.custom_customer_po_reference,
                         custom_bsp_source_snapshot=buying.encoded(manifest)))
@@ -303,7 +309,7 @@ def send_to_procurement(quotation, schedule_date=None, warehouse=None):
                        description=row["description"], qty=row["qty"], rate=row["rate"],
                        stock_uom=row["uom"], uom=row["uom"], conversion_factor=1,
                        custom_bsp_dcs_item=row["source"], warehouse=warehouse,
-                       project=sheet.project, schedule_date=schedule_date))
+                       project=project, schedule_date=schedule_date))
     # The commercial sender can create only this service-built draft. This is not
     # a Purchase User role grant and does not submit or approve the requisition.
     with buying.operation("handover"):
@@ -349,7 +355,7 @@ def send_to_procurement(quotation, schedule_date=None, warehouse=None):
         changes=[{"dt":"Quotation","dn":q.name,"field":"custom_bsp_material_request",
                   "old":q.get("custom_bsp_material_request") or "","new":request.name}])
     q.add_comment("Info", _("Sent to Procurement: {0}").format(request.name))
-    return {"name": request.name, "doctype": buying.MR, "already_sent": False}
+    return {"name": request.name, "doctype": buying.MR, "already_sent": False, "project": project}
 
 
 def assert_source_current(request):
