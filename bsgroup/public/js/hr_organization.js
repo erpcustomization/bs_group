@@ -7,14 +7,14 @@ window.bsHROrganization = async function (main) {
       .org-tools{padding:16px 20px;display:flex;gap:9px;align-items:center;flex-wrap:wrap;border-bottom:1px solid #e5edf1}
       .org-tools input{min-width:180px;max-width:240px}.org-tools select{max-width:260px}.org-summary{padding:14px 20px;display:flex;gap:18px;flex-wrap:wrap;color:#647789;font-size:12px}.org-summary b{color:#18384b;font-size:16px;margin-right:5px}
       .org-canvas{overflow:auto;max-height:720px;padding:28px 22px;background-color:#f9fbfd;background-image:radial-gradient(#dce5eb .7px,transparent .7px);background-size:18px 18px;min-height:200px}
-      .org-forest,.org-branch{list-style:none!important;margin:0!important;padding:0!important;display:flex;flex-direction:column;gap:0;width:max-content}
-      .org-node{display:flex;align-items:center;position:relative;padding:10px 0!important;margin:0!important}
-      .org-branch{padding-left:36px!important;position:relative}.org-branch:before{content:'';position:absolute;left:0;top:50%;width:36px;border-top:1.5px solid #99b5c6}
-      .org-branch>.org-node{padding-left:18px!important}.org-branch>.org-node:before{content:'';position:absolute;left:0;top:0;bottom:0;border-left:1.5px solid #99b5c6}
-      .org-branch>.org-node:first-child:before{top:50%}.org-branch>.org-node:last-child:before{bottom:50%}.org-branch>.org-node:only-child:before{display:none}
-      .org-branch>.org-node:after{content:'';position:absolute;left:0;top:50%;width:18px;border-top:1.5px solid #99b5c6}
-      .org-card{width:224px;flex:0 0 224px;background:#fff;border:1px solid #d9e5ec;border-left:3px solid #16887e;border-radius:12px;padding:14px;box-shadow:0 3px 12px #18384b08;position:relative;text-align:left}
-      .org-card.org-leader{border-left-color:#234a6c;background:#f2f7fc}.org-card.org-match{outline:3px solid #efc36c;outline-offset:2px}.org-card-header{display:flex;gap:10px;align-items:center}.org-initials{width:33px;height:33px;flex-shrink:0;display:grid;place-items:center;border-radius:10px;background:#e8f3f1;color:#186c65;font-size:12px;font-weight:700}
+      .org-forest,.org-branch{list-style:none!important;margin:0!important;padding:0!important;display:flex;flex-direction:row;align-items:flex-start;gap:0;width:max-content}
+      .org-forest{gap:32px}.org-node{display:flex;flex-direction:column;align-items:center;position:relative;padding:0 12px!important;margin:0!important}
+      .org-branch{padding-top:36px!important;position:relative}.org-branch:before{content:'';position:absolute;left:50%;top:0;height:18px;border-left:1.5px solid #99b5c6}
+      .org-branch>.org-node:before{content:'';position:absolute;left:0;right:0;top:-18px;border-top:1.5px solid #99b5c6}
+      .org-branch>.org-node:first-child:before{left:50%}.org-branch>.org-node:last-child:before{right:50%}.org-branch>.org-node:only-child:before{display:none}
+      .org-branch>.org-node:after{content:'';position:absolute;left:50%;top:-18px;height:18px;border-left:1.5px solid #99b5c6}
+      .org-card{width:224px;min-height:190px;flex:0 0 auto;background:#fff;border:1px solid #d9e5ec;border-top:3px solid #16887e;border-radius:12px;padding:14px;box-shadow:0 3px 12px #18384b08;position:relative;text-align:left}
+      .org-card.org-leader{border-top-color:#234a6c;background:#f2f7fc}.org-card.org-match{outline:3px solid #efc36c;outline-offset:2px}.org-card-header{display:flex;gap:10px;align-items:center}.org-initials{width:33px;height:33px;flex-shrink:0;display:grid;place-items:center;border-radius:10px;background:#e8f3f1;color:#186c65;font-size:12px;font-weight:700}
       .org-card a{font-size:13px;font-weight:650;color:#173b56;line-height:1.35}.org-role{font-size:11px;color:#63788a;margin:9px 0 6px;line-height:1.5}.org-team{font-size:10px;display:inline-block;border-radius:5px;padding:3px 6px;background:#edf3f7;color:#4c667a}.org-controls{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:9px;border-top:1px solid #edf2f5;flex-wrap:wrap}.org-controls button{font-size:11px!important;padding:3px 7px!important}.org-note{font-size:11px;color:#8b691f;margin-top:7px}.org-footer{padding:14px 20px;border-top:1px solid #e5edf1;font-size:11px;color:#718493}.org-team-links{display:flex;flex-wrap:wrap;gap:7px;padding:0 20px 14px}.org-team-links a{font-size:11px;color:#476278;background:#eff4f7;padding:5px 9px;border-radius:6px}.org-empty{padding:24px;color:#6d8091}
     `).appendTo(document.head);
     let state, search='', focus='', collapsed=new Set(), firstLoad=true, zoom=100;
@@ -61,7 +61,7 @@ window.bsHROrganization = async function (main) {
         if(state.can_create)$('<button class="btn btn-primary btn-sm">').text('Add employee').on('click',()=>frappe.new_doc('Employee',focus?{reports_to:focus}:{})).appendTo(tools);
         if(state.can_create_team)$('<button class="btn btn-default btn-sm">').text('Add team').on('click',()=>frappe.new_doc('Department')).appendTo(tools);
         const teams=[...new Set(employees.map(e=>e.department).filter(Boolean))].sort();
-        $('<div class="org-summary">').html(`<span><b>${employees.length}</b>Active employees</span><span><b>${teams.length}</b>Teams</span><span><b>${children.size}</b>Managers</span><span>Reporting flow →</span>`).appendTo(panel);
+        $('<div class="org-summary">').html(`<span><b>${employees.length}</b>Active employees</span><span><b>${teams.length}</b>Teams</span><span><b>${children.size}</b>Managers</span><span>Teams arranged horizontally · scroll across to explore</span>`).appendTo(panel);
         if(state.can_read_teams){const links=$('<div class="org-team-links" aria-label="Team details">').appendTo(panel);teams.forEach(t=>$('<a>').attr('href','/desk/department/'+encodeURIComponent(t)).text(t).appendTo(links));}
         const canvas=$('<div class="org-canvas" role="region" aria-label="Organization flow diagram" tabindex="0">').appendTo(panel);
         const tree=$('<ul class="org-forest" aria-label="Employee reporting flow">').appendTo(canvas);
@@ -94,6 +94,10 @@ window.bsHROrganization = async function (main) {
         [['−',-10],['+',10]].forEach(([label,delta])=>$('<button class="btn btn-default btn-xs">').attr('aria-label',delta<0?'Zoom out':'Zoom in').text(label).on('click',()=>{zoom=Math.max(50,Math.min(130,zoom+delta));applyZoom();}).appendTo(zoomBox));
         $('<button class="btn btn-default btn-xs">').text('Reset zoom').on('click',()=>{zoom=100;applyZoom();}).appendTo(zoomBox);
         if(search)tree.find('.org-match').first()[0]?.scrollIntoView({block:'nearest',inline:'nearest'});
+        else requestAnimationFrame(()=>{
+            const leader=tree.find('.org-card')[0];
+            if(leader&&panel[0].isConnected){const c=canvas[0],r=leader.getBoundingClientRect();c.scrollLeft+=r.left+r.width/2-c.getBoundingClientRect().left-c.clientWidth/2;}
+        });
     }
     async function load(){
         try{const r=await frappe.call({method:'bsgroup.hr_management.organization'});state=r.message;draw();}
