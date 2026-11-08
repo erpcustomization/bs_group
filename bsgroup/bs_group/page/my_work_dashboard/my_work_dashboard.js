@@ -58,6 +58,7 @@ async function bsOpenTimeOff(day) {
         try {
             const r=await frappe.call({method:'bsgroup.time_off.apply',args:{...values,request_id:requestId,expected_plan:JSON.stringify(plan.parts)},freeze:true,freeze_message:__('Sending your request for approval…')});
             dialog.hide();
+            window.dispatchEvent(new Event('bs-annual-balance-changed'));
             const names=r.message.names;
             const result=new frappe.ui.Dialog({title:__('Time Off requested'),fields:[{fieldtype:'HTML',fieldname:'result'}]});
             const area=result.fields_dict.result.$wrapper;
@@ -149,7 +150,9 @@ function bsAnnualLeaveBalance(parent) {
         } catch(e) {value.text('–');note.text(__('Balance unavailable. Please reload or contact HR.'));}
     }
     refresh();
-    const timer=setInterval(()=>{if(!box[0].isConnected)clearInterval(timer);else if(box.is(':visible'))refresh();},60000);
+    const changed=()=>{if(box[0].isConnected)refresh();};
+    window.addEventListener('bs-annual-balance-changed',changed);
+    const timer=setInterval(()=>{if(!box[0].isConnected){clearInterval(timer);window.removeEventListener('bs-annual-balance-changed',changed);}else if(box.is(':visible'))refresh();},60000);
 }
 
 function bsEmployeeServices(parent) {
