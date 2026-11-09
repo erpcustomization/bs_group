@@ -687,8 +687,9 @@ doctype_js["Opportunity"].append("public/js/opportunity_survey_steps.js")
 doctype_js["Opportunity"].append("public/js/opportunity_submit.js")
 doctype_js["Lead"].append("public/js/lead_submit.js")
 doctype_list_js["Opportunity"].append("public/js/opportunity_progress_filter.js")
-for _sales_doctype in ("Lead", "Opportunity"):
-    doctype_list_js[_sales_doctype].append("public/js/sales_filter_popup.js")
+for _sales_doctype in ("Lead", "Opportunity", "Presales Request", "Deal Cost Sheet", "Quotation"):
+    _prior = doctype_list_js.get(_sales_doctype, [])
+    doctype_list_js[_sales_doctype] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["public/js/sales_filter_popup.js"]
 
 for _downstream in ("Presales Request", "Deal Cost Sheet", "Quotation", "Site Survey Request"):
     for _event in ("before_insert", "before_validate"):

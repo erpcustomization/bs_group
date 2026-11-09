@@ -1,6 +1,6 @@
 // With the standard filter bar hidden, keep every saved filter in the popup.
 (() => {
-    for (const doctype of ['Lead', 'Opportunity']) {
+    for (const doctype of ['Lead', 'Opportunity', 'Presales Request', 'Deal Cost Sheet', 'Quotation']) {
         const settings = frappe.listview_settings[doctype];
         if (!settings || settings._bsi_popup_filters) continue;
         settings._bsi_popup_filters = true;
