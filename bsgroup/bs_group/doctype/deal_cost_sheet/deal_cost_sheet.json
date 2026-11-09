@@ -397,6 +397,7 @@
   {
    "fieldname": "section_break_dsjr",
    "fieldtype": "Section Break",
+   "hidden": 1,
    "label": "Costing tools",
    "collapsible": 1,
    "collapsible_depends_on": "eval:doc.docstatus === 0"
@@ -425,6 +426,7 @@
   {
    "fieldname": "section_break_ozlr",
    "fieldtype": "Section Break",
+   "hidden": 1,
    "label": "Solutions & responsibilities"
   },
   {
@@ -631,6 +633,7 @@
   {
    "fieldname": "custom_presales_effort_section",
    "fieldtype": "Section Break",
+   "hidden": 1,
    "label": "Presales Effort & Justification",
    "collapsible": 1,
    "collapsible_depends_on": ""

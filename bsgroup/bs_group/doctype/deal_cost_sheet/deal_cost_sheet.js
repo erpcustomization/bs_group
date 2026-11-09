@@ -31,6 +31,16 @@ function dcs_group_additional_details(frm) {
     additional.refresh();
 }
 
+// Presentation only: retain stored values, quotation flags and presales metrics.
+// Apply on refresh as well for benches with the previous DocType metadata.
+function dcs_hide_unused_sections(frm) {
+    [
+        'section_break_dsjr',
+        'section_break_ozlr',
+        'custom_presales_effort_section',
+    ].forEach(fieldname => frm.set_df_property(fieldname, 'hidden', 1));
+}
+
 frappe.ui.form.on("Deal Cost Sheet", {
 	onload(frm) {
 		// set_presales_filter(frm)
@@ -40,6 +50,7 @@ frappe.ui.form.on("Deal Cost Sheet", {
 	},
 	refresh(frm) {
 		dcs_group_additional_details(frm);
+		dcs_hide_unused_sections(frm);
 		recalc_parent(frm);
 		render_solution_matrix(frm);
 		render_summary_with_currency(frm);
