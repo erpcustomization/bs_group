@@ -71,4 +71,3 @@ class DescriptionTests(unittest.TestCase):
   with self.assertRaises(ValidationError):desc.install()
 
 if __name__=='__main__':unittest.main(verbosity=2)
-
