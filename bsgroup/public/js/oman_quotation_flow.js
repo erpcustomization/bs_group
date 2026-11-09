@@ -76,6 +76,7 @@
             if(frm.doc.name!==name) return;
             installationButton(frm,data);
             frm.__oman_quotation_pilot=!!data.enabled;
+            if(frm.fields_dict?.custom_oman_revision_no) frm.toggle_display('custom_oman_revision_no',!!data.enabled);
             if(!data.enabled) return;
             frm.set_df_property('custom_pipeline_stage','read_only',1);
             frm.remove_custom_button(__('Download Enterprise PDF'));
