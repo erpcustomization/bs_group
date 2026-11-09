@@ -140,7 +140,14 @@ def make_quotation(source_name):
 	frappe.has_permission("Quotation", "create", throw=True)
 	source = frappe.get_doc("Deal Cost Sheet", source_name)
 	refuse_stale_quotation_source(source)
+	from bsgroup.oman_quotation_flow import enabled, ensure_draft
+	if enabled():
+		return ensure_draft(source)
+	return _create_quotation(source)
 
+
+def _create_quotation(source):
+	"""Internal creation shared by the permitted action and Oman submit workflow."""
 	opp = frappe.db.get_value(
 		"Opportunity",
 		source.opportunity,

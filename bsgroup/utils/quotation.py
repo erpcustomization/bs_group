@@ -84,6 +84,9 @@ def validate_pipeline_stage(doc, method=None):
 	and Won/Lost date maintenance. Server-side guard - the popup on the form
 	is the primary UX, this makes the rule hold for API/bench updates too,
 	not just the form."""
+	from bsgroup.oman_quotation_flow import validate_stage
+	if validate_stage(doc):
+		return
 	stage = doc.custom_pipeline_stage
 	previous_stage = _get_previous_pipeline_stage(doc)
 

@@ -157,6 +157,9 @@ def dcs_apply_revision(args):
 	else:
 		sheet = frappe.get_doc("Deal Cost Sheet", dcs_name, for_update=True)
 		sheet.check_permission("write")
+		from bsgroup.oman_quotation_flow import guard_dcs_revision
+		if guard_dcs_revision(sheet):
+			return {"ok": 0, "error": "Use Revise BOQ for this Oman quotation. Its items, prices and revision history must update together.", "state": {}}
 		from bsgroup.api.dcs.boq_revision import boq_managed
 		if boq_managed(sheet.name, locking=True):
 			return {"ok": 0, "error": "This sheet uses governed BOQ revisions. Use BOQ Revision to change item or labour rates and keep totals aligned with its rows.", "state": {}}

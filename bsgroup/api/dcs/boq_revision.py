@@ -176,6 +176,9 @@ def _proposal(sheet, args, roles):
 
 
 def _sync_quotation(sheet, requested):
+    from bsgroup.oman_quotation_flow import enabled, pilot, sync_draft
+    if enabled() and sheet.custom_quotation and pilot(frappe.get_doc("Quotation", sheet.custom_quotation)):
+        return sync_draft(sheet)
     if not requested:
         return "Linked Quotation was not changed; review it against this revision before sending."
     from bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet import quotation_deal_identity
@@ -239,6 +242,12 @@ def _apply(args):
         return {"ok": 0, "error": "A Deal Cost Sheet and revision reason are required."}
     sheet = frappe.get_doc("Deal Cost Sheet", args["dcs"], for_update=True)
     sheet.check_permission("write")
+    from bsgroup.oman_quotation_flow import enabled, guard_dcs_revision
+    if enabled():
+        pilot_revision = guard_dcs_revision(sheet)
+        # Revisions update the existing pilot Draft atomically with the DCS.
+        if pilot_revision:
+            args = dict(args, update_quotation=1)
     if sheet.docstatus != 1:
         frappe.throw("BOQ Revision requires a submitted sheet; edit draft rows normally.")
     if str(args.get("expected_modified") or "") != str(sheet.modified):

@@ -285,7 +285,8 @@ def send_to_procurement(quotation, schedule_date=None, warehouse=None, project_m
     source = po_file(q)
     data = costing_snapshot(sheet)
     # Render before inserting: a rendering failure cannot leave a half-created PR.
-    quote_pdf = frappe.get_print("Quotation", q.name, as_pdf=True, no_letterhead=1)
+    from bsgroup.oman_quotation_flow import pilot, render_pdf
+    quote_pdf = render_pdf(q, no_letterhead=1) if pilot(q) else frappe.get_print("Quotation", q.name, as_pdf=True, no_letterhead=1)
     cost_pdf = costing_pdf(data)
     from bsgroup.project_handover import save_project, selections
     selected_modules = selections(project_modules)

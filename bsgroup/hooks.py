@@ -729,3 +729,15 @@ after_migrate.append("bsgroup.project_modules.install")
 after_migrate.append("bsgroup.project_boq_schedule.install")
 _prior = doc_events["Project"].get("before_validate", [])
 doc_events["Project"]["before_validate"] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.project_boq_schedule.validate"]
+
+# Oman pilot is opt-in and site-bound. UAE retains the existing flow.
+_prior = doc_events.setdefault("Deal Cost Sheet", {}).get("on_submit", [])
+doc_events["Deal Cost Sheet"]["on_submit"] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.oman_quotation_flow.dcs_submitted"]
+for _event in ("validate", "before_update_after_submit"):
+    _prior = doc_events["Quotation"].get(_event, [])
+    doc_events["Quotation"][_event] = ["bsgroup.oman_quotation_flow.validate"] + ([_prior] if isinstance(_prior, str) else list(_prior))
+for _dt in ("Quotation", "Deal Cost Sheet"):
+    _prior = doctype_js.get(_dt, [])
+    doctype_js[_dt] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["public/js/oman_quotation_flow.js"]
+doc_events["Quotation"]["before_cancel"].append("bsgroup.oman_quotation_flow.guard_cancel")
+doctype_list_js["Quotation"].append("public/js/oman_quotation_flow_list.js")
