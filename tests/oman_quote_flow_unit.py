@@ -172,4 +172,23 @@ class FlowTests(unittest.TestCase):
                 raise RuntimeError('Synthetic failure')
         self.assertIsNone(flow._operation.get())
 
+    def test_legacy_reverse_link_is_adopted_only_inside_revision(self):
+        self.s.custom_quotation=None;frappe.get_all.return_value=['Q-1'];frappe.get_doc.return_value=self.q
+        self.assertTrue(flow.guard_dcs_revision(self.s));self.assertIsNone(self.s.custom_quotation)
+        frappe.db.set_value.assert_not_called()
+        with self.mod('bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet',quotation_deal_identity=lambda s,q:''):
+            self.assertTrue(flow.guard_dcs_revision(self.s,attach=True))
+        self.assertEqual(self.s.custom_quotation,'Q-1');self.assertIn('write',self.q._permissions)
+
+    def test_ambiguous_legacy_links_are_never_guessed(self):
+        self.s.custom_quotation=None;frappe.get_all.return_value=['Q-1','Q-2']
+        self.assertIsNone(flow.linked_quotation(self.s))
+        with self.assertRaisesRegex(ValidationError,'multiple'):flow.guard_dcs_revision(self.s,attach=True)
+        frappe.db.set_value.assert_not_called()
+
+    def test_historical_submitted_reverse_link_is_not_adopted(self):
+        self.s.custom_quotation=None;frappe.get_all.return_value=['Q-1'];frappe.get_doc.return_value=self.q
+        self.q.docstatus=1;self.q.custom_oman_flow=0
+        self.assertFalse(flow.guard_dcs_revision(self.s,attach=True));frappe.db.set_value.assert_not_called()
+
 if __name__=='__main__':unittest.main(verbosity=2)

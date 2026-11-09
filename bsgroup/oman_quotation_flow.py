@@ -91,12 +91,35 @@ def dcs_submitted(doc, method=None):
         ensure_draft(doc)
 
 
-def guard_dcs_revision(sheet):
-    if not enabled() or not sheet.custom_quotation:
+def linked_quotation(sheet, strict=False):
+    if sheet.custom_quotation:
+        return sheet.custom_quotation
+    names = frappe.get_all("Quotation", filters={"custom_deal_cost_sheet": sheet.name,
+        "docstatus": ["!=", 2]}, pluck="name")
+    if len(names) > 1:
+        if strict:
+            frappe.throw("This DCS has multiple quotations and no current quotation link. Review the links before revising; no quotation was changed.")
+        return None
+    return names[0] if names else None
+
+
+def guard_dcs_revision(sheet, attach=False):
+    if not enabled():
         return False
-    q = frappe.get_doc("Quotation", sheet.custom_quotation, for_update=True)
+    name = linked_quotation(sheet, strict=True)
+    if not name:
+        return False
+    q = frappe.get_doc("Quotation", name, for_update=True)
     if pilot(q):
         check_editable(q)
+        if attach:
+            from bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet import quotation_deal_identity
+            q.check_permission("write")
+            if q.custom_deal_cost_sheet != sheet.name or quotation_deal_identity(sheet, q):
+                frappe.throw("The existing quotation does not match this DCS. Its link was not changed.")
+            if not sheet.custom_quotation:
+                frappe.db.set_value("Deal Cost Sheet", sheet.name, "custom_quotation", name)
+                sheet.custom_quotation = name
         return True
     return False
 
@@ -226,7 +249,12 @@ def can_install():
 def dcs_context(dcs):
     sheet = frappe.get_doc("Deal Cost Sheet", dcs)
     sheet.check_permission("read")
-    return dict(enabled=enabled(), can_install=can_install(), quotation=sheet.custom_quotation)
+    active = enabled()
+    name = linked_quotation(sheet) if active else sheet.custom_quotation
+    q = frappe.get_doc("Quotation", name) if active and name else None
+    managed = bool(q and pilot(q))
+    return dict(enabled=active, can_install=can_install(), quotation=name,
+        auto_sync=managed, terminal=bool(managed and q.custom_pipeline_stage in TERMINAL))
 
 
 @frappe.whitelist()

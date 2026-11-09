@@ -3586,6 +3586,7 @@ frappe.ui.form.on('Deal Cost Sheet', {
 
 // Governed submitted BOQ editor. The ordinary form remains locked.
 function dcs_boq_revision_dialog(frm, cap) {
+    var omanPilot = !!frm.__oman_quotation_pilot;
     // Complete BOQ preparation is distinct from customer-side negotiation.
     // The server still enforces assignment, per-line authority and approvals.
     if (cap.can_prepare_boq) {
@@ -3645,8 +3646,8 @@ function dcs_boq_revision_dialog(frm, cap) {
             {fieldtype:'Table',fieldname:'boq_resources',label:__('Labour / Resources'),fields:resourceFields,data:fields(frm.doc.resources,resourceKeys),cannot_add_rows:!cap.can_vendor_side,cannot_delete_rows:!cap.can_vendor_side,onchange:preview},
             {fieldtype:'HTML',fieldname:'preview'},
             {fieldtype:'Check',fieldname:'reconcile_header_adjustments',label:__('Replace earlier totals-only adjustments with this complete BOQ'),hidden:!gap || !frappe.user.has_role('Managing Director'),description:__('No hidden adjustment is carried forward. Ensure every intended cost and selling change is represented above.')},
-            {fieldtype:'Check',fieldname:'update_quotation',label:__('Update the linked Draft Quotation from this BOQ'),description:__('Requires Quotation write permission. Only this sheet’s verified Draft Quotation may be updated; otherwise the entire revision is refused.')},
-            {fieldtype:'Check',fieldname:'acknowledge_quote_review',label:__('Keep the existing quotation for separate review'),description:__('Required if quoted scope/selling changes and you are not updating the Draft Quotation. The sheet will return from Quoted to Submitted to Sales; Won/Lost outcomes are preserved.'),hidden:!frm.doc.custom_quotation}
+            {fieldtype:'Check',fieldname:'update_quotation',label:__(omanPilot?'Update the same quotation automatically with a new revision':'Update the linked Draft Quotation from this BOQ'),default:omanPilot?1:0,read_only:omanPilot?1:0,description:__('Requires Quotation write permission. Only this sheet’s verified Draft Quotation may be updated; otherwise the entire revision is refused.')},
+            {fieldtype:'Check',fieldname:'acknowledge_quote_review',label:__('Keep the existing quotation for separate review'),description:__('Required if quoted scope/selling changes and you are not updating the Draft Quotation. The sheet will return from Quoted to Submitted to Sales; Won/Lost outcomes are preserved.'),hidden:omanPilot||!frm.doc.custom_quotation}
         ],
         primary_action_label:__('Record BOQ Revision'),
         primary_action:function (v) {

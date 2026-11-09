@@ -28,3 +28,18 @@ async function form(data,{dirty=false,doctype='Quotation',fresh=false}={}){
  const other=Object.assign(new ListView(),{doctype:'Customer',settings:{}});assert.equal(other.get_args().fields.length,1);other.before_render();assert.equal(other.settings.get_indicator,undefined);
  console.log('PASS Oman pilot form actions, Save/PDF states, frozen/read-only actions, DCS link, list indicators and legacy isolation');
 })().catch(e=>{console.error(e);process.exitCode=1});
+// Exercise the actual BOQ dialog's pilot and legacy field definitions.
+{
+ const source=fs.readFileSync(path.join(root,'bsgroup/bs_group/doctype/deal_cost_sheet/deal_cost_sheet.js'),'utf8');
+ const start=source.indexOf('function dcs_boq_revision_dialog('),end=source.indexOf('function dcs_refresh_draft(',start);
+ let config;
+ const context={__:s=>s,flt:v=>Number(v||0),cint:v=>Number(v||0),format_currency:String,dcs_money_precision:()=>3,dcs_boq_totals:()=>({cost:100,selling:150,margin:33.33}),
+  frappe:{user:{has_role:()=>false},ui:{Dialog:class{constructor(c){config=c;this.fields_dict={preview:{$wrapper:{html(){}}}}}get_value(){return[]}show(){}}}}};
+ vm.createContext(context);vm.runInContext(source.slice(start,end),context);
+ for(const pilot of [true,false]){
+  context.dcs_boq_revision_dialog({__oman_quotation_pilot:pilot,doc:{items:[],resources:[],custom_quotation:'Q1',currency:'OMR'}},{can_prepare_boq:1});
+  const update=config.fields.find(f=>f.fieldname==='update_quotation'),review=config.fields.find(f=>f.fieldname==='acknowledge_quote_review');
+  assert.equal(update.default,pilot?1:0);assert.equal(update.read_only,pilot?1:0);assert.equal(review.hidden,pilot);
+ }
+ console.log('PASS actual BOQ dialog forces automatic sync only for the Oman pilot');
+}

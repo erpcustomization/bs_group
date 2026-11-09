@@ -106,9 +106,11 @@
             if(frm.doc.name!==name) return;
             installationButton(frm,data);
             if(!data.enabled) return;
+            frm.__oman_quotation_pilot=!!data.auto_sync;
             frm.remove_custom_button(__('Create Quotation'),__('More actions'));
+            if(data.terminal) frm.remove_custom_button(__('Revise BOQ'));
             if(data.quotation) frm.add_custom_button(__('View Linked Quotation'),()=>frappe.set_route('Form','Quotation',data.quotation));
-            if(frm.doc.docstatus===1) frm.set_intro(__('Use Revise BOQ to edit costing. The linked Draft Quotation updates automatically with revision history; no new quotation is created.'),'blue');
+            if(frm.doc.docstatus===1 && data.auto_sync) frm.set_intro(data.terminal ? __('The linked quotation is Won or Lost. Costing and quotation revisions are locked.') : __('Use Revise BOQ to edit costing. The linked Draft Quotation updates automatically with revision history; no new quotation is created.'),'blue');
         }
     });
 })();

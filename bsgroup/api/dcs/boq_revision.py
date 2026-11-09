@@ -242,16 +242,14 @@ def _apply(args):
         return {"ok": 0, "error": "A Deal Cost Sheet and revision reason are required."}
     sheet = frappe.get_doc("Deal Cost Sheet", args["dcs"], for_update=True)
     sheet.check_permission("write")
-    from bsgroup.oman_quotation_flow import enabled, guard_dcs_revision
-    if enabled():
-        pilot_revision = guard_dcs_revision(sheet)
-        # Revisions update the existing pilot Draft atomically with the DCS.
-        if pilot_revision:
-            args = dict(args, update_quotation=1)
     if sheet.docstatus != 1:
         frappe.throw("BOQ Revision requires a submitted sheet; edit draft rows normally.")
     if str(args.get("expected_modified") or "") != str(sheet.modified):
         frappe.throw("The sheet has changed since the revision dialog opened. Refresh and try again.")
+    from bsgroup.oman_quotation_flow import enabled, guard_dcs_revision
+    if enabled() and guard_dcs_revision(sheet, attach=True):
+        # Adopt only an unambiguous reverse-linked Draft, inside this transaction.
+        args = dict(args, update_quotation=1)
     if sheet.custom_award_state == "Awarded" or sheet.custom_delivery_release_state in ("Released", "Released with MD Override"):
         frappe.throw("Reverse the award before changing its BOQ. An awarded or released scope is locked.")
     if args.get("source") not in ["Customer", "Vendor", "Technical", "Internal"]:
