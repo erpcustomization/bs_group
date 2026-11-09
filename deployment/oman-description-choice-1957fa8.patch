@@ -1,3 +1,5 @@
+# Oman description selector 1957fa8; unique deployment payload, 9 November 2026.
+# Use filename oman-description-selector-1957fa8-v2.patch to avoid the agent's existing deploy.patch file.
 diff --git a/bsgroup/oman_item_description.py b/bsgroup/oman_item_description.py
 index 1ffe20a..568142e 100644
 --- a/bsgroup/oman_item_description.py
