@@ -5,7 +5,7 @@ async function form(data,{dirty=false,doctype='Quotation',fresh=false,withGrid=f
  const handlers={},calls=[],buttons=new Map(),primary=[];
  const frappe={ui:{form:{on(dt,h){handlers[dt]=h}}},call:async opts=>{calls.push(opts);return{message:data}},utils:{escape_html:s=>s},msgprint:()=>{},set_route:()=>{}};
  vm.runInNewContext(fs.readFileSync(path.join(root,'bsgroup/public/js/oman_quotation_flow.js'),'utf8'),{frappe,__:s=>s,window:{location:{reload(){}}}});
- const frm={doc:{name:'Q1',modified:'M1',custom_deal_cost_sheet:'DCS1',custom_pipeline_stage:'Delayed',docstatus:doctype==='Quotation'?0:1},is_new:()=>fresh,is_dirty:()=>dirty,
+ const frm={doc:{name:'Q1',modified:'M1',custom_deal_cost_sheet:'DCS1',custom_pipeline_stage:'Delayed',items:[{}, {custom_oman_use_costing_description:1}],docstatus:doctype==='Quotation'?0:1},is_new:()=>fresh,is_dirty:()=>dirty,
   add_custom_button:(label,fn)=>buttons.set(label,fn),remove_custom_button:label=>calls.push(['remove',label]),set_df_property:()=>{},set_intro:()=>{},dashboard:{set_headline:()=>{}},
   page:{set_primary_action:(label,fn)=>primary.push(label),clear_primary_action:()=>primary.push('clear')}};
  let grid;
@@ -14,7 +14,7 @@ async function form(data,{dirty=false,doctype='Quotation',fresh=false,withGrid=f
   grid={fields_map,update_docfield_property(name,key,value){fields_map[name][key]=value;},setup_user_defined_columns(){this.user_defined_columns=[fields_map.description];},reset_grid(){this.setup_user_defined_columns();}};
   frm.fields_dict={items:{grid}};
  }
- await handlers[doctype].refresh(frm);return{calls,buttons,primary,grid};
+ await handlers[doctype].refresh(frm);return{calls,buttons,primary,grid,frm};
 }
 (async()=>{
  let r=await form({enabled:false});assert.equal(r.buttons.size,0);assert.deepEqual(r.primary,[]);
@@ -26,6 +26,7 @@ async function form(data,{dirty=false,doctype='Quotation',fresh=false,withGrid=f
  r=await form({enabled:true,quotation:'Q1'},{doctype:'Deal Cost Sheet'});assert(r.buttons.has('View Linked Quotation'));assert(r.calls.some(c=>Array.isArray(c)&&c[1]==='Create Quotation'));
  r=await form({enabled:true,editable:true,can_write:true,can_print:true,client_descriptions:true},{withGrid:true});
  assert.equal(r.grid.fields_map.description.label,'Item Description (Costing)');assert.equal(r.grid.fields_map.description.read_only,1);
+ assert.equal(r.frm.doc.items[0].custom_oman_use_co_description,1);assert.equal(r.frm.doc.items[1].custom_oman_use_co_description,0);
  assert.deepEqual(Array.from(r.grid.user_defined_columns,x=>x.fieldname),['custom_oman_use_costing_description','description','custom_oman_use_co_description','custom_oman_client_description','qty','rate','amount']);
  r=await form({enabled:false},{withGrid:true});assert.equal(r.grid.fields_map.custom_oman_client_description.hidden,1);assert.equal(r.grid.fields_map.description.read_only,0);
  r=await form({enabled:false},{fresh:true});assert.equal(r.calls.length,0);

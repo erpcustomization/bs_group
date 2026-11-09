@@ -16,6 +16,11 @@
     function clientGrid(frm, active) {
         const grid=frm.fields_dict?.items?.grid;
         if(!grid?.fields_map?.custom_oman_client_description) return;
+        // CO is the display complement of the stored costing choice, including
+        // existing draft rows whose newly installed Check column starts at zero.
+        if(active) for(const row of frm.doc.items || []) {
+            row.custom_oman_use_co_description=Number(row.custom_oman_use_costing_description)?0:1;
+        }
         const description=grid.fields_map.description;
         grid._oman_original_description ||= {label:description.label,read_only:description.read_only};
         grid.update_docfield_property('description','label',active?__('Item Description (Costing)'):grid._oman_original_description.label);
