@@ -1,0 +1,193 @@
+diff --git a/bsgroup/oman_item_description.py b/bsgroup/oman_item_description.py
+index 1ffe20a..568142e 100644
+--- a/bsgroup/oman_item_description.py
++++ b/bsgroup/oman_item_description.py
+@@ -6,6 +6,8 @@ from frappe.utils import cint, flt
+ 
+ FLAG = "bs_oman_client_descriptions"
+ FIELD = "custom_oman_client_description"
++COSTING = "custom_oman_use_costing_description"
++CO = "custom_oman_use_co_description"
+ SOURCE = "custom_oman_dcs_row"
+ PARENT = "custom_oman_client_descriptions"
+ ADDITIONAL = "__additional_charges__"
+@@ -52,15 +54,15 @@ def missing_rows(q):
+     if not managed(q):
+         return []
+     return [r.idx or i for i, r in enumerate(q.items, 1)
+-        if visible_text(r.get(FIELD)).casefold() in ("", "generic", "item")]
++        if visible_text(r.description if cint(r.get(COSTING)) else r.get(FIELD)).casefold() in ("", "generic", "item")]
+ 
+ 
+ def require_client_wording(q):
+     missing = missing_rows(q)
+     if missing:
+-        frappe.throw("Enter CO Item Description for quotation line(s) "
++        frappe.throw("Enter the selected Item Description or CO Item Description for quotation line(s) "
+             + ", ".join(map(str, missing))
+-            + ". Only this wording is printed for the client; internal costing descriptions are never used as a fallback.")
++            + ". Only the selected wording is printed; CO wording never falls back to costing text.")
+ 
+ 
+ def signature(row):
+@@ -128,18 +130,33 @@ def prepare(q):
+                 frappe.throw("Costing source references are maintained by the quotation service.")
+     sheet = frappe.get_doc("Deal Cost Sheet", q.custom_deal_cost_sheet)
+     bind(q, sheet)
++    for row in q.items:
++        row.set(COSTING, 1 if cint(row.get(COSTING)) else 0)
++        row.set(CO, 0 if cint(row.get(COSTING)) else 1)
+     q.set(PARENT, 1)
+ 
+ 
+ def preserved_wording(q, previous_sheet):
+     if not managed(q):
+         return {}
+-    return {source["key"]: (row.item_code, row.get(FIELD) or "")
++    return {source["key"]: (row.item_code, row.get(FIELD) or "", cint(row.get(COSTING)))
+         for row, source in bind(q, previous_sheet, restore_internal=False)}
+ 
+ 
+ def print_html(html):
+     """Patch only the pilot format; keep historical offers' legacy branch intact."""
++    marker = "{# Oman description choice v3 #}"
++    if marker in html:
++        return html
++    old = '(row.get("custom_oman_client_description") or "")'
++    new = '((row.description or "") if row.get("custom_oman_use_costing_description") else (row.get("custom_oman_client_description") or ""))'
++    html = _print_html_v2(html)
++    if html.count(old) != 1:
++        frappe.throw("Review the Oman description selection print expression before setup.")
++    return html.replace("{# Oman CO descriptions v2 #}", marker).replace(old, new)
++
++
++def _print_html_v2(html):
+     marker = "{# Oman CO descriptions v2 #}"
+     if marker in html:
+         return html
+@@ -165,6 +182,18 @@ def print_html(html):
+ 
+ 
+ def readiness_script(script):
++    marker = "// Oman description choice v3"
++    if marker in script:
++        return script
++    script = _readiness_v2(script)
++    old = "clientWording ? (r.custom_oman_client_description || '') : (r.description || r.item_name || '')"
++    new = "clientWording ? (r.custom_oman_use_costing_description ? (r.description || '') : (r.custom_oman_client_description || '')) : (r.description || r.item_name || '')"
++    if script.count(old) != 1:
++        frappe.throw("Review the Oman selected-description readiness check before setup.")
++    return script.replace("// Oman CO descriptions v2", marker).replace(old,new).replace("clientWording ? 'CO Item Description'", "clientWording ? 'Selected Item / CO Item Description'")
++
++
++def _readiness_v2(script):
+     marker = "// Oman CO descriptions v2"
+     if marker in script:
+         return script
+@@ -202,9 +231,16 @@ def install():
+     create_custom_fields({"Quotation": [dict(fieldname=PARENT, label="Client description mode",
+         fieldtype="Check", hidden=1, read_only=1, print_hide=1, no_copy=1)],
+         "Quotation Item": [
++            dict(fieldname=COSTING, label="Use Item Description (Costing)", fieldtype="Check",
++                insert_after="item_name", default="0", print_hide=1,
++                description="Print the original costing description on this line, including any part numbers it contains."),
++            dict(fieldname=CO, label="Use CO Item Description", fieldtype="Check",
++                insert_after=COSTING, default="1", print_hide=1,
++                description="Print the editable CO wording instead. Select one description per line."),
+             dict(fieldname=FIELD, label="CO Item Description", fieldtype="Text Editor",
+                 insert_after="description", in_list_view=1, columns=3,
+-                description="Only this wording is printed for the client. Enter customer-friendly wording without internal part numbers where required."),
++                read_only_depends_on="eval:doc.custom_oman_use_costing_description == 1",
++                description="Printed only when Use CO Item Description is selected. Your wording is retained when you switch choices."),
+             dict(fieldname=SOURCE, label="Oman costing source row", fieldtype="Data",
+                 hidden=1, read_only=1, print_hide=1, no_copy=1),
+         ]})
+diff --git a/bsgroup/oman_quotation_flow.py b/bsgroup/oman_quotation_flow.py
+index c687909..e2f03d0 100644
+--- a/bsgroup/oman_quotation_flow.py
++++ b/bsgroup/oman_quotation_flow.py
+@@ -146,6 +146,7 @@ def sync_draft(sheet, previous_sheet=None):
+             description=description, custom_header=row.header,
+             custom_oman_dcs_row=row.name,
+             custom_oman_client_description=customer_text[1] if customer_text and customer_text[0] == row.item_code else "",
++            custom_oman_use_costing_description=customer_text[2] if customer_text and customer_text[0] == row.item_code else 0,
+             custom_exclude_item_name_and_brand=row.exclude_item_name_and_brand,
+             qty=row.qty, custom_cost_rate=row.cost_rate, custom_selling_rate=row.selling_rate,
+             price_list_rate=row.selling_rate, discount_percentage=0, rate=row.selling_rate))
+@@ -159,6 +160,7 @@ def sync_draft(sheet, previous_sheet=None):
+         rows.append(dict(item_code=code, item_name=item.item_name, description=item.item_name,
+             custom_oman_dcs_row=descriptions.ADDITIONAL,
+             custom_oman_client_description=customer_text[1] if customer_text and customer_text[0] == code else "",
++            custom_oman_use_costing_description=customer_text[2] if customer_text and customer_text[0] == code else 0,
+             qty=1, uom=item.stock_uom, stock_uom=item.stock_uom, conversion_factor=1,
+             rate=charges, price_list_rate=charges, discount_percentage=0))
+     q.set("items", rows)
+@@ -252,7 +254,8 @@ def context(quotation):
+         can_print=frappe.has_permission("Quotation", "print", doc=q),
+         ready_to_convert=complete,
+         client_descriptions=client_descriptions,
+-        can_install_descriptions=frappe.session.user == "Administrator" and not descriptions.enabled(),
++        can_install_descriptions=frappe.session.user == "Administrator" and (not descriptions.enabled()
++            or not frappe.db.exists("Custom Field", "Quotation Item-" + descriptions.COSTING)),
+         can_win=can_win, statuses=[s for s in ("Sent", "Delayed", "Cancelled", "Lost", "Won") if s != "Won" or can_win])
+ 
+ 
+diff --git a/bsgroup/public/js/oman_quotation_flow.js b/bsgroup/public/js/oman_quotation_flow.js
+index 1f3fa88..5f4ae07 100644
+--- a/bsgroup/public/js/oman_quotation_flow.js
++++ b/bsgroup/public/js/oman_quotation_flow.js
+@@ -21,12 +21,16 @@
+         grid.update_docfield_property('description','label',active?__('Item Description (Costing)'):grid._oman_original_description.label);
+         grid.update_docfield_property('description','read_only',active?1:grid._oman_original_description.read_only);
+         grid.update_docfield_property('custom_oman_client_description','hidden',active?0:1);
++        for(const field of ['custom_oman_use_costing_description','custom_oman_use_co_description']) {
++            if(grid.fields_map[field]) grid.update_docfield_property(field,'hidden',active?0:1);
++        }
+         if(!grid._oman_columns_wrapped){
+             const original=grid.setup_user_defined_columns;
+             grid.setup_user_defined_columns=function(...args){
+                 const result=original.apply(this,args);
+                 if(frm.__oman_client_descriptions) this.user_defined_columns=[
+-                    ['description',3],['custom_oman_client_description',3],['qty',1],['rate',1],['amount',2]
++                    ['custom_oman_use_costing_description',1],['description',2],
++                    ['custom_oman_use_co_description',1],['custom_oman_client_description',2],['qty',1],['rate',1],['amount',2]
+                 ].map(([name,columns])=>({...this.fields_map[name],in_list_view:1,columns}));
+                 return result;
+             };
+@@ -110,7 +114,7 @@
+             frm.remove_custom_button(__('Send to Procurement'));
+             frm.remove_custom_button(__('Set as Lost'));
+             frm.set_intro(__('Quotation revision R{0}. DCS revisions update this same quotation. Won and Lost are locked.',[data.revision]),'blue');
+-            if(data.client_descriptions) frm.set_intro(__('Fill CO Item Description on every line. Only that wording appears in the customer PDF. Item Description (Costing) is internal; client wording is retained for the same costing line during revisions.'),'blue');
++            if(data.client_descriptions) frm.set_intro(__('Choose one description per line: Use Item Description (Costing) prints the original costing wording, including any part numbers. Use CO Item Description prints your editable client wording. Choices and CO wording are retained during costing revisions.'),'blue');
+             frm.dashboard.set_headline(__('Quotation Status: {0} · R{1}',[frappe.utils.escape_html(frm.doc.custom_pipeline_stage || 'Draft'),data.revision]));
+             if(data.editable && data.can_write){
+                 frm.add_custom_button(__('Revise Costing Sheet'),()=>frappe.set_route('Form','Deal Cost Sheet',frm.doc.custom_deal_cost_sheet));
+@@ -128,7 +132,27 @@
+             }
+         }
+     });
++    async function selectDescription(frm,cdt,cdn,costing) {
++        if(!frm.__oman_client_descriptions || frm.__oman_description_selecting) return;
++        frm.__oman_description_selecting=true;
++        try {
++            await frappe.model.set_value(cdt,cdn,{
++                custom_oman_use_costing_description:costing?1:0,
++                custom_oman_use_co_description:costing?0:1
++            });
++            frm.refresh_field('items');
++            frm.remove_custom_button(__('Convert to PDF'));
++            frm.page.set_primary_action(__('Save'),()=>frm.save());
++            if(typeof window.eqa_readiness==='function') window.eqa_readiness(frm);
++        } finally {frm.__oman_description_selecting=false;}
++    }
+     frappe.ui.form.on('Quotation Item',{
++        custom_oman_use_costing_description(frm,cdt,cdn){
++            return selectDescription(frm,cdt,cdn,!!frappe.get_doc(cdt,cdn).custom_oman_use_costing_description);
++        },
++        custom_oman_use_co_description(frm,cdt,cdn){
++            return selectDescription(frm,cdt,cdn,!frappe.get_doc(cdt,cdn).custom_oman_use_co_description);
++        },
+         custom_oman_client_description(frm){
+             if(frm.__oman_client_descriptions && typeof window.eqa_readiness==='function') window.eqa_readiness(frm);
+         }
