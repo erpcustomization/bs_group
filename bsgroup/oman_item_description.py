@@ -6,6 +6,8 @@ from frappe.utils import cint, flt
 
 FLAG = "bs_oman_client_descriptions"
 FIELD = "custom_oman_client_description"
+COSTING = "custom_oman_use_costing_description"
+CO = "custom_oman_use_co_description"
 SOURCE = "custom_oman_dcs_row"
 PARENT = "custom_oman_client_descriptions"
 ADDITIONAL = "__additional_charges__"
@@ -52,15 +54,15 @@ def missing_rows(q):
     if not managed(q):
         return []
     return [r.idx or i for i, r in enumerate(q.items, 1)
-        if visible_text(r.get(FIELD)).casefold() in ("", "generic", "item")]
+        if visible_text(r.description if cint(r.get(COSTING)) else r.get(FIELD)).casefold() in ("", "generic", "item")]
 
 
 def require_client_wording(q):
     missing = missing_rows(q)
     if missing:
-        frappe.throw("Enter CO Item Description for quotation line(s) "
+        frappe.throw("Enter the selected Item Description or CO Item Description for quotation line(s) "
             + ", ".join(map(str, missing))
-            + ". Only this wording is printed for the client; internal costing descriptions are never used as a fallback.")
+            + ". Only the selected wording is printed; CO wording never falls back to costing text.")
 
 
 def signature(row):
@@ -128,18 +130,33 @@ def prepare(q):
                 frappe.throw("Costing source references are maintained by the quotation service.")
     sheet = frappe.get_doc("Deal Cost Sheet", q.custom_deal_cost_sheet)
     bind(q, sheet)
+    for row in q.items:
+        row.set(COSTING, 1 if cint(row.get(COSTING)) else 0)
+        row.set(CO, 0 if cint(row.get(COSTING)) else 1)
     q.set(PARENT, 1)
 
 
 def preserved_wording(q, previous_sheet):
     if not managed(q):
         return {}
-    return {source["key"]: (row.item_code, row.get(FIELD) or "")
+    return {source["key"]: (row.item_code, row.get(FIELD) or "", cint(row.get(COSTING)))
         for row, source in bind(q, previous_sheet, restore_internal=False)}
 
 
 def print_html(html):
     """Patch only the pilot format; keep historical offers' legacy branch intact."""
+    marker = "{# Oman description choice v3 #}"
+    if marker in html:
+        return html
+    old = '(row.get("custom_oman_client_description") or "")'
+    new = '((row.description or "") if row.get("custom_oman_use_costing_description") else (row.get("custom_oman_client_description") or ""))'
+    html = _print_html_v2(html)
+    if html.count(old) != 1:
+        frappe.throw("Review the Oman description selection print expression before setup.")
+    return html.replace("{# Oman CO descriptions v2 #}", marker).replace(old, new)
+
+
+def _print_html_v2(html):
     marker = "{# Oman CO descriptions v2 #}"
     if marker in html:
         return html
@@ -165,6 +182,18 @@ def print_html(html):
 
 
 def readiness_script(script):
+    marker = "// Oman description choice v3"
+    if marker in script:
+        return script
+    script = _readiness_v2(script)
+    old = "clientWording ? (r.custom_oman_client_description || '') : (r.description || r.item_name || '')"
+    new = "clientWording ? (r.custom_oman_use_costing_description ? (r.description || '') : (r.custom_oman_client_description || '')) : (r.description || r.item_name || '')"
+    if script.count(old) != 1:
+        frappe.throw("Review the Oman selected-description readiness check before setup.")
+    return script.replace("// Oman CO descriptions v2", marker).replace(old,new).replace("clientWording ? 'CO Item Description'", "clientWording ? 'Selected Item / CO Item Description'")
+
+
+def _readiness_v2(script):
     marker = "// Oman CO descriptions v2"
     if marker in script:
         return script
@@ -202,9 +231,16 @@ def install():
     create_custom_fields({"Quotation": [dict(fieldname=PARENT, label="Client description mode",
         fieldtype="Check", hidden=1, read_only=1, print_hide=1, no_copy=1)],
         "Quotation Item": [
+            dict(fieldname=COSTING, label="Use Item Description (Costing)", fieldtype="Check",
+                insert_after="item_name", default="0", print_hide=1,
+                description="Print the original costing description on this line, including any part numbers it contains."),
+            dict(fieldname=CO, label="Use CO Item Description", fieldtype="Check",
+                insert_after=COSTING, default="1", print_hide=1,
+                description="Print the editable CO wording instead. Select one description per line."),
             dict(fieldname=FIELD, label="CO Item Description", fieldtype="Text Editor",
                 insert_after="description", in_list_view=1, columns=3,
-                description="Only this wording is printed for the client. Enter customer-friendly wording without internal part numbers where required."),
+                read_only_depends_on="eval:doc.custom_oman_use_costing_description == 1",
+                description="Printed only when Use CO Item Description is selected. Your wording is retained when you switch choices."),
             dict(fieldname=SOURCE, label="Oman costing source row", fieldtype="Data",
                 hidden=1, read_only=1, print_hide=1, no_copy=1),
         ]})

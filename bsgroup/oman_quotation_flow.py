@@ -146,6 +146,7 @@ def sync_draft(sheet, previous_sheet=None):
             description=description, custom_header=row.header,
             custom_oman_dcs_row=row.name,
             custom_oman_client_description=customer_text[1] if customer_text and customer_text[0] == row.item_code else "",
+            custom_oman_use_costing_description=customer_text[2] if customer_text and customer_text[0] == row.item_code else 0,
             custom_exclude_item_name_and_brand=row.exclude_item_name_and_brand,
             qty=row.qty, custom_cost_rate=row.cost_rate, custom_selling_rate=row.selling_rate,
             price_list_rate=row.selling_rate, discount_percentage=0, rate=row.selling_rate))
@@ -159,6 +160,7 @@ def sync_draft(sheet, previous_sheet=None):
         rows.append(dict(item_code=code, item_name=item.item_name, description=item.item_name,
             custom_oman_dcs_row=descriptions.ADDITIONAL,
             custom_oman_client_description=customer_text[1] if customer_text and customer_text[0] == code else "",
+            custom_oman_use_costing_description=customer_text[2] if customer_text and customer_text[0] == code else 0,
             qty=1, uom=item.stock_uom, stock_uom=item.stock_uom, conversion_factor=1,
             rate=charges, price_list_rate=charges, discount_percentage=0))
     q.set("items", rows)
@@ -252,7 +254,8 @@ def context(quotation):
         can_print=frappe.has_permission("Quotation", "print", doc=q),
         ready_to_convert=complete,
         client_descriptions=client_descriptions,
-        can_install_descriptions=frappe.session.user == "Administrator" and not descriptions.enabled(),
+        can_install_descriptions=frappe.session.user == "Administrator" and (not descriptions.enabled()
+            or not frappe.db.exists("Custom Field", "Quotation Item-" + descriptions.COSTING)),
         can_win=can_win, statuses=[s for s in ("Sent", "Delayed", "Cancelled", "Lost", "Won") if s != "Won" or can_win])
 
 

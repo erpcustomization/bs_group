@@ -10,7 +10,7 @@ async function form(data,{dirty=false,doctype='Quotation',fresh=false,withGrid=f
   page:{set_primary_action:(label,fn)=>primary.push(label),clear_primary_action:()=>primary.push('clear')}};
  let grid;
  if(withGrid){
-  const fields_map=Object.fromEntries(['description','custom_oman_client_description','qty','rate','amount'].map(fieldname=>[fieldname,{fieldname,label:fieldname==='description'?'Description':fieldname,read_only:0}]));
+  const fields_map=Object.fromEntries(['description','custom_oman_client_description','custom_oman_use_costing_description','custom_oman_use_co_description','qty','rate','amount'].map(fieldname=>[fieldname,{fieldname,label:fieldname==='description'?'Description':fieldname,read_only:0}]));
   grid={fields_map,update_docfield_property(name,key,value){fields_map[name][key]=value;},setup_user_defined_columns(){this.user_defined_columns=[fields_map.description];},reset_grid(){this.setup_user_defined_columns();}};
   frm.fields_dict={items:{grid}};
  }
@@ -26,7 +26,7 @@ async function form(data,{dirty=false,doctype='Quotation',fresh=false,withGrid=f
  r=await form({enabled:true,quotation:'Q1'},{doctype:'Deal Cost Sheet'});assert(r.buttons.has('View Linked Quotation'));assert(r.calls.some(c=>Array.isArray(c)&&c[1]==='Create Quotation'));
  r=await form({enabled:true,editable:true,can_write:true,can_print:true,client_descriptions:true},{withGrid:true});
  assert.equal(r.grid.fields_map.description.label,'Item Description (Costing)');assert.equal(r.grid.fields_map.description.read_only,1);
- assert.deepEqual(Array.from(r.grid.user_defined_columns,x=>x.fieldname),['description','custom_oman_client_description','qty','rate','amount']);
+ assert.deepEqual(Array.from(r.grid.user_defined_columns,x=>x.fieldname),['custom_oman_use_costing_description','description','custom_oman_use_co_description','custom_oman_client_description','qty','rate','amount']);
  r=await form({enabled:false},{withGrid:true});assert.equal(r.grid.fields_map.custom_oman_client_description.hidden,1);assert.equal(r.grid.fields_map.description.read_only,0);
  r=await form({enabled:false},{fresh:true});assert.equal(r.calls.length,0);
  let renders=0;class ListView{get_args(){return{fields:['name']}}before_render(){renders++;return'original'}}
@@ -39,6 +39,22 @@ async function form(data,{dirty=false,doctype='Quotation',fresh=false,withGrid=f
  console.log('PASS Oman pilot form actions, Save/PDF states, frozen/read-only actions, DCS link, list indicators and legacy isolation');
 })().catch(e=>{console.error(e);process.exitCode=1});
 // Exercise the actual BOQ dialog's pilot and legacy field definitions.
+// Choosing either checkbox always selects exactly one and invalidates the saved PDF action.
+(async()=>{
+ const handlers={},row={custom_oman_use_costing_description:1,custom_oman_use_co_description:1},actions=[];
+ const frappe={ui:{form:{on(dt,h){handlers[dt]=h}}},get_doc:()=>row,model:{async set_value(dt,dn,values){Object.assign(row,values);}},utils:{},call:async()=>({})};
+ vm.runInNewContext(fs.readFileSync(path.join(root,'bsgroup/public/js/oman_quotation_flow.js'),'utf8'),{frappe,__:s=>s,window:{}});
+ const frm={__oman_client_descriptions:true,refresh_field:()=>{},remove_custom_button:x=>actions.push(x),page:{set_primary_action:x=>actions.push(x)}};
+ await handlers['Quotation Item'].custom_oman_use_costing_description(frm,'Quotation Item','ROW1');
+ assert.equal(row.custom_oman_use_co_description,0);assert.equal(row.custom_oman_use_costing_description,1);
+ row.custom_oman_use_co_description=1;
+ await handlers['Quotation Item'].custom_oman_use_co_description(frm,'Quotation Item','ROW1');
+ assert.equal(row.custom_oman_use_costing_description,0);assert.equal(row.custom_oman_use_co_description,1);
+ row.custom_oman_use_co_description=0;
+ await handlers['Quotation Item'].custom_oman_use_co_description(frm,'Quotation Item','ROW1');
+ assert.equal(row.custom_oman_use_costing_description,1);assert.equal(actions.at(-1),'Save');
+ console.log('PASS mutually exclusive description choices and Save action');
+})().catch(e=>{console.error(e);process.exitCode=1});
 {
  const source=fs.readFileSync(path.join(root,'bsgroup/bs_group/doctype/deal_cost_sheet/deal_cost_sheet.js'),'utf8');
  const start=source.indexOf('function dcs_boq_revision_dialog('),end=source.indexOf('function dcs_refresh_draft(',start);

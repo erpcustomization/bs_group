@@ -21,12 +21,16 @@
         grid.update_docfield_property('description','label',active?__('Item Description (Costing)'):grid._oman_original_description.label);
         grid.update_docfield_property('description','read_only',active?1:grid._oman_original_description.read_only);
         grid.update_docfield_property('custom_oman_client_description','hidden',active?0:1);
+        for(const field of ['custom_oman_use_costing_description','custom_oman_use_co_description']) {
+            if(grid.fields_map[field]) grid.update_docfield_property(field,'hidden',active?0:1);
+        }
         if(!grid._oman_columns_wrapped){
             const original=grid.setup_user_defined_columns;
             grid.setup_user_defined_columns=function(...args){
                 const result=original.apply(this,args);
                 if(frm.__oman_client_descriptions) this.user_defined_columns=[
-                    ['description',3],['custom_oman_client_description',3],['qty',1],['rate',1],['amount',2]
+                    ['custom_oman_use_costing_description',1],['description',2],
+                    ['custom_oman_use_co_description',1],['custom_oman_client_description',2],['qty',1],['rate',1],['amount',2]
                 ].map(([name,columns])=>({...this.fields_map[name],in_list_view:1,columns}));
                 return result;
             };
@@ -110,7 +114,7 @@
             frm.remove_custom_button(__('Send to Procurement'));
             frm.remove_custom_button(__('Set as Lost'));
             frm.set_intro(__('Quotation revision R{0}. DCS revisions update this same quotation. Won and Lost are locked.',[data.revision]),'blue');
-            if(data.client_descriptions) frm.set_intro(__('Fill CO Item Description on every line. Only that wording appears in the customer PDF. Item Description (Costing) is internal; client wording is retained for the same costing line during revisions.'),'blue');
+            if(data.client_descriptions) frm.set_intro(__('Choose one description per line: Use Item Description (Costing) prints the original costing wording, including any part numbers. Use CO Item Description prints your editable client wording. Choices and CO wording are retained during costing revisions.'),'blue');
             frm.dashboard.set_headline(__('Quotation Status: {0} · R{1}',[frappe.utils.escape_html(frm.doc.custom_pipeline_stage || 'Draft'),data.revision]));
             if(data.editable && data.can_write){
                 frm.add_custom_button(__('Revise Costing Sheet'),()=>frappe.set_route('Form','Deal Cost Sheet',frm.doc.custom_deal_cost_sheet));
@@ -128,7 +132,27 @@
             }
         }
     });
+    async function selectDescription(frm,cdt,cdn,costing) {
+        if(!frm.__oman_client_descriptions || frm.__oman_description_selecting) return;
+        frm.__oman_description_selecting=true;
+        try {
+            await frappe.model.set_value(cdt,cdn,{
+                custom_oman_use_costing_description:costing?1:0,
+                custom_oman_use_co_description:costing?0:1
+            });
+            frm.refresh_field('items');
+            frm.remove_custom_button(__('Convert to PDF'));
+            frm.page.set_primary_action(__('Save'),()=>frm.save());
+            if(typeof window.eqa_readiness==='function') window.eqa_readiness(frm);
+        } finally {frm.__oman_description_selecting=false;}
+    }
     frappe.ui.form.on('Quotation Item',{
+        custom_oman_use_costing_description(frm,cdt,cdn){
+            return selectDescription(frm,cdt,cdn,!!frappe.get_doc(cdt,cdn).custom_oman_use_costing_description);
+        },
+        custom_oman_use_co_description(frm,cdt,cdn){
+            return selectDescription(frm,cdt,cdn,!frappe.get_doc(cdt,cdn).custom_oman_use_co_description);
+        },
         custom_oman_client_description(frm){
             if(frm.__oman_client_descriptions && typeof window.eqa_readiness==='function') window.eqa_readiness(frm);
         }
