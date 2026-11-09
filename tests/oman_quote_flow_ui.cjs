@@ -39,7 +39,8 @@ async function form(data,{dirty=false,doctype='Quotation',fresh=false}={}){
  for(const pilot of [true,false]){
   context.dcs_boq_revision_dialog({__oman_quotation_pilot:pilot,doc:{items:[],resources:[],custom_quotation:'Q1',currency:'OMR'}},{can_prepare_boq:1});
   const update=config.fields.find(f=>f.fieldname==='update_quotation'),review=config.fields.find(f=>f.fieldname==='acknowledge_quote_review');
-  assert.equal(update.default,pilot?1:0);assert.equal(update.read_only,pilot?1:0);assert.equal(review.hidden,pilot);
+  assert.equal(update.fieldtype,pilot?'HTML':'Check');assert.equal(review.hidden,pilot);
+  if(pilot) assert.match(update.options,/same quotation updates automatically/);
  }
  console.log('PASS actual BOQ dialog forces automatic sync only for the Oman pilot');
 }

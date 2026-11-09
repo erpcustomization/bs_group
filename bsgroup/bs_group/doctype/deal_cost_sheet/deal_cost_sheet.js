@@ -3646,7 +3646,7 @@ function dcs_boq_revision_dialog(frm, cap) {
             {fieldtype:'Table',fieldname:'boq_resources',label:__('Labour / Resources'),fields:resourceFields,data:fields(frm.doc.resources,resourceKeys),cannot_add_rows:!cap.can_vendor_side,cannot_delete_rows:!cap.can_vendor_side,onchange:preview},
             {fieldtype:'HTML',fieldname:'preview'},
             {fieldtype:'Check',fieldname:'reconcile_header_adjustments',label:__('Replace earlier totals-only adjustments with this complete BOQ'),hidden:!gap || !frappe.user.has_role('Managing Director'),description:__('No hidden adjustment is carried forward. Ensure every intended cost and selling change is represented above.')},
-            {fieldtype:'Check',fieldname:'update_quotation',label:__(omanPilot?'Update the same quotation automatically with a new revision':'Update the linked Draft Quotation from this BOQ'),default:omanPilot?1:0,read_only:omanPilot?1:0,description:__('Requires Quotation write permission. Only this sheet’s verified Draft Quotation may be updated; otherwise the entire revision is refused.')},
+            {fieldtype:omanPilot?'HTML':'Check',fieldname:'update_quotation',label:__('Update the linked Draft Quotation from this BOQ'),options:omanPilot?'<div class="alert alert-info">'+__('The same quotation updates automatically with a new revision. No additional quotation is created. Quotation write permission remains required.')+'</div>':undefined,default:0,description:__('Requires Quotation write permission. Only this sheet’s verified Draft Quotation may be updated; otherwise the entire revision is refused.')},
             {fieldtype:'Check',fieldname:'acknowledge_quote_review',label:__('Keep the existing quotation for separate review'),description:__('Required if quoted scope/selling changes and you are not updating the Draft Quotation. The sheet will return from Quoted to Submitted to Sales; Won/Lost outcomes are preserved.'),hidden:omanPilot||!frm.doc.custom_quotation}
         ],
         primary_action_label:__('Record BOQ Revision'),
@@ -3662,7 +3662,7 @@ function dcs_boq_revision_dialog(frm, cap) {
                 dcs:frm.doc.name,expected_modified:frm.doc.modified,source:v.source,reason:v.reason,
                 technical_impact:v.technical_impact,items:clean(v.boq_items || [],itemKeys,true),
                 resources:clean(v.boq_resources || [],resourceKeys,false),
-                reconcile_header_adjustments:v.reconcile_header_adjustments || 0,update_quotation:v.update_quotation || 0,
+                reconcile_header_adjustments:v.reconcile_header_adjustments || 0,update_quotation:omanPilot?1:(v.update_quotation || 0),
                 acknowledge_quote_review:v.acknowledge_quote_review || 0
             },d);
         }
