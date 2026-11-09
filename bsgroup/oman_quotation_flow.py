@@ -124,7 +124,7 @@ def guard_dcs_revision(sheet, attach=False):
     return False
 
 
-def sync_draft(sheet):
+def sync_draft(sheet, previous_sheet=None):
     from bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet import quotation_deal_identity
     from bsgroup.dcs.currency import money_tolerance
     q = frappe.get_doc("Quotation", sheet.custom_quotation, for_update=True)
@@ -133,14 +133,19 @@ def sync_draft(sheet):
     if q.custom_deal_cost_sheet != sheet.name or quotation_deal_identity(sheet, q) or q.currency != sheet.currency:
         frappe.throw("The quotation identity or currency differs from this DCS. Revision was not saved.")
     snapshot(q, "Before DCS revision")
+    from bsgroup import oman_item_description as descriptions
+    wording = descriptions.preserved_wording(q, previous_sheet or sheet)
     rows = []
     for row in sheet.items:
         item = frappe.db.get_value("Item", row.item_code, ["item_name", "stock_uom"], as_dict=True)
         description = row.description or (row.item_name if row.exclude_item_name_and_brand else
             " - ".join(str(v) for v in (row.brand, row.item_code, row.item_name) if v)) or item.item_name
+        customer_text = wording.get(row.name)
         rows.append(dict(item_code=row.item_code, item_name=row.item_name or item.item_name,
             brand=row.brand, uom=item.stock_uom, stock_uom=item.stock_uom, conversion_factor=1,
             description=description, custom_header=row.header,
+            custom_oman_dcs_row=row.name,
+            custom_oman_client_description=customer_text[1] if customer_text and customer_text[0] == row.item_code else "",
             custom_exclude_item_name_and_brand=row.exclude_item_name_and_brand,
             qty=row.qty, custom_cost_rate=row.cost_rate, custom_selling_rate=row.selling_rate,
             price_list_rate=row.selling_rate, discount_percentage=0, rate=row.selling_rate))
@@ -150,7 +155,10 @@ def sync_draft(sheet):
         if not code:
             frappe.throw("Configure the existing DCS Additional Item before synchronising charges.")
         item = frappe.db.get_value("Item", code, ["item_name", "stock_uom"], as_dict=True)
+        customer_text = wording.get(descriptions.ADDITIONAL)
         rows.append(dict(item_code=code, item_name=item.item_name, description=item.item_name,
+            custom_oman_dcs_row=descriptions.ADDITIONAL,
+            custom_oman_client_description=customer_text[1] if customer_text and customer_text[0] == code else "",
             qty=1, uom=item.stock_uom, stock_uom=item.stock_uom, conversion_factor=1,
             rate=charges, price_list_rate=charges, discount_percentage=0))
     q.set("items", rows)
@@ -189,6 +197,8 @@ def validate(q, method=None):
     if before and q.custom_pipeline_stage != before.custom_pipeline_stage and not allowed:
         frappe.throw("Use Change Status to preserve the Oman quotation and procurement controls.")
     q.custom_oman_flow = 1
+    from bsgroup.oman_item_description import prepare
+    prepare(q)
 
 
 def validate_stage(q):
@@ -233,11 +243,16 @@ def context(quotation):
     from bsgroup.dcs.procurement import SEND_ROLES
     can_win = frappe.session.user == "Administrator" or bool(set(frappe.get_roles()) & SEND_ROLES)
     complete = not any(d._get_missing_mandatory_fields() for d in [q] + q.get_all_children())
+    from bsgroup import oman_item_description as descriptions
+    client_descriptions = descriptions.managed(q)
+    complete = complete and not descriptions.missing_rows(q)
     return dict(enabled=True, revision=cint(q.get("custom_oman_revision_no")),
         editable=q.docstatus == 0 and q.custom_pipeline_stage not in TERMINAL,
         can_write=frappe.has_permission("Quotation", "write", doc=q),
         can_print=frappe.has_permission("Quotation", "print", doc=q),
         ready_to_convert=complete,
+        client_descriptions=client_descriptions,
+        can_install_descriptions=frappe.session.user == "Administrator" and not descriptions.enabled(),
         can_win=can_win, statuses=[s for s in ("Sent", "Delayed", "Cancelled", "Lost", "Won") if s != "Won" or can_win])
 
 
@@ -344,10 +359,14 @@ def convert_pdf(quotation, expected_modified):
 
 def render_pdf(q, no_letterhead=None):
     """Use Oman's approved customer format and its configured PDF generator."""
+    from bsgroup.oman_item_description import require_client_wording, managed, PARENT
+    require_client_wording(q)
+    if managed(q):
+        q.set(PARENT, 1)
     if not frappe.db.exists("Print Format", PILOT_PRINT_FORMAT):
         frappe.throw("The Oman pilot print format is not installed. Ask Administrator to complete pilot setup.")
     letterhead = q.get("letter_head") or frappe.db.get_value("Letter Head", {"is_default": 1, "disabled": 0}, "name")
-    return frappe.get_print("Quotation", q.name, PILOT_PRINT_FORMAT, as_pdf=True,
+    return frappe.get_print("Quotation", q.name, PILOT_PRINT_FORMAT, as_pdf=True, doc=q,
         letterhead=letterhead, no_letterhead=(not bool(letterhead)) if no_letterhead is None else no_letterhead)
 
 

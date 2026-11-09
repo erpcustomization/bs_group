@@ -45,6 +45,7 @@ flow=importlib.import_module('bsgroup.oman_quotation_flow')
 class FlowTests(unittest.TestCase):
     def setUp(self):
         frappe.local.site='erp-om.k.frappe.cloud';frappe.defaults.get_global_default.return_value='1'
+        frappe.defaults.get_global_default.side_effect=lambda key: frappe.defaults.get_global_default.return_value if key==flow.FLAG else 0
         frappe.session.user='sales@example.com';frappe.get_roles.return_value=['BS Scoped Sales']
         frappe.get_doc.reset_mock();frappe.get_doc.side_effect=None
         frappe.get_all.reset_mock();frappe.get_all.return_value=[];frappe.db.reset_mock()

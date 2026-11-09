@@ -175,10 +175,10 @@ def _proposal(sheet, args, roles):
     return proposed, history
 
 
-def _sync_quotation(sheet, requested):
+def _sync_quotation(sheet, requested, previous_sheet=None):
     from bsgroup.oman_quotation_flow import enabled, pilot, sync_draft
     if enabled() and sheet.custom_quotation and pilot(frappe.get_doc("Quotation", sheet.custom_quotation)):
-        return sync_draft(sheet)
+        return sync_draft(sheet, previous_sheet=previous_sheet)
     if not requested:
         return "Linked Quotation was not changed; review it against this revision before sending."
     from bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet import quotation_deal_identity
@@ -320,7 +320,7 @@ def _apply(args):
     proposed.reload()
     from bsgroup.dcs.quotation_control import supersede_submitted
     supersession_changes = supersede_submitted(proposed)
-    quotation_note = _sync_quotation(proposed, truthy_flag(args.get("update_quotation")))
+    quotation_note = _sync_quotation(proposed, truthy_flag(args.get("update_quotation")), previous_sheet=sheet)
     changes = diff_changes(D2A_FIELDS, before, snapshot("Deal Cost Sheet", sheet.name, D2A_FIELDS), "Deal Cost Sheet", sheet.name)
     changes += supersession_changes
     if quote_changed and sheet.custom_quotation and not truthy_flag(args.get("update_quotation")):
