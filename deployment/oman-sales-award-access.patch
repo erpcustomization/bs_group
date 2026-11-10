@@ -1,0 +1,110 @@
+# Sales award and procurement access - OMAN - 2026-11-10
+diff --git a/bsgroup/api/dcs/award.py b/bsgroup/api/dcs/award.py
+--- a/bsgroup/api/dcs/award.py
++++ b/bsgroup/api/dcs/award.py
+@@ -8,6 +8,7 @@
+ """
+ 
+ from bsgroup.dcs.currency import money_precision
++from bsgroup.dcs.sales_handover_access import AWARD_ROLES
+ import frappe
+ from frappe.utils import now_datetime
+ 
+@@ -47,8 +48,8 @@
+ 
+ 
+ NOT_A_COMMERCIAL_ACTOR = (
+-	"Recording a customer award is a commercial action. Technical roles and System Manager "
+-	"administration cannot record an award."
++	"Recording a customer award requires Sales User, BS Scoped Sales, Sales Manager, "
++	"Commercial Controller or Managing Director access to this deal."
+ )
+ 
+ 
+@@ -70,7 +71,7 @@
+ 
+ 	if not dcs_exists_and_open(dcs_name, result):
+ 		pass
+-	elif has_any(roles, COMMERCIAL_ROLES) == 0:
++	elif has_any(roles, AWARD_ROLES) == 0:
+ 		result["error"] = NOT_A_COMMERCIAL_ACTOR
+ 	elif evidence not in VALID_EVIDENCE:
+ 		result["error"] = "evidence_type must be one of Customer PO, Letter of Award, Email Confirmation, Verbal - Not Evidenced, Not Provided."
+diff --git a/bsgroup/public/js/quotation.js b/bsgroup/public/js/quotation.js
+--- a/bsgroup/public/js/quotation.js
++++ b/bsgroup/public/js/quotation.js
+@@ -315,6 +315,12 @@
+         ["custom_customer_po", "custom_customer_po_reference"].forEach(
+             field => frm.set_df_property(field, "read_only", sent));
+         const open = name => {
++            if (frappe.user.has_role(["Sales User", "BS Scoped Sales"])
++                    && !frappe.user.has_role(["Sales Manager", "Commercial Controller", "Managing Director", "Purchase User", "Purchase Manager", "System Manager"])) {
++                // The handover service shares only the sender's requisition for read.
++                frappe.set_route("Form", "Material Request", name);
++                return;
++            }
+             frappe.route_options = {bsp_request: name};
+             frappe.set_route("bs-procurement");
+         };
+@@ -323,7 +329,7 @@
+             frm.set_intro(__("Sent to Procurement: {0}", [frappe.utils.escape_html(request)]), "green");
+         } else if (frm.doc.docstatus === 1 && frm.doc.custom_pipeline_stage === "Won"
+                 && !frm.is_dirty() && (frappe.session.user === "Administrator"
+-                || frappe.user.has_role(["Sales Manager", "Commercial Controller", "Managing Director"]))) {
++                || frappe.user.has_role(["Sales User", "BS Scoped Sales", "Sales Manager", "Commercial Controller", "Managing Director"]))) {
+             frm.add_custom_button(__("Send to Procurement"), async () => {
+                 if (frm.is_dirty()) {
+                     frappe.msgprint(__("Save the quotation before sending to procurement."));
+diff --git a/bsgroup/dcs/procurement.py b/bsgroup/dcs/procurement.py
+--- a/bsgroup/dcs/procurement.py
++++ b/bsgroup/dcs/procurement.py
+@@ -14,11 +14,12 @@
+ from frappe.utils import now_datetime, escape_html, nowdate, getdate, flt, cint
+ from frappe.utils.file_manager import save_file
+ from bsgroup.dcs.quotation_control import validate_position
++from bsgroup.dcs.sales_handover_access import AWARD_ROLES
+ from bsgroup import procurement as buying
+ 
+ DT = "DCS Purchase Request"
+ _writer = ContextVar("dcs_procurement_writer", default=False)
+-SEND_ROLES = {"Sales Manager", "Commercial Controller", "Managing Director"}
++SEND_ROLES = AWARD_ROLES
+ BUY_ROLES = {"Purchase User", "Purchase Manager"}
+ 
+ @contextmanager
+@@ -193,7 +194,7 @@
+ 
+ def source_documents(quotation, lock=False):
+     if frappe.session.user != "Administrator" and not set(frappe.get_roles()) & SEND_ROLES:
+-        deny("Sending to procurement requires commercial authority.")
++        deny("Sending to procurement requires Sales or commercial-manager access to this deal.")
+     q = buying.access(frappe.get_doc("Quotation", quotation, for_update=lock), "write")
+     if q.docstatus != 1 or q.custom_pipeline_stage != "Won":
+         frappe.throw(_("Save the submitted quotation as Won before sending to procurement."))
+diff --git a/bsgroup/oman_quotation_flow.py b/bsgroup/oman_quotation_flow.py
+--- a/bsgroup/oman_quotation_flow.py
++++ b/bsgroup/oman_quotation_flow.py
+@@ -310,7 +310,7 @@
+     check_editable(q)
+     from bsgroup.dcs.procurement import SEND_ROLES, source_items, handover_warehouses, send_to_procurement
+     if frappe.session.user != "Administrator" and not set(frappe.get_roles()) & SEND_ROLES:
+-        frappe.throw("Only the existing commercial-authority roles can record Won and send to Procurement.", frappe.PermissionError)
++        frappe.throw("Sales or commercial-manager access to this deal is required to record Won and send to Procurement.", frappe.PermissionError)
+     sheet = frappe.get_doc("Deal Cost Sheet", q.custom_deal_cost_sheet)
+     sheet.check_permission("write")
+     result = dict(required_by=today(), warehouses=handover_warehouses(sheet.company),
+diff --git a/bsgroup/dcs/sales_handover_access.py b/bsgroup/dcs/sales_handover_access.py
+new file mode 100644
+--- /dev/null
++++ b/bsgroup/dcs/sales_handover_access.py
+@@ -0,0 +1,10 @@
++"""Sales may record awards and hand over accessible deals, without approval powers.
++
++Document/company scope and all commercial-position checks remain at the callers.
++This role set must not be reused for approvals, reversals or delivery release.
++"""
++
++AWARD_ROLES = frozenset({
++    "Sales User", "BS Scoped Sales", "Sales Manager",
++    "Commercial Controller", "Managing Director",
++})
