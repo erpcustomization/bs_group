@@ -1,0 +1,325 @@
+Project plan 20261110
+
+diff --git a/bsgroup/project_plan.py b/bsgroup/project_plan.py
+new file mode 100644
+index 0000000..3e0c6f3
+--- /dev/null
++++ b/bsgroup/project_plan.py
+@@ -0,0 +1,195 @@
++"""Editable project plan backed by existing Tasks and native ToDo assignments."""
++import json
++
++import frappe
++from frappe import _
++from frappe.utils import getdate, get_datetime, strip_html
++
++
++def validate_template_status(doc, method=None):
++    """Keep native template generation compatible with the site's task stages."""
++    generated = doc.is_new() and doc.get("template_task") and doc.status == "Open"
++    template = doc.get("is_template") and doc.status == "Template"
++    if not (generated or template):
++        return
++    field = doc.meta.get_field("status")
++    options = (field.options or "").splitlines()
++    if doc.status not in options:
++        if "Project Planning" not in options:
++            frappe.throw(_("The Task status setup needs a Project Planning stage for template activities."))
++        doc.status = "Project Planning"
++
++
++def install():
++    from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
++    meta = frappe.get_meta("Project")
++    # Insert at the end of Details, before the first existing Tab Break. Do not
++    # move any existing fields into a different tab.
++    previous = None
++    for field in meta.fields:
++        if field.fieldtype == "Tab Break":
++            break
++        previous = field.fieldname
++    definitions = [
++        dict(fieldname="custom_bs_project_plan_tab", label="Project Plan", fieldtype="Tab Break", insert_after=previous),
++        dict(fieldname="custom_bs_project_plan", label="Project Plan", fieldtype="HTML", insert_after="custom_bs_project_plan_tab"),
++    ]
++    missing = []
++    for definition in definitions:
++        existing = meta.get_field(definition["fieldname"])
++        if existing and existing.fieldtype != definition["fieldtype"]:
++            frappe.throw(_("Project Plan field has an incompatible type: {0}").format(definition["fieldname"]))
++        if not existing:
++            missing.append(definition)
++    if missing:
++        create_custom_fields({"Project": missing}, update=False)
++    frappe.clear_cache(doctype="Project")
++    return {"installed": True}
++
++
++@frappe.whitelist(methods=["POST"])
++def setup():
++    frappe.only_for("System Manager")
++    return install()
++
++
++def _project(name, write=False):
++    if not name:
++        frappe.throw(_("Save and open a project first."))
++    doc = frappe.get_doc("Project", name)
++    doc.check_permission("write" if write else "read")
++    if write and doc.status in {"Completed", "Cancelled"}:
++        frappe.throw(_("Completed or cancelled projects cannot be replanned."))
++    return doc
++
++
++def _users(value):
++    values = frappe.parse_json(value) if isinstance(value, str) else value
++    if not isinstance(values, list) or len(values) > 50 or any(not isinstance(v, str) or not v for v in values):
++        frappe.throw(_("Choose valid assigned users."))
++    return sorted(set(values))
++
++
++def _assigned(value):
++    try:
++        values = json.loads(value or "[]")
++        return sorted(set(v for v in values if isinstance(v, str))) if isinstance(values, list) else []
++    except (TypeError, ValueError):
++        return []
++
++
++def _editable(task):
++    return task.status not in {"Completed", "Cancelled", "Template"}
++
++
++def _dated_value(original, value):
++    # Some sites store expected dates as Datetime. Preserve an existing time of
++    # day when moving its calendar date from this date-only planning screen.
++    if not value:
++        return None
++    date = getdate(value)
++    if original and (hasattr(original, "hour") or " " in str(original)):
++        return get_datetime(original).replace(year=date.year, month=date.month, day=date.day)
++    return date
++
++
++def _eligible(user, project, task):
++    account = frappe.db.get_value("User", user, ["enabled", "user_type"], as_dict=True)
++    return bool(account and account.enabled and account.user_type == "System User"
++                and frappe.has_permission("Project", "read", doc=project, user=user)
++                and frappe.has_permission("Task", "read", doc=task, user=user))
++
++
++@frappe.whitelist()
++def get_plan(project):
++    doc = _project(project)
++    can_edit = bool(doc.status not in {"Completed", "Cancelled"} and frappe.has_permission("Project", "write", doc=doc)
++                    and frappe.has_permission("Task", "write"))
++    rows = frappe.get_list("Task", filters={"project": doc.name, "is_template": 0},
++        fields=["name", "subject", "description", "exp_start_date", "exp_end_date", "status", "parent_task", "is_group", "_assign", "modified"],
++        order_by="lft asc, creation asc", limit_page_length=0) if frappe.has_permission("Task", "read") else []
++    assigned = set()
++    for row in rows:
++        row["assigned_to"] = _assigned(row.pop("_assign", None))
++        row["description_text"] = strip_html(row.description or "")
++        for field in ("exp_start_date", "exp_end_date"):
++            row[field] = str(getdate(row[field])) if row[field] else None
++        row["can_edit"] = can_edit and _editable(row)
++        assigned.update(row["assigned_to"])
++    names = {r.name: r.full_name or r.name for r in frappe.get_all("User", filters={"name": ["in", sorted(assigned)]},
++             fields=["name", "full_name"])} if assigned else {}
++    return dict(project=doc.name, project_name=doc.project_name, rows=rows, user_names=names,
++                can_create=bool(doc.status not in {"Completed", "Cancelled"} and frappe.has_permission("Project", "write", doc=doc)
++                                and frappe.has_permission("Task", "create")), company=doc.company,
++                can_read_tasks=bool(frappe.has_permission("Task", "read")))
++
++
++@frappe.whitelist()
++def assignment_choices(project, task):
++    doc = _project(project, write=True)
++    item = frappe.get_doc("Task", task)
++    item.check_permission("write")
++    if item.project != doc.name:
++        frappe.throw(_("The task must belong to this project."), frappe.PermissionError)
++    users = frappe.get_all("User", filters={"enabled": 1, "user_type": "System User"},
++                           fields=["name", "full_name"], order_by="full_name asc")
++    return [dict(value=u.name, label=u.full_name or u.name, description=u.name)
++            for u in users if _eligible(u.name, doc, item)]
++
++
++@frappe.whitelist(methods=["POST"])
++def save_task(project, task, subject, description, start_date, end_date, assigned_to, expected_modified, expected_assignees):
++    from frappe.desk.form import assign_to
++    doc = _project(project, write=True)
++    savepoint = "project_plan_" + frappe.generate_hash(length=10)
++    frappe.db.savepoint(savepoint)
++    try:
++        item = frappe.get_doc("Task", task, for_update=True)
++        item.check_permission("write")
++        if item.project != doc.name:
++            frappe.throw(_("The task must belong to this project."), frappe.PermissionError)
++        if not _editable(item):
++            frappe.throw(_("Completed, cancelled or template tasks cannot be replanned."))
++        if not expected_modified or get_datetime(item.modified) != get_datetime(expected_modified):
++            frappe.throw(_("This task changed. Refresh the plan before editing it."))
++        selected = _users(assigned_to)
++        todos = frappe.get_all("ToDo", filters={"reference_type": "Task", "reference_name": item.name, "status": "Open"},
++                               fields=["name", "allocated_to", "date", "description"])
++        current = sorted({todo.allocated_to for todo in todos})
++        if current != _users(expected_assignees):
++            frappe.throw(_("Task assignments changed. Refresh the plan before editing them."))
++        title = (subject or "").strip()
++        if not title:
++            frappe.throw(_("An activity name is required."))
++        start = getdate(start_date) if start_date else None
++        end = getdate(end_date) if end_date else None
++        if start and end and end < start:
++            frappe.throw(_("End Date cannot be before Start Date."))
++        for user in set(selected) - set(current):
++            if not _eligible(user, doc, item):
++                frappe.throw(_("Choose an active user who already has access to this project and task."), frappe.PermissionError)
++        item.subject = title
++        item.description = description or ""
++        item.exp_start_date = _dated_value(item.exp_start_date, start)
++        item.exp_end_date = _dated_value(item.exp_end_date, end)
++        # Save the same Task through native validation, dependencies and audit hooks.
++        item.save()
++        end = getdate(item.exp_end_date) if item.exp_end_date else None
++        for user in set(current) - set(selected):
++            assign_to.remove("Task", item.name, user)
++        added = sorted(set(selected) - set(current))
++        if added:
++            assign_to.add(dict(doctype="Task", name=item.name, assign_to=added,
++                               description=title, date=end, priority=item.priority or "Medium"))
++        # Like the native assignment API, task-write permission authorizes changes
++        # to its ToDos. Only the retained assignment's text and due date are touched.
++        for row in todos:
++            if row.allocated_to in selected and (str(row.date or "") != str(end or "") or row.description != title):
++                todo = frappe.get_doc("ToDo", row.name)
++                todo.date = end
++                todo.description = title
++                todo.save(ignore_permissions=True)
++        return {"name": item.name, "project": doc.name, "assigned_to": selected}
++    except Exception:
++        frappe.db.rollback(save_point=savepoint)
++        raise
+diff --git a/bsgroup/public/js/project_workspace.js b/bsgroup/public/js/project_workspace.js
+index f099109..aa7e6b3 100644
+--- a/bsgroup/public/js/project_workspace.js
++++ b/bsgroup/public/js/project_workspace.js
+@@ -7,6 +7,7 @@
+                 if (['connections_tab', 'costing_tab'].includes(tab.df.fieldname)) tab.df.hidden = 1;
+             }
+             frm.layout.refresh_tabs();
++            renderPlan(frm);
+             const field = frm.fields_dict.custom_bs_project_workspace;
+             if (!field) {
+                 if (frappe.user.has_role('System Manager')) frm.add_custom_button(__('Set Up Project Activities'), async () => {
+@@ -21,6 +22,97 @@
+             render(frm, frm.__bs_activity || 'tasks');
+         }
+     });
++    async function renderPlan(frm) {
++        const field = frm.fields_dict.custom_bs_project_plan;
++        if (!field) {
++            if (frappe.user.has_role('System Manager')) frm.add_custom_button(__('Set Up Project Plan'), async () => {
++                await frappe.call({method:'bsgroup.project_plan.setup',type:'POST',freeze:true});
++                frappe.msgprint(__('Project Plan is ready. Reload the page to use it.'));
++            });
++            return;
++        }
++        const host = field.$wrapper;
++        if (frm.is_new()) {host.text(__('Save this project to generate its plan from tasks and template activities.')); return;}
++        const project = frm.doc.name;
++        const version = frm.__bs_plan_version = (frm.__bs_plan_version || 0) + 1;
++        host.text(__('Loading project plan…'));
++        let data;
++        try {
++            ({message:data} = await frappe.call({method:'bsgroup.project_plan.get_plan',args:{project}}));
++        } catch (error) {
++            if (version===frm.__bs_plan_version) host.text(__('Could not load the plan. Check your access and refresh the project.'));
++            return;
++        }
++        if (version!==frm.__bs_plan_version || frm.doc.name!==project) return;
++        host.empty();
++        $('<h4>').text(__('Project Plan')+' · '+(data.project_name || project)).appendTo(host);
++        $('<p class="text-muted">').text(__('Automatically shows this project’s tasks and template activities. Edits update the same tasks; assigned tasks appear in each selected user’s task list.')).appendTo(host);
++        const actions = $('<div style="display:flex;gap:8px;margin:12px 0">').appendTo(host);
++        $('<button type="button" class="btn btn-default btn-sm">').text(__('Refresh Plan')).on('click',()=>renderPlan(frm)).appendTo(actions);
++        if (data.can_create) $('<button type="button" class="btn btn-primary btn-sm">').text(__('Add Activity')).on('click',()=>{
++            frappe.new_doc('Task', {project, company:data.company});
++        }).appendTo(actions);
++        if (!data.can_read_tasks) {$('<p>').text(__('Your current access does not allow viewing project tasks.')).appendTo(host); return;}
++        const table = $('<div class="table-responsive">').html('<table class="table table-bordered"><thead><tr><th>Activity</th><th>Description</th><th>Start Date</th><th>End Date</th><th>Assigned To</th><th>Status</th><th>Action</th></tr></thead><tbody></tbody></table>').appendTo(host).find('tbody');
++        for (const row of data.rows) {
++            const tr = $('<tr>').appendTo(table);
++            $('<td>').html(`<a href="/desk/task/${encodeURIComponent(row.name)}">${esc(row.subject)}</a><div class="text-muted small">${esc(row.name)}</div>`).appendTo(tr);
++            $('<td style="min-width:180px;max-width:360px;white-space:pre-wrap">').text(row.description_text || '—').appendTo(tr);
++            $('<td style="white-space:nowrap">').text(row.exp_start_date ? frappe.datetime.str_to_user(row.exp_start_date) : '—').appendTo(tr);
++            $('<td style="white-space:nowrap">').text(row.exp_end_date ? frappe.datetime.str_to_user(row.exp_end_date) : '—').appendTo(tr);
++            $('<td>').text(row.assigned_to.map(user=>data.user_names[user] || user).join(', ') || __('Unassigned')).appendTo(tr);
++            $('<td>').text(__(row.status)).appendTo(tr);
++            const edit = $('<td>').appendTo(tr);
++            if (row.can_edit) $('<button type="button" class="btn btn-default btn-sm">').text(__('Edit')).attr('aria-label',__('Edit')+' '+row.subject).on('click',()=>editPlanTask(frm,project,row,data.user_names)).appendTo(edit);
++            else edit.text(__('Read only'));
++        }
++        if (!data.rows.length) $('<tr><td colspan="7"></td></tr>').find('td').text(__('No activities yet. Add an activity or save this project with a Project Template to generate its tasks.')).end().appendTo(table);
++    }
++    async function editPlanTask(frm, project, row, names) {
++        const {message:choices} = await frappe.call({method:'bsgroup.project_plan.assignment_choices',args:{project,task:row.name}});
++        if (frm.doc.name!==project) return;
++        for (const user of row.assigned_to) if (!choices.some(option=>option.value===user)) choices.push({value:user,label:names[user] || user,description:user});
++        for (const option of choices) {option.label=esc(option.label);option.description=esc(option.description);}
++        const dialog = new frappe.ui.Dialog({
++            title:__('Edit Project Activity'), size:'large',
++            fields:[
++                {fieldname:'subject',fieldtype:'Data',label:__('Activity'),reqd:1,default:row.subject},
++                {fieldname:'description',fieldtype:'Text Editor',label:__('Description'),default:row.description || ''},
++                {fieldname:'date_section',fieldtype:'Section Break'},
++                {fieldname:'start_date',fieldtype:'Date',label:__('Start Date'),default:row.exp_start_date},
++                {fieldname:'date_column',fieldtype:'Column Break'},
++                {fieldname:'end_date',fieldtype:'Date',label:__('End Date'),default:row.exp_end_date},
++                {fieldname:'assignment_section',fieldtype:'Section Break'},
++                {fieldname:'assigned_to',fieldtype:'MultiSelectList',label:__('Assigned To'),default:[...row.assigned_to],
++                    description:__('Choose users who already have access to this project and task.'),
++                    get_data:txt=>choices.filter(option=>(option.label+' '+option.value).toLowerCase().includes((txt || '').toLowerCase()))}
++            ],
++            primary_action_label:__('Save Activity'),
++            async primary_action(values) {
++                if (dialog.__saving) return;
++                dialog.__saving = true;
++                dialog.get_primary_btn().prop('disabled',true);
++                try {
++                    await frappe.call({method:'bsgroup.project_plan.save_task',type:'POST',freeze:true,
++                        args:{project,task:row.name,subject:values.subject,description:values.description || '',
++                            start_date:values.start_date || '',end_date:values.end_date || '',assigned_to:values.assigned_to || [],
++                            expected_modified:row.modified,expected_assignees:row.assigned_to}});
++                    dialog.hide();
++                    frappe.show_alert({message:__('Project activity updated'),indicator:'green'});
++                    if (frm.doc.name===project) {
++                        renderPlan(frm);
++                        if (frm.fields_dict.custom_bs_project_workspace) render(frm,frm.__bs_activity || 'tasks');
++                    }
++                } finally {
++                    dialog.__saving = false;
++                    dialog.get_primary_btn().prop('disabled',false);
++                }
++            }
++        });
++        dialog.show();
++        await dialog.fields_dict.assigned_to.set_options();
++        dialog.fields_dict.assigned_to.set_value([...row.assigned_to]);
++    }
+     async function render(frm, section) {
+         frm.__bs_activity = section;
+         const version = frm.__bs_activity_version = (frm.__bs_activity_version || 0) + 1;
+diff --git a/bsgroup/hooks.py b/bsgroup/hooks.py
+index 41fad21..dc99a1e 100644
+--- a/bsgroup/hooks.py
++++ b/bsgroup/hooks.py
+@@ -371,6 +371,7 @@ doc_events = {
+             "bsgroup.utils.task.validate_zztest_task_closure_authority",
+         ],
+         "validate": [
++            "bsgroup.project_plan.validate_template_status",
+             "bsgroup.utils.task.validate_completion_from_blocked_status",
+             "bsgroup.utils.task.validate_milestone_requirements",
+             "bsgroup.utils.task.stamp_completed_on",
