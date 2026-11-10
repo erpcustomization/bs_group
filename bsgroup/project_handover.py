@@ -1,15 +1,50 @@
 """Project copy of an awarded quotation: operational scope only, never commercial values.
 
 Called inside the existing locked procurement transaction, after source authorisation.
-Native Project permissions and mandatory-field checks still apply.
+Direct calls retain native Project permissions. A checked sales handover may
+write only its linked project's BOQ; mandatory-field and company checks apply.
 """
 import json
+from contextlib import contextmanager
+from contextvars import ContextVar
 from html import escape
 
 import frappe
 from frappe import _
 from frappe.utils import getdate, strip_html
 from bsgroup.project_modules import MODULES
+
+
+_sales_handover = ContextVar("sales_project_handover", default=None)
+
+
+def _source_key(q, sheet):
+    return (q.name, sheet.name, sheet.company, sheet.get("project"))
+
+
+@contextmanager
+def sales_handover(q, sheet):
+    """Authorise only the linked project's BOQ step inside a checked sales send.
+
+    Callers must first validate the current quotation/award. No general Project
+    role, document share or approval permission is granted to the sender.
+    """
+    from bsgroup.dcs.sales_handover_access import AWARD_ROLES
+    if frappe.session.user != "Administrator" and not set(frappe.get_roles()) & AWARD_ROLES:
+        frappe.throw(_("Sales handover access is required."), frappe.PermissionError)
+    q.check_permission("write")
+    sheet.check_permission("write")
+    if q.get("custom_deal_cost_sheet") != sheet.name or q.company != sheet.company:
+        frappe.throw(_("The project handover must use the quotation's linked costing sheet and company."))
+    token = _sales_handover.set(_source_key(q, sheet))
+    try:
+        yield
+    finally:
+        _sales_handover.reset(token)
+
+
+def _scoped_handover(q, sheet):
+    return _sales_handover.get() == _source_key(q, sheet)
 
 
 def selections(value):
@@ -43,7 +78,10 @@ def context(q, sheet):
     selected = []
     if project:
         doc = frappe.get_doc("Project", project)
-        doc.check_permission("read")
+        if not _scoped_handover(q, sheet):
+            doc.check_permission("read")
+        if doc.company != sheet.company:
+            frappe.throw(_("The linked project must belong to the quotation company."))
         selected = [key for key, (_, field) in MODULES.items() if doc.get(field)]
     return dict(project=project, project_modules=selected,
                 project_customer=q.party_name if q.quotation_to == "Customer" else sheet.get("customer"),
@@ -51,6 +89,7 @@ def context(q, sheet):
 
 
 def save_project(q, sheet, modules, details=None):
+    scoped = _scoped_handover(q, sheet)
     selected = selections(modules)
     if isinstance(details, str):
         details = json.loads(details)
@@ -63,14 +102,16 @@ def save_project(q, sheet, modules, details=None):
     scope = boq_html(q)
     if sheet.get("project"):
         project = frappe.get_doc("Project", sheet.project, for_update=True)
-        project.check_permission("write")
+        if not scoped:
+            project.check_permission("write")
         if project.company != sheet.company:
             frappe.throw(_("The linked project must belong to the quotation company."))
         if project.status in ("Completed", "Cancelled"):
             frappe.throw(_("The linked project is closed. Resolve the project link before handover."))
     else:
         project = frappe.new_doc("Project")
-        project.check_permission("create")
+        if not scoped:
+            project.check_permission("create")
         required = ("project_type", "custom_project_manager", "expected_start_date", "expected_end_date")
         if any(not details.get(field) for field in required):
             frappe.throw(_("Complete the project type, project manager and start/end dates."))
@@ -90,5 +131,8 @@ def save_project(q, sheet, modules, details=None):
     from bsgroup.project_boq_schedule import append_quotation, importing
     append_quotation(project, q)
     with importing():
-        project.save()
+        if scoped:
+            project.save(ignore_permissions=True)
+        else:
+            project.save()
     return project.name

@@ -22,7 +22,10 @@ class ProjectHandoverTests(unittest.TestCase):
     def setUp(self):
         self.f = types.ModuleType('frappe')
         self.f._ = lambda value: value
-        self.f.throw = lambda value: (_ for _ in ()).throw(ValueError(value))
+        self.f.throw = lambda value, *args: (_ for _ in ()).throw(ValueError(value))
+        self.f.PermissionError=ValueError
+        self.f.session=Doc(user='sales@example.com')
+        self.f.get_roles=Mock(return_value=['BS Scoped Sales'])
         self.f.get_meta = Mock(return_value=Doc(has_field=lambda field: True))
         self.project = Doc(name='PROJ-1', company='AE', status='Open', custom_boq='<p>Existing scope</p>',
             custom_bs_infra_projects=1, check_permission=Mock(), save=Mock())
@@ -39,10 +42,10 @@ class ProjectHandoverTests(unittest.TestCase):
         self.p.start()
         spec = importlib.util.spec_from_file_location('handover_test',Path(__file__).resolve().parents[1]/'project_handover.py')
         self.m = importlib.util.module_from_spec(spec); spec.loader.exec_module(self.m)
-        self.q = Doc(name='Q-1', quotation_to='Customer', party_name='C-1')
+        self.q = Doc(name='Q-1', quotation_to='Customer', party_name='C-1', company='AE', custom_deal_cost_sheet='DCS-1',check_permission=Mock())
         self.q.items = [Doc(item_code='I-1',item_name='Camera',description='<b>Installation</b>',qty=2,uom='Nos',
             rate=1234,amount=2468,cost_rate=999,discount_amount=888)]
-        self.sheet = Doc(project='PROJ-1', company='AE', subject='Security installation')
+        self.sheet = Doc(name='DCS-1',project='PROJ-1', company='AE', subject='Security installation',check_permission=Mock())
         self.details = dict(project_type='Major Project', custom_project_manager='EMP-1',
             expected_start_date='2026-11-09', expected_end_date='2026-11-30',project_template='Template A')
 
@@ -70,6 +73,50 @@ class ProjectHandoverTests(unittest.TestCase):
         self.project.check_permission.side_effect = PermissionError()
         with self.assertRaises(PermissionError): self.m.save_project(self.q,self.sheet,['supply'])
         self.project.save.assert_not_called();self.assertIsNone(self.project.custom_bs_supply_projects)
+
+    def test_sales_handover_only_writes_the_validated_linked_project(self):
+        self.project.check_permission.side_effect=PermissionError()
+        with self.m.sales_handover(self.q,self.sheet):
+            self.assertEqual(self.m.save_project(self.q,self.sheet,['supply']),'PROJ-1')
+        self.project.save.assert_called_once_with(ignore_permissions=True)
+        self.q.check_permission.assert_called_once_with('write')
+        self.sheet.check_permission.assert_called_once_with('write')
+        with self.assertRaises(PermissionError):self.m.save_project(self.q,self.sheet,['supply'])
+
+    def test_handover_context_does_not_leak_after_failure_or_to_other_source(self):
+        with self.assertRaises(RuntimeError):
+            with self.m.sales_handover(self.q,self.sheet):
+                self.assertTrue(self.m._scoped_handover(self.q,self.sheet))
+                self.sheet.name='OTHER'
+                self.assertFalse(self.m._scoped_handover(self.q,self.sheet))
+                raise RuntimeError()
+        self.assertIsNone(self.m._sales_handover.get())
+
+    def test_handover_rejects_non_sales_unrelated_source_and_denied_documents(self):
+        for role in ['Technical Engineer','BS Scoped Presales','System Manager','Employee','Purchase User']:
+            self.f.get_roles.return_value=[role]
+            with self.assertRaises(ValueError):
+                with self.m.sales_handover(self.q,self.sheet):pass
+        self.f.get_roles.return_value=['BS Scoped Sales']
+        self.q.custom_deal_cost_sheet='OTHER'
+        with self.assertRaises(ValueError):
+            with self.m.sales_handover(self.q,self.sheet):pass
+        self.q.custom_deal_cost_sheet=self.sheet.name
+        self.sheet.check_permission.side_effect=PermissionError()
+        with self.assertRaises(PermissionError):
+            with self.m.sales_handover(self.q,self.sheet):pass
+        self.project.save.assert_not_called()
+
+    def test_sales_handover_still_validates_closed_project_company_and_required_fields(self):
+        with self.m.sales_handover(self.q,self.sheet):
+            self.project.status='Completed'
+            with self.assertRaises(ValueError):self.m.save_project(self.q,self.sheet,['supply'])
+            self.project.status='Open';self.project.company='OTHER'
+            with self.assertRaises(ValueError):self.m.save_project(self.q,self.sheet,['supply'])
+        self.sheet.project=None
+        with self.m.sales_handover(self.q,self.sheet):
+            with self.assertRaises(ValueError):self.m.save_project(self.q,self.sheet,['supply'],{})
+        self.project.save.assert_not_called()
 
     def test_wrong_company_or_closed_project_rejected(self):
         for field,value in [('company','OM'),('status','Completed'),('status','Cancelled')]:

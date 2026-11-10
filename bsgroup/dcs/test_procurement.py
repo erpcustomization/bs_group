@@ -26,6 +26,7 @@ class ProcurementTests(unittest.TestCase):
         cls.buyer=make_user('zztest-pr-buyer@example.com',['Purchase User'])
         cls.tech=make_user('zztest-pr-tech@example.com',['Technical Engineer'])
         cls.sales=make_user('zztest-pr-sales@example.com',['Sales User'])
+        cls.scoped_sales=make_user('zztest-pr-scoped-sales@example.com',['BS Scoped Sales'])
 
     @classmethod
     def tearDownClass(cls):
@@ -93,6 +94,63 @@ class ProcurementTests(unittest.TestCase):
         self.assertEqual(self.dcs.custom_frozen_revision_no,self.dcs.custom_dcs_revision_no)
         self.assertEqual(self.dcs.custom_frozen_total_cost,1000)
         self.assertEqual(self.dcs.custom_frozen_total_selling,1500)
+
+    def test_sales_user_wins_and_sends_own_deal_without_manager_role(self):
+        frappe.set_user('Administrator')
+        frappe.db.set_value('Deal Cost Sheet',self.dcs.name,'deal_owner',self.sales)
+        frappe.db.set_value('Opportunity',self.dcs.opportunity,'opportunity_owner',self.sales)
+        frappe.db.set_value('Quotation',self.q.name,'owner',self.sales)
+        frappe.set_user(self.sales)
+        self.q.reload();self.dcs.reload()
+        self.assertFalse(set(frappe.get_roles()) & {'Sales Manager','Commercial Controller','Managing Director'})
+        self.win()
+        self.assertEqual(self.dcs.custom_award_state,'Awarded')
+        self.assertEqual(self.dcs.custom_awarded_by,self.sales)
+        sent=self.send()
+        self.assertEqual(sent['doctype'],buying.MR)
+        self.assertEqual(self.send()['name'],sent['name'])
+        request=frappe.get_doc(buying.MR,sent['name'])
+        self.assertEqual(request.docstatus,0)
+        self.assertTrue(frappe.has_permission(buying.MR,'read',doc=request))
+        self.assertFalse(frappe.has_permission(buying.MR,'write',doc=request))
+        self.assertFalse(frappe.has_permission(buying.MR,'submit',doc=request))
+
+    def test_non_sales_cannot_record_award(self):
+        from bsgroup.api.dcs.award import dcs_record_award
+        frappe.set_user(self.tech)
+        result=dcs_record_award(dcs=self.dcs.name,award_reference='ZZTEST-PO',evidence_type='Customer PO')
+        self.assertEqual(result['ok'],0)
+        self.assertNotEqual(frappe.db.get_value('Deal Cost Sheet',self.dcs.name,'custom_award_state'),'Awarded')
+
+    def test_scoped_sales_wins_and_sends_own_deal(self):
+        self.sales=self.scoped_sales
+        self.test_sales_user_wins_and_sends_own_deal_without_manager_role()
+
+    def test_scoped_sales_cannot_send_another_owners_deal(self):
+        self.win()
+        frappe.set_user(self.scoped_sales)
+        with self.assertRaises(frappe.PermissionError):self.send()
+
+    def test_sales_handover_creates_project_without_general_project_access(self):
+        frappe.set_user('Administrator')
+        frappe.db.set_value('Deal Cost Sheet',self.dcs.name,'deal_owner',self.sales)
+        frappe.db.set_value('Opportunity',self.dcs.opportunity,'opportunity_owner',self.sales)
+        frappe.db.set_value('Quotation',self.q.name,'owner',self.sales)
+        employee=frappe.db.get_value('Employee',{'company':self.dcs.company,'status':'Active'},'name')
+        project_type=frappe.db.get_value('Project Type',{},'name')
+        self.assertTrue(employee and project_type,'Seed the local project manager/type fixtures')
+        frappe.set_user(self.sales);self.q.reload();self.dcs.reload();self.win()
+        self.assertFalse(frappe.has_permission('Project','create'))
+        details=dict(project_type=project_type,custom_project_manager=employee,
+            expected_start_date=nowdate(),expected_end_date=add_days(nowdate(),7),custom_project_description='ZZTEST sales handover')
+        with patch.object(frappe,'get_print',return_value=sample_pdf()),patch.object(p,'costing_pdf',return_value=sample_pdf()):
+            result=p.send_to_procurement(self.q.name,add_days(nowdate(),7),'Stores - AE',
+                project_modules=['supply'],project_details=details)
+        self.assertTrue(result['project'])
+        project=frappe.get_doc('Project',result['project'])
+        self.assertTrue(project.custom_bs_supply_projects)
+        self.assertIn(self.q.name,project.custom_boq)
+        self.assertFalse(frappe.has_permission('Project','write',doc=project))
 
     def test_send_creates_standard_pr_with_private_evidence_and_replays(self):
         self.win();r=self.send();packet=frappe.get_doc(buying.MR,r['name'])

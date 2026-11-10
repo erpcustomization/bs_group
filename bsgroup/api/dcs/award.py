@@ -8,6 +8,7 @@ service-owned state.
 """
 
 from bsgroup.dcs.currency import money_precision
+from bsgroup.dcs.sales_handover_access import AWARD_ROLES
 import frappe
 from frappe.utils import now_datetime
 
@@ -47,8 +48,8 @@ def clear_reversal_block(sheet_name, new_ref):
 
 
 NOT_A_COMMERCIAL_ACTOR = (
-	"Recording a customer award is a commercial action. Technical roles and System Manager "
-	"administration cannot record an award."
+	"Recording a customer award requires Sales User, BS Scoped Sales, Sales Manager, "
+	"Commercial Controller or Managing Director access to this deal."
 )
 
 
@@ -70,7 +71,7 @@ def dcs_record_award(args):
 
 	if not dcs_exists_and_open(dcs_name, result):
 		pass
-	elif has_any(roles, COMMERCIAL_ROLES) == 0:
+	elif has_any(roles, AWARD_ROLES) == 0:
 		result["error"] = NOT_A_COMMERCIAL_ACTOR
 	elif evidence not in VALID_EVIDENCE:
 		result["error"] = "evidence_type must be one of Customer PO, Letter of Award, Email Confirmation, Verbal - Not Evidenced, Not Provided."

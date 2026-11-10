@@ -165,10 +165,25 @@ class FlowTests(unittest.TestCase):
                 refuse_stale_quotation_source=lambda s:None,quotation_deal_identity=lambda s,q:''):
             with self.assertRaisesRegex(ValidationError,'multiple'):flow.ensure_draft(self.s)
         create.assert_not_called()
-    def test_scoped_sales_cannot_win(self):
+    def test_non_sales_cannot_win(self):
         frappe.get_doc.return_value=self.q
-        with self.mod('bsgroup.dcs.procurement',SEND_ROLES={'Sales Manager'},source_items=Mock(),handover_warehouses=Mock(),send_to_procurement=Mock()):
-            with self.assertRaisesRegex(ValidationError,'commercial-authority'):flow.won_context('Q-1')
+        frappe.get_roles.return_value=['BS Scoped Presales']
+        from bsgroup.dcs.sales_handover_access import AWARD_ROLES
+        with self.mod('bsgroup.dcs.procurement',SEND_ROLES=AWARD_ROLES,source_items=Mock(),handover_warehouses=Mock(),send_to_procurement=Mock()):
+            with self.assertRaisesRegex(ValidationError,'Sales or commercial-manager'):flow.won_context('Q-1')
+    def test_all_sales_roles_can_open_won_handover(self):
+        from bsgroup.dcs.sales_handover_access import AWARD_ROLES
+        self.q.company=self.s.company
+        frappe.get_doc.side_effect=lambda dt,name,**kw:self.q if dt=='Quotation' else self.s
+        def send_to_procurement(quotation, schedule_date=None, warehouse=None): pass
+        with self.mod('bsgroup.dcs.procurement',SEND_ROLES=AWARD_ROLES,
+                source_items=lambda s:[{'is_stock_item':True}],handover_warehouses=lambda c:['Stores'],send_to_procurement=send_to_procurement):
+            for role in AWARD_ROLES:
+                with self.subTest(role=role):
+                    frappe.get_roles.return_value=[role]
+                    result=flow.won_context('Q-1')
+                    self.assertEqual(result['warehouses'],['Stores']);self.assertTrue(result['stock_items'])
+        self.assertIn('write',self.q._permissions);self.assertIn('write',self.s._permissions)
     def test_stale_status_request_rejected(self):
         frappe.get_doc.return_value=self.q
         with self.assertRaisesRegex(ValidationError,'changed'):flow._change_status('Q-1','Delayed','old',reason='Delay')
@@ -195,9 +210,12 @@ class FlowTests(unittest.TestCase):
         with self.assertRaises(ValidationError):flow.install()
     def test_read_only_context_filters_win_by_role(self):
         frappe.get_doc.return_value=self.q
-        with self.mod('bsgroup.dcs.procurement',SEND_ROLES={'Sales Manager'}):
+        from bsgroup.dcs.sales_handover_access import AWARD_ROLES
+        with self.mod('bsgroup.dcs.procurement',SEND_ROLES=AWARD_ROLES):
+            frappe.get_roles.return_value=['Technical Engineer']
             result=flow.context('Q-1');self.assertNotIn('Won',result['statuses']);self.assertTrue(result['editable'])
-            frappe.get_roles.return_value=['Sales Manager'];self.assertIn('Won',flow.context('Q-1')['statuses'])
+            for role in AWARD_ROLES:
+                frappe.get_roles.return_value=[role];self.assertIn('Won',flow.context('Q-1')['statuses'])
 
     def test_pdf_uses_approved_format_and_letterhead(self):
         frappe.db.exists.return_value=True;frappe.db.get_value.return_value='Oman Letterhead'

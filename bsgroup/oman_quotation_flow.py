@@ -310,7 +310,7 @@ def won_context(quotation):
     check_editable(q)
     from bsgroup.dcs.procurement import SEND_ROLES, source_items, handover_warehouses, send_to_procurement
     if frappe.session.user != "Administrator" and not set(frappe.get_roles()) & SEND_ROLES:
-        frappe.throw("Only the existing commercial-authority roles can record Won and send to Procurement.", frappe.PermissionError)
+        frappe.throw("Sales or commercial-manager access to this deal is required to record Won and send to Procurement.", frappe.PermissionError)
     sheet = frappe.get_doc("Deal Cost Sheet", q.custom_deal_cost_sheet)
     sheet.check_permission("write")
     result = dict(required_by=today(), warehouses=handover_warehouses(sheet.company),
@@ -319,8 +319,9 @@ def won_context(quotation):
     # Honour that extension when present, without silently installing it in Oman.
     result["project_required"] = "project_modules" in inspect.signature(send_to_procurement).parameters
     if result["project_required"]:
-        from bsgroup.project_handover import context as project_context
-        result.update(project_context(q, sheet))
+        from bsgroup.project_handover import context as project_context, sales_handover
+        with sales_handover(q, sheet):
+            result.update(project_context(q, sheet))
     return result
 
 

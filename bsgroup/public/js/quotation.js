@@ -315,6 +315,12 @@ frappe.ui.form.on("Quotation", {
         ["custom_customer_po", "custom_customer_po_reference"].forEach(
             field => frm.set_df_property(field, "read_only", sent));
         const open = name => {
+            if (frappe.user.has_role(["Sales User", "BS Scoped Sales"])
+                    && !frappe.user.has_role(["Sales Manager", "Commercial Controller", "Managing Director", "Purchase User", "Purchase Manager", "System Manager"])) {
+                // The handover service shares only the sender's requisition for read.
+                frappe.set_route("Form", "Material Request", name);
+                return;
+            }
             frappe.route_options = {bsp_request: name};
             frappe.set_route("bs-procurement");
         };
@@ -323,7 +329,7 @@ frappe.ui.form.on("Quotation", {
             frm.set_intro(__("Sent to Procurement: {0}", [frappe.utils.escape_html(request)]), "green");
         } else if (frm.doc.docstatus === 1 && frm.doc.custom_pipeline_stage === "Won"
                 && !frm.is_dirty() && (frappe.session.user === "Administrator"
-                || frappe.user.has_role(["Sales Manager", "Commercial Controller", "Managing Director"]))) {
+                || frappe.user.has_role(["Sales User", "BS Scoped Sales", "Sales Manager", "Commercial Controller", "Managing Director"]))) {
             frm.add_custom_button(__("Send to Procurement"), async () => {
                 if (frm.is_dirty()) {
                     frappe.msgprint(__("Save the quotation before sending to procurement."));

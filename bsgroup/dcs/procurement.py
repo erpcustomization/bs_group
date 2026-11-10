@@ -15,11 +15,12 @@ from frappe import _
 from frappe.utils import now_datetime, escape_html, nowdate, getdate, flt, cint
 from frappe.utils.file_manager import save_file
 from bsgroup.dcs.quotation_control import validate_position
+from bsgroup.dcs.sales_handover_access import AWARD_ROLES
 from bsgroup import procurement as buying
 
 DT = "DCS Purchase Request"
 _writer = ContextVar("dcs_procurement_writer", default=False)
-SEND_ROLES = {"Sales Manager", "Commercial Controller", "Managing Director"}
+SEND_ROLES = AWARD_ROLES
 BUY_ROLES = {"Purchase User", "Purchase Manager"}
 
 @contextmanager
@@ -194,7 +195,7 @@ def procurement_users(request):
 
 def source_documents(quotation, lock=False):
     if frappe.session.user != "Administrator" and not set(frappe.get_roles()) & SEND_ROLES:
-        deny("Sending to procurement requires commercial authority.")
+        deny("Sending to procurement requires Sales or commercial-manager access to this deal.")
     q = buying.access(frappe.get_doc("Quotation", quotation, for_update=lock), "write")
     if q.docstatus != 1 or q.custom_pipeline_stage != "Won":
         frappe.throw(_("Save the submitted quotation as Won before sending to procurement."))
@@ -254,14 +255,16 @@ Respect explicit Warehouse user restrictions and expose names only.
 @frappe.whitelist()
 def handover_context(quotation):
     q, sheet = source_documents(quotation)
-    from bsgroup.project_handover import context
+    from bsgroup.project_handover import context, sales_handover
     existing = frappe.db.get_value(buying.MR, {"custom_bsp_key": handover_key(sheet)}, "name")
+    with sales_handover(q, sheet):
+        project_context = context(q, sheet) if not existing else {}
     return dict(quotation=q.name, dcs=sheet.name, company=sheet.company, currency=sheet.currency,
                 customer_po=q.custom_customer_po_reference, revision=sheet.custom_revision_reference,
                 existing=existing, items=source_items(sheet), required_by=nowdate(),
                 warehouses=handover_warehouses(sheet.company),
                 resources=len(sheet.resources or []), additional_charges=len(sheet.addtional_charges or []),
-                **(context(q, sheet) if not existing else {}))
+                **project_context)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -288,9 +291,10 @@ def send_to_procurement(quotation, schedule_date=None, warehouse=None, project_m
     from bsgroup.oman_quotation_flow import pilot, render_pdf
     quote_pdf = render_pdf(q, no_letterhead=1) if pilot(q) else frappe.get_print("Quotation", q.name, as_pdf=True, no_letterhead=1)
     cost_pdf = costing_pdf(data)
-    from bsgroup.project_handover import save_project, selections
+    from bsgroup.project_handover import save_project, selections, sales_handover
     selected_modules = selections(project_modules)
-    project = save_project(q, sheet, selected_modules, project_details)
+    with sales_handover(q, sheet):
+        project = save_project(q, sheet, selected_modules, project_details)
     manifest = dict(costing=data, items=rows, files=[], source_po=source.name,
                     schedule_date=str(schedule_date),
                     customer_po_reference=q.custom_customer_po_reference,
