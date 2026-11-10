@@ -53,7 +53,7 @@ def install():
                  {"name", "doctype", "parent", "parenttype", "parentfield", "idx", "owner", "creation", "modified", "modified_by"}}
         group.update(label=title, keep_closed=1)
         sidebar.append("items", group)
-        for section, label, icon in SECTIONS:
+        for section, label, icon in SECTIONS[:2]:
             options = {"bs_module": key, "bs_section": section}
             sidebar.append("items", dict(type="Link", label=label, link_type="Page", link_to="bs-project-modules",
                 child=1, icon=icon, route_options=json.dumps(options),
@@ -122,5 +122,5 @@ def overview(module, section="dashboard"):
     result = dict(module=module, title=MODULES[module][0], field=MODULES[module][1], section=section,
                   projects=projects, can_create=bool(frappe.has_permission("Project", "create")))
     if section not in ("dashboard", "projects"):
-        result.update(records(section, projects))
+        result.update(requires_project=True)
     return result

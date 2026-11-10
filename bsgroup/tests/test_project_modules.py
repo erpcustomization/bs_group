@@ -111,5 +111,14 @@ class ProjectModuleTests(unittest.TestCase):
         self.assertFalse(self.m.records('advances',[Record(name='P1')])['available'])
         self.f.get_list.assert_not_called()
 
+    def test_old_module_activity_url_requires_opening_one_project(self):
+        self.m.install()
+        self.f.get_list.return_value=[Record(name='P1'),Record(name='P2')]
+        self.f.get_list.reset_mock()
+        result=self.m.overview('infra','tasks')
+        self.assertTrue(result['requires_project'])
+        self.assertNotIn('rows',result)
+        self.f.get_list.assert_called_once()
+
 
 if __name__=='__main__':unittest.main()

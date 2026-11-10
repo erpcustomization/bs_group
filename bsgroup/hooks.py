@@ -303,7 +303,7 @@ doctype_js = {
     "Lead": 'public/js/Lead.js',
     "Opportunity": "public/js/opportunity.js",
     "Quotation": 'public/js/quotation.js',
-    "Project": 'public/js/project.js',
+    "Project": ["public/js/project.js", "public/js/project_workspace.js"],
     "Task": "public/js/task.js",
     "Timesheet": "public/js/timesheet.js",
     "Leave Application": "public/js/leave_application.js",
@@ -715,7 +715,7 @@ doctype_js["Lead"].append("public/js/lead_assignment.js")
 override_whitelisted_methods["frappe.desk.form.assign_to.add"] = "bsgroup.lead_assignment.assign"
 
 # Project expenses retain native HRMS approvals, accounting and cost-overrun hooks.
-doctype_js["Project"] = ["public/js/project.js", "public/js/project_expenses.js", "public/js/project_requests.js", "public/js/project_module_form.js"]
+doctype_js["Project"] = ["public/js/project.js", "public/js/project_expenses.js", "public/js/project_requests.js", "public/js/project_module_form.js", "public/js/project_workspace.js"]
 doctype_js["Expense Claim"] = "public/js/project_expense_claim.js"
 doctype_list_js["Expense Claim"] = "public/js/project_expense_list.js"
 doc_events["Expense Claim"]["before_validate"] = "bsgroup.project_expenses.validate"
@@ -747,3 +747,6 @@ doctype_list_js["Quotation"].append("public/js/oman_quotation_flow_list.js")
 for _event, _handler in (("before_validate", "before_validate"), ("before_print", "require_net_discount")):
     _prior = doc_events["Quotation"].get(_event, [])
     doc_events["Quotation"][_event] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.oman_quotation_flow." + _handler]
+
+# Keep project activities inside each project; no role or workflow changes.
+after_migrate.append("bsgroup.project_workspace.install")

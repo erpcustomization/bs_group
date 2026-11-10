@@ -1,0 +1,232 @@
+Project owned activities oman 20261110
+
+diff --git a/bsgroup/project_workspace.py b/bsgroup/project_workspace.py
+new file mode 100644
+index 0000000..5b0aa9b
+--- /dev/null
++++ b/bsgroup/project_workspace.py
+@@ -0,0 +1,141 @@
++"""Project-owned activity navigation; native record permissions and workflows apply."""
++import json
++from importlib.util import find_spec
++import frappe
++from frappe import _
++
++
++SECTIONS = {
++    "tasks": ("Tasks", "Task", "project"),
++    "timesheets": ("Timesheets", "Timesheet", None),
++    "scheduler": ("Tech Task Scheduler", "Tech Task Scheduler", None),
++    "expenses": ("Expenses", "Expense Claim", "project"),
++    "advances": ("Advance", "Employee Advance", "custom_project"),
++    "labor": ("Labour Approval", "Labor Preapproval", "reference"),
++}
++MODULE_TITLES = {"BS Supply Projects", "BS ELV Projects", "BS Infra Projects", "BS 3CX Projects"}
++
++
++def install():
++    """Add an activity tab and remove only the old generic project navigation."""
++    from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
++    meta = frappe.get_meta("Project")
++    definitions = [
++        dict(fieldname="custom_bs_project_activities", label="Project Activities", fieldtype="Tab Break",
++             insert_after=meta.fields[-1].fieldname),
++        dict(fieldname="custom_bs_project_workspace", label="Project Activities", fieldtype="HTML",
++             insert_after="custom_bs_project_activities"),
++    ]
++    missing = []
++    for definition in definitions:
++        existing = meta.get_field(definition["fieldname"])
++        if existing and existing.fieldtype != definition["fieldtype"]:
++            frappe.throw(_("Project activity field has an incompatible type: {0}").format(definition["fieldname"]))
++        if not existing:
++            missing.append(definition)
++    if missing:
++        create_custom_fields({"Project": missing}, update=False)
++    if frappe.db.exists("DocType", "Sidebar") and frappe.db.exists("Sidebar", "BS Group"):
++        sidebar = frappe.get_doc("Sidebar", "BS Group")
++        retained, group = [], None
++        for row in sidebar.items:
++            if row.type == "Section Break":
++                group = row.label
++            remove = False
++            if group in MODULE_TITLES and row.type == "Link" and row.link_to == "bs-project-modules":
++                try:
++                    options = json.loads(row.route_options or "{}")
++                except (ValueError, TypeError):
++                    options = {}
++                remove = options.get("bs_section") in SECTIONS
++            if group == "BS Project" and row.type == "Link" and row.link_type == "DocType":
++                remove = row.link_to in {"Task", "Timesheet", "Tech Task Scheduler"}
++            if not remove:
++                retained.append(row)
++        if len(retained) != len(sidebar.items):
++            sidebar.set("items", retained)
++            previous = frappe.flags.in_migrate
++            try:
++                frappe.flags.in_migrate = True
++                sidebar.save()
++            finally:
++                frappe.flags.in_migrate = previous
++    frappe.clear_cache(doctype="Project")
++    frappe.clear_cache()
++    return {"installed": True}
++
++
++@frappe.whitelist(methods=["POST"])
++def setup():
++    frappe.only_for("System Manager")
++    return install()
++
++
++def own_employee(company):
++    rows = frappe.get_all("Employee", filters={"user_id": frappe.session.user, "status": "Active", "company": company},
++                          fields=["name"], limit_page_length=2)
++    return rows[0].name if len(rows) == 1 else None
++
++
++@frappe.whitelist()
++def context(project, section="tasks"):
++    if section not in SECTIONS:
++        frappe.throw(_("Choose a valid project activity."))
++    if not project:
++        frappe.throw(_("Open a project first."))
++    doc = frappe.get_doc("Project", project)
++    doc.check_permission("read")
++    title, doctype, field = SECTIONS[section]
++    result = dict(project=doc.name, project_name=doc.project_name, company=doc.company, title=title,
++                  doctype=doctype, rows=[], available=False, can_create=False, defaults={}, child=None, problem=None)
++    if not frappe.db.exists("DocType", doctype):
++        result["problem"] = _("This activity is not installed on this site.")
++        return result
++    meta = frappe.get_meta(doctype)
++    if field and not meta.has_field(field):
++        result["problem"] = _("The project link for this activity has not been configured.")
++        return result
++    result["available"] = bool(frappe.has_permission(doctype, "read"))
++    result["can_create"] = bool(frappe.has_permission(doctype, "create") and doc.status != "Cancelled")
++    result["defaults"] = {field: doc.name} if field else {}
++    if meta.has_field("company"):
++        result["defaults"]["company"] = doc.company
++    filters = {field: doc.name} if field else []
++    if section == "labor":
++        filters["source"] = "Project"
++        result["defaults"].update(source="Project", cost_center=doc.get("cost_center") or frappe.db.get_value("Company", doc.company, "cost_center"))
++    elif section == "timesheets":
++        filters = [["Timesheet Detail", "project", "=", doc.name]]
++        result["child"] = dict(field="time_logs", values={"project": doc.name})
++    elif section == "scheduler":
++        filters = [["Tech Task Scheduler List", "project", "=", doc.name]]
++        result["child"] = dict(field="tech_task_scheduler_list", values={"project": doc.name, "category": "Project",
++                                  "category_doctype": "Project", "category_name": doc.name})
++    if section in {"expenses", "advances", "timesheets"}:
++        employee = own_employee(doc.company)
++        if employee:
++            result["defaults"]["employee"] = employee
++        if section in {"expenses", "advances"} and not employee:
++            result.update(can_create=False, problem=_("Your login must be linked to one active Employee in this project's company to create a request."))
++
++    # Reuse the existing site's stronger project request controls where deployed.
++    controlled = None
++    if section in {"expenses", "advances", "labor"}:
++        module = "bsgroup.project_expenses" if section == "expenses" else "bsgroup.project_requests"
++        if find_spec(module) is not None:
++            handler = frappe.get_attr(module + ".context")
++            controlled = handler(project) if section == "expenses" else handler(project, "advance" if section == "advances" else "labor")
++    if controlled is not None:
++        result.update(can_create=controlled["can_create"], problem=controlled.get("problem"))
++        if section == "expenses":
++            result["defaults"].update(employee=controlled["employee"], expense_approver=controlled["expense_approver"])
++            result["rows"] = controlled["claims"]
++        else:
++            result["defaults"] = controlled["defaults"]
++            result["rows"] = controlled["records"]
++    elif result["available"]:
++        fields = ["name", "modified", "docstatus"] + [name for name in
++                  ("subject", "employee_name", "status", "workflow_state", "task") if meta.has_field(name)]
++        result["rows"] = frappe.get_list(doctype, filters=filters, fields=fields, distinct=True,
++                                        order_by="creation desc", limit_page_length=100)
++    return result
+diff --git a/bsgroup/public/js/project_workspace.js b/bsgroup/public/js/project_workspace.js
+new file mode 100644
+index 0000000..968afb5
+--- /dev/null
++++ b/bsgroup/public/js/project_workspace.js
+@@ -0,0 +1,64 @@
++(() => {
++    const sections = {tasks:'Tasks', timesheets:'Timesheets', scheduler:'Tech Task Scheduler', expenses:'Expenses', advances:'Advance', labor:'Labour Approval'};
++    const esc = value => frappe.utils.escape_html(String(value ?? ''));
++    frappe.ui.form.on('Project', {
++        refresh(frm) {
++            const field = frm.fields_dict.custom_bs_project_workspace;
++            if (!field) {
++                if (frappe.user.has_role('System Manager')) frm.add_custom_button(__('Set Up Project Activities'), async () => {
++                    await frappe.call({method:'bsgroup.project_workspace.setup',type:'POST',freeze:true});
++                    frappe.msgprint(__('Project Activities is ready. Reload the page to use it.'));
++                });
++                return;
++            }
++            if (frm.is_new()) {field.$wrapper.text(__('Save this project to use its activities.')); return;}
++            for (const title of ['Expenses','Advance','Labour Approval']) frm.remove_custom_button(__(title),__('Project Requests'));
++            frm.add_custom_button(__('Project Activities'), () => frm.scroll_to_field('custom_bs_project_workspace'));
++            render(frm, frm.__bs_activity || 'tasks');
++        }
++    });
++    async function render(frm, section) {
++        frm.__bs_activity = section;
++        const version = frm.__bs_activity_version = (frm.__bs_activity_version || 0) + 1;
++        const project = frm.doc.name;
++        const host = frm.fields_dict.custom_bs_project_workspace.$wrapper;
++        host.empty();
++        $('<h4>').text(frm.doc.project_name || project).appendTo(host);
++        $('<p class="text-muted">').text(__('Activities for this project only') + ' · ' + project).appendTo(host);
++        const nav = $('<nav aria-label="Project activities" style="display:flex;gap:8px;flex-wrap:wrap;margin:16px 0">').appendTo(host);
++        for (const [id,title] of Object.entries(sections)) $('<button type="button" class="btn btn-sm">')
++            .addClass(id===section ? 'btn-primary' : 'btn-default').attr('aria-pressed',String(id===section))
++            .text(__(title)).on('click',()=>render(frm,id)).appendTo(nav);
++        const panel = $('<section aria-live="polite">').text(__('Loading…')).appendTo(host);
++        let data;
++        try {
++            ({message:data} = await frappe.call({method:'bsgroup.project_workspace.context',args:{project,section}}));
++        } catch (error) {
++            if (version===frm.__bs_activity_version) panel.text(__('Could not load this project activity. Check your access and try again.'));
++            return;
++        }
++        if (version!==frm.__bs_activity_version || frm.doc.name!==project) return;
++        panel.empty();
++        if (data.problem) $('<p class="text-muted">').text(data.problem).appendTo(panel);
++        const actions = $('<div style="display:flex;gap:8px;margin-bottom:12px">').appendTo(panel);
++        if (data.can_create) $('<button type="button" class="btn btn-primary btn-sm">').text(__('New')+' '+__(data.doctype)).on('click',()=>{
++            frappe.model.with_doctype(data.doctype, () => {
++                const doc = frappe.model.get_new_doc(data.doctype);
++                Object.assign(doc,data.defaults);
++                doc.__bs_project_request = project;
++                if (data.child) {
++                    const child = frappe.model.add_child(doc,data.child.field);
++                    Object.assign(child,data.child.values);
++                }
++                frappe.set_route('Form',data.doctype,doc.name);
++            });
++        }).appendTo(actions);
++        $('<button type="button" class="btn btn-default btn-sm">').text(__('Refresh')).on('click',()=>render(frm,section)).appendTo(actions);
++        if (!data.available) {$('<p>').text(__('This activity is restricted by your existing access.')).appendTo(panel); return;}
++        const route=data.doctype.toLowerCase().replaceAll(' ','-');
++        $('<div class="table-responsive">').html(`<table class="table table-bordered"><thead><tr><th>Record</th><th>Details</th><th>Status</th></tr></thead><tbody>${data.rows.map(row=>
++            `<tr><td><a href="/desk/${route}/${encodeURIComponent(row.name)}">${esc(row.name)}</a></td><td>${esc(row.subject||row.employee_name||row.task||'—')}</td><td>${esc(row.workflow_state||row.status||['Draft','Submitted','Cancelled'][row.docstatus])}</td></tr>`
++        ).join('') || '<tr><td colspan="3">No records for this project.</td></tr>'}</tbody></table>`).appendTo(panel);
++        $('<p class="text-muted">').text(__('Showing up to 100 accessible records linked to this project.')).appendTo(panel);
++    }
++})();
+diff --git a/bsgroup/hooks.py b/bsgroup/hooks.py
+index 909da73..41fad21 100644
+--- a/bsgroup/hooks.py
++++ b/bsgroup/hooks.py
+@@ -303,7 +303,7 @@ doctype_js = {
+     "Lead": 'public/js/Lead.js',
+     "Opportunity": "public/js/opportunity.js",
+     "Quotation": 'public/js/quotation.js',
+-    "Project": 'public/js/project.js',
++    "Project": ["public/js/project.js", "public/js/project_workspace.js"],
+     "Task": "public/js/task.js",
+     "Timesheet": "public/js/timesheet.js",
+     "Leave Application": "public/js/leave_application.js",

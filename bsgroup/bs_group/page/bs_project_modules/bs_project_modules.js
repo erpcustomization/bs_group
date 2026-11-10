@@ -2,7 +2,7 @@ frappe.pages['bs-project-modules'].on_page_load = function(wrapper) {
     const page = frappe.ui.make_app_page({parent:wrapper,title:__('Project Modules'),single_column:true});
     const host = $('<div class="bspm">').appendTo(page.main);
     const modules = {supply:'BS Supply Projects',elv:'BS ELV Projects',infra:'BS Infra Projects','3cx':'BS 3CX Projects'};
-    const sections = {dashboard:'Dashboard',projects:'Projects',tasks:'Tasks',timesheets:'Timesheets',scheduler:'Tech Task Scheduler',expenses:'Expenses',advances:'Advance',labor:'Labour Approval'};
+    const sections = {dashboard:'Dashboard',projects:'Projects'};
     const esc = value => frappe.utils.escape_html(String(value ?? ''));
     let key='supply', section='dashboard', version=0;
     if (!document.getElementById('bspm-style')) $('<style id="bspm-style">').text(`
@@ -23,6 +23,7 @@ frappe.pages['bs-project-modules'].on_page_load = function(wrapper) {
         key = options.bs_module || params.get('bs_module') || key;
         section = options.bs_section || params.get('bs_section') || section;
         delete options.bs_module; delete options.bs_section;
+        if (['tasks','timesheets','scheduler','expenses','advances','labor'].includes(section)) section='projects';
         if (!modules[key] || !sections[section]) {host.text(__('Choose a valid project module.'));return;}
         const current=++version;
         page.set_title(modules[key]);
@@ -34,7 +35,7 @@ frappe.pages['bs-project-modules'].on_page_load = function(wrapper) {
         for(const [id,title] of Object.entries(modules)) $('<button type="button">').text(title).toggleClass('active',id===key).on('click',()=>navigate(id,'dashboard')).appendTo(moduleNav);
         const hero=$('<section class="bspm-hero">').appendTo(host);
         $('<h2>').text(data.title).appendTo(hero);
-        $('<div class="bspm-note">').text('Projects can belong to more than one module. Your existing project templates, workflows and access apply.').appendTo(hero);
+        $('<div class="bspm-note">').text('Open a project, then choose Project Activities for its Tasks, Timesheets, Tech Task Scheduler, Expenses, Advance and Labour Approval.').appendTo(hero);
         const actions=$('<div class="bspm-actions">').appendTo(hero);
         if(data.can_create) $('<button class="btn btn-primary btn-sm">').text(__('New Project')).on('click',()=>frappe.new_doc('Project',{[data.field]:1})).appendTo(actions);
         $('<button class="btn btn-default btn-sm">').text(__('Choose Existing Project')).on('click',()=>frappe.set_route('List','Project')).appendTo(actions);
