@@ -2,6 +2,7 @@
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 import frappe
+from bsgroup.attendance_location import format_location
 
 TZ = ZoneInfo('Asia/Dubai')
 
@@ -46,7 +47,7 @@ def get_month(month):
     end = date(start.year + (start.month == 12), start.month % 12 + 1, 1)
     now = datetime.now(TZ)
     phase = 'before-start' if now.time() < time(9) else 'started'
-    key = f'bs-attendance-month-v4:{frappe.session.user}:{month}:{now.date()}:{phase}'
+    key = f'bs-attendance-month-v5:{frappe.session.user}:{month}:{now.date()}:{phase}'
     cached = frappe.cache.get_value(key)
     if cached is not None:
         return cached
@@ -59,11 +60,17 @@ def get_month(month):
     lower = datetime.combine(start, time(), TZ).astimezone(site).replace(tzinfo=None)
     upper = datetime.combine(end, time(), TZ).astimezone(site).replace(tzinfo=None)
     logs = frappe.get_all('Employee Checkin', filters=[['employee', '=', emp.name],
-        ['time', '>=', lower], ['time', '<', upper]], fields=['time', 'log_type'], limit_page_length=0)
+        ['time', '>=', lower], ['time', '<', upper]], fields=['time', 'log_type', 'latitude', 'longitude'],
+        order_by='time asc, creation asc, name asc', limit_page_length=0)
     by_day = {}
+    locations = {}
     for log in logs:
         stamp = frappe.utils.get_datetime(log.time).replace(tzinfo=site).astimezone(TZ)
         by_day.setdefault(stamp.date(), []).append((stamp, log.log_type))
+        key = (stamp, log.log_type)
+        location = format_location(getattr(log, 'latitude', None), getattr(log, 'longitude', None))
+        if log.log_type == 'OUT' or key not in locations:
+            locations[key] = location
     overlap = [['employee', '=', emp.name], ['docstatus', '=', 1],
                ['from_date', '<', end], ['to_date', '>=', start]]
     leaves = frappe.get_all('Leave Application', filters=overlap + [['status', '=', 'Approved']],
@@ -126,6 +133,8 @@ def get_month(month):
         days.append(dict(date=str(day), status=status, working_minutes=worked,
             check_in=first.strftime('%I:%M %p') if first else None,
             check_out=last_out.strftime('%I:%M %p') if last_out else None,
+            check_in_location=locations.get((first, 'IN')),
+            check_out_location=locations.get((last_out, 'OUT')),
             incomplete=incomplete, holiday=holiday or ''))
         day += timedelta(days=1)
     result = dict(visible=True, month=month, totals=totals, days=days,

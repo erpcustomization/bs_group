@@ -3,6 +3,7 @@ from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 import frappe
+from bsgroup.attendance_location import format_location
 
 DUBAI = ZoneInfo('Asia/Dubai')
 DASHBOARD_SHIFTS = {'General - UAE', 'Enterprise Sales Shift', 'Presales'}
@@ -26,7 +27,7 @@ def get_today_status():
     if frappe.session.user == 'Guest':
         frappe.throw('Sign in to view attendance', frappe.PermissionError)
     now = datetime.now(DUBAI)
-    key = 'bs-attendance-v2:' + frappe.session.user + ':' + str(now.date())
+    key = 'bs-attendance-v3:' + frappe.session.user + ':' + str(now.date())
     cached = frappe.cache.get_value(key)
     if cached is not None:
         return cached
@@ -62,18 +63,22 @@ def _status(now, user=None):
         ['employee', '=', employee.name],
         ['time', '>=', lower.astimezone(site).replace(tzinfo=None)],
         ['time', '<', upper.astimezone(site).replace(tzinfo=None)]],
-        fields=['time', 'log_type'], order_by='time asc', limit_page_length=0)
+        fields=['time', 'log_type', 'latitude', 'longitude'], order_by='time asc, creation asc, name asc', limit_page_length=0)
     first = last_out = active = None
+    first_location = last_out_location = None
     worked = 0
     for log in logs:
         stamp = frappe.utils.get_datetime(log.time).replace(tzinfo=site).astimezone(DUBAI)
         if stamp > now:
             continue
         if log.log_type == 'IN':
+            if first is None:
+                first_location = format_location(getattr(log, 'latitude', None), getattr(log, 'longitude', None))
             first = first or stamp
             active = active or stamp
         elif log.log_type == 'OUT':
             last_out = stamp
+            last_out_location = format_location(getattr(log, 'latitude', None), getattr(log, 'longitude', None))
             if active:
                 worked += max(0, (stamp - active).total_seconds())
                 active = None
@@ -94,6 +99,7 @@ def _status(now, user=None):
     return dict(visible=True, date=str(day), server_now=iso(now),
         shift_start=iso(start), shift_end=iso(end), grace_min=0,
         first_in=iso(first), last_out=iso(last_out), checked_in=bool(active),
+        first_in_location=first_location, last_out_location=last_out_location,
         active_since=iso(active), worked_minutes=int(worked // 60),
         late_minutes=max(0, int((first-start).total_seconds() // 60)) if first else 0,
         early_exit_minutes=max(0, int((end-last_out).total_seconds() // 60)) if last_out and not active else 0,

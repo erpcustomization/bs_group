@@ -35,5 +35,9 @@ async function render(t,extra={},module='sales') {
  assert((await render('10:00',{on_leave:true})).innerHTML.includes("You're on leave"));
  assert((await render('10:00',{is_holiday:true})).innerHTML.includes('Enjoy your day off'));
  assert((await render('10:00',{visible:false})).hidden);
+ const located=(await render('18:10',{first_in:iso('09:00'),last_out:iso('18:00'),first_in_location:'GPS 25.00000, 55.00000',last_out_location:'GPS 26.00000, 56.00000'})).innerHTML;
+ assert(located.includes('Check-in:</strong> 9:00 AM \u00b7 GPS 25.00000, 55.00000'));
+ assert(located.includes('Check-out:</strong> 6:00 PM \u00b7 GPS 26.00000, 56.00000'));
+ assert((await render('10:00',{first_in:iso('09:00'),checked_in:true})).innerHTML.includes('Location not recorded'));
  console.log('PASS: shift phases, 9:01 lateness, five module messages, checkout, leave, duty, holiday and hidden missing profile');
 })();

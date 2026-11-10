@@ -12,7 +12,7 @@ function bsDashboardPunches(parent, afterPunch) {
     async function refresh() {
         try {
             state=(await frappe.call({method:'bsgroup.dashboard_punch.context',quiet:true})).message;
-            status.text(state.allowed?(state.last_time?__('Last {0}: {1}',[state.last_type==='IN'?__('Check In'):__('Check Out'),frappe.datetime.str_to_user(state.last_time)]):__('No attendance punches yet')):__('Contact HR to enable check-in access.'));
+            status.text(state.allowed?(state.last_time?__('Last {0}: {1}',[state.last_type==='IN'?__('Check In'):__('Check Out'),frappe.datetime.str_to_user(state.last_time)+' · '+(state.last_location || __('Location not recorded'))]):__('No attendance punches yet')):__('Contact HR to enable check-in access.'));
             buttons.IN.prop('disabled',busy || !state.allowed || state.last_type==='IN');
             buttons.OUT.prop('disabled',busy || !state.allowed || state.last_type!=='IN');
         } catch(e) {state=null;Object.values(buttons).forEach(b=>b.prop('disabled',true));status.text(__('Attendance unavailable. Please contact HR or reload.'));}
@@ -387,7 +387,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
                 const labels={on_time:'On time',late:'Late',leave:'Leave',off:'Off',on_duty:'On duty / WFH',not_started:'Not started yet · starts at 9 AM',no_checkin:'No check-in',pending_checkout:'Check-in recorded; checkout pending (not counted as late)'};
                 a.days.forEach(d=>{
                     const enabled=leaveContext?.can_create && d.date===leaveContext.today && !leaveContext.today_locked && ['no_checkin','not_started'].includes(d.status);
-                    const label=`${d.date}: ${labels[d.status]}\nCheck-in: ${d.check_in || 'Not recorded'}\nCheck-out: ${d.check_out || 'Not recorded'}\nDubai time · ${duration(d.working_minutes)}${d.holiday?' · '+d.holiday:''} · ${enabled?'Apply for leave':'Locked · contact HR for corrections'}`;
+                    const label=`${d.date}: ${labels[d.status]}\nCheck-in: ${d.check_in ? d.check_in+' · '+(d.check_in_location || 'Location not recorded') : 'Not recorded'}\nCheck-out: ${d.check_out ? d.check_out+' · '+(d.check_out_location || 'Location not recorded') : 'Not recorded'}\nDubai time · ${duration(d.working_minutes)}${d.holiday?' · '+d.holiday:''} · ${enabled?'Apply for leave':'Locked · contact HR for corrections'}`;
                     const cell=$('<span>').addClass('bs-att-day-'+d.status).text(Number(d.date.slice(-2))).attr('title',label).attr('aria-label',label).appendTo(days);
                     if(enabled) cell.attr({role:'button',tabindex:'0'}).on('click',()=>applyLeave(d.date)).on('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();applyLeave(d.date);}});
                 });

@@ -1,0 +1,353 @@
+Attendance recorded locations - UAE - 20261110
+
+diff --git a/bsgroup/attendance_location.py b/bsgroup/attendance_location.py
+new file mode 100644
+index 0000000..4c1c7fa
+--- /dev/null
++++ b/bsgroup/attendance_location.py
+@@ -0,0 +1,17 @@
++"""Format recorded GPS only; never request or transmit an employee's location."""
++import math
++
++
++def format_location(latitude, longitude):
++    missing = 'Location not recorded'
++    if latitude is None or longitude is None or latitude == '' or longitude == '':
++        return missing
++    try:
++        lat, lon = float(latitude), float(longitude)
++    except (TypeError, ValueError):
++        return missing
++    if (not math.isfinite(lat) or not math.isfinite(lon)
++            or not -90 <= lat <= 90 or not -180 <= lon <= 180
++            or (lat == 0 and lon == 0)):
++        return missing
++    return f'GPS {lat:.5f}, {lon:.5f}'
+diff --git a/bsgroup/attendance_widget.py b/bsgroup/attendance_widget.py
+index dfdc68c..7767a86 100644
+--- a/bsgroup/attendance_widget.py
++++ b/bsgroup/attendance_widget.py
+@@ -3,6 +3,7 @@ from datetime import datetime, time, timedelta
+ from zoneinfo import ZoneInfo
+ 
+ import frappe
++from bsgroup.attendance_location import format_location
+ 
+ DUBAI = ZoneInfo('Asia/Dubai')
+ DASHBOARD_SHIFTS = {'General - UAE', 'Enterprise Sales Shift', 'Presales'}
+@@ -26,7 +27,7 @@ def get_today_status():
+     if frappe.session.user == 'Guest':
+         frappe.throw('Sign in to view attendance', frappe.PermissionError)
+     now = datetime.now(DUBAI)
+-    key = 'bs-attendance-v2:' + frappe.session.user + ':' + str(now.date())
++    key = 'bs-attendance-v3:' + frappe.session.user + ':' + str(now.date())
+     cached = frappe.cache.get_value(key)
+     if cached is not None:
+         return cached
+@@ -62,18 +63,22 @@ def _status(now, user=None):
+         ['employee', '=', employee.name],
+         ['time', '>=', lower.astimezone(site).replace(tzinfo=None)],
+         ['time', '<', upper.astimezone(site).replace(tzinfo=None)]],
+-        fields=['time', 'log_type'], order_by='time asc', limit_page_length=0)
++        fields=['time', 'log_type', 'latitude', 'longitude'], order_by='time asc, creation asc, name asc', limit_page_length=0)
+     first = last_out = active = None
++    first_location = last_out_location = None
+     worked = 0
+     for log in logs:
+         stamp = frappe.utils.get_datetime(log.time).replace(tzinfo=site).astimezone(DUBAI)
+         if stamp > now:
+             continue
+         if log.log_type == 'IN':
++            if first is None:
++                first_location = format_location(getattr(log, 'latitude', None), getattr(log, 'longitude', None))
+             first = first or stamp
+             active = active or stamp
+         elif log.log_type == 'OUT':
+             last_out = stamp
++            last_out_location = format_location(getattr(log, 'latitude', None), getattr(log, 'longitude', None))
+             if active:
+                 worked += max(0, (stamp - active).total_seconds())
+                 active = None
+@@ -94,6 +99,7 @@ def _status(now, user=None):
+     return dict(visible=True, date=str(day), server_now=iso(now),
+         shift_start=iso(start), shift_end=iso(end), grace_min=0,
+         first_in=iso(first), last_out=iso(last_out), checked_in=bool(active),
++        first_in_location=first_location, last_out_location=last_out_location,
+         active_since=iso(active), worked_minutes=int(worked // 60),
+         late_minutes=max(0, int((first-start).total_seconds() // 60)) if first else 0,
+         early_exit_minutes=max(0, int((end-last_out).total_seconds() // 60)) if last_out and not active else 0,
+diff --git a/bsgroup/bs_group/page/my_work_dashboard/my_work_dashboard.js b/bsgroup/bs_group/page/my_work_dashboard/my_work_dashboard.js
+index 731c60b..76b6bfe 100644
+--- a/bsgroup/bs_group/page/my_work_dashboard/my_work_dashboard.js
++++ b/bsgroup/bs_group/page/my_work_dashboard/my_work_dashboard.js
+@@ -12,7 +12,7 @@ function bsDashboardPunches(parent, afterPunch) {
+     async function refresh() {
+         try {
+             state=(await frappe.call({method:'bsgroup.dashboard_punch.context',quiet:true})).message;
+-            status.text(state.allowed?(state.last_time?__('Last {0}: {1}',[state.last_type==='IN'?__('Check In'):__('Check Out'),frappe.datetime.str_to_user(state.last_time)]):__('No attendance punches yet')):__('Contact HR to enable check-in access.'));
++            status.text(state.allowed?(state.last_time?__('Last {0}: {1}',[state.last_type==='IN'?__('Check In'):__('Check Out'),frappe.datetime.str_to_user(state.last_time)+' · '+(state.last_location || __('Location not recorded'))]):__('No attendance punches yet')):__('Contact HR to enable check-in access.'));
+             buttons.IN.prop('disabled',busy || !state.allowed || state.last_type==='IN');
+             buttons.OUT.prop('disabled',busy || !state.allowed || state.last_type!=='IN');
+         } catch(e) {state=null;Object.values(buttons).forEach(b=>b.prop('disabled',true));status.text(__('Attendance unavailable. Please contact HR or reload.'));}
+@@ -387,7 +387,7 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
+                 const labels={on_time:'On time',late:'Late',leave:'Leave',off:'Off',on_duty:'On duty / WFH',not_started:'Not started yet · starts at 9 AM',no_checkin:'No check-in',pending_checkout:'Check-in recorded; checkout pending (not counted as late)'};
+                 a.days.forEach(d=>{
+                     const enabled=leaveContext?.can_create && d.date===leaveContext.today && !leaveContext.today_locked && ['no_checkin','not_started'].includes(d.status);
+-                    const label=`${d.date}: ${labels[d.status]}\nCheck-in: ${d.check_in || 'Not recorded'}\nCheck-out: ${d.check_out || 'Not recorded'}\nDubai time · ${duration(d.working_minutes)}${d.holiday?' · '+d.holiday:''} · ${enabled?'Apply for leave':'Locked · contact HR for corrections'}`;
++                    const label=`${d.date}: ${labels[d.status]}\nCheck-in: ${d.check_in ? d.check_in+' · '+(d.check_in_location || 'Location not recorded') : 'Not recorded'}\nCheck-out: ${d.check_out ? d.check_out+' · '+(d.check_out_location || 'Location not recorded') : 'Not recorded'}\nDubai time · ${duration(d.working_minutes)}${d.holiday?' · '+d.holiday:''} · ${enabled?'Apply for leave':'Locked · contact HR for corrections'}`;
+                     const cell=$('<span>').addClass('bs-att-day-'+d.status).text(Number(d.date.slice(-2))).attr('title',label).attr('aria-label',label).appendTo(days);
+                     if(enabled) cell.attr({role:'button',tabindex:'0'}).on('click',()=>applyLeave(d.date)).on('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();applyLeave(d.date);}});
+                 });
+diff --git a/bsgroup/bs_group/report/employee_checkin_report/employee_checkin_report.py b/bsgroup/bs_group/report/employee_checkin_report/employee_checkin_report.py
+index 738effc..b580264 100644
+--- a/bsgroup/bs_group/report/employee_checkin_report/employee_checkin_report.py
++++ b/bsgroup/bs_group/report/employee_checkin_report/employee_checkin_report.py
+@@ -10,6 +10,7 @@ from frappe import _
+ from frappe.utils import add_days, getdate, nowdate, time_diff_in_hours
+ 
+ from bsgroup.utils.employee_checkin import _haversine_distance_meters
++from bsgroup.attendance_location import format_location
+ 
+ DEFAULT_NOMINATIM_URL = "https://nominatim.openstreetmap.org/reverse"
+ 
+@@ -112,12 +113,14 @@ def get_columns(filters=None) -> list[dict]:
+ 			"fieldtype": "Datetime",
+ 			"width": 180,
+ 		},
++		{"label": _("Check-In Location"), "fieldname": "checkin_location", "fieldtype": "Data", "width": 240},
+ 		{
+ 			"label": _("Check-Out Time"),
+ 			"fieldname": "checkout_time",
+ 			"fieldtype": "Datetime",
+ 			"width": 180,
+ 		},
++		{"label": _("Check-Out Location"), "fieldname": "checkout_location", "fieldtype": "Data", "width": 240},
+ 		{
+ 			"label": _("Total Working Hours"),
+ 			"fieldname": "working_hours",
+@@ -188,12 +191,12 @@ def get_head_offices():
+ 	return offices
+ 
+ 
+-def get_place(latitude, longitude, head_offices):
++def get_place(latitude, longitude, head_offices, allow_external=True):
+ 	"""Nearest Head Office name if the check-in falls within that office's
+ 	allowed radius; otherwise a real-world address via reverse geocoding.
+ 	Returns None only when there are no coordinates or geocoding fails."""
+ 	lat, lon = _parse_coordinate(latitude), _parse_coordinate(longitude)
+-	if lat is None or lon is None:
++	if format_location(lat, lon) == "Location not recorded":
+ 		return None
+ 
+ 	nearest = None
+@@ -207,10 +210,16 @@ def get_place(latitude, longitude, head_offices):
+ 
+ 	if nearest is not None:
+ 		allowed_m = float(nearest.allowd_distance_meters or 0)
+-		if not allowed_m or nearest_distance <= allowed_m:
++		if allowed_m > 0 and nearest_distance <= allowed_m:
+ 			return nearest.title or nearest.name
+ 
+-	return reverse_geocode(lat, lon)
++	return reverse_geocode(lat, lon) if allow_external else None
++
++
++def recorded_location(latitude, longitude, head_offices):
++	gps = format_location(_parse_coordinate(latitude), _parse_coordinate(longitude))
++	place = get_place(latitude, longitude, head_offices, allow_external=False)
++	return f"{place} · {gps}" if place else gps
+ 
+ 
+ def reverse_geocode(latitude, longitude):
+@@ -296,13 +305,21 @@ def get_data(filters=None):
+ 				',', 1
+ 			) AS shift,
+ 			SUBSTRING_INDEX(
+-				GROUP_CONCAT(CASE WHEN ec.log_type = 'IN' THEN ec.latitude END ORDER BY ec.time ASC),
++				GROUP_CONCAT(CASE WHEN ec.log_type = 'IN' THEN COALESCE(ec.latitude, '') END ORDER BY ec.time ASC, ec.creation ASC, ec.name ASC),
+ 				',', 1
+ 			) AS latitude,
+ 			SUBSTRING_INDEX(
+-				GROUP_CONCAT(CASE WHEN ec.log_type = 'IN' THEN ec.longitude END ORDER BY ec.time ASC),
++				GROUP_CONCAT(CASE WHEN ec.log_type = 'IN' THEN COALESCE(ec.longitude, '') END ORDER BY ec.time ASC, ec.creation ASC, ec.name ASC),
++				',', 1
++			) AS longitude,
++			SUBSTRING_INDEX(
++				GROUP_CONCAT(CASE WHEN ec.log_type = 'OUT' THEN COALESCE(ec.latitude, '') END ORDER BY ec.time DESC, ec.creation DESC, ec.name DESC),
++				',', 1
++			) AS checkout_latitude,
++			SUBSTRING_INDEX(
++				GROUP_CONCAT(CASE WHEN ec.log_type = 'OUT' THEN COALESCE(ec.longitude, '') END ORDER BY ec.time DESC, ec.creation DESC, ec.name DESC),
+ 				',', 1
+-			) AS longitude
++			) AS checkout_longitude
+ 		FROM `tabEmployee Checkin` ec
+ 		{where_clause}
+ 		GROUP BY ec.employee, DATE(ec.time)
+@@ -434,7 +451,9 @@ def get_data(filters=None):
+ 				"working_hours": working_hours,
+ 				"latitude": latitude,
+ 				"longitude": longitude,
+-				"place": get_place(latitude, longitude, head_offices),
++				"place": get_place(latitude, longitude, head_offices, allow_external=False),
++				"checkin_location": recorded_location(latitude, longitude, head_offices) if checkin else "",
++				"checkout_location": recorded_location(row.checkout_latitude, row.checkout_longitude, head_offices) if checkout else "",
+ 			})
+ 
+ 	data.sort(key=lambda r: (r["work_date"] is None, r["work_date"]), reverse=True)
+diff --git a/bsgroup/dashboard_punch.py b/bsgroup/dashboard_punch.py
+index e676212..83b5c3d 100644
+--- a/bsgroup/dashboard_punch.py
++++ b/bsgroup/dashboard_punch.py
+@@ -1,6 +1,7 @@
+ """Current-user dashboard punches using normal HRMS insert permissions."""
+ import math
+ import frappe
++from bsgroup.attendance_location import format_location
+ from frappe.utils import now_datetime, cint
+ 
+ 
+@@ -12,7 +13,7 @@ def employee():
+ 
+ 
+ def latest(emp):
+-    rows=frappe.get_all('Employee Checkin',filters={'employee':emp},fields=['name','log_type','time'],order_by='time desc, creation desc',limit_page_length=1)
++    rows=frappe.get_all('Employee Checkin',filters={'employee':emp},fields=['name','log_type','time','latitude','longitude'],order_by='time desc, creation desc',limit_page_length=1)
+     return rows[0] if rows else None
+ 
+ 
+@@ -23,6 +24,7 @@ def context():
+     row=latest(emp)
+     return dict(allowed=allowed,last_name=row.name if row else '',last_type=row.log_type if row else None,
+                 last_time=str(row.time) if row else None,
++                last_location=format_location(row.latitude, row.longitude) if row else None,
+                 location_required=bool(cint(frappe.db.get_single_value('HR Settings','allow_geolocation_tracking'))))
+ 
+ 
+diff --git a/bsgroup/hr_attendance.py b/bsgroup/hr_attendance.py
+index f9eda0b..6b099dc 100644
+--- a/bsgroup/hr_attendance.py
++++ b/bsgroup/hr_attendance.py
+@@ -1,6 +1,7 @@
+ """Permission-filtered HR calendar; manual entries never fabricate punches."""
+ from datetime import date, timedelta
+ import frappe
++from bsgroup.attendance_location import format_location
+ from frappe.utils import nowdate
+ from bsgroup.hr_management import _guard
+ 
+@@ -32,7 +33,7 @@ def calendar_days(start, end, logs, leaves, attendance, requests, today):
+     for row in logs:
+         key = str(row["time"])[:10]
+         if key in days:
+-            days[key]["punches"].append(dict(row))
++            days[key]["punches"].append(dict(row, location=format_location(row.get("latitude"), row.get("longitude"))))
+     for row in attendance:
+         key = str(row["attendance_date"])[:10]
+         if key in days:
+@@ -67,7 +68,7 @@ def month_view(month, employee=None):
+     emp = frappe.get_doc("Employee", employee)
+     emp.check_permission("read")
+     restricted = []
+-    logs = _rows("Employee Checkin", ["name", "time", "log_type"],
++    logs = _rows("Employee Checkin", ["name", "time", "log_type", "latitude", "longitude"],
+                  [["employee", "=", employee], ["time", ">=", str(start) + " 00:00:00"],
+                   ["time", "<", str(end) + " 00:00:00"]], restricted)
+     overlap = [["employee", "=", employee], ["docstatus", "!=", 2],
+diff --git a/bsgroup/monthly_attendance.py b/bsgroup/monthly_attendance.py
+index 2b9a84b..da160d0 100644
+--- a/bsgroup/monthly_attendance.py
++++ b/bsgroup/monthly_attendance.py
+@@ -2,6 +2,7 @@
+ from datetime import date, datetime, time, timedelta
+ from zoneinfo import ZoneInfo
+ import frappe
++from bsgroup.attendance_location import format_location
+ 
+ TZ = ZoneInfo('Asia/Dubai')
+ 
+@@ -46,7 +47,7 @@ def get_month(month):
+     end = date(start.year + (start.month == 12), start.month % 12 + 1, 1)
+     now = datetime.now(TZ)
+     phase = 'before-start' if now.time() < time(9) else 'started'
+-    key = f'bs-attendance-month-v4:{frappe.session.user}:{month}:{now.date()}:{phase}'
++    key = f'bs-attendance-month-v5:{frappe.session.user}:{month}:{now.date()}:{phase}'
+     cached = frappe.cache.get_value(key)
+     if cached is not None:
+         return cached
+@@ -59,11 +60,17 @@ def get_month(month):
+     lower = datetime.combine(start, time(), TZ).astimezone(site).replace(tzinfo=None)
+     upper = datetime.combine(end, time(), TZ).astimezone(site).replace(tzinfo=None)
+     logs = frappe.get_all('Employee Checkin', filters=[['employee', '=', emp.name],
+-        ['time', '>=', lower], ['time', '<', upper]], fields=['time', 'log_type'], limit_page_length=0)
++        ['time', '>=', lower], ['time', '<', upper]], fields=['time', 'log_type', 'latitude', 'longitude'],
++        order_by='time asc, creation asc, name asc', limit_page_length=0)
+     by_day = {}
++    locations = {}
+     for log in logs:
+         stamp = frappe.utils.get_datetime(log.time).replace(tzinfo=site).astimezone(TZ)
+         by_day.setdefault(stamp.date(), []).append((stamp, log.log_type))
++        key = (stamp, log.log_type)
++        location = format_location(getattr(log, 'latitude', None), getattr(log, 'longitude', None))
++        if log.log_type == 'OUT' or key not in locations:
++            locations[key] = location
+     overlap = [['employee', '=', emp.name], ['docstatus', '=', 1],
+                ['from_date', '<', end], ['to_date', '>=', start]]
+     leaves = frappe.get_all('Leave Application', filters=overlap + [['status', '=', 'Approved']],
+@@ -126,6 +133,8 @@ def get_month(month):
+         days.append(dict(date=str(day), status=status, working_minutes=worked,
+             check_in=first.strftime('%I:%M %p') if first else None,
+             check_out=last_out.strftime('%I:%M %p') if last_out else None,
++            check_in_location=locations.get((first, 'IN')),
++            check_out_location=locations.get((last_out, 'OUT')),
+             incomplete=incomplete, holiday=holiday or ''))
+         day += timedelta(days=1)
+     result = dict(visible=True, month=month, totals=totals, days=days,
+diff --git a/bsgroup/public/js/attendance_widget.js b/bsgroup/public/js/attendance_widget.js
+index 58255cb..f08243b 100644
+--- a/bsgroup/public/js/attendance_widget.js
++++ b/bsgroup/public/js/attendance_widget.js
+@@ -36,7 +36,9 @@
+         const timeline=[[start,'start'],[lunch,'lunch'],[wrap,'wrap-up'],[end,'finish']];
+         let current=0; timeline.forEach(([value],i)=>{if(now>=value) current=i;});
+         const sub = rest ? (a.is_holiday ? a.holiday_name : '') : a.first_in && !a.on_duty ? a.late_minutes ? 'You started late today – stay focused and be productive.' : 'Great start! Make the day count.' : '';
+-        el.innerHTML=`<div class="bs-att-ring" role="img" aria-label="${esc(done ? phase : duration(mins(target,now))+' '+label)}" style="--lunch:${percent(lunch)}%;--back:${percent(back)}%;--wrap:${percent(wrap)}%;--marker:${marker}deg"><span class="bs-att-now"></span><div><strong>${done ? (rest?'☀':'✓') : duration(mins(target,now))}</strong><small>${esc(done ? phase : label)}</small></div></div><div class="bs-att-content"><div class="bs-att-top"><span>Today’s attendance</span><span class="bs-att-badges">${badges.map(([text,tone])=>`<b class="bs-att-badge ${tone}">${esc(text)}</b>`).join('')}</span></div><div class="bs-att-phase ${colour}">${esc(phase.toUpperCase())}</div><h3>${esc(headline)}</h3>${sub?`<p>${esc(sub)}</p>`:''}<div class="bs-att-timeline">${timeline.map(([value,text],i)=>`<${i===current?'b':'span'}>${esc(clock(value))} ${text}</${i===current?'b':'span'}>`).join('<i>·</i>')}</div><small class="bs-att-foot">Dubai time · Come on time, work on time, go on time.</small></div>`;
++        const punches = [['Check-in',a.first_in,a.first_in_location],['Check-out',a.last_out,a.last_out_location]]
++            .map(([label,stamp,location]) => `<div><strong>${esc(label)}:</strong> ${stamp ? `${esc(clock(stamp))} · ${esc(location || 'Location not recorded')}` : 'Not recorded'}</div>`).join('');
++        el.innerHTML=`<div class="bs-att-ring" role="img" aria-label="${esc(done ? phase : duration(mins(target,now))+' '+label)}" style="--lunch:${percent(lunch)}%;--back:${percent(back)}%;--wrap:${percent(wrap)}%;--marker:${marker}deg"><span class="bs-att-now"></span><div><strong>${done ? (rest?'☀':'✓') : duration(mins(target,now))}</strong><small>${esc(done ? phase : label)}</small></div></div><div class="bs-att-content"><div class="bs-att-top"><span>Today’s attendance</span><span class="bs-att-badges">${badges.map(([text,tone])=>`<b class="bs-att-badge ${tone}">${esc(text)}</b>`).join('')}</span></div><div class="bs-att-phase ${colour}">${esc(phase.toUpperCase())}</div><h3>${esc(headline)}</h3>${sub?`<p>${esc(sub)}</p>`:''}<div class="bs-att-punch-locations" style="font-size:11px;line-height:1.6;margin-top:8px;overflow-wrap:anywhere">${punches}</div><div class="bs-att-timeline">${timeline.map(([value,text],i)=>`<${i===current?'b':'span'}>${esc(clock(value))} ${text}</${i===current?'b':'span'}>`).join('<i>·</i>')}</div><small class="bs-att-foot">Dubai time · Come on time, work on time, go on time.</small></div>`;
+     }
+     async function refresh() {
+         if (!data || Date.now()-fetched>=300000) {
+diff --git a/bsgroup/public/js/hr_attendance.js b/bsgroup/public/js/hr_attendance.js
+index 2b8d8ad..c013fad 100644
+--- a/bsgroup/public/js/hr_attendance.js
++++ b/bsgroup/public/js/hr_attendance.js
+@@ -9,7 +9,7 @@ window.bsHRAttendance = function(main) {
+     let data, sequence=0;
+     if(!document.getElementById('hrcal-style')) $('<style id="hrcal-style">').text(`
+       .hrcal-controls{display:flex;gap:14px;flex-wrap:wrap;margin:0 0 18px}.hrcal-controls label{font-size:12px;color:#627587;min-width:180px}.hrcal-controls select{min-width:280px}.hrcal-controls .form-control{margin-top:6px}
+-      .hrcal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin:14px 0}.hrcal-weekday{padding:8px;font-size:11px;color:#738496;text-align:center}.hrcal-day{border:1px solid #dfe7ed;border-radius:10px;background:#fff;min-height:106px;padding:10px;text-align:left;color:#193047;display:flex;flex-direction:column;gap:5px;cursor:pointer}.hrcal-day:hover{border-color:#27948e;box-shadow:0 2px 10px #16334612}.hrcal-day strong{font-size:14px}.hrcal-day small{font-size:10px;line-height:1.4}.hrcal-day.has-punch{border-top:3px solid #268b7f}.hrcal-day.has-leave{background:#eff4fb;border-top:3px solid #6487b5}.hrcal-day.has-pending{border-bottom:3px solid #caa266}.hrcal-day.is-future{color:#718294;background:#fafbfd}.hrcal-day.is-today strong{color:#087c75}.hrcal-note{font-size:11px;color:#738496;margin:10px 0}.hrcal-summary{display:flex;gap:12px;flex-wrap:wrap}.hrcal-summary span{background:#edf3f7;border-radius:7px;padding:7px 10px;font-size:12px}.hrcal-detail h5{margin:18px 0 8px;font-size:13px}.hrcal-detail p{font-size:12px}.hrcal-detail a{color:#215b79}.hrcal-time{font-variant-numeric:tabular-nums}
++      .hrcal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin:14px 0}.hrcal-weekday{padding:8px;font-size:11px;color:#738496;text-align:center}.hrcal-day{border:1px solid #dfe7ed;border-radius:10px;background:#fff;min-height:106px;padding:10px;text-align:left;color:#193047;display:flex;flex-direction:column;gap:5px;cursor:pointer}.hrcal-day:hover{border-color:#27948e;box-shadow:0 2px 10px #16334612}.hrcal-day strong{font-size:14px}.hrcal-day small{font-size:10px;line-height:1.4;overflow-wrap:anywhere}.hrcal-day.has-punch{border-top:3px solid #268b7f}.hrcal-day.has-leave{background:#eff4fb;border-top:3px solid #6487b5}.hrcal-day.has-pending{border-bottom:3px solid #caa266}.hrcal-day.is-future{color:#718294;background:#fafbfd}.hrcal-day.is-today strong{color:#087c75}.hrcal-note{font-size:11px;color:#738496;margin:10px 0}.hrcal-summary{display:flex;gap:12px;flex-wrap:wrap}.hrcal-summary span{background:#edf3f7;border-radius:7px;padding:7px 10px;font-size:12px}.hrcal-detail h5{margin:18px 0 8px;font-size:13px}.hrcal-detail p{font-size:12px}.hrcal-detail a{color:#215b79}.hrcal-time{font-variant-numeric:tabular-nums}
+       @media(max-width:760px){.hrcal-day{padding:6px;min-height:90px}.hrcal-day small{font-size:9px}.hrcal-grid{gap:3px}.hrcal-controls select{min-width:200px}}
+     `).appendTo(document.head);
+     const link = (dt,name,label) => `<a href="/desk/${frappe.router.slug(dt)}/${encodeURIComponent(name)}">${esc(label || name)}</a>`;
+@@ -18,7 +18,7 @@ window.bsHRAttendance = function(main) {
+     function detail(day) {
+         const d = new frappe.ui.Dialog({title: `${employee.find(':selected').text()} · ${frappe.datetime.str_to_user(day.date)}`,size:'large',fields:[{fieldname:'details',fieldtype:'HTML'}]});
+         let html='<div class="hrcal-detail"><h5>Recorded check-in / check-out</h5>';
+-        html += day.punches.length ? `<table class="hrm-table"><tr><th>Type</th><th>Time</th><th>Record</th></tr>${day.punches.map(p=>`<tr><td>${esc(p.log_type || 'Unspecified')}</td><td class="hrcal-time">${esc(clock(p))}</td><td>${link('Employee Checkin',p.name)}</td></tr>`).join('')}</table>` : '<p>No check-in or check-out records for this date.</p>';
++        html += day.punches.length ? `<table class="hrm-table"><tr><th>Type</th><th>Time</th><th>Location</th><th>Record</th></tr>${day.punches.map(p=>`<tr><td>${esc(p.log_type || 'Unspecified')}</td><td class="hrcal-time">${esc(clock(p))}</td><td>${esc(p.location || 'Location not recorded')}</td><td>${link('Employee Checkin',p.name)}</td></tr>`).join('')}</table>` : '<p>No check-in or check-out records for this date.</p>';
+         html += '<h5>Leave applications</h5>' + (day.leaves.length ? day.leaves.map(l=>`<p>${link('Leave Application',l.name,leaveLabel(l))}</p>`).join('') : '<p>No leave application for this date.</p>');
+         html += '<h5>HR attendance records</h5>' + (day.attendance.length ? day.attendance.map(a=>`<p>${link('Attendance',a.name,`${a.status} · ${a.docstatus===1?'Submitted':'Draft'} · ${a.name}`)}</p>`).join('') : '<p>No HR attendance record.</p>');
+         html += '<h5>Attendance requests</h5>' + (day.requests.length ? day.requests.map(r=>`<p>${link('Attendance Request',r.name,`${r.reason} · ${r.docstatus===1?'Submitted':'Draft'}${r.is_half_day?' · half day':''}`)}</p>`).join('') : '<p>No attendance request.</p>');
+@@ -67,8 +67,8 @@ window.bsHRAttendance = function(main) {
+             const ins=day.punches.filter(p=>p.log_type==='IN'), outs=day.punches.filter(p=>p.log_type==='OUT');
+             const approved=day.leaves.filter(l=>l.approved), pending=day.leaves.filter(l=>!l.approved && !['Rejected','Cancelled'].includes(l.status));
+             const labels=[];
+-            if(ins.length)labels.push(`IN ${clock(ins[0])}`);
+-            if(outs.length)labels.push(`OUT ${clock(outs[outs.length-1])}`);
++            if(ins.length)labels.push(`IN ${clock(ins[0])} · ${ins[0].location || 'Location not recorded'}`);
++            if(outs.length)labels.push(`OUT ${clock(outs[outs.length-1])} · ${outs[outs.length-1].location || 'Location not recorded'}`);
+             if(!day.punches.length) labels.push(day.future?'Upcoming':'No punches recorded');
+             if(day.punches.length>2)labels.push(`${day.punches.length} punch records`);
+             approved.forEach(l=>labels.push(`${l.is_half_day?'½ day ':''}${l.leave_type} · approved`));

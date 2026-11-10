@@ -10,6 +10,7 @@ from frappe import _
 from frappe.utils import add_days, getdate, nowdate, time_diff_in_hours
 
 from bsgroup.utils.employee_checkin import _haversine_distance_meters
+from bsgroup.attendance_location import format_location
 
 DEFAULT_NOMINATIM_URL = "https://nominatim.openstreetmap.org/reverse"
 
@@ -112,12 +113,14 @@ def get_columns(filters=None) -> list[dict]:
 			"fieldtype": "Datetime",
 			"width": 180,
 		},
+		{"label": _("Check-In Location"), "fieldname": "checkin_location", "fieldtype": "Data", "width": 240},
 		{
 			"label": _("Check-Out Time"),
 			"fieldname": "checkout_time",
 			"fieldtype": "Datetime",
 			"width": 180,
 		},
+		{"label": _("Check-Out Location"), "fieldname": "checkout_location", "fieldtype": "Data", "width": 240},
 		{
 			"label": _("Total Working Hours"),
 			"fieldname": "working_hours",
@@ -188,12 +191,12 @@ def get_head_offices():
 	return offices
 
 
-def get_place(latitude, longitude, head_offices):
+def get_place(latitude, longitude, head_offices, allow_external=True):
 	"""Nearest Head Office name if the check-in falls within that office's
 	allowed radius; otherwise a real-world address via reverse geocoding.
 	Returns None only when there are no coordinates or geocoding fails."""
 	lat, lon = _parse_coordinate(latitude), _parse_coordinate(longitude)
-	if lat is None or lon is None:
+	if format_location(lat, lon) == "Location not recorded":
 		return None
 
 	nearest = None
@@ -207,10 +210,16 @@ def get_place(latitude, longitude, head_offices):
 
 	if nearest is not None:
 		allowed_m = float(nearest.allowd_distance_meters or 0)
-		if not allowed_m or nearest_distance <= allowed_m:
+		if allowed_m > 0 and nearest_distance <= allowed_m:
 			return nearest.title or nearest.name
 
-	return reverse_geocode(lat, lon)
+	return reverse_geocode(lat, lon) if allow_external else None
+
+
+def recorded_location(latitude, longitude, head_offices):
+	gps = format_location(_parse_coordinate(latitude), _parse_coordinate(longitude))
+	place = get_place(latitude, longitude, head_offices, allow_external=False)
+	return f"{place} · {gps}" if place else gps
 
 
 def reverse_geocode(latitude, longitude):
@@ -296,13 +305,21 @@ def get_data(filters=None):
 				',', 1
 			) AS shift,
 			SUBSTRING_INDEX(
-				GROUP_CONCAT(CASE WHEN ec.log_type = 'IN' THEN ec.latitude END ORDER BY ec.time ASC),
+				GROUP_CONCAT(CASE WHEN ec.log_type = 'IN' THEN COALESCE(ec.latitude, '') END ORDER BY ec.time ASC, ec.creation ASC, ec.name ASC),
 				',', 1
 			) AS latitude,
 			SUBSTRING_INDEX(
-				GROUP_CONCAT(CASE WHEN ec.log_type = 'IN' THEN ec.longitude END ORDER BY ec.time ASC),
+				GROUP_CONCAT(CASE WHEN ec.log_type = 'IN' THEN COALESCE(ec.longitude, '') END ORDER BY ec.time ASC, ec.creation ASC, ec.name ASC),
 				',', 1
-			) AS longitude
+			) AS longitude,
+			SUBSTRING_INDEX(
+				GROUP_CONCAT(CASE WHEN ec.log_type = 'OUT' THEN COALESCE(ec.latitude, '') END ORDER BY ec.time DESC, ec.creation DESC, ec.name DESC),
+				',', 1
+			) AS checkout_latitude,
+			SUBSTRING_INDEX(
+				GROUP_CONCAT(CASE WHEN ec.log_type = 'OUT' THEN COALESCE(ec.longitude, '') END ORDER BY ec.time DESC, ec.creation DESC, ec.name DESC),
+				',', 1
+			) AS checkout_longitude
 		FROM `tabEmployee Checkin` ec
 		{where_clause}
 		GROUP BY ec.employee, DATE(ec.time)
@@ -434,7 +451,9 @@ def get_data(filters=None):
 				"working_hours": working_hours,
 				"latitude": latitude,
 				"longitude": longitude,
-				"place": get_place(latitude, longitude, head_offices),
+				"place": get_place(latitude, longitude, head_offices, allow_external=False),
+				"checkin_location": recorded_location(latitude, longitude, head_offices) if checkin else "",
+				"checkout_location": recorded_location(row.checkout_latitude, row.checkout_longitude, head_offices) if checkout else "",
 			})
 
 	data.sort(key=lambda r: (r["work_date"] is None, r["work_date"]), reverse=True)

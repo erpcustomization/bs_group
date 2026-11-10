@@ -1,6 +1,7 @@
 """Permission-filtered HR calendar; manual entries never fabricate punches."""
 from datetime import date, timedelta
 import frappe
+from bsgroup.attendance_location import format_location
 from frappe.utils import nowdate
 from bsgroup.hr_management import _guard
 
@@ -32,7 +33,7 @@ def calendar_days(start, end, logs, leaves, attendance, requests, today):
     for row in logs:
         key = str(row["time"])[:10]
         if key in days:
-            days[key]["punches"].append(dict(row))
+            days[key]["punches"].append(dict(row, location=format_location(row.get("latitude"), row.get("longitude"))))
     for row in attendance:
         key = str(row["attendance_date"])[:10]
         if key in days:
@@ -67,7 +68,7 @@ def month_view(month, employee=None):
     emp = frappe.get_doc("Employee", employee)
     emp.check_permission("read")
     restricted = []
-    logs = _rows("Employee Checkin", ["name", "time", "log_type"],
+    logs = _rows("Employee Checkin", ["name", "time", "log_type", "latitude", "longitude"],
                  [["employee", "=", employee], ["time", ">=", str(start) + " 00:00:00"],
                   ["time", "<", str(end) + " 00:00:00"]], restricted)
     overlap = [["employee", "=", employee], ["docstatus", "!=", 2],
