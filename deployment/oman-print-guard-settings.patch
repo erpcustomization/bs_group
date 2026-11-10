@@ -1,0 +1,14 @@
+# Oman quotation native print callback compatibility - 2026-11-10
+diff --git a/bsgroup/oman_quotation_flow.py b/bsgroup/oman_quotation_flow.py
+index ef6ad11..aee8518 100644
+--- a/bsgroup/oman_quotation_flow.py
++++ b/bsgroup/oman_quotation_flow.py
+@@ -55,7 +55,7 @@ def discount_basis_ready(q):
+         or q.get("apply_discount_on") == "Net Total")
+ 
+ 
+-def require_net_discount(q, method=None):
++def require_net_discount(q, method=None, print_settings=None):
+     if pilot(q) and not discount_basis_ready(q):
+         frappe.throw("Save this quotation to apply its discount before VAT, then review the totals before creating a PDF.")
+ 
