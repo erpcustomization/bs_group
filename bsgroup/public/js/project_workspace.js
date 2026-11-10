@@ -3,6 +3,9 @@
     const esc = value => frappe.utils.escape_html(String(value ?? ''));
     frappe.ui.form.on('Project', {
         refresh(frm) {
+            for (const name of ['connections_tab', 'costing_tab']) {
+                if (frm.fields_dict[name]) frm.set_df_property(name, 'hidden', 1);
+            }
             const field = frm.fields_dict.custom_bs_project_workspace;
             if (!field) {
                 if (frappe.user.has_role('System Manager')) frm.add_custom_button(__('Set Up Project Activities'), async () => {
