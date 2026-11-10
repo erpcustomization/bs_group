@@ -60,6 +60,43 @@ class FlowTests(unittest.TestCase):
     def test_gate_never_enables_uae(self):
         frappe.local.site='erp-bitssecureit.u.frappe.cloud';self.assertFalse(flow.enabled())
         frappe.local.site='erp-om.k.frappe.cloud';frappe.defaults.get_global_default.return_value='0';self.assertFalse(flow.enabled())
+    def test_discount_basis_normalized_before_native_calculation(self):
+        for amount, percentage in ((0,0),(10,0),(0,10)):
+            self.q.update(apply_discount_on='Grand Total',discount_amount=amount,additional_discount_percentage=percentage)
+            flow.before_validate(self.q)
+            self.assertEqual(self.q.apply_discount_on,'Net Total')
+            self.assertEqual((self.q.discount_amount,self.q.additional_discount_percentage),(amount,percentage))
+            self.assertEqual(self.q.total,125)
+    def test_discount_policy_is_oman_only(self):
+        self.q.apply_discount_on='Grand Total'
+        frappe.local.site='erp-bitssecureit.u.frappe.cloud'
+        flow.before_validate(self.q)
+        self.assertEqual(self.q.apply_discount_on,'Grand Total')
+        frappe.local.site='erp-om.k.frappe.cloud';frappe.defaults.get_global_default.return_value='0'
+        flow.before_validate(self.q)
+        self.assertEqual(self.q.apply_discount_on,'Grand Total')
+    def test_discount_basis_retains_submitted_and_cancelled_history(self):
+        for status in (1,2):
+            self.q.docstatus=status;self.q.apply_discount_on='Grand Total'
+            flow.before_validate(self.q)
+            self.assertEqual(self.q.apply_discount_on,'Grand Total')
+        self.q.docstatus=1;self.q._before=Doc(docstatus=1)
+        flow.before_validate(self.q)
+        self.assertEqual(self.q.apply_discount_on,'Grand Total')
+    def test_finalizing_draft_uses_net_basis(self):
+        self.q.docstatus=1;self.q._before=Doc(docstatus=0);self.q.apply_discount_on='Grand Total'
+        flow.before_validate(self.q)
+        self.assertEqual(self.q.apply_discount_on,'Net Total')
+    def test_legacy_and_other_documents_not_enrolled(self):
+        self.q.custom_deal_cost_sheet=None;self.q.custom_oman_flow=0;self.q.apply_discount_on='Grand Total'
+        flow.before_validate(self.q)
+        self.assertEqual(self.q.apply_discount_on,'Grand Total')
+    def test_print_requires_saving_discounted_drafts_first(self):
+        for amount, percentage in ((10,0),(0,5)):
+            self.q.update(apply_discount_on='Grand Total',discount_amount=amount,additional_discount_percentage=percentage)
+            with self.assertRaisesRegex(ValidationError,'Save this quotation'):flow.require_net_discount(self.q)
+            self.q.apply_discount_on='Net Total';flow.require_net_discount(self.q)
+        self.q.docstatus=1;self.q.apply_discount_on='Grand Total';flow.require_net_discount(self.q)
     def test_legacy_submitted_excluded(self):
         self.q.docstatus=1;self.q.custom_oman_flow=0;self.assertFalse(flow.pilot(self.q))
     def test_client_cannot_clear_pilot_to_bypass_lock(self):

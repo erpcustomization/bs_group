@@ -114,6 +114,13 @@
             clientGrid(frm,frm.__oman_client_descriptions);
             if(frm.fields_dict?.custom_oman_revision_no) frm.toggle_display('custom_oman_revision_no',!!data.enabled);
             if(!data.enabled) return;
+            if(data.discount_before_vat && data.editable){
+                frm.set_df_property('apply_discount_on','read_only',1);
+                frm.set_df_property('apply_discount_on','description',__('Discounts are deducted from the net amount before VAT is calculated.'));
+                if(data.can_write && frm.doc.apply_discount_on!=='Net Total'){
+                    await frm.set_value('apply_discount_on','Net Total');
+                }
+            }
             frm.set_df_property('custom_pipeline_stage','read_only',1);
             frm.remove_custom_button(__('Download Enterprise PDF'));
             frm.remove_custom_button(__('Send to Procurement'));

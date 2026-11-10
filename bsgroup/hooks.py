@@ -741,3 +741,9 @@ for _dt in ("Quotation", "Deal Cost Sheet"):
     doctype_js[_dt] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["public/js/oman_quotation_flow.js"]
 doc_events["Quotation"]["before_cancel"].append("bsgroup.oman_quotation_flow.guard_cancel")
 doctype_list_js["Quotation"].append("public/js/oman_quotation_flow_list.js")
+
+# Normalize the basis before the native controller calculates quotation taxes.
+# These functions retain the existing exact Oman pilot gate.
+for _event, _handler in (("before_validate", "before_validate"), ("before_print", "require_net_discount")):
+    _prior = doc_events["Quotation"].get(_event, [])
+    doc_events["Quotation"][_event] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.oman_quotation_flow." + _handler]

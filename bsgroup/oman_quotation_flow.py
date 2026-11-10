@@ -32,6 +32,34 @@ def pilot(q):
                      or (previous and previous.get("custom_oman_flow"))))
 
 
+def before_validate(q, method=None):
+    """Choose the tax-exclusive basis before ERPNext calculates amounts.
+
+    Keep the entered percentage / amount and let the native tax engine allocate
+    the discount and recalculate VAT, currency conversions and rounding.
+    Historical submitted offers retain their saved financial position.
+    """
+    if not pilot(q) or q.docstatus == 2:
+        return
+    previous = q.get_doc_before_save()
+    if previous and previous.docstatus != 0:
+        return
+    if q.docstatus != 0 and not previous:
+        return
+    q.apply_discount_on = "Net Total"
+
+
+def discount_basis_ready(q):
+    return (q.docstatus != 0 or not (
+        flt(q.get("discount_amount")) or flt(q.get("additional_discount_percentage")))
+        or q.get("apply_discount_on") == "Net Total")
+
+
+def require_net_discount(q, method=None):
+    if pilot(q) and not discount_basis_ready(q):
+        frappe.throw("Save this quotation to apply its discount before VAT, then review the totals before creating a PDF.")
+
+
 @contextmanager
 def operation(q, action):
     token = _operation.set((q.name, action))
@@ -252,7 +280,8 @@ def context(quotation):
         editable=q.docstatus == 0 and q.custom_pipeline_stage not in TERMINAL,
         can_write=frappe.has_permission("Quotation", "write", doc=q),
         can_print=frappe.has_permission("Quotation", "print", doc=q),
-        ready_to_convert=complete,
+        ready_to_convert=complete and discount_basis_ready(q),
+        discount_before_vat=True,
         client_descriptions=client_descriptions,
         can_install_descriptions=frappe.session.user == "Administrator" and (not descriptions.enabled()
             or not frappe.db.exists("Custom Field", "Quotation Item-" + descriptions.COSTING)),
@@ -348,6 +377,7 @@ def convert_pdf(quotation, expected_modified):
     q.check_permission("print")
     if str(q.modified) != str(expected_modified):
         frappe.throw("The quotation changed. Save and reload before converting to PDF.")
+    require_net_discount(q)
     if q.docstatus == 0:
         q._validate_mandatory()
     from bsgroup.dcs.quotation_control import validate_position
