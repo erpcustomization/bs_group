@@ -1,0 +1,46 @@
+Project Additional Details 20261110
+
+diff --git a/bsgroup/public/js/project_workspace.js b/bsgroup/public/js/project_workspace.js
+index aa7e6b3..9ee869f 100644
+--- a/bsgroup/public/js/project_workspace.js
++++ b/bsgroup/public/js/project_workspace.js
+@@ -3,6 +3,7 @@
+     const esc = value => frappe.utils.escape_html(String(value ?? ''));
+     frappe.ui.form.on('Project', {
+         refresh(frm) {
++            groupAdditionalDetails(frm);
+             for (const tab of frm.layout.tabs || []) {
+                 if (['connections_tab', 'costing_tab'].includes(tab.df.fieldname)) tab.df.hidden = 1;
+             }
+@@ -22,6 +23,31 @@
+             render(frm, frm.__bs_activity || 'tasks');
+         }
+     });
++    function groupAdditionalDetails(frm) {
++        const tabs = frm.layout.tabs || [];
++        const additional = tabs.find(tab=>tab.df.fieldname==='monitor_progress_tab');
++        const boq = tabs.find(tab=>tab.df.fieldname==='custom_boq_tab');
++        if (!additional || !boq) return;
++        const wasBoqActive = boq.is_active();
++        additional.label = additional.df.label = __('Additional Details');
++        additional.tab_link.find('.nav-link').text(additional.label);
++        if (!additional.wrapper.children('.bs-additional-progress-heading').length) {
++            $('<h4 class="bs-additional-progress-heading" style="margin:20px 20px 8px">').text(__('Progress')).prependTo(additional.wrapper);
++        }
++        // Move the existing controls, keeping their values, editors, validation
++        // and event handlers intact. Repeating refresh never copies a control.
++        if (boq.wrapper.children().length) {
++            if (!additional.wrapper.children('.bs-additional-boq-heading').length) {
++                $('<h4 class="bs-additional-boq-heading" style="margin:24px 20px 8px">').text(__('BOQ')).appendTo(additional.wrapper);
++            }
++            boq.wrapper.children().appendTo(additional.wrapper);
++        }
++        for (const field of Object.values(frm.fields_dict)) {
++            if (field.tab===boq) additional.add_field(field);
++        }
++        boq.df.hidden = 1;
++        if (wasBoqActive) additional.set_active();
++    }
+     async function renderPlan(frm) {
+         const field = frm.fields_dict.custom_bs_project_plan;
+         if (!field) {
