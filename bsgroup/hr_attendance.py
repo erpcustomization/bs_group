@@ -1,7 +1,7 @@
 """Permission-filtered HR calendar; manual entries never fabricate punches."""
 from datetime import date, timedelta
 import frappe
-from bsgroup.attendance_location import format_location
+from bsgroup.attendance_place import describe_location
 from frappe.utils import nowdate
 from bsgroup.hr_management import _guard
 
@@ -33,7 +33,7 @@ def calendar_days(start, end, logs, leaves, attendance, requests, today):
     for row in logs:
         key = str(row["time"])[:10]
         if key in days:
-            days[key]["punches"].append(dict(row, location=format_location(row.get("latitude"), row.get("longitude"))))
+            days[key]["punches"].append(dict(row, location=describe_location(row.get("latitude"), row.get("longitude"))))
     for row in attendance:
         key = str(row["attendance_date"])[:10]
         if key in days:

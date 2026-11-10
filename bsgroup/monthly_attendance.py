@@ -2,7 +2,7 @@
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 import frappe
-from bsgroup.attendance_location import format_location
+from bsgroup.attendance_place import describe_location
 
 TZ = ZoneInfo('Asia/Dubai')
 
@@ -47,7 +47,7 @@ def get_month(month):
     end = date(start.year + (start.month == 12), start.month % 12 + 1, 1)
     now = datetime.now(TZ)
     phase = 'before-start' if now.time() < time(9) else 'started'
-    key = f'bs-attendance-month-v5:{frappe.session.user}:{month}:{now.date()}:{phase}'
+    key = f'bs-attendance-month-v6:{frappe.session.user}:{month}:{now.date()}:{phase}'
     cached = frappe.cache.get_value(key)
     if cached is not None:
         return cached
@@ -68,7 +68,7 @@ def get_month(month):
         stamp = frappe.utils.get_datetime(log.time).replace(tzinfo=site).astimezone(TZ)
         by_day.setdefault(stamp.date(), []).append((stamp, log.log_type))
         key = (stamp, log.log_type)
-        location = format_location(getattr(log, 'latitude', None), getattr(log, 'longitude', None))
+        location = describe_location(getattr(log, 'latitude', None), getattr(log, 'longitude', None))
         if log.log_type == 'OUT' or key not in locations:
             locations[key] = location
     overlap = [['employee', '=', emp.name], ['docstatus', '=', 1],

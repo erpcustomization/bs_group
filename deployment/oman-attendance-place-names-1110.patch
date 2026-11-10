@@ -1,0 +1,126 @@
+Attendance stored place names - oman - 20261110
+
+diff --git a/bsgroup/attendance_place.py b/bsgroup/attendance_place.py
+new file mode 100644
+index 0000000..0eec390
+--- /dev/null
++++ b/bsgroup/attendance_place.py
+@@ -0,0 +1,34 @@
++"""Display already stored place names alongside permission-scoped punch GPS.
++
++No coordinates are sent to an external mapping service from attendance views.
++"""
++import frappe
++from bsgroup.attendance_location import format_location
++
++
++def describe_location(latitude, longitude, head_offices=None):
++    gps = format_location(latitude, longitude)
++    if gps == 'Location not recorded':
++        return gps
++    lat, lon = float(latitude), float(longitude)
++    try:
++        key = f'bsgroup:reverse_geocode:en:{round(lat, 5)}:{round(lon, 5)}'
++        cached = frappe.cache.get_value(key)
++        if isinstance(cached, str) and cached.strip():
++            return f'{cached.strip()} · {gps} · © OpenStreetMap contributors'
++        from bsgroup.bs_group.report.employee_checkin_report.employee_checkin_report import get_head_offices, get_place
++        offices = head_offices
++        if offices is None:
++            local = getattr(frappe, 'local', None)
++            offices = getattr(local, 'bs_attendance_place_offices', None)
++            if offices is None:
++                offices = get_head_offices()
++                if local is not None:
++                    local.bs_attendance_place_offices = offices
++        place = get_place(lat, lon, offices, allow_external=False)
++        if place:
++            return f'{place} · {gps}'
++    except Exception:
++        # A missing office setup or cache outage must not hide recorded punches.
++        pass
++    return f'Place name unavailable · {gps}'
+diff --git a/bsgroup/attendance_widget.py b/bsgroup/attendance_widget.py
+index 7767a86..f2dcf55 100644
+--- a/bsgroup/attendance_widget.py
++++ b/bsgroup/attendance_widget.py
+@@ -3,7 +3,7 @@ from datetime import datetime, time, timedelta
+ from zoneinfo import ZoneInfo
+ 
+ import frappe
+-from bsgroup.attendance_location import format_location
++from bsgroup.attendance_place import describe_location
+ 
+ DUBAI = ZoneInfo('Asia/Dubai')
+ DASHBOARD_SHIFTS = {'General - UAE', 'Enterprise Sales Shift', 'Presales'}
+@@ -27,7 +27,7 @@ def get_today_status():
+     if frappe.session.user == 'Guest':
+         frappe.throw('Sign in to view attendance', frappe.PermissionError)
+     now = datetime.now(DUBAI)
+-    key = 'bs-attendance-v3:' + frappe.session.user + ':' + str(now.date())
++    key = 'bs-attendance-v4:' + frappe.session.user + ':' + str(now.date())
+     cached = frappe.cache.get_value(key)
+     if cached is not None:
+         return cached
+@@ -73,12 +73,12 @@ def _status(now, user=None):
+             continue
+         if log.log_type == 'IN':
+             if first is None:
+-                first_location = format_location(getattr(log, 'latitude', None), getattr(log, 'longitude', None))
++                first_location = describe_location(getattr(log, 'latitude', None), getattr(log, 'longitude', None))
+             first = first or stamp
+             active = active or stamp
+         elif log.log_type == 'OUT':
+             last_out = stamp
+-            last_out_location = format_location(getattr(log, 'latitude', None), getattr(log, 'longitude', None))
++            last_out_location = describe_location(getattr(log, 'latitude', None), getattr(log, 'longitude', None))
+             if active:
+                 worked += max(0, (stamp - active).total_seconds())
+                 active = None
+diff --git a/bsgroup/bs_group/report/employee_checkin_report/employee_checkin_report.py b/bsgroup/bs_group/report/employee_checkin_report/employee_checkin_report.py
+index b580264..7111238 100644
+--- a/bsgroup/bs_group/report/employee_checkin_report/employee_checkin_report.py
++++ b/bsgroup/bs_group/report/employee_checkin_report/employee_checkin_report.py
+@@ -217,9 +217,8 @@ def get_place(latitude, longitude, head_offices, allow_external=True):
+ 
+ 
+ def recorded_location(latitude, longitude, head_offices):
+-	gps = format_location(_parse_coordinate(latitude), _parse_coordinate(longitude))
+-	place = get_place(latitude, longitude, head_offices, allow_external=False)
+-	return f"{place} · {gps}" if place else gps
++	from bsgroup.attendance_place import describe_location
++	return describe_location(_parse_coordinate(latitude), _parse_coordinate(longitude), head_offices)
+ 
+ 
+ def reverse_geocode(latitude, longitude):
+diff --git a/bsgroup/monthly_attendance.py b/bsgroup/monthly_attendance.py
+index da160d0..ad1f9d2 100644
+--- a/bsgroup/monthly_attendance.py
++++ b/bsgroup/monthly_attendance.py
+@@ -2,7 +2,7 @@
+ from datetime import date, datetime, time, timedelta
+ from zoneinfo import ZoneInfo
+ import frappe
+-from bsgroup.attendance_location import format_location
++from bsgroup.attendance_place import describe_location
+ 
+ TZ = ZoneInfo('Asia/Dubai')
+ 
+@@ -47,7 +47,7 @@ def get_month(month):
+     end = date(start.year + (start.month == 12), start.month % 12 + 1, 1)
+     now = datetime.now(TZ)
+     phase = 'before-start' if now.time() < time(9) else 'started'
+-    key = f'bs-attendance-month-v5:{frappe.session.user}:{month}:{now.date()}:{phase}'
++    key = f'bs-attendance-month-v6:{frappe.session.user}:{month}:{now.date()}:{phase}'
+     cached = frappe.cache.get_value(key)
+     if cached is not None:
+         return cached
+@@ -68,7 +68,7 @@ def get_month(month):
+         stamp = frappe.utils.get_datetime(log.time).replace(tzinfo=site).astimezone(TZ)
+         by_day.setdefault(stamp.date(), []).append((stamp, log.log_type))
+         key = (stamp, log.log_type)
+-        location = format_location(getattr(log, 'latitude', None), getattr(log, 'longitude', None))
++        location = describe_location(getattr(log, 'latitude', None), getattr(log, 'longitude', None))
+         if log.log_type == 'OUT' or key not in locations:
+             locations[key] = location
+     overlap = [['employee', '=', emp.name], ['docstatus', '=', 1],

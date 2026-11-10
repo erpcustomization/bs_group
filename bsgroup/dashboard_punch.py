@@ -1,7 +1,7 @@
 """Current-user dashboard punches using normal HRMS insert permissions."""
 import math
 import frappe
-from bsgroup.attendance_location import format_location
+from bsgroup.attendance_place import describe_location
 from frappe.utils import now_datetime, cint
 
 
@@ -24,7 +24,7 @@ def context():
     row=latest(emp)
     return dict(allowed=allowed,last_name=row.name if row else '',last_type=row.log_type if row else None,
                 last_time=str(row.time) if row else None,
-                last_location=format_location(row.latitude, row.longitude) if row else None,
+                last_location=describe_location(row.latitude, row.longitude) if row else None,
                 location_required=bool(cint(frappe.db.get_single_value('HR Settings','allow_geolocation_tracking'))))
 
 

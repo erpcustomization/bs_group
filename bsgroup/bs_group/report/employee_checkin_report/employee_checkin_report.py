@@ -217,9 +217,8 @@ def get_place(latitude, longitude, head_offices, allow_external=True):
 
 
 def recorded_location(latitude, longitude, head_offices):
-	gps = format_location(_parse_coordinate(latitude), _parse_coordinate(longitude))
-	place = get_place(latitude, longitude, head_offices, allow_external=False)
-	return f"{place} · {gps}" if place else gps
+	from bsgroup.attendance_place import describe_location
+	return describe_location(_parse_coordinate(latitude), _parse_coordinate(longitude), head_offices)
 
 
 def reverse_geocode(latitude, longitude):

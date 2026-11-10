@@ -3,7 +3,7 @@ from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 import frappe
-from bsgroup.attendance_location import format_location
+from bsgroup.attendance_place import describe_location
 
 DUBAI = ZoneInfo('Asia/Dubai')
 DASHBOARD_SHIFTS = {'General - UAE', 'Enterprise Sales Shift', 'Presales'}
@@ -27,7 +27,7 @@ def get_today_status():
     if frappe.session.user == 'Guest':
         frappe.throw('Sign in to view attendance', frappe.PermissionError)
     now = datetime.now(DUBAI)
-    key = 'bs-attendance-v3:' + frappe.session.user + ':' + str(now.date())
+    key = 'bs-attendance-v4:' + frappe.session.user + ':' + str(now.date())
     cached = frappe.cache.get_value(key)
     if cached is not None:
         return cached
@@ -73,12 +73,12 @@ def _status(now, user=None):
             continue
         if log.log_type == 'IN':
             if first is None:
-                first_location = format_location(getattr(log, 'latitude', None), getattr(log, 'longitude', None))
+                first_location = describe_location(getattr(log, 'latitude', None), getattr(log, 'longitude', None))
             first = first or stamp
             active = active or stamp
         elif log.log_type == 'OUT':
             last_out = stamp
-            last_out_location = format_location(getattr(log, 'latitude', None), getattr(log, 'longitude', None))
+            last_out_location = describe_location(getattr(log, 'latitude', None), getattr(log, 'longitude', None))
             if active:
                 worked += max(0, (stamp - active).total_seconds())
                 active = None

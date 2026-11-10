@@ -26,8 +26,8 @@ s['records']['Employee Checkin'] = [
     NS(time='2026-11-02 17:00:00',log_type='OUT',latitude=28,longitude=58),
     NS(time='2026-11-02 20:00:00',log_type='OUT',latitude=29,longitude=59)]
 r = s['m']._status(s['now'])
-assert r['first_in_location'] == 'GPS 25.00000, 55.00000'
-assert r['last_out_location'] == 'GPS 28.00000, 58.00000'
+assert r['first_in_location'].endswith('GPS 25.00000, 55.00000')
+assert r['last_out_location'].endswith('GPS 28.00000, 58.00000')
 assert r['worked_minutes'] == 420
 s['records']['Employee Checkin'][0].latitude = None
 assert s['m']._status(s['now'])['first_in_location'] == 'Location not recorded'
@@ -49,7 +49,7 @@ m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);m.datetime=Cl
 r=m.get_month('2026-11')['days'][1]
 assert r['check_in']=='09:00 AM' and r['check_out']=='05:00 PM'
 assert r['check_in_location']=='Location not recorded'
-assert r['check_out_location']=='GPS 28.00000, 58.00000'
+assert r['check_out_location'].endswith('GPS 28.00000, 58.00000')
 assert r['working_minutes']==420
 for c in f.get_all.call_args_list:
     if c.args[0]=='Employee': assert c.kwargs['filters']['user_id']=='alice@example.com'
