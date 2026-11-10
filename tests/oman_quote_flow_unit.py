@@ -97,6 +97,17 @@ class FlowTests(unittest.TestCase):
             with self.assertRaisesRegex(ValidationError,'Save this quotation'):flow.require_net_discount(self.q)
             self.q.apply_discount_on='Net Total';flow.require_net_discount(self.q)
         self.q.docstatus=1;self.q.apply_discount_on='Grand Total';flow.require_net_discount(self.q)
+    def test_print_callback_accepts_framework_settings(self):
+        settings={'print_with_letterhead':0}
+        self.q.update(apply_discount_on='Net Total',discount_amount=10)
+        flow.require_net_discount(self.q,'before_print',settings)
+        flow.require_net_discount(self.q,method='before_print',print_settings=settings)
+        self.q.apply_discount_on='Grand Total'
+        with self.assertRaisesRegex(ValidationError,'Save this quotation'):
+            flow.require_net_discount(self.q,'before_print',settings)
+        self.q.docstatus=1;flow.require_net_discount(self.q,'before_print',settings)
+        frappe.local.site='erp-bitssecureit.u.frappe.cloud'
+        self.q.docstatus=0;flow.require_net_discount(self.q,'before_print',settings)
     def test_legacy_submitted_excluded(self):
         self.q.docstatus=1;self.q.custom_oman_flow=0;self.assertFalse(flow.pilot(self.q))
     def test_client_cannot_clear_pilot_to_bypass_lock(self):
