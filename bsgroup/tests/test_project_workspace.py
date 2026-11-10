@@ -65,7 +65,8 @@ class ProjectWorkspaceTests(unittest.TestCase):
         self.assertEqual(self.f.get_list.call_args.kwargs['filters'],{'project':'P-B'})
 
     def test_child_creation_keeps_project_and_scheduler_category(self):
-        self.assertEqual(self.m.context('P-A','timesheets')['child'],dict(field='time_logs',values={'project':'P-A'}))
+        self.assertEqual(self.m.context('P-A','timesheets')['child'],dict(field='time_logs',values={
+            'project':'P-A','custom_reference_type':'Project','custom_reference':'P-A'}))
         values=self.m.context('P-A','scheduler')['child']['values']
         self.assertEqual(values,dict(project='P-A',category='Project',category_doctype='Project',category_name='P-A'))
 
