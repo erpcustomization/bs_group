@@ -1,0 +1,10 @@
+diff --git a/bsgroup/public/css/bs_sales_theme.css b/bsgroup/public/css/bs_sales_theme.css
+--- a/bsgroup/public/css/bs_sales_theme.css
++++ b/bsgroup/public/css/bs_sales_theme.css
+@@ -2,4 +2,6 @@
+ @media screen {
++    /* Hide only the Project conversation footer; retain stored history and task work logs. */
++    .page-container[data-page-route="Project"] .form-footer > .after-save { display: none !important; }
+     .bs-project-ui .page-container .form-section .section-body { max-width: none; }
+     .bs-project-ui .page-container .form-tabs { flex-wrap: wrap; gap: 8px 20px; }
+     .bs-project-ui :is(.bs-project-plan, .bs-project-activity) { min-width: 0; }
