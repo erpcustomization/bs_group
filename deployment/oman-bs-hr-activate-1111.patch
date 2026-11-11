@@ -1,0 +1,70 @@
+diff --git a/bsgroup/bs_group/page/hr_dashboard/hr_dashboard.py b/bsgroup/bs_group/page/hr_dashboard/hr_dashboard.py
+--- a/bsgroup/bs_group/page/hr_dashboard/hr_dashboard.py
++++ b/bsgroup/bs_group/page/hr_dashboard/hr_dashboard.py
+@@ -48,6 +48,7 @@
+ 
+ @frappe.whitelist()
+ def get_dashboard_context():
++	from bsgroup.hr_management import can_manage
+ 	user = frappe.session.user
+ 	roles = frappe.get_roles(user)
+ 	employee = _get_employee(user)
+@@ -58,7 +59,7 @@
+ 		"employee_name": employee.employee_name if employee else user,
+ 		"has_employee": bool(employee),
+ 		"is_manager": bool(reports) or bool(MANAGER_ROLES & set(roles)),
+-		"is_hr": _is_hr(roles),
++		"is_hr": can_manage(),
+ 	}
+ 
+ 
+diff --git a/bsgroup/bs_group/page/hr_dashboard/hr_dashboard.js b/bsgroup/bs_group/page/hr_dashboard/hr_dashboard.js
+--- a/bsgroup/bs_group/page/hr_dashboard/hr_dashboard.js
++++ b/bsgroup/bs_group/page/hr_dashboard/hr_dashboard.js
+@@ -1,5 +1,5 @@
+ const HRD_METHOD = "bsgroup.bs_group.page.hr_dashboard.hr_dashboard";
+-const _hrd_state = { tab: "employee" };
++const _hrd_state = { tab: null };
+ 
+ frappe.pages["hr-dashboard"].on_page_load = function (wrapper) {
+ 	const page = frappe.ui.make_app_page({
+@@ -85,7 +85,9 @@
+ 			const ctx = r.message || {};
+ 			const tabs = [{ key: "employee", label: "My Dashboard" }];
+ 			if (ctx.is_manager) tabs.push({ key: "manager", label: "Manager" });
+-			if (ctx.is_hr) tabs.push({ key: "hr", label: "HR" });
++			if (ctx.is_hr) tabs.unshift({ key: "hr", label: "HR Management" });
++            if (!_hrd_state.tab) _hrd_state.tab = ctx.is_hr ? "hr" : "employee";
++            if (ctx.is_hr) {$(".hrd-header h1").text("BS HR"); $("#hrd-tabs").hide();}
+ 
+ 			$("#hrd-subtitle").text("BS Group · " + (ctx.employee_name || frappe.session.user));
+ 			$("#hrd-tabs").html(
+@@ -107,7 +109,7 @@
+ 	$("#hrd-body").html('<div class="hrd-loading">Fetching live data…</div>');
+ 	if (tab === "employee") hrd_render_employee();
+ 	else if (tab === "manager") hrd_render_manager();
+-	else if (tab === "hr") hrd_render_hr();
++	else if (tab === "hr") window.bsHRManagement($("#hrd-body"));
+ }
+ 
+ function hrd_render_employee() {
+@@ -218,3 +220,7 @@
+ 		},
+ 	});
+ }
++
++frappe.pages["hr-dashboard"].on_page_show = function () {
++    if (window.bsHRSelectSection) window.bsHRSelectSection(new URLSearchParams(location.search).get('hr_section') || 'dashboard');
++};
+diff --git a/bsgroup/hooks.py b/bsgroup/hooks.py
+--- a/bsgroup/hooks.py
++++ b/bsgroup/hooks.py
+@@ -712,4 +712,8 @@
+ _quotation_numbering_hooks(globals())
+ from bsgroup.hr_email import configure_hooks as _hr_email_hooks
+ _hr_email_hooks(globals())
++
++# Oman HR feature parity uses native local leave policy and existing access.
++from bsgroup.hr_oman import configure_hooks as _hr_oman_hooks
++_hr_oman_hooks(globals())
+ override_whitelisted_methods["frappe.desk.form.assign_to.add"] = "bsgroup.lead_assignment.assign"
