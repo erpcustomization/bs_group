@@ -743,3 +743,8 @@ _quotation_workflow_hooks(globals())
 after_migrate.append("bsgroup.project_workspace.install")
 after_migrate.append("bsgroup.project_plan.install")
 after_migrate.append("bsgroup.project_ai_plan.install")
+
+# Oman-only, explicitly enabled HR sending; no change to other mail routes.
+after_migrate.append("bsgroup.hr_email.install")
+doc_events.setdefault("Email Queue", {}).setdefault("before_insert", []).append("bsgroup.hr_email.route_queue")
+doc_events.setdefault("HR Settings", {}).setdefault("validate", []).append("bsgroup.hr_email.validate_settings")
