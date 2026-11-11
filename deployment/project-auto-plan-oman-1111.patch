@@ -605,7 +605,7 @@ diff --git a/bsgroup/dcs/procurement.py b/bsgroup/dcs/procurement.py
      rows = source_items(sheet)
      if not schedule_date or getdate(schedule_date) < getdate(nowdate()):
          frappe.throw(_("Select a required-by date of today or later."))
-@@ -286,18 +291,24 @@
+@@ -286,17 +291,23 @@
      from bsgroup.oman_quotation_flow import pilot, render_pdf
      quote_pdf = render_pdf(q, no_letterhead=1) if pilot(q) else frappe.get_print("Quotation", q.name, as_pdf=True, no_letterhead=1)
      cost_pdf = costing_pdf(data)
@@ -627,12 +627,10 @@ diff --git a/bsgroup/dcs/procurement.py b/bsgroup/dcs/procurement.py
                          custom_bsp_managed=1, custom_bsp_key=key,
                          custom_deal_cost_sheet=sheet.name, custom_bsp_quotation=q.name,
 -                        custom_project=sheet.project, custom_bsp_customer=manifest["customer"],
--                        title=("Purchase Â· " + (sheet.subject or sheet.name))[:140],
 +                        custom_project=project, custom_bsp_customer=manifest["customer"],
-+                        title=("Purchase · " + (sheet.subject or sheet.name))[:140],
+                         title=("Purchase · " + (sheet.subject or sheet.name))[:140],
                          custom_bsp_customer_po=q.custom_customer_po_reference,
                          custom_bsp_source_snapshot=buying.encoded(manifest)))
-     for row in rows:
 @@ -305,7 +316,7 @@
                         description=row["description"], qty=row["qty"], rate=row["rate"],
                         stock_uom=row["uom"], uom=row["uom"], conversion_factor=1,
@@ -663,7 +661,7 @@ diff --git a/bsgroup/dcs/procurement.py b/bsgroup/dcs/procurement.py
 diff --git a/bsgroup/public/js/quotation.js b/bsgroup/public/js/quotation.js
 --- a/bsgroup/public/js/quotation.js
 +++ b/bsgroup/public/js/quotation.js
-@@ -348,11 +348,24 @@
+@@ -348,6 +348,19 @@
                  const additional = data.resources || data.additional_charges
                      ? `<p>${data.resources} labour/resource rows and ${data.additional_charges} additional charge rows
                         remain in the attached costing evidence. Only the Item lines below become purchasing lines.</p>` : "";
@@ -683,12 +681,6 @@ diff --git a/bsgroup/public/js/quotation.js b/bsgroup/public/js/quotation.js
                  const dialog = new frappe.ui.Dialog({
                      title:__("Send to Procurement"),
                      fields:[
-                         {fieldname:"summary",fieldtype:"HTML",options:
--                            `<p>Create a draft Purchase Requisition from ${esc(data.dcs)} Â· ${esc(data.revision)}.
-+                            `<p>Create a draft Purchase Requisition from ${esc(data.dcs)} · ${esc(data.revision)}.
-                             Procurement will review and request PR approval before creating Purchase Orders.</p>
-                             <p>Customer PO: ${esc(data.customer_po)}</p>
-                             <table class="table table-bordered"><thead><tr><th>Item</th><th>Quantity</th><th>Budget rate</th></tr></thead>
 @@ -361,20 +374,28 @@
                          {fieldname:"schedule_date",label:__("Required By"),fieldtype:"Date",reqd:1,default:data.required_by},
                          {fieldname:"warehouse",label:__("Target Warehouse"),fieldtype:"Select",options:["",...data.warehouses],
@@ -710,10 +702,9 @@ diff --git a/bsgroup/public/js/quotation.js b/bsgroup/public/js/quotation.js
                              const result = await frappe.call({
                                  method:"bsgroup.dcs.procurement.send_to_procurement",
 -                                args:{quotation:frm.doc.name,...values},freeze:true,
--                                freeze_message:__("Creating requisition and preserving sales documentsâ€¦")
 +                                args:{quotation:frm.doc.name,schedule_date:values.schedule_date,warehouse:values.warehouse,
 +                                    project_modules:JSON.stringify(selected),project_details:JSON.stringify(projectDetails)},freeze:true,
-+                                freeze_message:__("Creating requisition and preserving sales documents…")
+                                 freeze_message:__("Creating requisition and preserving sales documents…")
                              });
                              if (!result.message) return;
                              dialog.hide();
