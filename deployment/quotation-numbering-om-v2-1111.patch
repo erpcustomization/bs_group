@@ -1,0 +1,284 @@
+Quotation IDs without SAL prefix; explicit rename mapping; v2 Oman hook context 20261111
+
+diff --git a/bsgroup/quotation_numbering.py b/bsgroup/quotation_numbering.py
+new file mode 100644
+--- /dev/null
++++ b/bsgroup/quotation_numbering.py
+@@ -0,0 +1,208 @@
++"""Site-admin migration of quotation IDs, using native linked-document renaming."""
++import json
++import re
++
++import frappe
++from frappe.utils import cint, now_datetime
++
++SITES = {"erp-bitssecureit.u.frappe.cloud", "erp-om.k.frappe.cloud"}
++FLAG = "bs_quotation_without_sal"
++STATE = "bs_quotation_numbering_migration"
++ALIAS = "custom_previous_quotation_id"
++
++
++def authorised():
++    return frappe.local.site in SITES and (frappe.session.user == "Administrator"
++        or "System Manager" in frappe.get_roles())
++
++
++def check_admin():
++    if not authorised():
++        frappe.throw("Quotation numbering setup requires the site administrator.", frappe.PermissionError)
++
++
++def enabled():
++    return frappe.local.site in SITES and cint(frappe.defaults.get_global_default(FLAG)) == 1
++
++
++def clean(value):
++    return value[4:] if isinstance(value, str) and value.startswith("SAL-") else value
++
++
++def before_insert(doc, method=None):
++    # Normalise drafts opened before the setting changed, including copied/API rows.
++    if enabled():
++        doc.naming_series = clean(doc.naming_series)
++        doc.set(ALIAS, None)
++
++
++def resolve(name):
++    """Resolve immutable handover evidence only through an explicitly recorded alias."""
++    if not name or not name.startswith("SAL-") or not frappe.get_meta("Quotation").has_field(ALIAS):
++        return name
++    return frappe.db.get_value("Quotation", {ALIAS: name}, "name") or name
++
++
++def validate_alias(doc, method=None):
++    previous = doc.get_doc_before_save()
++    if (doc.get(ALIAS) or "") != ((previous.get(ALIAS) or "") if previous else ""):
++        frappe.throw("The previous quotation ID is protected migration history.")
++
++
++def after_rename(doc, method, old, new, merge=False):
++    if merge or not doc.get(ALIAS):
++        return
++    # This operational source field is Data rather than a native Link field.
++    if frappe.db.exists("DocType", "BS Project BOQ Line"):
++        frappe.db.set_value("BS Project BOQ Line", {"source_quotation": old},
++            "source_quotation", new, update_modified=False)
++
++
++def candidates():
++    return frappe.get_all("Quotation", filters={"name": ["like", "SAL-%"]},
++        fields=["name", "docstatus", "naming_series"], order_by="name")
++
++
++def plan():
++    rows = candidates()
++    names = set(frappe.get_all("Quotation", pluck="name"))
++    conflicts = [r.name for r in rows if clean(r.name) in names]
++    return rows, conflicts
++
++
++@frappe.whitelist()
++def status():
++    if not authorised():
++        return {"authorised": False}
++    rows, conflicts = plan()
++    state = json.loads(frappe.defaults.get_global_default(STATE) or "{}")
++    return dict(authorised=True, enabled=enabled(), remaining=len(rows), conflicts=conflicts,
++        examples=[dict(old=r.name, new=clean(r.name)) for r in rows[:3]], state=state)
++
++
++def save_state(**values):
++    frappe.defaults.set_global_default(STATE, json.dumps(dict(updated=str(now_datetime()), **values)))
++
++
++def install_schema():
++    from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
++    create_custom_fields({"Quotation": [dict(fieldname=ALIAS, label="Previous Quotation ID",
++        fieldtype="Data", read_only=1, no_copy=1, print_hide=1, unique=1,
++        insert_after="naming_series")]})
++
++
++def configure_series(rows):
++    from frappe.core.doctype.document_naming_settings.document_naming_settings import DocumentNamingSettings
++    from frappe.model.naming import NamingSeries
++    meta = frappe.get_meta("Quotation")
++    options = meta.get_field("naming_series").options.splitlines()
++    prefixes = {}
++    for series in options:
++        if series.startswith("SAL-"):
++            prefix = NamingSeries(series).get_prefix()
++            prefixes[prefix] = 0
++    for row in rows:
++        match = re.fullmatch(r"(SAL-QTN-\d{4}-)(\d+)(?:-\d+)?", row.name)
++        if match:
++            prefixes[match[1]] = max(prefixes.get(match[1], 0), int(match[2]))
++    for name in frappe.get_all("Quotation", filters={"name": ["like", "QTN-%"]}, pluck="name"):
++        match = re.fullmatch(r"(QTN-\d{4}-)(\d+)(?:-\d+)?", name)
++        if match:
++            key = "SAL-" + match[1]
++            prefixes[key] = max(prefixes.get(key, 0), int(match[2]))
++    # Keep the numeric sequence, including historical years and reserved numbers.
++    for old, floor in sorted(prefixes.items()):
++        current = NamingSeries(old).get_current_value() or 0
++        target = NamingSeries(clean(old))
++        target.update_counter(max(floor, current, target.get_current_value() or 0))
++    settings = frappe.get_doc("Document Naming Settings")
++    settings.transaction_type = "Quotation"
++    settings.naming_series_options = "\n".join(dict.fromkeys(clean(s) for s in options))
++    settings.user_must_always_select = 0
++    settings.check_duplicate()
++    settings.set_series_options_in_meta("Quotation", settings.naming_series_options)
++    frappe.defaults.set_global_default(FLAG, 1)
++
++
++@frappe.whitelist(methods=["POST"])
++def start():
++    check_admin()
++    rows, conflicts = plan()
++    if conflicts:
++        frappe.throw("Numbering conflicts must be reviewed before renaming: " + ", ".join(conflicts[:10]))
++    install_schema()
++    # A fixed job ID prevents competing migration jobs for this site.
++    from frappe.utils.background_jobs import is_job_enqueued
++    job_id = "quotation-remove-sal-prefix"
++    if is_job_enqueued(job_id):
++        return status()
++    save_state(status="Queued", total=len(rows), completed=0, requested_by=frappe.session.user)
++    frappe.enqueue("bsgroup.quotation_numbering.run", queue="long", timeout=7200,
++        job_id=job_id, enqueue_after_commit=True, requested_by=frappe.session.user)
++    return status()
++
++
++def rename_one(old):
++    from frappe.model.rename_doc import rename_doc
++    new = clean(old)
++    if new == old:
++        return old
++    # Native rename updates Link/Dynamic Link fields, child parents, files and history.
++    frappe.db.set_value("Quotation", old, ALIAS, old, update_modified=False)
++    rename_doc("Quotation", old, new, force=True, merge=False,
++        ignore_permissions=False, show_alert=False, rebuild_search=False)
++    # Keep the stored series consistent without invoking commercial save workflows.
++    series = frappe.db.get_value("Quotation", new, "naming_series")
++    frappe.db.set_value("Quotation", new, "naming_series", clean(series), update_modified=False)
++    return new
++
++
++def run(requested_by):
++    frappe.set_user(requested_by)
++    check_admin()
++    completed = 0
++    total = 0
++    try:
++        with frappe.cache.lock("quotation-remove-sal-prefix", timeout=7200, blocking_timeout=1):
++            rows, conflicts = plan()
++            total = len(rows)
++            if conflicts:
++                frappe.throw("Existing IDs conflict with the proposed quotation IDs.")
++            for row in rows:
++                frappe.get_doc("Quotation", row.name).check_permission("write")
++            configure_series(rows)
++            save_state(status="Running", total=total, completed=0, requested_by=requested_by)
++            frappe.db.commit()
++            for row in rows:
++                rename_one(row.name)
++                completed += 1
++                save_state(status="Running", total=total, completed=completed, requested_by=requested_by)
++                frappe.db.commit()
++            remaining = len(candidates())
++            save_state(status="Complete" if not remaining else "Review required", total=total,
++                completed=completed, remaining=remaining, requested_by=requested_by)
++            frappe.db.commit()
++            frappe.enqueue("frappe.utils.global_search.rebuild_for_doctype", doctype="Quotation")
++    except Exception as exc:
++        frappe.db.rollback()
++        save_state(status="Stopped", total=total, completed=completed, error=str(exc), requested_by=requested_by)
++        frappe.db.commit()
++        frappe.log_error(title="Quotation numbering migration", message=frappe.get_traceback())
++        raise
++
++
++def configure_hooks(namespace):
++    for event, handler in [("before_insert", "before_insert"), ("after_rename", "after_rename"),
++                           ("validate", "validate_alias"), ("before_update_after_submit", "validate_alias")]:
++        events = namespace["doc_events"].setdefault("Quotation", {})
++        prior = events.get(event, [])
++        prior = [prior] if isinstance(prior, str) else list(prior)
++        value = "bsgroup.quotation_numbering." + handler
++        if value not in prior:
++            events[event] = prior + [value]
++    for dt in ("Quotation", "Document Naming Settings"):
++        prior = namespace["doctype_js"].get(dt, [])
++        prior = [prior] if isinstance(prior, str) else list(prior)
++        value = "public/js/quotation_numbering.js"
++        if value not in prior:
++            namespace["doctype_js"][dt] = prior + [value]
+diff --git a/bsgroup/public/js/quotation_numbering.js b/bsgroup/public/js/quotation_numbering.js
+new file mode 100644
+--- /dev/null
++++ b/bsgroup/public/js/quotation_numbering.js
+@@ -0,0 +1,32 @@
++(() => {
++    const base = 'bsgroup.quotation_numbering.';
++    async function show() {
++        const data = (await frappe.call({method:base+'status',freeze:true})).message;
++        if (!data?.authorised) return;
++        const esc = frappe.utils.escape_html;
++        const state = data.state || {};
++        const dialog = new frappe.ui.Dialog({title:__('Quotation numbering'),fields:[{fieldtype:'HTML',fieldname:'summary'}]});
++        dialog.fields_dict.summary.$wrapper.html(`<p><strong>${data.enabled ? 'New quotations use IDs without SAL-.' : 'Remove SAL- from new and existing quotation IDs.'}</strong></p>
++            <p>Existing quotations remaining: <strong>${data.remaining}</strong></p>
++            <p>Migration: ${esc(state.status || 'Not started')} Â· ${state.completed || 0} / ${state.total || data.remaining}</p>
++            ${state.error ? '<p class="text-danger">'+esc(state.error)+'</p>' : ''}
++            ${data.examples.map(r=>'<p>'+esc(r.old)+' â†’ '+esc(r.new)+'</p>').join('')}
++            <p>Linked records, attachments and history are retained. Previously issued PDF contents remain unchanged.</p>
++            ${data.conflicts.length ? '<p class="text-danger">Conflicting IDs: '+data.conflicts.map(esc).join(', ')+'</p>' : ''}`);
++        if (!data.conflicts.length && !['Running','Queued'].includes(state.status) && (data.remaining || !data.enabled)) {
++            dialog.set_primary_action(__('Apply to New and Existing Quotations'),async()=>{
++                await frappe.call({method:base+'start',type:'POST',freeze:true});
++                dialog.hide(); await show();
++            });
++        }
++        dialog.set_secondary_action_label(__('Refresh Status'));
++        dialog.set_secondary_action(()=>{dialog.hide();show();});
++        dialog.show();
++    }
++    for (const dt of ['Quotation','Document Naming Settings']) frappe.ui.form.on(dt,{
++        refresh(frm) {
++            if (frappe.session.user==='Administrator' || frappe.user.has_role('System Manager'))
++                frm.add_custom_button(__('Quotation Numbering'),show,__('Administration'));
++        }
++    });
++})();
+diff --git a/bsgroup/hooks.py b/bsgroup/hooks.py
+--- a/bsgroup/hooks.py
++++ b/bsgroup/hooks.py
+@@ -710,2 +710,4 @@
+ doctype_js["Lead"].append("public/js/lead_assignment.js")
++from bsgroup.quotation_numbering import configure_hooks as _quotation_numbering_hooks
++_quotation_numbering_hooks(globals())
+ override_whitelisted_methods["frappe.desk.form.assign_to.add"] = "bsgroup.lead_assignment.assign"
+diff --git a/bsgroup/dcs/procurement.py b/bsgroup/dcs/procurement.py
+--- a/bsgroup/dcs/procurement.py
++++ b/bsgroup/dcs/procurement.py
+@@ -374,7 +374,8 @@
+         return
+     data = manifest["costing"]
+     # Match the sales send lock order while validating against concurrent reversal.
+-    q = frappe.get_doc("Quotation", manifest["quotation"], for_update=True)
++    from bsgroup.quotation_numbering import resolve
++    q = frappe.get_doc("Quotation", resolve(manifest["quotation"]), for_update=True)
+     sheet = frappe.get_doc("Deal Cost Sheet", data["dcs"], for_update=True)
+     from bsgroup.dcs.commercial_authority import authorised_position
+     from bsgroup.dcs.obligation import assert_clearance
+@@ -404,8 +405,9 @@
+         if old.custom_bsp_source_snapshot != doc.custom_bsp_source_snapshot:
+             deny("Sales handover evidence cannot be changed.")
+     data = manifest["costing"]
++    from bsgroup.quotation_numbering import resolve
+     if (doc.company != data["company"] or doc.custom_deal_cost_sheet != data["dcs"]
+-            or doc.custom_bsp_quotation != manifest["quotation"]
++            or doc.custom_bsp_quotation != resolve(manifest["quotation"])
+             or (doc.custom_project or "") != (manifest.get("project") or "")
+             or (doc.custom_bsp_customer or "") != (manifest.get("customer") or "")
+             or doc.custom_bsp_customer_po != manifest["customer_po_reference"]):
