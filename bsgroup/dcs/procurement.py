@@ -374,7 +374,8 @@ def assert_source_current(request):
         return
     data = manifest["costing"]
     # Match the sales send lock order while validating against concurrent reversal.
-    q = frappe.get_doc("Quotation", manifest["quotation"], for_update=True)
+    from bsgroup.quotation_numbering import resolve
+    q = frappe.get_doc("Quotation", resolve(manifest["quotation"]), for_update=True)
     sheet = frappe.get_doc("Deal Cost Sheet", data["dcs"], for_update=True)
     from bsgroup.dcs.commercial_authority import authorised_position
     from bsgroup.dcs.obligation import assert_clearance
@@ -404,8 +405,9 @@ def validate_handover_request(doc, old):
         if old.custom_bsp_source_snapshot != doc.custom_bsp_source_snapshot:
             deny("Sales handover evidence cannot be changed.")
     data = manifest["costing"]
+    from bsgroup.quotation_numbering import resolve
     if (doc.company != data["company"] or doc.custom_deal_cost_sheet != data["dcs"]
-            or doc.custom_bsp_quotation != manifest["quotation"]
+            or doc.custom_bsp_quotation != resolve(manifest["quotation"])
             or (doc.custom_project or "") != (manifest.get("project") or "")
             or (doc.custom_bsp_customer or "") != (manifest.get("customer") or "")
             or doc.custom_bsp_customer_po != manifest["customer_po_reference"]):
