@@ -1,0 +1,21 @@
+diff --git a/bsgroup/bs_group/page/my_work_dashboard/my_work_dashboard.js b/bsgroup/bs_group/page/my_work_dashboard/my_work_dashboard.js
+index a34f61e..6b8f0bf 100644
+--- a/bsgroup/bs_group/page/my_work_dashboard/my_work_dashboard.js
++++ b/bsgroup/bs_group/page/my_work_dashboard/my_work_dashboard.js
+@@ -500,7 +500,6 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
+             }
+             dialog.show();
+         }
+-        button.on('click',showDetails);
+         function place() {
+             if (card[0].isConnected) return;
+             if (root.find('.bs-exec').length) {
+@@ -518,6 +517,8 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
+                 heading.append($('<strong>').text('Early checkout'),button,$('<label>').text('Reporting date ').append(dateInput));
+                 card.insertBefore(work);
+             }
++            // Executive refresh removes child jQuery handlers along with its content.
++            button.off('click.bsEarlyCheckout').on('click.bsEarlyCheckout',showDetails);
+         }
+         async function refresh(force=true) {
+             place();
