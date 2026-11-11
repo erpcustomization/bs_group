@@ -1689,7 +1689,7 @@ new file mode 100644
 +};
 --- a/bsgroup/hooks.py
 +++ b/bsgroup/hooks.py
-@@ -1,3 +1,7 @@
+@@ -747,3 +747,7 @@
  # Oman-only, explicitly enabled HR sending; no change to other mail routes.
  from bsgroup.hr_email import configure_hooks as _hr_email_hooks
  _hr_email_hooks(globals())
