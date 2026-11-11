@@ -1,5 +1,7 @@
 /* Project-specific panels use the same Sales tokens and component geometry. */
 @media screen {
+    /* Hide only the Project conversation footer; retain stored history and task work logs. */
+    .page-container[data-page-route="Project"] .form-footer > .after-save { display: none !important; }
     .bs-project-ui .page-container .form-section .section-body { max-width: none; }
     .bs-project-ui .page-container .form-tabs { flex-wrap: wrap; gap: 8px 20px; }
     .bs-project-ui :is(.bs-project-plan, .bs-project-activity) { min-width: 0; }
