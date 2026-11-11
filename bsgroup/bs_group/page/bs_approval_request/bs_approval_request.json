@@ -1,0 +1,11 @@
+{
+ "doctype": "Page",
+ "name": "bs-approval-request",
+ "page_name": "bs-approval-request",
+ "module": "BS Group",
+ "title": "Approval Request",
+ "standard": "Yes",
+ "system_page": 0,
+ "roles": [{"role": "BS Procurement Approver"}],
+ "modified": "2026-11-12 00:00:00"
+}
