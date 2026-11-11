@@ -1,0 +1,32 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync('bsgroup/public/js/project_workspace.js','utf8').replace(/\}\)\(\);\s*$/, 'globalThis.makeAutosave=planAutosave;})();');
+const context={window:{addEventListener(){}},frappe:{ui:{form:{on(){}}}},setTimeout,clearTimeout};
+vm.runInNewContext(source,context);
+const base={name:'T',modified:'v1',subject:'Original',status:'Open',assigned_to:[]};
+const defer=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
+async function run(){
+ let calls=[],states=[],receipts=[],first=defer();
+ let autosave=context.makeAutosave({...base},async(changes,row)=>{calls.push({changes,row});if(calls.length===1)return first.promise;return {row:{...row,...changes,modified:'v3'}};},s=>states.push(s),(r,p)=>receipts.push([...p]));
+ autosave.edit('subject','First',60000);let saving=autosave.flush();
+ autosave.edit('subject','Latest',60000);autosave.edit('status','Delayed',60000);
+ assert.equal(calls.length,1);
+ first.resolve({row:{...base,subject:'First',modified:'v2'}});await saving;
+ assert.equal(calls.length,2);assert.equal(calls[1].row.modified,'v2');
+ assert.equal(calls[1].changes.subject,'Latest');assert.equal(calls[1].changes.status,'Delayed');
+ assert.deepEqual(receipts[0],['subject','status']);assert.equal(autosave.hasPending(),false);autosave.dispose();
+ calls=[];let reject=true;
+ autosave=context.makeAutosave({...base},async(changes,row)=>{calls.push({changes,row});if(reject)throw Error('conflict');return {row:{...row,...changes,modified:'v2'}};},s=>states.push(s),()=>{});
+ autosave.edit('status','Completed',60000);await autosave.flush();
+ assert.equal(autosave.hasPending(),true);assert.equal(states.at(-1).failed,true);
+ reject=false;await autosave.flush();assert.equal(calls[1].row.modified,'v1');assert.equal(autosave.hasPending(),false);autosave.dispose();
+ calls=[];autosave=context.makeAutosave({...base},async(changes,row)=>{calls.push(changes);return {row:{...row,...changes,modified:'v2'}};},()=>{},()=>{});
+ autosave.edit('subject','Draft',60000);autosave.edit('subject','Final',60000);await autosave.flush();
+ assert.equal(calls.length,1);assert.equal(calls[0].subject,'Final');
+ autosave.edit('subject','Final',60000);await autosave.flush();assert.equal(calls.length,1);autosave.dispose();
+ const stuck=defer();const a=context.makeAutosave({...base},()=>stuck.promise,()=>{},()=>{});
+ let secondSaved=false;const b=context.makeAutosave({...base,name:'B'},async(changes,row)=>{secondSaved=true;return {row:{...row,...changes}};},()=>{},()=>{});
+ a.edit('subject','A',60000);const pa=a.flush();b.edit('status','On Hold',60000);await b.flush();assert.equal(secondSaved,true);
+ stuck.resolve({row:{...base,subject:'A'}});await pa;a.dispose();b.dispose();
+ console.log('PASS: queued edits, versions, status autosave, debounce, unchanged values, independent rows, failures and retry');
+}
+run().catch(error=>{console.error(error);process.exitCode=1;});

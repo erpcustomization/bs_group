@@ -245,6 +245,43 @@ def assignment_choices(project, task):
 
 
 @frappe.whitelist(methods=["POST"])
+def autosave_task(project, task, changes, expected_modified, expected_assignees):
+    """Serialize one row's field changes using the existing guarded save paths."""
+    changes = frappe.parse_json(changes) if isinstance(changes, str) else changes
+    allowed = {"subject", "description", "start_date", "end_date", "assigned_to", "status"}
+    if not isinstance(changes, dict) or not changes or set(changes) - allowed:
+        frappe.throw(_("Choose valid Project Plan fields to update."))
+    savepoint = "plan_autosave_" + frappe.generate_hash(length=10)
+    frappe.db.savepoint(savepoint)
+    try:
+        doc, item = _read_task(project, task, lock=True)
+        if not expected_modified or get_datetime(item.modified) != get_datetime(expected_modified):
+            frappe.throw(_("This task changed elsewhere. Reload the row before editing it again."))
+        details = {key: value for key, value in changes.items() if key != "status"}
+        if details:
+            save_task(project, task,
+                subject=details.get("subject", item.subject),
+                description=details.get("description", item.description),
+                start_date=details.get("start_date", str(getdate(item.exp_start_date)) if item.exp_start_date else None),
+                end_date=details.get("end_date", str(getdate(item.exp_end_date)) if item.exp_end_date else None),
+                assigned_to=details.get("assigned_to", expected_assignees),
+                expected_modified=expected_modified, expected_assignees=expected_assignees)
+            expected_modified = frappe.db.get_value("Task", task, "modified")
+        if "status" in changes:
+            set_task_status(project, task, changes["status"], expected_modified)
+        # Read the receipt in this transaction, including native assignment and
+        # permission changes. The next queued save uses this exact version.
+        plan = get_plan(project)
+        row = next((row for row in plan["rows"] if row.name == task), None)
+        if not row:
+            frappe.throw(_("The saved task is no longer accessible in this project."))
+        return {"row": row, "user_names": plan["user_names"]}
+    except Exception:
+        frappe.db.rollback(save_point=savepoint)
+        raise
+
+
+@frappe.whitelist(methods=["POST"])
 def save_task(project, task, subject, description, start_date, end_date, assigned_to, expected_modified, expected_assignees):
     from frappe.desk.form import assign_to
     doc = _project(project, write=True)

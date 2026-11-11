@@ -1,0 +1,263 @@
+diff --git a/bsgroup/project_plan.py b/bsgroup/project_plan.py
+index 4792261..9515a68 100644
+--- a/bsgroup/project_plan.py
++++ b/bsgroup/project_plan.py
+@@ -244,6 +244,43 @@ def assignment_choices(project, task):
+             for u in users if _eligible(u.name, doc, item)]
+ 
+ 
++@frappe.whitelist(methods=["POST"])
++def autosave_task(project, task, changes, expected_modified, expected_assignees):
++    """Serialize one row's field changes using the existing guarded save paths."""
++    changes = frappe.parse_json(changes) if isinstance(changes, str) else changes
++    allowed = {"subject", "description", "start_date", "end_date", "assigned_to", "status"}
++    if not isinstance(changes, dict) or not changes or set(changes) - allowed:
++        frappe.throw(_("Choose valid Project Plan fields to update."))
++    savepoint = "plan_autosave_" + frappe.generate_hash(length=10)
++    frappe.db.savepoint(savepoint)
++    try:
++        doc, item = _read_task(project, task, lock=True)
++        if not expected_modified or get_datetime(item.modified) != get_datetime(expected_modified):
++            frappe.throw(_("This task changed elsewhere. Reload the row before editing it again."))
++        details = {key: value for key, value in changes.items() if key != "status"}
++        if details:
++            save_task(project, task,
++                subject=details.get("subject", item.subject),
++                description=details.get("description", item.description),
++                start_date=details.get("start_date", str(getdate(item.exp_start_date)) if item.exp_start_date else None),
++                end_date=details.get("end_date", str(getdate(item.exp_end_date)) if item.exp_end_date else None),
++                assigned_to=details.get("assigned_to", expected_assignees),
++                expected_modified=expected_modified, expected_assignees=expected_assignees)
++            expected_modified = frappe.db.get_value("Task", task, "modified")
++        if "status" in changes:
++            set_task_status(project, task, changes["status"], expected_modified)
++        # Read the receipt in this transaction, including native assignment and
++        # permission changes. The next queued save uses this exact version.
++        plan = get_plan(project)
++        row = next((row for row in plan["rows"] if row.name == task), None)
++        if not row:
++            frappe.throw(_("The saved task is no longer accessible in this project."))
++        return {"row": row, "user_names": plan["user_names"]}
++    except Exception:
++        frappe.db.rollback(save_point=savepoint)
++        raise
++
++
+ @frappe.whitelist(methods=["POST"])
+ def save_task(project, task, subject, description, start_date, end_date, assigned_to, expected_modified, expected_assignees):
+     from frappe.desk.form import assign_to
+diff --git a/bsgroup/public/js/project_workspace.js b/bsgroup/public/js/project_workspace.js
+index 625f67f..0592fb9 100644
+--- a/bsgroup/public/js/project_workspace.js
++++ b/bsgroup/public/js/project_workspace.js
+@@ -1,6 +1,48 @@
+ (() => {
+     const sections = {tasks:'Tasks', timesheets:'Timesheets', scheduler:'Tech Task Scheduler', expenses:'Expenses', advances:'Advance', labor:'Labour Approval'};
+     const esc = value => frappe.utils.escape_html(String(value ?? ''));
++    const pendingSaves = new Set();
++    window.addEventListener('beforeunload', event => {
++        if (pendingSaves.size) { event.preventDefault(); event.returnValue = ''; }
++    });
++    // One request per row at a time. Acknowledging an older edit must never
++    // remove a newer edit made while its request was in flight.
++    function planAutosave(initial, send, notify, acknowledge) {
++        let base=initial, sequence=0, busy=false, timer=null, failed=false;
++        const pending=new Map();
++        const state=()=>notify({busy,failed,pending:pending.size>0});
++        async function flush() {
++            clearTimeout(timer);timer=null;
++            if(busy || !pending.size) return;
++            busy=true;failed=false;state();
++            while(pending.size) {
++                const batch=new Map(pending);
++                try {
++                    const receipt=await send(Object.fromEntries([...batch].map(([key,edit])=>[key,edit.value])),base);
++                    base=receipt.row;
++                    for(const [key,edit] of batch) if(pending.get(key)===edit) pending.delete(key);
++                    acknowledge(receipt,new Set(pending.keys()));
++                } catch(error) {failed=true;break;}
++            }
++            busy=false;state();
++        }
++        return {
++            edit(key,value,delay=0) {
++                const field={start_date:'exp_start_date',end_date:'exp_end_date'}[key] || key;
++                const equal=key==='assigned_to'
++                    ? JSON.stringify([...(base[field] || [])].sort())===JSON.stringify([...value].sort())
++                    : String(base[field] || '')===String(value || '');
++                if(!busy && equal){pending.delete(key);failed=false;state();return;}
++                pending.set(key,{value,sequence:++sequence});failed=false;
++                clearTimeout(timer);state();
++                timer=setTimeout(flush,delay);
++            },
++            flush,
++            busy:()=>busy,
++            hasPending:()=>pending.size>0,
++            dispose(){clearTimeout(timer);pending.clear();failed=false;state();},
++        };
++    }
+     frappe.ui.form.on('Project', {
+         before_load(frm) {
+             // Register activity tabs before Frappe restores the URL's tab.
+@@ -122,7 +164,7 @@
+         $('<p class="text-muted">').text(__('Automatically shows this project’s tasks and template activities. Edits update the same tasks; assigned tasks appear in each selected user’s task list.')).appendTo(host);
+         const actions = $('<div style="display:flex;gap:8px;margin:12px 0">').appendTo(host);
+         $('<button type="button" class="btn btn-default btn-sm">').text(__('Refresh Plan')).on('click',()=>{
+-            if (frm.__bs_plan_dirty.size) return frappe.msgprint(__('Save or discard the edited rows before refreshing.'));
++            if (frm.__bs_plan_dirty.size) return frappe.msgprint(__('Wait for automatic saving to finish. Resolve any row showing a save error before refreshing.'));
+             renderPlan(frm);
+         }).appendTo(actions);
+         if (!data.work_updates_ready && frappe.user.has_role('System Manager')) $('<button type="button" class="btn btn-primary btn-sm">').text(__('Enable Task Work Updates')).on('click',async()=>{
+@@ -132,75 +174,100 @@
+             openProjectRecord(frm,{doctype:'Task',defaults:{project,company:data.company}},null,()=>renderPlan(frm));
+         }).appendTo(actions);
+         if (!data.can_read_tasks) {$('<p>').text(__('Your current access does not allow viewing project tasks.')).appendTo(host); return;}
+-        const table = $('<div class="table-responsive">').html('<table class="table table-bordered"><thead><tr><th>Activity</th><th>Description</th><th>Start Date</th><th>End Date</th><th>Assigned To</th><th>Today’s Work</th><th>Status</th><th>Save</th></tr></thead><tbody></tbody></table>').appendTo(host).find('tbody');
++        const table = $('<div class="table-responsive">').html('<table class="table table-bordered"><thead><tr><th>Activity</th><th>Description</th><th>Start Date</th><th>End Date</th><th>Assigned To</th><th>Today’s Work</th><th>Status</th></tr></thead><tbody></tbody></table>').appendTo(host).find('tbody');
+         for (const row of data.rows) drawPlanRow(frm,project,row,data,$('<tr>').appendTo(table));
+-        if (!data.rows.length) $('<tr><td colspan="8"></td></tr>').find('td').text(__('No activities yet. Add an activity or save this project with a Project Template to generate its tasks.')).end().appendTo(table);
++        if (!data.rows.length) $('<tr><td colspan="7"></td></tr>').find('td').text(__('No activities yet. Add an activity or save this project with a Project Template to generate its tasks.')).end().appendTo(table);
+     }
+     function drawPlanRow(frm,project,row,data,tr) {
+         tr.empty();
+-        let description=row.description || '', selected=[...row.assigned_to], names={...data.user_names}, busy=false;
+-        const dirty=()=>{frm.__bs_plan_dirty.add(row.name);save.prop('disabled',false).text(__('Save changes'));};
++        let description=row.description || '', selected=[...row.assigned_to], names={...data.user_names};
++        const dirtyRows=frm.__bs_plan_dirty;
+         const cell=()=> $('<td style="vertical-align:top;min-width:130px">').appendTo(tr);
+-        const input=(parent,label,value,type='text')=>$('<input class="form-control input-sm">').attr({type,'aria-label':label+' '+row.name}).val(value || '').prop('disabled',!row.can_edit).on('input change',dirty).appendTo(parent);
+-        const titleCell=cell(), subject=input(titleCell,__('Activity'),row.subject);
++        const titleCell=cell();
++        const indicator=$('<div class="small text-muted" role="status" aria-live="polite">').text(__('Saved automatically'));
++        const recovery=$('<div hidden>');
++        let controller;
++        const input=(parent,label,key,value,type='text')=>{
++            const control=$('<input class="form-control input-sm bs-plan-edit">').attr({type,'aria-label':label+' '+row.name}).val(value || '').prop('disabled',!row.can_edit).appendTo(parent);
++            control.on('input',event=>{
++                // Mark composition as pending, but commit its final value only.
++                if(event.originalEvent?.isComposing) return;
++                controller.edit(key,control.val(),type==='text'?900:400);
++            }).on('compositionend',()=>controller.edit(key,control.val(),900));
++            control.on('change',()=>controller.edit(key,control.val())).on('blur',()=>controller.flush());
++            return control;
++        };
++        const subject=input(titleCell,__('Activity'),'subject',row.subject);
+         $('<div class="text-muted small">').text(row.name).appendTo(titleCell);
++        indicator.appendTo(titleCell);recovery.appendTo(titleCell);
+         $('<button type="button" class="btn btn-link btn-xs">').text(__('Open task form')).on('click',()=>{
+-            if(frm.__bs_plan_dirty.size) return frappe.msgprint(__('Save or discard the edited rows before opening the task form.'));
++            if(dirtyRows.size) return frappe.msgprint(__('Wait for automatic saving to finish or resolve the row save error.'));
+             openProjectRecord(frm,{doctype:'Task'},row.name,()=>renderPlan(frm));
+         }).appendTo(titleCell);
+         const descriptionCell=cell();
+         const preview=$('<div style="white-space:pre-wrap;max-width:250px;max-height:100px;overflow:auto">').text(row.description_text || '—').appendTo(descriptionCell);
+-        $('<button type="button" class="btn btn-default btn-xs">').text(__('Edit description')).prop('disabled',!row.can_edit).on('click',()=>{
+-            const d=new frappe.ui.Dialog({title:__('Activity Description'),size:'large',fields:[{fieldname:'description',fieldtype:'Text Editor',label:__('Description'),default:description}],primary_action_label:__('Use description'),primary_action(v){description=v.description || '';preview.text(new DOMParser().parseFromString(description,'text/html').body.textContent || '—');dirty();d.hide();}});d.show();
++        $('<button type="button" class="btn btn-default btn-xs bs-plan-edit">').text(__('Edit description')).prop('disabled',!row.can_edit).on('click',()=>{
++            const d=new frappe.ui.Dialog({title:__('Activity Description'),size:'large',fields:[{fieldname:'description',fieldtype:'Text Editor',label:__('Description'),default:description}],primary_action_label:__('Done'),primary_action(v){description=v.description || '';preview.text(new DOMParser().parseFromString(description,'text/html').body.textContent || '—');controller.edit('description',description);d.hide();}});d.show();
+         }).appendTo(descriptionCell);
+-        const start=input(cell(),__('Start Date'),row.exp_start_date,'date'), end=input(cell(),__('End Date'),row.exp_end_date,'date');
++        const start=input(cell(),__('Start Date'),'start_date',row.exp_start_date,'date'), end=input(cell(),__('End Date'),'end_date',row.exp_end_date,'date');
+         const assigned=cell();
+         const label=$('<div>').text(selected.map(u=>names[u] || u).join(', ') || __('Unassigned')).appendTo(assigned);
+-        $('<button type="button" class="btn btn-default btn-xs">').text(__('Choose users')).prop('disabled',!row.can_edit).on('click',async()=>{
++        $('<button type="button" class="btn btn-default btn-xs bs-plan-edit">').text(__('Choose users')).prop('disabled',!row.can_edit).on('click',async()=>{
+             const {message:choices}=await frappe.call({method:'bsgroup.project_plan.assignment_choices',args:{project,task:row.name}});
+             for(const u of selected) if(!choices.some(o=>o.value===u)) choices.push({value:u,label:names[u] || u,description:u});
+             for(const o of choices) {names[o.value]=o.label;o.label=esc(o.label);o.description=esc(o.description);}
+-            const d=new frappe.ui.Dialog({title:__('Assign Activity'),fields:[{fieldname:'users',fieldtype:'MultiSelectList',label:__('Assigned To'),get_data:txt=>choices.filter(o=>(o.label+' '+o.value).toLowerCase().includes((txt||'').toLowerCase()))}],primary_action_label:__('Use selection'),primary_action(v){selected=v.users || [];label.text(selected.map(u=>names[u] || u).join(', ') || __('Unassigned'));dirty();d.hide();}});
++            const d=new frappe.ui.Dialog({title:__('Assign Activity'),fields:[{fieldname:'users',fieldtype:'MultiSelectList',label:__('Assigned To'),get_data:txt=>choices.filter(o=>(o.label+' '+o.value).toLowerCase().includes((txt||'').toLowerCase()))}],primary_action_label:__('Done'),primary_action(v){selected=[...(v.users || [])];label.text(selected.map(u=>names[u] || u).join(', ') || __('Unassigned'));controller.edit('assigned_to',selected);d.hide();}});
+             d.show();await d.fields_dict.users.set_options();d.fields_dict.users.set_value(selected);
+         }).appendTo(assigned);
+         const work=cell();
+-        $('<button type="button" class="btn btn-default btn-sm">').text(__('Enter today’s task')).attr('title',row.can_log_work?'':__('Only assigned users can record work.')).prop('disabled',!row.can_log_work).on('click',()=>showWork(frm,project,row,true)).appendTo(work);
++        const workButton=$('<button type="button" class="btn btn-default btn-sm">').text(__('Enter today’s task')).attr('title',row.can_log_work?'':__('Only assigned users can record work.')).prop('disabled',!row.can_log_work).on('click',()=>showWork(frm,project,row,true)).appendTo(work);
+         $('<button type="button" class="btn btn-link btn-sm">').text(__('View work history')).on('click',()=>showWork(frm,project,row,false)).appendTo(work);
+         const statusCell=cell(), status=$('<select class="form-control input-sm">').attr('aria-label',__('Status')+' '+row.name).prop('disabled',!row.can_change_status || !data.work_updates_ready).appendTo(statusCell);
+         const options=[...data.status_options]; if(!options.includes(row.status)) options.unshift(row.status);
+         for(const value of options) $('<option>').val(value).text(__(value)).appendTo(status);
+-        status.val(row.status);
+-        if(row.overdue) $('<div class="text-warning small">').text(__('Past end date')).appendTo(statusCell);
+-        $('<button type="button" class="btn btn-default btn-xs">').text(__('Save status')).prop('disabled',!row.can_change_status || !data.work_updates_ready).on('click',async()=>{
+-            if(status.val()===row.status) return;
+-            if(frm.__bs_plan_dirty.has(row.name)) return frappe.msgprint(__('Save the row changes before updating its status.'));
+-            await perform(async()=>{await frappe.call({method:'bsgroup.project_plan.set_task_status',type:'POST',args:{project,task:row.name,status:status.val(),expected_modified:row.modified}});});
+-        }).appendTo(statusCell);
+-        const saveCell=cell();
+-        const save=$('<button type="button" class="btn btn-primary btn-sm">').text(__('Saved')).prop('disabled',true).on('click',async()=>{
+-            await perform(async()=>{await frappe.call({method:'bsgroup.project_plan.save_task',type:'POST',args:{project,task:row.name,subject:subject.val(),description,start_date:start.val(),end_date:end.val(),assigned_to:selected,expected_modified:row.modified,expected_assignees:row.assigned_to}});});
+-        }).appendTo(saveCell);
+-        $('<button type="button" class="btn btn-link btn-xs">').text(__('Discard changes')).prop('disabled',!row.can_edit).on('click',()=>{frm.__bs_plan_dirty.delete(row.name);drawPlanRow(frm,project,row,data,tr);}).appendTo(saveCell);
+-        async function perform(action) {
+-            if(busy) return;busy=true;
+-            const buttons=tr.find('button').toArray().map(button=>[button,button.disabled]);
+-            tr.find('button').prop('disabled',true);
+-            try {
+-                await action();frm.__bs_plan_dirty.delete(row.name);
+-                if(frm.doc.name===project && !frm.__bs_plan_dirty.size && !frm.is_dirty()) {
+-                    await frm.reload_doc();
+-                    frappe.show_alert({message:__('Task saved'),indicator:'green'});
+-                    return;
+-                }
++        status.val(row.status).on('change',()=>controller.edit('status',status.val()));
++        const overdue=$('<div class="text-warning small">').text(__('Past end date')).toggle(!!row.overdue).appendTo(statusCell);
++        controller=planAutosave(row,async(changes,base)=>{
++            const {message:receipt}=await frappe.call({method:'bsgroup.project_plan.autosave_task',type:'POST',args:{project,task:row.name,changes,expected_modified:base.modified,expected_assignees:base.assigned_to}});
++            return receipt;
++        },state=>{
++            const unsaved=state.busy || state.pending;
++            if(unsaved){dirtyRows.add(row.name);pendingSaves.add(controller);}
++            else {dirtyRows.delete(row.name);pendingSaves.delete(controller);}
++            indicator.text(state.failed?__('Not saved — check the error and retry or reload this row.'):unsaved?__('Saving…'):__('Saved automatically'))
++                .toggleClass('text-danger',state.failed).toggleClass('text-muted',!state.failed);
++            recovery.prop('hidden',!state.failed);
++        },(receipt,pending)=>{
++            row=receipt.row;Object.assign(names,receipt.user_names);
++            // Update only acknowledged fields; preserve anything typed while
++            // the request was in flight and keep the user's focus in place.
++            if(!pending.has('subject'))subject.val(row.subject);
++            if(!pending.has('description')){description=row.description || '';preview.text(row.description_text || '—');}
++            if(!pending.has('start_date'))start.val(row.exp_start_date || '');
++            if(!pending.has('end_date'))end.val(row.exp_end_date || '');
++            if(!pending.has('assigned_to')){selected=[...row.assigned_to];label.text(selected.map(u=>names[u] || u).join(', ') || __('Unassigned'));}
++            if(!pending.has('status')){
++                if(!status.find('option').toArray().some(o=>o.value===row.status)) $('<option>').val(row.status).text(__(row.status)).appendTo(status);
++                status.val(row.status);
++            }
++            tr.find('.bs-plan-edit').prop('disabled',!row.can_edit);
++            status.prop('disabled',!row.can_change_status || !data.work_updates_ready);
++            workButton.prop('disabled',!row.can_log_work);
++            overdue.toggle(!!row.overdue);
++            if(frm.__bs_activity_tabs?.tasks)frm.__bs_activity_tabs.tasks.activity_project=null;
++        });
++        $('<button type="button" class="btn btn-link btn-xs">').text(__('Retry')).on('click',()=>controller.flush()).appendTo(recovery);
++        $('<button type="button" class="btn btn-link btn-xs">').text(__('Reload row')).on('click',()=>{
++            if(controller.busy())return;
++            frappe.confirm(__('Reload this row and discard its unsaved changes?'),async()=>{
++                if(controller.busy())return;
+                 const {message:fresh}=await frappe.call({method:'bsgroup.project_plan.get_plan',args:{project}});
+-                if(frm.doc.name!==project) return;
++                if(controller.busy())return;
++                controller.dispose();
+                 const updated=fresh.rows.find(r=>r.name===row.name);
+-                if(updated) drawPlanRow(frm,project,updated,fresh,tr);else tr.remove();
+-                if(frm.__bs_activity_tabs?.tasks) frm.__bs_activity_tabs.tasks.activity_project=null;
+-                frappe.show_alert({message:__('Task saved'),indicator:'green'});
+-            } catch(error) {for(const [button,disabled] of buttons) button.disabled=disabled;}
+-            finally {busy=false;}
+-        }
++                if(updated)drawPlanRow(frm,project,updated,fresh,tr);else tr.remove();
++            });
++        }).appendTo(recovery);
+     }
+     async function showWork(frm,project,row,entry) {
+         const d=new frappe.ui.Dialog({title:entry?__('Enter today’s task'):__('Task Work History'),size:'large',fields:[
+@@ -257,7 +324,7 @@
+         $('<p class="text-muted">').text(__('Showing up to 100 accessible records linked to this project.')).appendTo(panel);
+     }
+     function openProjectRecord(frm,data,name,afterClose) {
+-        if(frm.__bs_plan_dirty?.size) return frappe.msgprint(__('Save or discard the edited plan rows before opening another form.'));
++        if(frm.__bs_plan_dirty?.size) return frappe.msgprint(__('Wait for automatic saving to finish or resolve the row save error before opening another form.'));
+         const project=frm.doc.name;
+         const d=new frappe.ui.Dialog({title:(name || __('New')+' '+__(data.doctype))+' · '+project,size:'extra-large',fields:[{fieldname:'form',fieldtype:'HTML'}]});
+         const host=d.fields_dict.form.$wrapper;

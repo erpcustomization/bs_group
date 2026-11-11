@@ -58,6 +58,28 @@ class ProjectPlanTests(unittest.TestCase):
         with self.assertRaises(PermissionError):self.plan.get_plan('P-A')
         self.f.get_list.assert_not_called()
 
+    def test_autosave_status_only_keeps_assigned_user_endpoint(self):
+        with patch.object(self.plan, 'save_task') as save, patch.object(self.plan, 'set_task_status') as status, patch.object(self.plan, 'get_plan', return_value={'rows':[self.task], 'user_names':{}}):
+            result=self.plan.autosave_task('P-A','TASK-A',{'status':'Delayed'},self.task.modified,[])
+            save.assert_not_called()
+            status.assert_called_once_with('P-A','TASK-A','Delayed',self.task.modified)
+            self.assertEqual(result['row'],self.task)
+
+    def test_autosave_combined_update_uses_new_version_and_rolls_back(self):
+        self.f.db.get_value.return_value='2026-11-11 13:00:00'
+        with patch.object(self.plan, 'save_task') as save, patch.object(self.plan, 'set_task_status',side_effect=ValueError('dependency')) as status:
+            with self.assertRaises(ValueError):
+                self.plan.autosave_task('P-A','TASK-A',{'subject':'Changed','status':'Completed'},self.task.modified,[])
+            self.assertEqual(save.call_args.kwargs['description'],'Scope')
+            status.assert_called_once_with('P-A','TASK-A','Completed','2026-11-11 13:00:00')
+            self.f.db.rollback.assert_called_with(save_point='plan_autosave_testhash')
+
+    def test_autosave_rejects_stale_or_unknown_fields(self):
+        with patch.object(self.plan,'save_task') as save, patch.object(self.plan,'set_task_status') as status:
+            for changes,version in [({'status':'Open'},'2000-01-01'),({'project':'P-B'},self.task.modified),({},self.task.modified)]:
+                with self.assertRaises(ValueError):self.plan.autosave_task('P-A','TASK-A',changes,version,[])
+            save.assert_not_called();status.assert_not_called()
+
     def test_plan_query_is_project_scoped_and_permission_filtered(self):
         self.plan.get_plan('P-A')
         args=self.f.get_list.call_args.kwargs
