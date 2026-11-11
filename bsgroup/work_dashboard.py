@@ -8,6 +8,7 @@ def navigation_script():
     """Serve navigation from the app when patched static assets are unavailable."""
     from pathlib import Path
     content = Path(frappe.get_app_path('bsgroup', 'public', 'js', 'scoped_sales_access.js')).read_text()
+    content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'bs_erp_app.js')).read_text()
     content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'approval_request_navigation.js')).read_text()
     content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'personal_column_widths.js')).read_text()
     content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'sales_list_search.js')).read_text()

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{{ bs_app.name }}</title><meta name="theme-color" content="#123354">
+  <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="{{ bs_app.name }}">
+  <meta name="description" content="Install BS ERP and open your existing dashboard, modules and work on your phone.">
+  <link rel="manifest" href="{{ bs_app.api }}manifest">
+  <link rel="apple-touch-icon" href="{{ bs_app.api }}icon?size=180&amp;v={{ bs_app.version }}">
+  <link rel="icon" href="{{ bs_app.api }}icon?size=192&amp;v={{ bs_app.version }}">
+  <link rel="stylesheet" href="{{ bs_app.api }}style?v={{ bs_app.version }}">
+</head>
+<body class="bserp-install-page">
+  <main class="bserp-install-main">
+    <header class="bserp-install-header"><a href="/bs-erp" aria-label="{{ bs_app.name }} home"><img src="{{ bs_app.api }}icon?size=192&amp;v={{ bs_app.version }}" width="52" height="52" alt=""><strong>BS ERP</strong></a><span>{{ bs_app.region or 'Your workspace' }}</span></header>
+    <section class="bserp-install-hero">
+      <div class="bserp-install-copy"><p class="bserp-eyebrow">BITS SECURE IT · YOUR WORKSPACE</p><h1>Your work.<br><span>Wherever you are.</span></h1><p class="bserp-intro">The dashboard, modules and records you use in ERP, together in an app on your phone.</p>
+        <div class="bserp-install-actions"><button type="button" class="bserp-primary" data-bs-erp-install>Install {{ bs_app.name }}</button><a class="bserp-secondary" href="{{ bs_app.start }}">Open BS ERP <span aria-hidden="true">↗</span></a></div>
+        <p class="bserp-install-status" aria-live="polite">Sign in with your existing ERP account.</p>
+        <div class="bserp-facts"><span>Same account</span><span>Same records</span><span>Your existing access</span></div>
+      </div>
+      <div class="bserp-preview" aria-label="Your ERP workspace illustration">
+        <div class="bserp-preview-top"><span class="bserp-dot"></span><strong>{{ bs_app.name }}</strong><span>My workspace</span></div>
+        <div class="bserp-preview-body"><div class="bserp-preview-welcome"><small>EVERYTHING IN ONE PLACE</small><h2>Ready for your day.</h2><p>Your dashboard opens when you sign in.</p></div>
+          <div class="bserp-preview-grid"><div><span aria-hidden="true">◷</span><strong>Attendance & leave</strong><small>Your daily HR tasks</small></div><div><span aria-hidden="true">▤</span><strong>Sales & quotations</strong><small>Your customer work</small></div><div><span aria-hidden="true">☷</span><strong>Projects & tasks</strong><small>Your assigned work</small></div><div><span aria-hidden="true">✓</span><strong>Procurement & approvals</strong><small>Your next decisions</small></div></div>
+          <p class="bserp-preview-note">Modules shown are examples. You see only what your account can access.</p>
+        </div>
+      </div>
+    </section>
+    <section class="bserp-install-guide" id="install-guide" tabindex="-1"><div><p class="bserp-eyebrow">SET UP ONCE</p><h2>Add BS ERP to your phone</h2><p>Open this page in your phone’s browser.</p></div><ol><li><strong>Android · Chrome</strong><span>Tap Install above. If no prompt appears, open the browser menu and choose “Install app” or “Add to Home screen”.</span></li><li><strong>iPhone · Safari</strong><span>Tap Share, then “Add to Home Screen”. Enable “Open as Web App” if offered, then tap Add.</span></li><li><strong>Start working</strong><span>Open the BS ERP icon and sign in. Use Modules to reach the same screens you use in the browser.</span></li></ol></section>
+    <footer class="bserp-install-footer"><span>{{ bs_app.name }} · Bits Secure IT</span><span>Internet connection required to load and save your work.</span></footer>
+  </main>
+  <script src="{{ bs_app.api }}script?v={{ bs_app.version }}" defer></script>
+</body>
+</html>
