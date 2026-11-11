@@ -140,4 +140,3 @@ def install():
     missing = [d for d in definitions if not meta.has_field(d["fieldname"])]
     if missing:
         create_custom_fields({"HR Settings": missing}, update=False)
-

@@ -13,10 +13,10 @@ index 6334ec1..3cb9462 100644
 +doc_events.setdefault("HR Settings", {}).setdefault("validate", []).append("bsgroup.hr_email.validate_settings")
 diff --git a/bsgroup/hr_email.py b/bsgroup/hr_email.py
 new file mode 100644
-index 0000000..da34207
+index 0000000..35b4306
 --- /dev/null
 +++ b/bsgroup/hr_email.py
-@@ -0,0 +1,143 @@
+@@ -0,0 +1,142 @@
 +"""Opt-in Oman HR sender routing. Never changes default or incoming accounts."""
 +import inspect
 +import json
@@ -159,7 +159,6 @@ index 0000000..da34207
 +    missing = [d for d in definitions if not meta.has_field(d["fieldname"])]
 +    if missing:
 +        create_custom_fields({"HR Settings": missing}, update=False)
-+
 diff --git a/bsgroup/utils/employee.py b/bsgroup/utils/employee.py
 index edf7eb1..ef88820 100644
 --- a/bsgroup/utils/employee.py
@@ -177,154 +176,11 @@ diff --git a/bsgroup/utils/visa.py b/bsgroup/utils/visa.py
 index 5e6a8db..179127e 100644
 --- a/bsgroup/utils/visa.py
 +++ b/bsgroup/utils/visa.py
-@@ -1,74 +1,75 @@
--import frappe
--from frappe.utils import getdate, today
--
--NOTIFY_STATUSES = ("Expiring Soon", "Expired")
--
--
--def update_employee_visa_status():
--    current_date = getdate(today())
--
--    employees = frappe.get_all(
--        "Employee",
--        filters={"status": ["!=", "Left"]},
--        fields=[
--            "name",
--            "employee_name",
--            "custom_visa_expiry_date",
--            "custom_visa_status",
--            "user_id",
--        ],
--    )
--
--    for emp in employees:
--        if not emp.custom_visa_expiry_date:
--            status = "Pending"
--        else:
--            expiry_date = getdate(emp.custom_visa_expiry_date)
--            days_left = (expiry_date - current_date).days
--
--            if days_left < 0:
--                status = "Expired"
--            elif days_left <= 30:
--                status = "Expiring Soon"
--            else:
--                status = "Valid"
--
--        if status != emp.custom_visa_status:
--            frappe.db.set_value(
--                "Employee",
--                emp.name,
--                "custom_visa_status",
--                status,
--                update_modified=False
--            )
--
--            if status in NOTIFY_STATUSES:
--                send_visa_status_email(emp, status)
--
--
--def send_visa_status_email(employee, status):
--    if not employee.user_id:
--        return
--
--    recipient = frappe.db.get_value("User", employee.user_id, "email")
--    if not recipient:
--        return
--
--    expiry_date = getdate(employee.custom_visa_expiry_date)
--
--    if status == "Expired":
--        subject = "Your Visa Has Expired"
--        message = (
--            f"Dear {employee.employee_name},<br><br>"
--            f"Your visa expired on {expiry_date.strftime('%d-%m-%Y')}. "
--            "Please contact HR immediately to renew your visa.<br><br>Regards,<br>HR Team"
--        )
--    else:
--        subject = "Your Visa is Expiring Soon"
--        message = (
--            f"Dear {employee.employee_name},<br><br>"
--            f"Your visa is expiring on {expiry_date.strftime('%d-%m-%Y')}. "
--            "Please contact HR to begin the renewal process.<br><br>Regards,<br>HR Team"
--        )
--
+@@ -71,4 +71,5 @@ def send_visa_status_email(employee, status):
+             "Please contact HR to begin the renewal process.<br><br>Regards,<br>HR Team"
+         )
+ 
 -    frappe.sendmail(recipients=[recipient], subject=subject, message=message, now=False)
 \ No newline at end of file
-+import frappe
-+from frappe.utils import getdate, today
-+
-+NOTIFY_STATUSES = ("Expiring Soon", "Expired")
-+
-+
-+def update_employee_visa_status():
-+    current_date = getdate(today())
-+
-+    employees = frappe.get_all(
-+        "Employee",
-+        filters={"status": ["!=", "Left"]},
-+        fields=[
-+            "name",
-+            "employee_name",
-+            "custom_visa_expiry_date",
-+            "custom_visa_status",
-+            "user_id",
-+        ],
-+    )
-+
-+    for emp in employees:
-+        if not emp.custom_visa_expiry_date:
-+            status = "Pending"
-+        else:
-+            expiry_date = getdate(emp.custom_visa_expiry_date)
-+            days_left = (expiry_date - current_date).days
-+
-+            if days_left < 0:
-+                status = "Expired"
-+            elif days_left <= 30:
-+                status = "Expiring Soon"
-+            else:
-+                status = "Valid"
-+
-+        if status != emp.custom_visa_status:
-+            frappe.db.set_value(
-+                "Employee",
-+                emp.name,
-+                "custom_visa_status",
-+                status,
-+                update_modified=False
-+            )
-+
-+            if status in NOTIFY_STATUSES:
-+                send_visa_status_email(emp, status)
-+
-+
-+def send_visa_status_email(employee, status):
-+    if not employee.user_id:
-+        return
-+
-+    recipient = frappe.db.get_value("User", employee.user_id, "email")
-+    if not recipient:
-+        return
-+
-+    expiry_date = getdate(employee.custom_visa_expiry_date)
-+
-+    if status == "Expired":
-+        subject = "Your Visa Has Expired"
-+        message = (
-+            f"Dear {employee.employee_name},<br><br>"
-+            f"Your visa expired on {expiry_date.strftime('%d-%m-%Y')}. "
-+            "Please contact HR immediately to renew your visa.<br><br>Regards,<br>HR Team"
-+        )
-+    else:
-+        subject = "Your Visa is Expiring Soon"
-+        message = (
-+            f"Dear {employee.employee_name},<br><br>"
-+            f"Your visa is expiring on {expiry_date.strftime('%d-%m-%Y')}. "
-+            "Please contact HR to begin the renewal process.<br><br>Regards,<br>HR Team"
-+        )
-+
 +    frappe.sendmail(recipients=[recipient], subject=subject, message=message, now=False,
 +                    reference_doctype="Employee", reference_name=employee.name)
