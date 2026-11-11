@@ -80,6 +80,8 @@ def is_assigned_manager(sheet, user=None):
         return False
     route = route_for(sheet)
     fixed = route.get("approval_policy") == FIXED_POLICY
+    if fixed_approval_enabled() and (not fixed or user != FIXED_APPROVER):
+        return False  # Old route snapshots cannot retain approval authority after policy cutover.
     valid_policy = (fixed and user == FIXED_APPROVER) or (
         route.get("approval_policy") == "Immediate Manager" and route.get("changed_by") != user)
     return bool(valid_policy and route.get("approval_manager") == user

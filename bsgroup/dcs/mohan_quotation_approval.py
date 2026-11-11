@@ -1,0 +1,106 @@
+"""Mohan's explicit Won action records the current commercial approval atomically.
+
+Only called inside the validated quotation save. No impersonation, blanket
+approval bypass, independent commit or caller-supplied approval identity.
+"""
+from html import escape
+
+import frappe
+
+from bsgroup.dcs.manager_approval import (
+    FINAL_STATES, FIXED_APPROVER, FIXED_POLICY, fixed_approval_enabled,
+    is_assigned_manager,
+)
+
+
+def approve_on_won(quotation, sheet):
+    if (frappe.session.user != FIXED_APPROVER or not fixed_approval_enabled()
+            or quotation.docstatus != 1 or quotation.custom_pipeline_stage != "Won"):
+        return False
+    previous = quotation.get_doc_before_save()
+    if previous and previous.get("custom_pipeline_stage") == "Won":
+        return False  # An ordinary save of an already-Won quote is not a new decision.
+    quotation.check_permission("write")
+    sheet.check_permission("write")
+    if quotation.get("custom_deal_cost_sheet") != sheet.name or quotation.company != sheet.company:
+        frappe.throw("The quotation and costing sheet must belong to the same deal and company.")
+    # Reuse all source, PO, revision and commercial-input validation before approval.
+    from bsgroup.dcs.procurement import validate_won
+    validate_won(quotation)
+    from bsgroup.dcs.baseline import ensure_baseline
+    ensure_baseline(sheet.name, "quotation_won_approval")
+    sheet.reload()
+    from bsgroup.dcs.commercial_authority import authorised_position
+    if authorised_position(sheet):
+        return False
+    if sheet.custom_approval_state in FINAL_STATES:
+        frappe.throw("The current costing revision has a recorded decision. Review and revise the costing sheet before marking it Won.")
+    if sheet.custom_approval_required != "Manager":
+        frappe.throw("The current costing position cannot be approved by marking the quotation Won. Review its commercial validation.")
+    if not is_assigned_manager(sheet):
+        frappe.throw("Route the current costing approval to Mohan before marking this quotation Won.")
+    from bsgroup.api.dcs.approval import dcs_approval_decision
+    result = dcs_approval_decision(dcs=sheet.name, action="Approve",
+        reason="Approved automatically by Mohan's Won action on quotation " + quotation.name
+        + "; costing revision " + sheet.custom_revision_reference + ".")
+    if not result.get("ok"):
+        frappe.throw(result.get("error") or "The quotation's commercial approval could not be recorded.")
+    sheet.reload()
+    if not authorised_position(sheet):
+        frappe.throw("The current costing revision is not approved. The Won action was not completed.")
+    return True
+
+
+def pending_routes():
+    """Read-only setup summary; does not approve or route records."""
+    from bsgroup.dcs.manager_approval import route_for
+    counts = {}
+    for name in frappe.get_all("Deal Cost Sheet", filters={"docstatus": 1,
+            "custom_approval_required": ["in", ["Manager", "Blocked"]],
+            "custom_approval_state": ["not in", list(FINAL_STATES)]}, pluck="name"):
+        route = route_for(name)
+        key = route.get("approval_manager") or "Not assigned"
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+@frappe.whitelist(methods=["POST"])
+def configure():
+    """Explicit administrator setup; reroutes pending reviews, never approves them."""
+    frappe.only_for("System Manager")
+    if not frappe.db.get_value("User", FIXED_APPROVER, "enabled"):
+        frappe.throw("Mohan's user must be enabled before applying this approval policy.")
+    from bsgroup.dcs.manager_approval import reroute_pending
+    settings = frappe.get_doc("BS Group Settings")
+    settings.dcs_approval_policy = FIXED_POLICY
+    settings.save()
+    # Also repair older snapshots when the stored policy was already Mohan.
+    reroute_pending()
+    return page()
+
+
+@frappe.whitelist()
+def page():
+    frappe.only_for("System Manager")
+    from frappe.sessions import get_csrf_token
+    rows = "".join("<tr><td>" + escape(user) + "</td><td>" + str(count) + "</td></tr>"
+        for user, count in sorted(pending_routes().items()))
+    enabled = fixed_approval_enabled()
+    body = f'''<h2>Mohan quotation approvals</h2>
+    <p><b>Current policy: {"Mohan only" if enabled else "Immediate manager / previous policy"}</b></p>
+    <p>This policy routes pending and future commercial approvals to {FIXED_APPROVER}.
+    When Mohan marks a quotation Won, its pending commercial approval is recorded
+    automatically against the current costing revision in the same transaction.
+    No separate approver action is required.</p>
+    <p>Existing decisions, customer PO requirements, source checks and commercial
+    hard limits remain enforced. This does not approve Purchase Requisitions,
+    Purchase Orders or delivery release.</p>
+    <h3>Current pending review assignments</h3>
+    <table class="table table-bordered"><thead><tr><th>Approver</th><th>Pending reviews</th></tr></thead>
+    <tbody>{rows or '<tr><td colspan="2">No pending reviews</td></tr>'}</tbody></table>
+    <form method="post" action="/api/method/bsgroup.dcs.mohan_quotation_approval.configure">
+    <input type="hidden" name="csrf_token" value="{escape(get_csrf_token(), quote=True)}">
+    <button class="btn btn-primary" type="submit">Apply Mohan-only routing to pending and future approvals</button></form>
+    <p><a href="/desk/bs-group-settings">BS Group Settings</a></p>'''
+    frappe.respond_as_web_page("Mohan quotation approvals", body,
+        indicator_color="green" if enabled else "orange")

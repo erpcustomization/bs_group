@@ -109,6 +109,8 @@ def sync_won(doc, method=None):
     sheet = frappe.get_doc("Deal Cost Sheet", doc.custom_deal_cost_sheet, for_update=True)
     if sheet.custom_award_state == "Awarded":
         return
+    from bsgroup.dcs.mohan_quotation_approval import approve_on_won
+    approve_on_won(doc, sheet)
     from bsgroup.api.dcs.award import dcs_record_award
     result = dcs_record_award(dcs=sheet.name, award_reference=doc.custom_customer_po_reference,
                               evidence_type="Customer PO", notes="Customer PO uploaded on quotation " + doc.name +
