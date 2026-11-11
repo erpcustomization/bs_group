@@ -1689,11 +1689,12 @@ new file mode 100644
 +};
 --- a/bsgroup/hooks.py
 +++ b/bsgroup/hooks.py
-@@ -747,3 +747,7 @@
- # Oman-only, explicitly enabled HR sending; no change to other mail routes.
+@@ -712,4 +712,8 @@
+ _quotation_numbering_hooks(globals())
  from bsgroup.hr_email import configure_hooks as _hr_email_hooks
  _hr_email_hooks(globals())
 +
 +# Oman HR feature parity uses native local leave policy and existing access.
 +from bsgroup.hr_oman import configure_hooks as _hr_oman_hooks
 +_hr_oman_hooks(globals())
+ override_whitelisted_methods["frappe.desk.form.assign_to.add"] = "bsgroup.lead_assignment.assign"
