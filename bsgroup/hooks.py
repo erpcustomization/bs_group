@@ -748,6 +748,10 @@ after_migrate.append("bsgroup.project_ai_plan.install")
 from bsgroup.hr_email import configure_hooks as _hr_email_hooks
 _hr_email_hooks(globals())
 
+# UAE attendance emails stay disabled until explicitly enabled in HR Settings.
+from bsgroup.uae_attendance_email import configure_hooks as _uae_attendance_hooks
+_uae_attendance_hooks(globals())
+
 # Oman HR feature parity uses native local leave policy and existing access.
 from bsgroup.hr_oman import configure_hooks as _hr_oman_hooks
 _hr_oman_hooks(globals())
