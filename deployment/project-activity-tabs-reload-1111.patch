@@ -1,0 +1,17 @@
+Project activity tab reload 20261111
+
+diff --git a/bsgroup/public/js/project_workspace.js b/bsgroup/public/js/project_workspace.js
+index b4949c1..670e628 100644
+--- a/bsgroup/public/js/project_workspace.js
++++ b/bsgroup/public/js/project_workspace.js
+@@ -2,6 +2,10 @@
+     const sections = {tasks:'Tasks', timesheets:'Timesheets', scheduler:'Tech Task Scheduler', expenses:'Expenses', advances:'Advance', labor:'Labour Approval'};
+     const esc = value => frappe.utils.escape_html(String(value ?? ''));
+     frappe.ui.form.on('Project', {
++        before_load(frm) {
++            // Register activity tabs before Frappe restores the URL's tab.
++            groupActivityTabs(frm);
++        },
+         refresh(frm) {
+             groupAdditionalDetails(frm);
+             groupActivityTabs(frm);

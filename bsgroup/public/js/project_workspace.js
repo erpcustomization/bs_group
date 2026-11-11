@@ -2,6 +2,10 @@
     const sections = {tasks:'Tasks', timesheets:'Timesheets', scheduler:'Tech Task Scheduler', expenses:'Expenses', advances:'Advance', labor:'Labour Approval'};
     const esc = value => frappe.utils.escape_html(String(value ?? ''));
     frappe.ui.form.on('Project', {
+        before_load(frm) {
+            // Register activity tabs before Frappe restores the URL's tab.
+            groupActivityTabs(frm);
+        },
         refresh(frm) {
             groupAdditionalDetails(frm);
             groupActivityTabs(frm);
