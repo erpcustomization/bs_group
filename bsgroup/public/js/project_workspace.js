@@ -44,7 +44,9 @@
                     label:title, permlevel:original.df.permlevel || 0
                 }, frm, layout.tab_link_container, layout.tabs_content);
                 layout.tabs.push(tab);
-                tab.activity_host = $('<div class="form-section" style="padding:20px">').appendTo(tab.wrapper);
+                const section = $('<div class="form-section" style="padding:20px">').appendTo(tab.wrapper);
+                // Native refresh hides sections without a visible control.
+                tab.activity_host = $('<div class="frappe-control" data-fieldtype="HTML">').appendTo(section);
                 const activate = tab.set_active.bind(tab);
                 tab.set_active = () => {
                     activate();
