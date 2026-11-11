@@ -1,0 +1,20 @@
+{
+ "doctype":"DocType", "name":"BS Project Plan Run", "module":"BS Group", "engine":"InnoDB",
+ "autoname":"hash", "track_changes":1,
+ "field_order":["purchase_request","project","quotation","costing_sheet","status","error_detail","requested_by","started_at","finished_at","attempt_token","source_snapshot","task_names"],
+ "fields":[
+  {"fieldname":"purchase_request","label":"Purchase Requisition","fieldtype":"Link","options":"Material Request","reqd":1,"unique":1,"read_only":1},
+  {"fieldname":"project","label":"Project","fieldtype":"Link","options":"Project","reqd":1,"read_only":1,"in_list_view":1},
+  {"fieldname":"quotation","label":"Quotation","fieldtype":"Link","options":"Quotation","reqd":1,"read_only":1},
+  {"fieldname":"costing_sheet","label":"Costing Sheet","fieldtype":"Link","options":"Deal Cost Sheet","reqd":1,"read_only":1},
+  {"fieldname":"status","label":"Status","fieldtype":"Select","options":"Queued\nGenerating\nReady\nFailed\nAI setup required\nReview required\nExisting plan retained","reqd":1,"read_only":1,"in_list_view":1},
+  {"fieldname":"error_detail","label":"Planning Status Details","fieldtype":"Small Text","read_only":1},
+  {"fieldname":"requested_by","label":"Requested By","fieldtype":"Link","options":"User","read_only":1},
+  {"fieldname":"started_at","label":"Started At","fieldtype":"Datetime","read_only":1},
+  {"fieldname":"finished_at","label":"Finished At","fieldtype":"Datetime","read_only":1},
+  {"fieldname":"attempt_token","label":"Attempt Token","fieldtype":"Data","read_only":1,"hidden":1},
+  {"fieldname":"source_snapshot","label":"Operational Source Snapshot","fieldtype":"Long Text","read_only":1,"hidden":1},
+  {"fieldname":"task_names","label":"Created Tasks","fieldtype":"Long Text","read_only":1}
+ ],
+ "permissions":[{"role":"System Manager","read":1}], "sort_field":"creation","sort_order":"DESC"
+}

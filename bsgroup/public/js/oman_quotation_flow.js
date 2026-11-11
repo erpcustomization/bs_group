@@ -50,9 +50,10 @@
     }
     function projectFields(data) {
         if (!data.project_required) return [];
-        const modules=[['supply','Supply Only'],['elv','ELV'],['3cx','3CX'],['infra','Infra']];
+        const modules=[['elv','ELV Project'],['3cx','3CX Project'],['infra','Infra Project'],['supply','Supply Only']];
         return [
-            {fieldtype:'Section Break',label:__('Project modules')},
+            {fieldtype:'Section Break',label:__('Select Project Category — choose one or more')},
+            {fieldtype:'HTML',options:'<p><strong>'+__(data.project ? 'The existing linked project will be used.' : 'A project will be created automatically.')+'</strong> '+__('An AI-generated draft project plan will be prepared using the quotation and costing sheet. Please select ELV Project, 3CX Project, Infra Project or Supply Only (choose all that apply). Existing activities are retained. If AI is unavailable, the project remains created and its plan shows the action required.')+'</p>'},
             ...modules.map(([key,label])=>({fieldtype:'Check',fieldname:'module_'+key,label:__(label),default:(data.project_modules||[]).includes(key)?1:0})),
             ...(data.project ? [{fieldtype:'HTML',options:`<p>${__('Existing Project')}: ${frappe.utils.escape_html(data.project)}</p>`}] : [
                 {fieldtype:'Link',fieldname:'project_type',label:__('Project Type'),options:'Project Type',reqd:1},
@@ -85,7 +86,7 @@
             {fieldtype:'Small Text',fieldname:'reason',label:__('Reason'),reqd:['Lost','Cancelled','Delayed'].includes(stage)?1:0},
         ];
         dialog=new frappe.ui.Dialog({title:__('Mark quotation {0}',[stage]),fields,
-            primary_action_label:won?__('Confirm Won and Create Requisition'):__('Save Status'),
+            primary_action_label:won?__('Confirm Won, Create Project and Send'):__('Save Status'),
             async primary_action(values){
                 dialog.disable_primary_action();
                 try {
@@ -98,6 +99,7 @@
                             ['project_type','custom_project_manager','expected_start_date','expected_end_date','customer','custom_project_description'].map(key=>[key,values[key]])))});
                     dialog.hide();await frm.reload_doc();
                     if(result?.requisition) frappe.msgprint(__('Purchase Requisition created: {0}',[frappe.utils.escape_html(result.requisition)]));
+                    if(result?.project) frappe.msgprint(__('Project created/linked: {0}. Open Project Plan to follow automatic planning.',[frappe.utils.escape_html(result.project)]));
                 } finally {dialog.enable_primary_action();}
             }});
         dialog.show();

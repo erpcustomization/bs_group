@@ -56,6 +56,10 @@
             }
             frm.layout.refresh_tabs();
             renderPlan(frm);
+            if (frappe.user.has_role('System Manager')) frm.add_custom_button(__('Test AI Planning Connection'), async()=>{
+                const {message}=await frappe.call({method:'bsgroup.project_ai_plan.test_connection',type:'POST',freeze:true,freeze_message:__('Checking AI planning with sample data…')});
+                if(message?.success) frappe.msgprint(__(message.message)+' '+__('Activities generated: {0}',[message.activities]));
+            },__('Actions'));
             const field = frm.fields_dict.custom_bs_project_workspace;
             if (!field) {
                 if (frappe.user.has_role('System Manager')) frm.add_custom_button(__('Set Up Project Activities'), async () => {
@@ -162,6 +166,23 @@
         host.empty();
         $('<h4>').text(__('Project Plan')+' · '+(data.project_name || project)).appendTo(host);
         $('<p class="text-muted">').text(__('Automatically shows this project’s tasks and template activities. Edits update the same tasks; assigned tasks appear in each selected user’s task list.')).appendTo(host);
+        if (data.ai_plan && !data.ai_plan.installed && frappe.user.has_role('System Manager')) {
+            $('<button type="button" class="btn btn-default btn-sm">').text(__('Enable Automatic Project Planning')).on('click',async()=>{
+                await frappe.call({method:'bsgroup.project_ai_plan.setup',type:'POST',freeze:true}); renderPlan(frm);
+            }).appendTo(host);
+        }
+        for (const run of data.ai_plan?.runs || []) {
+            const messages={Queued:'AI project plan is queued. Refresh Plan shortly.',Generating:'AI is preparing the project plan. Refresh Plan shortly.',
+                Ready:'AI-generated draft plan. Review the activities and proposed dates, then assign users.',
+                'AI setup required':'Project created. Configure this site’s Claude connection to generate its plan.',
+                'Existing plan retained':'The existing project plan has been retained, including its assignments and work history.'};
+            const notice=$('<div class="alert alert-info">').text(__(messages[run.status] || run.error_detail || run.status)).appendTo(host);
+            if (data.can_create && ['Failed','AI setup required','Review required','Generating','Queued'].includes(run.status)) {
+                $('<button type="button" class="btn btn-default btn-xs" style="margin-left:12px">').text(__('Retry AI Plan')).on('click',async()=>{
+                    await frappe.call({method:'bsgroup.project_ai_plan.retry',type:'POST',args:{project,run_name:run.name},freeze:true}); renderPlan(frm);
+                }).appendTo(notice);
+            }
+        }
         const actions = $('<div style="display:flex;gap:8px;margin:12px 0">').appendTo(host);
         $('<button type="button" class="btn btn-default btn-sm">').text(__('Refresh Plan')).on('click',()=>{
             if (frm.__bs_plan_dirty.size) return frappe.msgprint(__('Wait for automatic saving to finish. Resolve any row showing a save error before refreshing.'));

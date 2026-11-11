@@ -58,7 +58,7 @@ const frm={doc:{docstatus:1,custom_deal_cost_sheet:'DCS-1',custom_pipeline_stage
     await dialog.options.primary_action({schedule_date:'2026-10-27',warehouse:'Stores - AE',module_supply:1,module_elv:1});
     check(calls.at(-1).method.endsWith('.send_to_procurement')&&calls.at(-1).args.warehouse==='Stores - AE',
         'Creation carries source quotation, date and warehouse');
-    check(calls.at(-1).args.project_modules==='["supply","elv"]','Selected project modules reach server');
+    check(calls.at(-1).args.project_modules==='["elv","supply"]','Selected project modules reach server');
     check(routes.at(-1).args[0]==='bs-procurement'&&routes.at(-1).options.bsp_request==='PR-1',
         'Created standard PR opens in BS Procurement');
     check(dialog.hidden&&!dialog.disabled,'Creation closes dialog and restores action');

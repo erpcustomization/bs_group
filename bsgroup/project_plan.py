@@ -149,7 +149,12 @@ def get_plan(project):
         assigned.update(row["assigned_to"])
     names = {r.name: r.full_name or r.name for r in frappe.get_all("User", filters={"name": ["in", sorted(assigned)]},
              fields=["name", "full_name"])} if assigned else {}
+    ai_plan = {"installed": False, "runs": []}
+    if frappe.db.exists("DocType", "BS Project Plan Run"):
+        from bsgroup.project_ai_plan import summary
+        ai_plan = summary(doc.name)
     return dict(project=doc.name, project_name=doc.project_name, rows=rows, user_names=names,
+                ai_plan=ai_plan,
                 can_create=bool(doc.status not in {"Completed", "Cancelled"} and frappe.has_permission("Project", "write", doc=doc)
                                 and frappe.has_permission("Task", "create")), company=doc.company,
                 can_read_tasks=bool(frappe.has_permission("Task", "read")), status_options=list(PLAN_STATUSES),

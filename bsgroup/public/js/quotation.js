@@ -348,11 +348,11 @@ frappe.ui.form.on("Quotation", {
                 const additional = data.resources || data.additional_charges
                     ? `<p>${data.resources} labour/resource rows and ${data.additional_charges} additional charge rows
                        remain in the attached costing evidence. Only the Item lines below become purchasing lines.</p>` : "";
-                const modules = [['supply','Supply Only'],['elv','ELV'],['3cx','3CX'],['infra','Infra']];
+                const modules = [['elv','ELV Project'],['3cx','3CX Project'],['infra','Infra Project'],['supply','Supply Only']];
                 const projectFields = data.project ? [
-                    {fieldtype:'HTML',fieldname:'project_info',options:`<p>Project: <strong>${esc(data.project)}</strong>. The quotation BOQ will be added without prices. Existing BOQ content is retained.</p>`}
+                    {fieldtype:'HTML',fieldname:'project_info',options:`<p>The quotation will be linked to existing project <strong>${esc(data.project)}</strong>. Its existing plan will be retained. If it has no activities, an AI-generated draft plan will be prepared from the quotation and costing sheet.</p>`}
                 ] : [
-                    {fieldtype:'HTML',fieldname:'project_info',options:'<p>A project will be created with the quotation BOQ without prices. Complete the existing required project details below.</p>'},
+                    {fieldtype:'HTML',fieldname:'project_info',options:'<p><strong>A project will be created automatically.</strong> An AI-generated draft project plan will be prepared using the quotation and costing sheet. Please select ELV Project, 3CX Project, Infra Project or Supply Only (choose all that apply). Complete the project manager and schedule below. If AI is unavailable, the project remains created and its plan shows the action required.</p>'},
                     {fieldname:'project_type',label:__('Project Type'),fieldtype:'Link',options:'Project Type',reqd:1},
                     {fieldname:'project_template',label:__('From Template'),fieldtype:'Link',options:'Project Template'},
                     {fieldname:'custom_project_manager',label:__('Project Manager'),fieldtype:'Link',options:'Employee',reqd:1},
@@ -375,11 +375,11 @@ frappe.ui.form.on("Quotation", {
                         {fieldname:"warehouse",label:__("Target Warehouse"),fieldtype:"Select",options:["",...data.warehouses],
                          reqd:data.items.some(row=>row.is_stock_item)?1:0,
                          default:data.warehouses.length===1?data.warehouses[0]:""},
-                        {fieldname:'project_section',fieldtype:'Section Break',label:__('Project Modules — choose one or more')},
+                        {fieldname:'project_section',fieldtype:'Section Break',label:__('Select Project Category — choose one or more')},
                         ...modules.map(([key,label])=>({fieldname:'module_'+key,fieldtype:'Check',label:__(label),default:(data.project_modules||[]).includes(key)?1:0})),
                         ...projectFields
                     ],
-                    primary_action_label:__("Create Purchase Requisition"),
+                    primary_action_label:__("Create Project and Send to Procurement"),
                     async primary_action(values) {
                         const selected=modules.filter(([key])=>values['module_'+key]).map(([key])=>key);
                         if(!selected.length){frappe.msgprint(__('Choose at least one project module.'));return;}
@@ -395,6 +395,7 @@ frappe.ui.form.on("Quotation", {
                             if (!result.message) return;
                             dialog.hide();
                             await frm.reload_doc();
+                            if(result.message.project) frappe.msgprint(__('Project {0} is linked to this handover. Open Project Plan to follow automatic planning.',[esc(result.message.project)]));
                             open(result.message.name);
                         } finally { dialog.enable_primary_action(); }
                     }

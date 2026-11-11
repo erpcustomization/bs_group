@@ -368,6 +368,7 @@ def _change_status(quotation, stage, expected_modified, reason=None, schedule_da
             args.update(project_modules=project_modules, project_details=project_details)
         sent = send_to_procurement(**args)
         result["requisition"] = sent["name"]
+        result["project"] = sent.get("project")
     snapshot(q, "Status changed to " + stage)
     return result
 

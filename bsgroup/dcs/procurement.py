@@ -276,7 +276,8 @@ def send_to_procurement(quotation, schedule_date=None, warehouse=None, project_m
     if existing:
         if frappe.db.get_value(buying.MR, existing, "custom_bsp_quotation") != q.name:
             frappe.throw(_("This award was already sent using another quotation."))
-        return {"name": existing, "doctype": buying.MR, "already_sent": True}
+        return {"name": existing, "doctype": buying.MR, "already_sent": True,
+                "project": frappe.db.get_value(buying.MR, existing, "custom_project")}
     rows = source_items(sheet)
     if not schedule_date or getdate(schedule_date) < getdate(nowdate()):
         frappe.throw(_("Select a required-by date of today or later."))
@@ -295,6 +296,8 @@ def send_to_procurement(quotation, schedule_date=None, warehouse=None, project_m
     selected_modules = selections(project_modules)
     with sales_handover(q, sheet):
         project = save_project(q, sheet, selected_modules, project_details)
+    if not sheet.get("project"):
+        frappe.db.set_value("Deal Cost Sheet", sheet.name, "project", project)
     manifest = dict(costing=data, items=rows, files=[], source_po=source.name,
                     schedule_date=str(schedule_date),
                     customer_po_reference=q.custom_customer_po_reference,
@@ -344,6 +347,8 @@ def send_to_procurement(quotation, schedule_date=None, warehouse=None, project_m
         award_sequence=data["award_sequence"], customer_po=q.custom_customer_po_reference))
     with buying.operation("handover"):
         request.save(ignore_permissions=True)
+    from bsgroup.project_ai_plan import queue_plan
+    queue_plan(request, q, sheet, project, selected_modules)
     frappe.db.set_value("Quotation", q.name, "custom_bsp_material_request", request.name)
     # Standard read-only document share lets the sender follow their requisition.
     # No notification/email is sent and no purchasing approval access is granted.
