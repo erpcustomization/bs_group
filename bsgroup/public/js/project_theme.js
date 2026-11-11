@@ -1,4 +1,4 @@
-// Presentation only. Native forms, list controls and permissions remain in use.
+// Project theme 20261111: native forms, list controls and permissions remain in use.
 (() => {
     const doctypes = new Set([
         'Project', 'Task', 'Timesheet', 'Tech Task Scheduler', 'Site Survey Request',

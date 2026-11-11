@@ -1,0 +1,10 @@
+diff --git a/bsgroup/public/js/project_theme.js b/bsgroup/public/js/project_theme.js
+index 1981cab..b146b39 100644
+--- a/bsgroup/public/js/project_theme.js
++++ b/bsgroup/public/js/project_theme.js
+@@ -1,4 +1,4 @@
+-// Presentation only. Native forms, list controls and permissions remain in use.
++// Project theme 20261111: native forms, list controls and permissions remain in use.
+ (() => {
+     const doctypes = new Set([
+         'Project', 'Task', 'Timesheet', 'Tech Task Scheduler', 'Site Survey Request',
