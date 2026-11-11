@@ -35,7 +35,7 @@ frappe.pages['bs-project-modules'].on_page_load = function(wrapper) {
         for(const [id,title] of Object.entries(modules)) $('<button type="button">').text(title).toggleClass('active',id===key).on('click',()=>navigate(id,'dashboard')).appendTo(moduleNav);
         const hero=$('<section class="bspm-hero">').appendTo(host);
         $('<h2>').text(data.title).appendTo(hero);
-        $('<div class="bspm-note">').text('Open a project, then choose Project Activities for its Tasks, Timesheets, Tech Task Scheduler, Expenses, Advance and Labour Approval.').appendTo(hero);
+        $('<div class="bspm-note">').text('Open a project to manage its plan, tasks, timesheets, scheduler, expenses, advances and labour approvals from one screen.').appendTo(hero);
         const actions=$('<div class="bspm-actions">').appendTo(hero);
         if(data.can_create) $('<button class="btn btn-primary btn-sm">').text(__('New Project')).on('click',()=>frappe.new_doc('Project',{[data.field]:1})).appendTo(actions);
         $('<button class="btn btn-default btn-sm">').text(__('Choose Existing Project')).on('click',()=>frappe.set_route('List','Project')).appendTo(actions);

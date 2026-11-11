@@ -1,0 +1,615 @@
+diff --git a/bsgroup/bs_group/page/bs_project_modules/bs_project_modules.js b/bsgroup/bs_group/page/bs_project_modules/bs_project_modules.js
+index cb25d7a..934d11d 100644
+--- a/bsgroup/bs_group/page/bs_project_modules/bs_project_modules.js
++++ b/bsgroup/bs_group/page/bs_project_modules/bs_project_modules.js
+@@ -35,7 +35,7 @@ frappe.pages['bs-project-modules'].on_page_load = function(wrapper) {
+         for(const [id,title] of Object.entries(modules)) $('<button type="button">').text(title).toggleClass('active',id===key).on('click',()=>navigate(id,'dashboard')).appendTo(moduleNav);
+         const hero=$('<section class="bspm-hero">').appendTo(host);
+         $('<h2>').text(data.title).appendTo(hero);
+-        $('<div class="bspm-note">').text('Open a project, then choose Project Activities for its Tasks, Timesheets, Tech Task Scheduler, Expenses, Advance and Labour Approval.').appendTo(hero);
++        $('<div class="bspm-note">').text('Open a project to manage its plan, tasks, timesheets, scheduler, expenses, advances and labour approvals from one screen.').appendTo(hero);
+         const actions=$('<div class="bspm-actions">').appendTo(hero);
+         if(data.can_create) $('<button class="btn btn-primary btn-sm">').text(__('New Project')).on('click',()=>frappe.new_doc('Project',{[data.field]:1})).appendTo(actions);
+         $('<button class="btn btn-default btn-sm">').text(__('Choose Existing Project')).on('click',()=>frappe.set_route('List','Project')).appendTo(actions);
+diff --git a/bsgroup/hooks.py b/bsgroup/hooks.py
+index 5075a78..80e7336 100644
+--- a/bsgroup/hooks.py
++++ b/bsgroup/hooks.py
+@@ -256,12 +256,13 @@ app_include_js = [
+     "bsgroup.bundle.js",
+     "navbar_custom.bundle.js",
+     "bs_sales_theme.bundle.js",
++    "/assets/bsgroup/js/project_theme.js?v=20261111-project-visuals",
+     # "/assets/bsgroup/js/bs_welcome_banner.js",
+ ]
+ app_include_css = [
+     "/assets/bsgroup/css/sidebar.css",
+     "/assets/bsgroup/css/labor_preapproval.css",
+-    "/assets/bsgroup/css/bs_sales_theme.css?v=20261024-lead-toolbar-2",
++    "/assets/bsgroup/css/bs_sales_theme.css?v=20261111-project-visuals",
+     # "/assets/bsgroup/css/bs_welcome_banner.css",
+ ]
+ 
+diff --git a/bsgroup/public/css/bs_sales_theme.css b/bsgroup/public/css/bs_sales_theme.css
+index 71934be..57e0f93 100644
+--- a/bsgroup/public/css/bs_sales_theme.css
++++ b/bsgroup/public/css/bs_sales_theme.css
+@@ -1,7 +1,61 @@
+-/* BS Group sales screens share BS Procurement's existing palette.
++/* Project-specific panels use the same Sales tokens and component geometry. */
++@media screen {
++    .bs-project-ui .page-container .form-section .section-body { max-width: none; }
++    .bs-project-ui .page-container .form-tabs { flex-wrap: wrap; gap: 8px 20px; }
++    .bs-project-ui :is(.bs-project-plan, .bs-project-activity) { min-width: 0; }
++    .bs-project-ui :is(.bs-project-plan, .bs-project-activity) h4 {
++        color: #12335f; font-size: 20px; font-weight: 650; line-height: 1.4;
++        letter-spacing: -.35px; margin: 0 0 8px;
++    }
++    .bs-project-ui :is(.bs-project-plan, .bs-project-activity) p { font-size: 12px; line-height: 1.6; }
++    .bs-project-ui :is(.bs-project-plan, .bs-project-activity) .table-responsive {
++        border: 1px solid #dfe7f2; border-radius: 8px; margin: 16px 0; background: #fff;
++    }
++    .bs-project-ui :is(.bs-project-plan, .bs-project-activity) .table { margin: 0; border: 0; font-size: 12px; }
++    .bs-project-ui :is(.bs-project-plan, .bs-project-activity) .table th {
++        background: #eef3fb; color: #4c6486; font-size: 11px; font-weight: 600;
++        padding: 11px 10px; border-color: #dfe7f2; white-space: nowrap;
++    }
++    .bs-project-ui :is(.bs-project-plan, .bs-project-activity) .table td {
++        padding: 12px 10px; border-color: #e6ecf5; line-height: 1.55;
++    }
++    .bs-project-ui :is(.bs-project-plan, .bs-project-activity) .table tbody tr:hover { background: #f7faff; }
++    .bs-project-ui .bs-project-plan .table td .btn { margin-top: 6px; white-space: normal; }
++    .bs-project-ui .bs-project-plan .table td:first-child { min-width: 190px !important; }
++    .bs-project-ui .bs-project-plan .table td:nth-child(2) { min-width: 200px !important; }
++    .bs-project-ui .bs-project-plan .table .form-control { min-height: 34px; }
++    .bs-project-ui .bs-project-plan .table .small { margin-top: 5px; }
++    .bs-project-ui .modal-content { border: 1px solid #dfe7f2; border-radius: 12px; color: #172b4d; }
++    .bs-project-ui .modal-header { border-bottom: 1px solid #dfe7f2; background: #f4f7fc; border-radius: 12px 12px 0 0; }
++    .bs-project-ui .modal-title { color: #12335f; font-size: 18px; font-weight: 650; }
++    .bs-project-ui .modal-content .form-control { border: 1px solid #cdd9e9; border-radius: 7px; font-size: 12px; }
++    .bs-project-ui .modal-content .btn-primary { background: #1d5fc4; border-color: #1d5fc4; color: #fff; border-radius: 7px; }
++    .bs-project-ui .modal-content :is(button, input, select, textarea):focus-visible { outline: 2px solid #1d5fc4; outline-offset: 2px; }
++    .bs-project-ui .bspm { background: #f4f7fc; color: #172b4d; padding: 18px 22px; }
++    .bs-project-ui .bspm-hero { background: transparent; padding: 0; border: 0; border-radius: 0; }
++    .bs-project-ui .bspm-hero h2 { color: #12335f; font-size: 23px; font-weight: 650; letter-spacing: -.55px; line-height: 1.3; }
++    .bs-project-ui .bspm-note { color: #60718b; }
++    .bs-project-ui .bspm-nav button { border-color: #dfe7f2; border-radius: 7px; color: #31527e; background: #fff; }
++    .bs-project-ui .bspm-nav button.active { color: #fff; background: #1d5fc4; border-color: #1d5fc4; }
++    .bs-project-ui .bspm-stat { background: #fff; border: 1px solid #dfe7f2; border-top: 3px solid #1d5fc4; border-radius: 10px; padding: 20px; box-shadow: 0 2px 8px #16386704; }
++    .bs-project-ui .bspm-stat span { color: #60718b; font-size: 12px; }
++    .bs-project-ui .bspm-stat strong { color: #12335f; font-size: 28px; font-weight: 650; letter-spacing: -.5px; }
++    .bs-project-ui .bspm-table { border-color: #dfe7f2; border-radius: 8px; }
++    .bs-project-ui .bspm-table th { background: #eef3fb; color: #4c6486; font-size: 11px; font-weight: 600; }
++    .bs-project-ui .bspm-table :is(th, td) { padding: 11px 12px; border-bottom-color: #e6ecf5; }
++    .bs-project-ui .bspm-table tbody tr:hover { background: #f7faff; }
++    .bs-project-ui .bspm-table a { color: #1b5ab4; font-weight: 600; }
++    @media (max-width: 767px) {
++        .bs-project-ui .bspm { padding: 12px; }
++        .bs-project-ui .bspm-stat { padding: 14px; }
++        .bs-project-ui .page-container .form-layout { padding: 10px; }
++    }
++}
++
++/* BS Group sales and project screens share BS Procurement's existing palette.
+    Screen-only: print formats, documents and accounting behaviour are untouched. */
+ @media screen {
+-    .bs-sales-ui {
++    :is(.bs-sales-ui, .bs-project-ui) {
+         --bs-sales-theme-version: "20261024-lead-toolbar";
+         --bs-navy: #102d59;
+         --bs-blue: #1d5fc4;
+@@ -10,114 +64,114 @@
+         --bs-line: #dfe7f2;
+         --bs-canvas: #f4f7fc;
+     }
+-    .bs-sales-ui .page-container { color: var(--bs-ink); background: var(--bs-canvas); }
+-    .bs-sales-ui .page-head { background: #fff; border-bottom: 1px solid var(--bs-line); }
+-    .bs-sales-ui .page-title .title-text { color: var(--bs-navy); font-weight: 650; }
+-    .bs-sales-ui .page-title .es-breadcrumbs__label { color: var(--bs-navy); }
+-    .bs-sales-ui .page-container .es-button { border-radius: 7px; }
+-    .bs-sales-ui .page-container .es-button.primary-action {
++    :is(.bs-sales-ui, .bs-project-ui) .page-container { color: var(--bs-ink); background: var(--bs-canvas); }
++    :is(.bs-sales-ui, .bs-project-ui) .page-head { background: #fff; border-bottom: 1px solid var(--bs-line); }
++    :is(.bs-sales-ui, .bs-project-ui) .page-title .title-text { color: var(--bs-navy); font-weight: 650; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-title .es-breadcrumbs__label { color: var(--bs-navy); }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .es-button { border-radius: 7px; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .es-button.primary-action {
+         background: var(--bs-blue); border-color: var(--bs-blue); color: #fff;
+     }
+-    .bs-sales-ui .page-container .es-button.primary-action:hover:not(:disabled) { background: var(--bs-navy); }
+-    .bs-sales-ui .page-container .layout-main-section {
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .es-button.primary-action:hover:not(:disabled) { background: var(--bs-navy); }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .layout-main-section {
+         background: #fff; border: 1px solid var(--bs-line); border-radius: 10px;
+         box-shadow: 0 2px 8px rgb(16 45 89 / 3%);
+     }
+-    .bs-sales-ui .page-container .btn { border-radius: 7px; font-weight: 550; }
+-    .bs-sales-ui .page-container .btn-primary {
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .btn { border-radius: 7px; font-weight: 550; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .btn-primary {
+         background: var(--bs-blue); border-color: var(--bs-blue); color: #fff;
+         box-shadow: 0 2px 4px rgb(29 95 196 / 12%);
+     }
+-    .bs-sales-ui .page-container .btn-primary:hover:not(:disabled) { background: var(--bs-navy); border-color: var(--bs-navy); }
+-    .bs-sales-ui .page-container .btn-default { background: #fff; border: 1px solid var(--bs-line); color: var(--bs-navy); }
+-    .bs-sales-ui .page-container .btn-default:hover:not(:disabled) { background: #edf3fc; }
+-    .bs-sales-ui .page-container :is(button, a, input, select, textarea):focus-visible {
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .btn-primary:hover:not(:disabled) { background: var(--bs-navy); border-color: var(--bs-navy); }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .btn-default { background: #fff; border: 1px solid var(--bs-line); color: var(--bs-navy); }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .btn-default:hover:not(:disabled) { background: #edf3fc; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container :is(button, a, input, select, textarea):focus-visible {
+         outline: 2px solid var(--bs-blue); outline-offset: 2px;
+     }
+-    .bs-sales-ui .page-container .form-control {
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .form-control {
+         border: 1px solid var(--bs-line); border-radius: 7px; background-color: #fff; color: var(--bs-ink);
+     }
+-    .bs-sales-ui .page-container .form-control:focus { border-color: var(--bs-blue); box-shadow: 0 0 0 2px rgb(29 95 196 / 10%); }
+-    .bs-sales-ui .page-container .form-control:disabled,
+-    .bs-sales-ui .page-container .form-control[readonly] { background-color: var(--bs-canvas); }
+-    .bs-sales-ui .page-container .control-label { color: var(--bs-muted); font-size: 12px; }
+-    .bs-sales-ui .page-container .form-section { border-color: var(--bs-line); }
+-    .bs-sales-ui .page-container .section-head { color: var(--bs-navy); font-weight: 650; font-size: 14px; }
+-    .bs-sales-ui .page-container .form-tabs-list { background: #fff; border-bottom-color: var(--bs-line); }
+-    .bs-sales-ui .page-container .form-tabs .nav-link { color: var(--bs-muted); }
+-    .bs-sales-ui .page-container .form-tabs .nav-link.active { color: var(--bs-blue); border-bottom-color: var(--bs-blue); }
+-    .bs-sales-ui .page-container :is(.list-row-head, .grid-heading-row, .dt-row-header .dt-cell) {
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .form-control:focus { border-color: var(--bs-blue); box-shadow: 0 0 0 2px rgb(29 95 196 / 10%); }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .form-control:disabled,
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .form-control[readonly] { background-color: var(--bs-canvas); }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .control-label { color: var(--bs-muted); font-size: 12px; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .form-section { border-color: var(--bs-line); }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .section-head { color: var(--bs-navy); font-weight: 650; font-size: 14px; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .form-tabs-list { background: #fff; border-bottom-color: var(--bs-line); }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .form-tabs .nav-link { color: var(--bs-muted); }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .form-tabs .nav-link.active { color: var(--bs-blue); border-bottom-color: var(--bs-blue); }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container :is(.list-row-head, .grid-heading-row, .dt-row-header .dt-cell) {
+         background: #edf3fc; color: var(--bs-navy); border-color: var(--bs-line); font-size: 12px;
+     }
+-    .bs-sales-ui .page-container .list-row-container { border-bottom-color: var(--bs-line); }
+-    .bs-sales-ui .page-container .list-row-container:hover { background: #f7faff; }
+-    .bs-sales-ui .page-container .list-row .level-item a { color: var(--bs-blue); }
+-    .bs-sales-ui .page-container :is(.frappe-list, .form-grid, .datatable) { border-color: var(--bs-line); }
+-    .bs-sales-ui .page-container .filter-section { padding-top: 10px; padding-bottom: 10px; }
+-    .bs-sales-ui .page-container .report-summary { background: var(--bs-canvas); border-radius: 8px; }
+-    .bs-sales-ui .page-container .summary-value { color: var(--bs-navy); }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .list-row-container { border-bottom-color: var(--bs-line); }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .list-row-container:hover { background: #f7faff; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .list-row .level-item a { color: var(--bs-blue); }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container :is(.frappe-list, .form-grid, .datatable) { border-color: var(--bs-line); }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .filter-section { padding-top: 10px; padding-bottom: 10px; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .report-summary { background: var(--bs-canvas); border-radius: 8px; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .summary-value { color: var(--bs-navy); }
+ 
+     /* Custom dashboard shells; preserve all metrics, filters and status colours. */
+-    .bs-sales-ui :is(.smd-wrap, .psd-wrap, .mspe-root) {
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-wrap, .psd-wrap, .mspe-root) {
+         background: var(--bs-canvas); color: var(--bs-ink); padding: 16px;
+         font-family: inherit; min-height: 0;
+         --ps-primary: #1d5fc4; --ps-primary2: #1d5fc4; --ps-accent: #1d5fc4;
+         --ps-line: #dfe7f2; --ps-bg: #f4f7fc; --ps-text: #172b4d; --ps-muted: #60718b;
+         --ps-shadow: 0 2px 8px rgb(16 45 89 / 3%); --ps-radius: 10px;
+     }
+-    .bs-sales-ui :is(.smd-header, .psd-hero) {
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-header, .psd-hero) {
+         background: #fff; color: var(--bs-ink); border: 1px solid var(--bs-line);
+         border-radius: 10px; padding: 18px; margin-bottom: 16px; box-shadow: none;
+     }
+-    .bs-sales-ui :is(.smd-header h1, .psd-hero h1, .mspe-title) {
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-header h1, .psd-hero h1, .mspe-title) {
+         font-size: 22px; line-height: 1.3; font-weight: 650; color: var(--bs-navy); margin: 0 0 8px;
+     }
+-    .bs-sales-ui :is(.smd-header .sub, .psd-hero p, .mspe-sub) { color: var(--bs-muted); font-size: 12px; opacity: 1; }
+-    .bs-sales-ui :is(.smd-header .filter-btn, .smd-header .refresh-btn, .psd-btn) {
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-header .sub, .psd-hero p, .mspe-sub) { color: var(--bs-muted); font-size: 12px; opacity: 1; }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-header .filter-btn, .smd-header .refresh-btn, .psd-btn) {
+         background: #fff; color: var(--bs-navy); border: 1px solid var(--bs-line);
+         border-radius: 7px; padding: 7px 12px; font-size: 12px;
+     }
+-    .bs-sales-ui :is(.smd-header .filter-btn, .smd-header .refresh-btn, .psd-btn):hover,
+-    .bs-sales-ui :is(.smd-header .filter-btn.active, .psd-btn.active, .psd-btn.filter-active) {
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-header .filter-btn, .smd-header .refresh-btn, .psd-btn):hover,
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-header .filter-btn.active, .psd-btn.active, .psd-btn.filter-active) {
+         background: #edf3fc; color: var(--bs-blue); border-color: #bdcfee;
+     }
+-    .bs-sales-ui :is(.smd-card, .psd-panel, .psd-kpi-card, .mspe-card, .mspe-filters, .mspe-gridwrap) {
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-card, .psd-panel, .psd-kpi-card, .mspe-card, .mspe-filters, .mspe-gridwrap) {
+         background: #fff; border: 1px solid var(--bs-line); border-radius: 10px;
+         padding: 16px; box-shadow: 0 2px 8px rgb(16 45 89 / 3%);
+     }
+-    .bs-sales-ui .mspe-gridwrap { padding: 0; }
+-    .bs-sales-ui :is(.smd-grid4 .smd-card, .psd-kpi-card, .mspe-card) { border-top: 3px solid var(--bs-blue); }
+-    .bs-sales-ui .psd-kpi-card::after { content: none; }
+-    .bs-sales-ui .psd-meta-card { background: var(--bs-canvas); border: 1px solid var(--bs-line); border-radius: 8px; padding: 12px; }
+-    .bs-sales-ui :is(.psd-meta-value, .mspe-card .val) { color: var(--bs-navy); }
+-    .bs-sales-ui :is(.smd-metric-value, .psd-kpi-value) { font-size: 28px; font-weight: 650; }
+-    .bs-sales-ui :is(.smd-metric-label, .smd-metric-note, .smd-update-meta, .psd-meta-label, .mspe-card .lbl, .mspe-card .cur) { color: var(--bs-muted); }
+-    .bs-sales-ui :is(.smd-sec-title h2, .psd-sec-title h2) { color: var(--bs-navy); font-size: 15px; font-weight: 650; }
+-    .bs-sales-ui :is(.smd-link, .smd-opp-link, .psd-link) { color: var(--bs-blue); }
+-    .bs-sales-ui :is(.smd-bar-fill, .psd-bar-fill, .mspe-prog span) { background: var(--bs-blue); }
+-    .bs-sales-ui :is(.smd-bar-track, .psd-bar-track) { background: #e8effb; }
+-    .bs-sales-ui :is(.smd-table, .psd-table) th {
++    :is(.bs-sales-ui, .bs-project-ui) .mspe-gridwrap { padding: 0; }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-grid4 .smd-card, .psd-kpi-card, .mspe-card) { border-top: 3px solid var(--bs-blue); }
++    :is(.bs-sales-ui, .bs-project-ui) .psd-kpi-card::after { content: none; }
++    :is(.bs-sales-ui, .bs-project-ui) .psd-meta-card { background: var(--bs-canvas); border: 1px solid var(--bs-line); border-radius: 8px; padding: 12px; }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.psd-meta-value, .mspe-card .val) { color: var(--bs-navy); }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-metric-value, .psd-kpi-value) { font-size: 28px; font-weight: 650; }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-metric-label, .smd-metric-note, .smd-update-meta, .psd-meta-label, .mspe-card .lbl, .mspe-card .cur) { color: var(--bs-muted); }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-sec-title h2, .psd-sec-title h2) { color: var(--bs-navy); font-size: 15px; font-weight: 650; }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-link, .smd-opp-link, .psd-link) { color: var(--bs-blue); }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-bar-fill, .psd-bar-fill, .mspe-prog span) { background: var(--bs-blue); }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-bar-track, .psd-bar-track) { background: #e8effb; }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-table, .psd-table) th {
+         background: #edf3fc; color: var(--bs-navy); font-size: 11px; letter-spacing: .02em;
+     }
+-    .bs-sales-ui :is(.smd-table, .psd-table) :is(th, td) { padding: 9px 8px; border-bottom-color: var(--bs-line); }
+-    .bs-sales-ui :is(.smd-update-item, .smd-dropdown, .psd-dropdown) { border-color: var(--bs-line); border-radius: 8px; }
+-    .bs-sales-ui .psd-dd-item.selected { background: #edf3fc; color: var(--bs-blue); }
+-    .bs-sales-ui .mspe-filters { gap: 18px; }
+-    .bs-sales-ui .mspe-table tr.grp th { background: #eef3fb; color: #294b77; }
+-    .bs-sales-ui .mspe-table tr.grp th:is(.inv, .bkd) { color: #294b77; border-bottom-color: #cfdbec; }
+-    .bs-sales-ui .mspe-table tr.cols th { background: #eef3fb; color: #4c6486; }
+-    .bs-sales-ui .mspe-select { border-color: var(--bs-line); border-radius: 7px; }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-table, .psd-table) :is(th, td) { padding: 9px 8px; border-bottom-color: var(--bs-line); }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-update-item, .smd-dropdown, .psd-dropdown) { border-color: var(--bs-line); border-radius: 8px; }
++    :is(.bs-sales-ui, .bs-project-ui) .psd-dd-item.selected { background: #edf3fc; color: var(--bs-blue); }
++    :is(.bs-sales-ui, .bs-project-ui) .mspe-filters { gap: 18px; }
++    :is(.bs-sales-ui, .bs-project-ui) .mspe-table tr.grp th { background: #eef3fb; color: #294b77; }
++    :is(.bs-sales-ui, .bs-project-ui) .mspe-table tr.grp th:is(.inv, .bkd) { color: #294b77; border-bottom-color: #cfdbec; }
++    :is(.bs-sales-ui, .bs-project-ui) .mspe-table tr.cols th { background: #eef3fb; color: #4c6486; }
++    :is(.bs-sales-ui, .bs-project-ui) .mspe-select { border-color: var(--bs-line); border-radius: 7px; }
+     @media (max-width: 767px) {
+-        .bs-sales-ui :is(.smd-wrap, .psd-wrap, .mspe-root) { padding: 10px; }
+-        .bs-sales-ui .psd-hero { grid-template-columns: 1fr; }
+-        .bs-sales-ui :is(.smd-header, .psd-hero) { padding: 14px; }
++        :is(.bs-sales-ui, .bs-project-ui) :is(.smd-wrap, .psd-wrap, .mspe-root) { padding: 10px; }
++        :is(.bs-sales-ui, .bs-project-ui) .psd-hero { grid-template-columns: 1fr; }
++        :is(.bs-sales-ui, .bs-project-ui) :is(.smd-header, .psd-hero) { padding: 14px; }
+     }
+ }
+ 
+ /* Match the measured Procurement type scale and component geometry, not Desk's
+    default InterVariable/14px controls. Keep this scoped and out of print. */
+ @media screen {
+-    .bs-sales-ui .page-container {
++    :is(.bs-sales-ui, .bs-project-ui) .page-container {
+         font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         font-size: 13px; font-weight: 400; line-height: 1.5;
+         font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased;
+@@ -125,154 +179,154 @@
+         --heading-color: #12335f; --border-color: #dfe7f2;
+         --control-bg: #fff;
+     }
+-    .bs-sales-ui .page-container :is(button, input, select, textarea, .control-value) { font-family: inherit; }
+-    .bs-sales-ui .page-container :is(.btn, .es-button) {
++    :is(.bs-sales-ui, .bs-project-ui) .page-container :is(button, input, select, textarea, .control-value) { font-family: inherit; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container :is(.btn, .es-button) {
+         font-size: 12px; font-weight: 550; line-height: 1.4;
+         min-height: 34px; padding: 7px 10px;
+         transition: background .16s, border-color .16s, box-shadow .16s;
+     }
+-    .bs-sales-ui .page-container .es-button:not([data-variant="solid"]) {
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .es-button:not([data-variant="solid"]) {
+         background: #fff; color: #31527e; border: 1px solid #cfdbec;
+     }
+-    .bs-sales-ui .page-container :is(.btn-primary, .es-button.primary-action):hover:not(:disabled) { background: #164fa7; border-color: #164fa7; }
+-    .bs-sales-ui .page-container .es-button:disabled { opacity: .45; }
+-    .bs-sales-ui .page-container .page-head { padding: 8px 0; }
+-    .bs-sales-ui .page-container .page-head .es-breadcrumbs__label { font-size: 13px; font-weight: 550; }
+-    .bs-sales-ui[data-route^="List/"] .page-head .es-breadcrumbs__label {
++    :is(.bs-sales-ui, .bs-project-ui) .page-container :is(.btn-primary, .es-button.primary-action):hover:not(:disabled) { background: #164fa7; border-color: #164fa7; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .es-button:disabled { opacity: .45; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .page-head { padding: 8px 0; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .page-head .es-breadcrumbs__label { font-size: 13px; font-weight: 550; }
++    :is(.bs-sales-ui, .bs-project-ui)[data-route^="List/"] .page-head .es-breadcrumbs__label {
+         color: #12335f; font-size: 22px; letter-spacing: -.55px; line-height: 1.3; font-weight: 650;
+     }
+-    .bs-sales-ui[data-route^="List/"] .layout-main-section {
++    :is(.bs-sales-ui, .bs-project-ui)[data-route^="List/"] .layout-main-section {
+         background: var(--bs-canvas); padding: 16px 22px 20px;
+         border-radius: 12px; box-shadow: 0 4px 20px #1638670a;
+     }
+-    .bs-sales-ui[data-route^="List/"] .list-page-form { background: transparent; padding: 0 0 12px; border: 0; }
+-    .bs-sales-ui[data-route^="List/"] .frappe-list .result-container {
++    :is(.bs-sales-ui, .bs-project-ui)[data-route^="List/"] .list-page-form { background: transparent; padding: 0 0 12px; border: 0; }
++    :is(.bs-sales-ui, .bs-project-ui)[data-route^="List/"] .frappe-list .result-container {
+         background: #fff; border: 1px solid var(--bs-line); border-radius: 8px;
+     }
+-    .bs-sales-ui .page-container :is(.list-row, .list-row-container) { font-size: 12px; color: #172b4d; }
+-    .bs-sales-ui .page-container .list-row { min-height: 48px; }
+-    .bs-sales-ui .page-container .list-row .level-item a { color: #1b5ab4; font-size: 12px; font-weight: 600; }
+-    .bs-sales-ui .page-container .list-row-head {
++    :is(.bs-sales-ui, .bs-project-ui) .page-container :is(.list-row, .list-row-container) { font-size: 12px; color: #172b4d; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .list-row { min-height: 48px; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .list-row .level-item a { color: #1b5ab4; font-size: 12px; font-weight: 600; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .list-row-head {
+         background: #eef3fb; color: #4c6486; font-size: 11px; font-weight: 600;
+         min-height: 38px; border-radius: 7px 7px 0 0;
+     }
+-    .bs-sales-ui .page-container .list-row-head :is(span, .list-count) { font-size: 11px; }
+-    .bs-sales-ui .page-container .list-paging-area { background: transparent; border-top: 0; padding-top: 12px; }
+-    .bs-sales-ui .page-container :is(.indicator-pill, .es-badge) { font-family: inherit; font-size: 10px; font-weight: 600; border-radius: 5px; padding: 2px 7px; line-height: 1.6; }
+-    .bs-sales-ui .page-container .indicator-pill.green { background: #eaf6f2; color: #226c53; border: 1px solid #cde8dd; }
+-    .bs-sales-ui .page-container .indicator-pill.blue { background: #e9f1ff; color: #2359a8; border: 1px solid #d6e4fa; }
+-    .bs-sales-ui .page-container .indicator-pill.red { background: #fff0f1; color: #a03c4b; border: 1px solid #f1d3d8; }
+-    .bs-sales-ui .page-container .indicator-pill.orange { background: #fff7e7; color: #8a5d16; border: 1px solid #efdfbd; }
+-    .bs-sales-ui .page-container .form-control { font-size: 12px; color: #172b4d; border-color: #cdd9e9; }
+-    .bs-sales-ui .page-container .form-control::placeholder { color: #6b7e98; }
+-    .bs-sales-ui .page-container .form-section .control-label { font-size: 11px; font-weight: 400; color: #687b96; }
+-    .bs-sales-ui .page-container .section-head { font-size: 13px; color: #294b77; letter-spacing: -.1px; font-weight: 600; }
+-    .bs-sales-ui .page-container .form-tabs .nav-link { font-size: 12px; font-weight: 600; padding: 12px 2px; }
+-    .bs-sales-ui .page-container .form-tabs { gap: 22px; }
+-    .bs-sales-ui .page-container .form-layout { background: var(--bs-canvas); padding: 16px; }
+-    .bs-sales-ui .page-container .form-layout .form-section {
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .list-row-head :is(span, .list-count) { font-size: 11px; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .list-paging-area { background: transparent; border-top: 0; padding-top: 12px; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container :is(.indicator-pill, .es-badge) { font-family: inherit; font-size: 10px; font-weight: 600; border-radius: 5px; padding: 2px 7px; line-height: 1.6; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .indicator-pill.green { background: #eaf6f2; color: #226c53; border: 1px solid #cde8dd; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .indicator-pill.blue { background: #e9f1ff; color: #2359a8; border: 1px solid #d6e4fa; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .indicator-pill.red { background: #fff0f1; color: #a03c4b; border: 1px solid #f1d3d8; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .indicator-pill.orange { background: #fff7e7; color: #8a5d16; border: 1px solid #efdfbd; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .form-control { font-size: 12px; color: #172b4d; border-color: #cdd9e9; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .form-control::placeholder { color: #6b7e98; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .form-section .control-label { font-size: 11px; font-weight: 400; color: #687b96; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .section-head { font-size: 13px; color: #294b77; letter-spacing: -.1px; font-weight: 600; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .form-tabs .nav-link { font-size: 12px; font-weight: 600; padding: 12px 2px; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .form-tabs { gap: 22px; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .form-layout { background: var(--bs-canvas); padding: 16px; }
++    :is(.bs-sales-ui, .bs-project-ui) .page-container .form-layout .form-section {
+         background: #fff; border: 1px solid var(--bs-line); border-radius: 10px;
+         margin-bottom: 14px; box-shadow: 0 2px 8px #16386704;
+     }
+-    .bs-sales-ui :is(.smd-wrap, .psd-wrap, .mspe-root) { padding: 18px 22px; }
+-    .bs-sales-ui :is(.smd-header, .psd-hero) { border: 0; background: transparent; padding: 0; box-shadow: none; gap: 12px; }
+-    .bs-sales-ui :is(.smd-header h1, .psd-hero h1, .mspe-title) { color: #12335f; font-size: 23px; letter-spacing: -.55px; line-height: 1.3; margin: 0 0 6px; }
+-    .bs-sales-ui :is(.smd-header .sub, .psd-hero>div>p) { display: none; }
+-    .bs-sales-ui .psd-hero { display: flex; flex-wrap: wrap; align-items: flex-start; }
+-    .bs-sales-ui .psd-hero>div:first-child { flex: 1 1 100%; }
+-    .bs-sales-ui .psd-hero-actions { margin-top: 12px; }
+-    .bs-sales-ui .psd-hero-meta { display: flex; flex-wrap: wrap; gap: 16px; width: 100%; }
+-    .bs-sales-ui .psd-meta-card { background: transparent; border: 0; border-radius: 0; padding: 0 16px 0 0; border-right: 1px solid var(--bs-line); }
+-    .bs-sales-ui .psd-meta-card:last-child { border-right: 0; }
+-    .bs-sales-ui .psd-meta-label { font-size: 10px; letter-spacing: .02em; margin-bottom: 2px; }
+-    .bs-sales-ui .psd-meta-value { font-size: 12px; font-weight: 550; line-height: 1.5; }
+-    .bs-sales-ui :is(.smd-card, .psd-panel, .psd-kpi-card, .mspe-card) { padding: 20px; box-shadow: 0 2px 8px #16386704; }
+-    .bs-sales-ui :is(.smd-metric-label, .psd-kpi-label, .mspe-card .lbl) { font-size: 12px; font-weight: 400; }
+-    .bs-sales-ui :is(.smd-metric-value, .psd-kpi-value, .mspe-card .val) { font-size: 28px; letter-spacing: -.5px; font-weight: 650; line-height: 1.3; }
+-    .bs-sales-ui :is(.smd-sec-title h2, .psd-sec-title h2) { font-size: 13px; font-weight: 600; color: #294b77; }
+-    .bs-sales-ui :is(.smd-table, .psd-table, .mspe-table) { font-size: 12px; }
+-    .bs-sales-ui :is(.smd-table, .psd-table, .mspe-table) th { background: #eef3fb; color: #4c6486; font-size: 11px; font-weight: 600; text-transform: none; letter-spacing: 0; }
+-    .bs-sales-ui :is(.smd-table, .psd-table, .mspe-table) td { padding: 11px 12px; font-size: 12px; line-height: 1.55; }
+-    .bs-sales-ui :is(.smd-badge, .psd-badge) { border-radius: 5px; font-size: 10px; font-weight: 600; padding: 2px 7px; }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-wrap, .psd-wrap, .mspe-root) { padding: 18px 22px; }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-header, .psd-hero) { border: 0; background: transparent; padding: 0; box-shadow: none; gap: 12px; }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-header h1, .psd-hero h1, .mspe-title) { color: #12335f; font-size: 23px; letter-spacing: -.55px; line-height: 1.3; margin: 0 0 6px; }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-header .sub, .psd-hero>div>p) { display: none; }
++    :is(.bs-sales-ui, .bs-project-ui) .psd-hero { display: flex; flex-wrap: wrap; align-items: flex-start; }
++    :is(.bs-sales-ui, .bs-project-ui) .psd-hero>div:first-child { flex: 1 1 100%; }
++    :is(.bs-sales-ui, .bs-project-ui) .psd-hero-actions { margin-top: 12px; }
++    :is(.bs-sales-ui, .bs-project-ui) .psd-hero-meta { display: flex; flex-wrap: wrap; gap: 16px; width: 100%; }
++    :is(.bs-sales-ui, .bs-project-ui) .psd-meta-card { background: transparent; border: 0; border-radius: 0; padding: 0 16px 0 0; border-right: 1px solid var(--bs-line); }
++    :is(.bs-sales-ui, .bs-project-ui) .psd-meta-card:last-child { border-right: 0; }
++    :is(.bs-sales-ui, .bs-project-ui) .psd-meta-label { font-size: 10px; letter-spacing: .02em; margin-bottom: 2px; }
++    :is(.bs-sales-ui, .bs-project-ui) .psd-meta-value { font-size: 12px; font-weight: 550; line-height: 1.5; }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-card, .psd-panel, .psd-kpi-card, .mspe-card) { padding: 20px; box-shadow: 0 2px 8px #16386704; }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-metric-label, .psd-kpi-label, .mspe-card .lbl) { font-size: 12px; font-weight: 400; }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-metric-value, .psd-kpi-value, .mspe-card .val) { font-size: 28px; letter-spacing: -.5px; font-weight: 650; line-height: 1.3; }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-sec-title h2, .psd-sec-title h2) { font-size: 13px; font-weight: 600; color: #294b77; }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-table, .psd-table, .mspe-table) { font-size: 12px; }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-table, .psd-table, .mspe-table) th { background: #eef3fb; color: #4c6486; font-size: 11px; font-weight: 600; text-transform: none; letter-spacing: 0; }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-table, .psd-table, .mspe-table) td { padding: 11px 12px; font-size: 12px; line-height: 1.55; }
++    :is(.bs-sales-ui, .bs-project-ui) :is(.smd-badge, .psd-badge) { border-radius: 5px; font-size: 10px; font-weight: 600; padding: 2px 7px; }
+     @media(max-width: 767px) {
+-        .bs-sales-ui[data-route^="List/"] .layout-main-section,
+-        .bs-sales-ui :is(.smd-wrap, .psd-wrap, .mspe-root) { padding: 12px; }
+-        .bs-sales-ui .page-container .page-head .es-breadcrumbs__label { font-size: 13px; }
++        :is(.bs-sales-ui, .bs-project-ui)[data-route^="List/"] .layout-main-section,
++        :is(.bs-sales-ui, .bs-project-ui) :is(.smd-wrap, .psd-wrap, .mspe-root) { padding: 12px; }
++        :is(.bs-sales-ui, .bs-project-ui) .page-container .page-head .es-breadcrumbs__label { font-size: 13px; }
+     }
+     @media(prefers-reduced-motion: reduce) {
+-        .bs-sales-ui .page-container :is(.btn, .es-button) { transition: none; }
++        :is(.bs-sales-ui, .bs-project-ui) .page-container :is(.btn, .es-button) { transition: none; }
+     }
+ }
+ 
+ /* Native Frappe lists, arranged in the same header/canvas/table pattern as BSP.
+    No custom list renderer: filtering, selection, pagination and views stay native. */
+ @media screen {
+-    .bs-sales-ui .bs-list-shell .page-head { padding: 0; min-height: 42px; }
+-    .bs-sales-ui .bs-list-shell .page-head .es-breadcrumbs__label { font-size: 13px; font-weight: 500; letter-spacing: 0; }
+-    .bs-sales-ui .bs-list-shell .layout-main-section {
++    :is(.bs-sales-ui, .bs-project-ui) .bs-list-shell .page-head { padding: 0; min-height: 42px; }
++    :is(.bs-sales-ui, .bs-project-ui) .bs-list-shell .page-head .es-breadcrumbs__label { font-size: 13px; font-weight: 500; letter-spacing: 0; }
++    :is(.bs-sales-ui, .bs-project-ui) .bs-list-shell .layout-main-section {
+         background: #f4f7fc; padding: 16px 24px 20px;
+         min-height: calc(100vh - 100px); border: 1px solid #dfe7f2;
+         border-radius: 12px; box-shadow: 0 4px 20px #1638670a;
+     }
+-    .bs-sales-ui .bs-list-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 0 0 14px; }
+-    .bs-sales-ui .bs-list-heading h1 { flex: 1 1 200px; margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -.55px; line-height: 1.3; color: #12335f; }
+-    .bs-sales-ui .bs-list-heading .page-actions { flex: 0 1 auto; width: auto; padding: 0; gap: 6px; min-width: 0; flex-wrap: wrap; }
+-    .bs-sales-ui .bs-list-shell .list-page-form { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 8px 12px; padding: 0 0 14px; margin: 0; background: transparent; }
+-    .bs-sales-ui .bs-list-shell .standard-filter-section { flex: 1 1 480px; flex-wrap: wrap; gap: 8px; padding: 0; }
+-    .bs-sales-ui .bs-list-shell .standard-filter-section .form-group { margin: 0; }
+-    .bs-sales-ui .bs-list-shell .standard-filter-section .input-with-feedback { font-size: 12px; }
+-    .bs-sales-ui .bs-list-shell .filter-section { flex: 0 1 auto; padding: 0; margin: 0; gap: 6px; }
+-    .bs-sales-ui .bs-list-shell .frappe-list { padding: 0; background: transparent; }
+-    .bs-sales-ui .bs-list-shell .result-container { background: #fff; border: 1px solid #dfe7f2; border-radius: 8px; }
+-    .bs-sales-ui .bs-list-shell .frappe-list .list-row-head { background: #eef3fb; color: #4c6486 !important; font-size: 11px; font-weight: 600; border-radius: 7px 7px 0 0; min-height: 38px; }
+-    .bs-sales-ui .bs-list-shell .list-row { min-height: 50px; padding-top: 10px; padding-bottom: 10px; line-height: 1.55; }
+-    .bs-sales-ui .bs-list-shell .list-row-container { background: #fff; border-bottom-color: #e6e9ee; }
+-    .bs-sales-ui .bs-list-shell .list-row-container:hover { background: #f6f9ff; }
+-    .bs-sales-ui .bs-list-shell .list-paging-area { background: transparent; margin-top: 10px; padding: 0; }
++    :is(.bs-sales-ui, .bs-project-ui) .bs-list-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 0 0 14px; }
++    :is(.bs-sales-ui, .bs-project-ui) .bs-list-heading h1 { flex: 1 1 200px; margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -.55px; line-height: 1.3; color: #12335f; }
++    :is(.bs-sales-ui, .bs-project-ui) .bs-list-heading .page-actions { flex: 0 1 auto; width: auto; padding: 0; gap: 6px; min-width: 0; flex-wrap: wrap; }
++    :is(.bs-sales-ui, .bs-project-ui) .bs-list-shell .list-page-form { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 8px 12px; padding: 0 0 14px; margin: 0; background: transparent; }
++    :is(.bs-sales-ui, .bs-project-ui) .bs-list-shell .standard-filter-section { flex: 1 1 480px; flex-wrap: wrap; gap: 8px; padding: 0; }
++    :is(.bs-sales-ui, .bs-project-ui) .bs-list-shell .standard-filter-section .form-group { margin: 0; }
++    :is(.bs-sales-ui, .bs-project-ui) .bs-list-shell .standard-filter-section .input-with-feedback { font-size: 12px; }
++    :is(.bs-sales-ui, .bs-project-ui) .bs-list-shell .filter-section { flex: 0 1 auto; padding: 0; margin: 0; gap: 6px; }
++    :is(.bs-sales-ui, .bs-project-ui) .bs-list-shell .frappe-list { padding: 0; background: transparent; }
++    :is(.bs-sales-ui, .bs-project-ui) .bs-list-shell .result-container { background: #fff; border: 1px solid #dfe7f2; border-radius: 8px; }
++    :is(.bs-sales-ui, .bs-project-ui) .bs-list-shell .frappe-list .list-row-head { background: #eef3fb; color: #4c6486 !important; font-size: 11px; font-weight: 600; border-radius: 7px 7px 0 0; min-height: 38px; }
++    :is(.bs-sales-ui, .bs-project-ui) .bs-list-shell .list-row { min-height: 50px; padding-top: 10px; padding-bottom: 10px; line-height: 1.55; }
++    :is(.bs-sales-ui, .bs-project-ui) .bs-list-shell .list-row-container { background: #fff; border-bottom-color: #e6e9ee; }
++    :is(.bs-sales-ui, .bs-project-ui) .bs-list-shell .list-row-container:hover { background: #f6f9ff; }
++    :is(.bs-sales-ui, .bs-project-ui) .bs-list-shell .list-paging-area { background: transparent; margin-top: 10px; padding: 0; }
+     @media(max-width: 767px) {
+-        .bs-sales-ui .bs-list-shell .layout-main-section { padding: 14px 12px; }
+-        .bs-sales-ui .bs-list-heading .page-actions { flex: 1 1 100%; justify-content: flex-start !important; }
+-        .bs-sales-ui .bs-list-shell .standard-filter-section { flex-basis: 100%; }
++        :is(.bs-sales-ui, .bs-project-ui) .bs-list-shell .layout-main-section { padding: 14px 12px; }
++        :is(.bs-sales-ui, .bs-project-ui) .bs-list-heading .page-actions { flex: 1 1 100%; justify-content: flex-start !important; }
++        :is(.bs-sales-ui, .bs-project-ui) .bs-list-shell .standard-filter-section { flex-basis: 100%; }
+     }
+ }
+ 
+ /* Lead toolbar: presentation only; preserve all native filter controls. */
+ @media screen {
+-    body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-heading { margin-bottom: 16px; gap: 12px; }
+-    body.bs-sales-ui[data-route="List/Lead/List"] .bs-list-heading .page-actions { gap: 8px; align-items: center; }
+-    body.bs-sales-ui[data-route="List/Lead/List"] .list-page-form {
++    body:is(.bs-sales-ui, .bs-project-ui)[data-route="List/Lead/List"] .bs-list-heading { margin-bottom: 16px; gap: 12px; }
++    body:is(.bs-sales-ui, .bs-project-ui)[data-route="List/Lead/List"] .bs-list-heading .page-actions { gap: 8px; align-items: center; }
++    body:is(.bs-sales-ui, .bs-project-ui)[data-route="List/Lead/List"] .list-page-form {
+         display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start;
+         gap: 16px 24px; padding: 16px; margin-bottom: 16px;
+         background: #fff; border: 1px solid #dfe7f2; border-radius: 10px;
+         box-shadow: 0 2px 6px #16386704;
+     }
+-    body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section {
++    body:is(.bs-sales-ui, .bs-project-ui)[data-route="List/Lead/List"] .standard-filter-section {
+         display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;
+         min-width: 0; width: 100%;
+     }
+-    body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section > .frappe-control {
++    body:is(.bs-sales-ui, .bs-project-ui)[data-route="List/Lead/List"] .standard-filter-section > .frappe-control {
+         width: 100%; max-width: none; min-width: 0; padding: 0; margin: 0; flex: none;
+     }
+-    body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section .input-group { flex-wrap: nowrap; }
+-    body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section .form-control {
++    body:is(.bs-sales-ui, .bs-project-ui)[data-route="List/Lead/List"] .standard-filter-section .input-group { flex-wrap: nowrap; }
++    body:is(.bs-sales-ui, .bs-project-ui)[data-route="List/Lead/List"] .standard-filter-section .form-control {
+         height: 34px; min-height: 34px; border-color: #dfe7f2; background: #fff; color: #172b4d;
+         border-radius: 6px; font-size: 12px;
+     }
+-    body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section .input-group > .form-control { border-radius: 6px 0 0 6px; min-width: 0; }
+-    body.bs-sales-ui[data-route="List/Lead/List"] .match-type-dropdown-btn { height: 34px; min-height: 34px; border-radius: 0 6px 6px 0; border-color: #dfe7f2; }
+-    body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section :is(.select-icon, .placeholder) { top: 8px; }
+-    body.bs-sales-ui[data-route="List/Lead/List"] .filter-section {
++    body:is(.bs-sales-ui, .bs-project-ui)[data-route="List/Lead/List"] .standard-filter-section .input-group > .form-control { border-radius: 6px 0 0 6px; min-width: 0; }
++    body:is(.bs-sales-ui, .bs-project-ui)[data-route="List/Lead/List"] .match-type-dropdown-btn { height: 34px; min-height: 34px; border-radius: 0 6px 6px 0; border-color: #dfe7f2; }
++    body:is(.bs-sales-ui, .bs-project-ui)[data-route="List/Lead/List"] .standard-filter-section :is(.select-icon, .placeholder) { top: 8px; }
++    body:is(.bs-sales-ui, .bs-project-ui)[data-route="List/Lead/List"] .filter-section {
+         flex-direction: column; align-items: flex-end; justify-content: flex-start;
+         gap: 10px; margin: 0; padding: 0 0 0 20px; border-left: 1px solid #e6ecf5;
+     }
+-    body.bs-sales-ui[data-route="List/Lead/List"] .filter-section .btn { min-height: 34px; }
+-    body.bs-sales-ui[data-route="List/Lead/List"] .form-control:focus { border-color: #1d5fc4; box-shadow: 0 0 0 2px #1d5fc414; }
++    body:is(.bs-sales-ui, .bs-project-ui)[data-route="List/Lead/List"] .filter-section .btn { min-height: 34px; }
++    body:is(.bs-sales-ui, .bs-project-ui)[data-route="List/Lead/List"] .form-control:focus { border-color: #1d5fc4; box-shadow: 0 0 0 2px #1d5fc414; }
+     @media(max-width: 1000px) {
+-        body.bs-sales-ui[data-route="List/Lead/List"] .list-page-form { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+-        body.bs-sales-ui[data-route="List/Lead/List"] .filter-section { flex-direction: row; justify-content: flex-end; border-left: 0; border-top: 1px solid #e6ecf5; padding: 12px 0 0; }
++        body:is(.bs-sales-ui, .bs-project-ui)[data-route="List/Lead/List"] .list-page-form { grid-template-columns: minmax(0, 1fr); gap: 12px; }
++        body:is(.bs-sales-ui, .bs-project-ui)[data-route="List/Lead/List"] .filter-section { flex-direction: row; justify-content: flex-end; border-left: 0; border-top: 1px solid #e6ecf5; padding: 12px 0 0; }
+     }
+     @media(max-width: 600px) {
+-        body.bs-sales-ui[data-route="List/Lead/List"] .standard-filter-section { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+-        body.bs-sales-ui[data-route="List/Lead/List"] .list-page-form { padding: 12px; }
++        body:is(.bs-sales-ui, .bs-project-ui)[data-route="List/Lead/List"] .standard-filter-section { grid-template-columns: repeat(2, minmax(0, 1fr)); }
++        body:is(.bs-sales-ui, .bs-project-ui)[data-route="List/Lead/List"] .list-page-form { padding: 12px; }
+     }
+ }
+diff --git a/bsgroup/public/js/project_theme.js b/bsgroup/public/js/project_theme.js
+new file mode 100644
+index 0000000..1981cab
+--- /dev/null
++++ b/bsgroup/public/js/project_theme.js
+@@ -0,0 +1,61 @@
++// Presentation only. Native forms, list controls and permissions remain in use.
++(() => {
++    const doctypes = new Set([
++        'Project', 'Task', 'Timesheet', 'Tech Task Scheduler', 'Site Survey Request',
++        'Expense Claim', 'Employee Advance', 'Labor Preapproval',
++        'Labor Attendance', 'Labor Payment Voucher', 'Task Scheduler',
++    ]);
++    const reports = new Set([
++        'Task Summary Report', 'Task Scheduler Report', 'Tech Task Scheduler Report',
++        'Weekly Project Governance Report',
++    ]);
++    const mounted = new Map();
++    let pending = false;
++    function layout() {
++        pending = false;
++        const route = document.body.dataset.route || '';
++        const [view, name, mode] = route.split('/');
++        const selected = ((view === 'List' || view === 'Form') && doctypes.has(name))
++            || view === 'bs-project-modules'
++            || (view === 'query-report' && reports.has(name))
++            || (view === 'Workspaces' && ['BS Project', 'Projects', 'Projects, AMC & PPM Management'].includes(name));
++        document.body.classList.toggle('bs-project-ui', selected);
++        const page = view === 'List' && doctypes.has(name) && mode === 'List'
++            ? document.getElementById(`page-${route}`) : null;
++        for (const [oldPage, state] of mounted) {
++            if (oldPage === page) continue;
++            if (state.origin.parentNode) state.origin.replaceWith(state.actions);
++            state.heading.remove();
++            oldPage.classList.remove('bs-list-shell');
++            mounted.delete(oldPage);
++        }
++        if (!page || mounted.has(page)) return;
++        const main = page.querySelector('.layout-main-section');
++        const actions = page.querySelector('.page-head .page-actions');
++        if (!main || !actions || !main.querySelector('.list-page-form')) return;
++        const heading = document.createElement('header');
++        heading.className = 'bs-list-heading';
++        const title = document.createElement('h1');
++        title.textContent = name;
++        heading.appendChild(title);
++        const origin = document.createComment('Project list actions original position');
++        actions.before(origin);
++        heading.appendChild(actions);
++        main.prepend(heading);
++        page.classList.add('bs-list-shell');
++        mounted.set(page, {heading, actions, origin});
++    }
++    function schedule() {
++        if (pending) return;
++        pending = true;
++        requestAnimationFrame(layout);
++    }
++    function start() {
++        layout();
++        new MutationObserver(schedule).observe(document.body, {
++            attributes: true, attributeFilter: ['data-route'], childList: true, subtree: true,
++        });
++    }
++    if (document.body) start();
++    else document.addEventListener('DOMContentLoaded', start, {once: true});
++})();
+diff --git a/bsgroup/public/js/project_workspace.js b/bsgroup/public/js/project_workspace.js
+index f305440..625f67f 100644
+--- a/bsgroup/public/js/project_workspace.js
++++ b/bsgroup/public/js/project_workspace.js
+@@ -104,7 +104,7 @@
+             });
+             return;
+         }
+-        const host = field.$wrapper;
++        const host = field.$wrapper.addClass('bs-project-plan');
+         if (frm.is_new()) {host.text(__('Save this project to generate its plan from tasks and template activities.')); return;}
+         const project = frm.doc.name;
+         const version = frm.__bs_plan_version = (frm.__bs_plan_version || 0) + 1;
+@@ -227,7 +227,7 @@
+         const version = tab.activity_version = (tab.activity_version || 0) + 1;
+         const project = frm.doc.name;
+         tab.activity_project = project;
+-        const host = tab.activity_host;
++        const host = tab.activity_host.addClass('bs-project-activity');
+         host.empty();
+         if (frm.is_new()) {host.text(__('Save this project to use its activities.')); return;}
+         $('<h4>').text(__(sections[section])+' · '+(frm.doc.project_name || project)).appendTo(host);

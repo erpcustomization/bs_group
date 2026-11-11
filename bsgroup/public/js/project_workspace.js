@@ -104,7 +104,7 @@
             });
             return;
         }
-        const host = field.$wrapper;
+        const host = field.$wrapper.addClass('bs-project-plan');
         if (frm.is_new()) {host.text(__('Save this project to generate its plan from tasks and template activities.')); return;}
         const project = frm.doc.name;
         const version = frm.__bs_plan_version = (frm.__bs_plan_version || 0) + 1;
@@ -227,7 +227,7 @@
         const version = tab.activity_version = (tab.activity_version || 0) + 1;
         const project = frm.doc.name;
         tab.activity_project = project;
-        const host = tab.activity_host;
+        const host = tab.activity_host.addClass('bs-project-activity');
         host.empty();
         if (frm.is_new()) {host.text(__('Save this project to use its activities.')); return;}
         $('<h4>').text(__(sections[section])+' · '+(frm.doc.project_name || project)).appendTo(host);
