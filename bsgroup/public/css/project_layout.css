@@ -1,5 +1,36 @@
 /* Presentation only: retain Project history and Task daily-work comments. */
 @media screen {
+    #bs-show-modules {
+        position: fixed; left: 58px; bottom: 16px; z-index: 1031;
+        padding: 8px 12px; color: #12335f; background: #fff;
+        border: 1px solid #cdd9e9; box-shadow: 0 2px 8px #12335f20;
+    }
+    #bs-show-modules[hidden] { display: none !important; }
+    #page-Project .form-tabs-list { min-width: 0; }
+    #page-Project .form-tabs {
+        display: flex; flex-wrap: nowrap !important; gap: 0 !important;
+        overflow-x: auto; overflow-y: hidden; align-items: stretch;
+        scrollbar-width: thin; max-width: 100%; padding: 0 6px;
+    }
+    #page-Project .form-tabs > .nav-item { flex: 0 0 auto; margin: 0; }
+    #page-Project .form-tabs .nav-link {
+        white-space: nowrap; padding: 12px 8px; margin: 0;
+        font-size: 11.5px; min-height: 42px; line-height: 18px;
+    }
+    #page-Project .bs-project-plan .table { table-layout: fixed; width: 100%; }
+    #page-Project .bs-project-plan .table :is(th,td) { min-width: 0 !important; overflow-wrap: anywhere; }
+    #page-Project .bs-project-plan .table :is(th,td):nth-child(1) { width: 18%; }
+    #page-Project .bs-project-plan .table :is(th,td):nth-child(2) { width: 20%; }
+    #page-Project .bs-project-plan .table :is(th,td):nth-child(3),
+    #page-Project .bs-project-plan .table :is(th,td):nth-child(4) { width: 12%; }
+    #page-Project .bs-project-plan .table :is(th,td):nth-child(5) { width: 13%; }
+    #page-Project .bs-project-plan .table :is(th,td):nth-child(6) { width: 14%; }
+    #page-Project .bs-project-plan .table :is(th,td):nth-child(7) { width: 11%; }
+    #page-Project .bs-project-plan .table .form-control { min-width: 0; width: 100%; padding-left: 6px; padding-right: 6px; }
+    @media (max-width: 767px) {
+        #page-Project .form-tabs .nav-link { font-size: 12px; padding: 12px 10px; }
+        #page-Project .bs-project-plan .table { min-width: 900px; }
+    }
     .page-container[data-page-route="Project"] .form-footer > .after-save {
         display: none !important;
     }
