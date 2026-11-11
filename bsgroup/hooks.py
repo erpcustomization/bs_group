@@ -252,11 +252,10 @@ app_license = "mit"
 # on_login = "bsgroup.utils.company_access.validate_company_on_login"
 
 app_include_js = [
-    "/api/method/bsgroup.work_dashboard.navigation_script?v=20261101-attendance-shared",
+    "/api/method/bsgroup.work_dashboard.navigation_script?v=20261111-project-visuals",
     "bsgroup.bundle.js",
     "navbar_custom.bundle.js",
     "bs_sales_theme.bundle.js",
-    "/assets/bsgroup/js/project_theme.js?v=20261111-project-visuals",
     # "/assets/bsgroup/js/bs_welcome_banner.js",
 ]
 app_include_css = [

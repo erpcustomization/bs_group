@@ -20,9 +20,11 @@ def navigation_script():
     content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'hr_monthly_review.js')).read_text()
     content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'hr_attendance.js')).read_text()
     content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'hr_sidebar.js')).read_text()
+    content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'project_theme.js')).read_text()
     import json
     style = Path(frappe.get_app_path('bsgroup', 'public', 'css', 'portal_finish.css')).read_text()
     style += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'css', 'attendance_widget.css')).read_text()
+    style += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'css', 'bs_sales_theme.css')).read_text()
     content += '\n(() => { const s=document.createElement("style"); s.id="bs-portal-theme"; s.textContent=' + json.dumps(style) + '; document.getElementById(s.id)?.remove(); document.head.append(s); document.body.classList.add("bs-premium"); })();'
     frappe.local.response.update(type='download', filename='scoped_sales_access.js',
                                  filecontent=content, content_type='application/javascript',
