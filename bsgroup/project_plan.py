@@ -1,9 +1,21 @@
 """Editable project plan backed by existing Tasks and native ToDo assignments."""
 import json
+from html import escape
 
 import frappe
 from frappe import _
 from frappe.utils import getdate, get_datetime, strip_html
+
+PLAN_STATUSES = ("Open", "In Progress", "Delayed", "On Hold", "Completed")
+WORK_SUBJECT = "Project Plan daily work"
+
+
+class ProjectPlanTaskMixin:
+    def update_status(self):
+        # A deadline warning must not overwrite a user's execution status.
+        if self.get("custom_bs_plan_status_managed") and self.status in PLAN_STATUSES:
+            return
+        return super().update_status()
 
 
 def validate_template_status(doc, method=None):
@@ -43,7 +55,16 @@ def install():
             missing.append(definition)
     if missing:
         create_custom_fields({"Project": missing}, update=False)
+    if not frappe.get_meta("Task").has_field("custom_bs_plan_status_managed"):
+        create_custom_fields({"Task": [dict(fieldname="custom_bs_plan_status_managed", label="Project Plan Status Managed",
+            fieldtype="Check", insert_after="status", hidden=1, read_only=1, default="0")]}, update=False)
+    from frappe.custom.doctype.property_setter.property_setter import make_property_setter
+    options = [value for value in (frappe.get_meta("Task").get_field("status").options or "").splitlines() if value]
+    combined = options + [value for value in PLAN_STATUSES if value not in options]
+    if combined != options:
+        make_property_setter("Task", "status", "options", "\n".join(combined), "Text")
     frappe.clear_cache(doctype="Project")
+    frappe.clear_cache(doctype="Task")
     return {"installed": True}
 
 
@@ -111,17 +132,103 @@ def get_plan(project):
     assigned = set()
     for row in rows:
         row["assigned_to"] = _assigned(row.pop("_assign", None))
+        if row.status == "Completed" and not row["assigned_to"]:
+            row["assigned_to"] = sorted(set(frappe.get_all("ToDo", filters={"reference_type": "Task",
+                "reference_name": row.name, "status": "Closed"}, pluck="allocated_to")))
         row["description_text"] = strip_html(row.description or "")
         for field in ("exp_start_date", "exp_end_date"):
             row[field] = str(getdate(row[field])) if row[field] else None
         row["can_edit"] = can_edit and _editable(row)
+        item = frappe.get_doc("Task", row.name)
+        row["can_edit"] = row["can_edit"] and frappe.has_permission("Task", "write", doc=item)
+        row["can_log_work"] = doc.status != "Cancelled" and row.status not in {"Cancelled", "Template"} and _is_assigned(item, closed=True)
+        project_status_editable = doc.status != "Cancelled" and (doc.status != "Completed" or frappe.has_permission("Project", "write", doc=doc))
+        row["can_change_status"] = project_status_editable and row.status not in {"Cancelled", "Template"} and (
+            frappe.has_permission("Task", "write", doc=item) or (row.status != "Completed" and _is_assigned(item)))
+        row["overdue"] = bool(row.exp_end_date and getdate(row.exp_end_date) < getdate() and row.status not in {"Completed", "Cancelled"})
         assigned.update(row["assigned_to"])
     names = {r.name: r.full_name or r.name for r in frappe.get_all("User", filters={"name": ["in", sorted(assigned)]},
              fields=["name", "full_name"])} if assigned else {}
     return dict(project=doc.name, project_name=doc.project_name, rows=rows, user_names=names,
                 can_create=bool(doc.status not in {"Completed", "Cancelled"} and frappe.has_permission("Project", "write", doc=doc)
                                 and frappe.has_permission("Task", "create")), company=doc.company,
-                can_read_tasks=bool(frappe.has_permission("Task", "read")))
+                can_read_tasks=bool(frappe.has_permission("Task", "read")), status_options=list(PLAN_STATUSES),
+                work_updates_ready=frappe.get_meta("Task").has_field("custom_bs_plan_status_managed"))
+
+
+def _is_assigned(item, closed=False):
+    return bool(frappe.db.exists("ToDo", {"reference_type": "Task", "reference_name": item.name,
+        "allocated_to": frappe.session.user, "status": ["in", ["Open", "Closed"] if closed and item.status == "Completed" else ["Open"]]}))
+
+
+def _read_task(project, task, lock=False):
+    doc = _project(project)
+    item = frappe.get_doc("Task", task, for_update=lock)
+    item.check_permission("read")
+    if item.project != doc.name:
+        frappe.throw(_("The task must belong to this project."), frappe.PermissionError)
+    return doc, item
+
+
+@frappe.whitelist()
+def work_history(project, task):
+    _read_task(project, task)
+    rows = frappe.get_all("Comment", filters={"reference_doctype": "Task", "reference_name": task,
+        "comment_type": "Comment", "subject": WORK_SUBJECT}, fields=["name", "creation", "comment_by", "comment_email", "content"],
+        order_by="creation desc", limit_page_length=100)
+    for row in rows:
+        row["text"] = strip_html(row.pop("content") or "")
+    return rows
+
+
+@frappe.whitelist(methods=["POST"])
+def save_work(project, task, work):
+    doc, item = _read_task(project, task, lock=True)
+    if doc.status == "Cancelled" or item.status in {"Cancelled", "Template"} or not _is_assigned(item, closed=True):
+        frappe.throw(_("Only users assigned to this task can enter today's work."), frappe.PermissionError)
+    text = (work or "").strip()
+    if not text or len(text) > 20000:
+        frappe.throw(_("Enter the work completed today (up to 20,000 characters)."))
+    author = frappe.db.get_value("User", frappe.session.user, "full_name") or frappe.session.user
+    content = "<p><strong>Today's work — " + str(getdate()) + "</strong></p><p>" + escape(text).replace("\n", "<br>") + "</p>"
+    # Comments are the native Task activity history. The caller and task are
+    # checked above; users cannot supply an author, date, reference or HTML.
+    entry = frappe.get_doc(dict(doctype="Comment", comment_type="Comment", reference_doctype="Task",
+        reference_name=item.name, subject=WORK_SUBJECT, content=content,
+        comment_email=frappe.session.user, comment_by=author)).insert(ignore_permissions=True)
+    return {"name": entry.name, "task": item.name}
+
+
+@frappe.whitelist(methods=["POST"])
+def set_task_status(project, task, status, expected_modified):
+    savepoint = "plan_status_" + frappe.generate_hash(length=10)
+    frappe.db.savepoint(savepoint)
+    try:
+        doc, item = _read_task(project, task, lock=True)
+        writable = frappe.has_permission("Task", "write", doc=item)
+        assigned = item.status != "Completed" and _is_assigned(item)
+        project_locked = doc.status == "Cancelled" or (doc.status == "Completed" and not (writable and frappe.has_permission("Project", "write", doc=doc)))
+        if project_locked or item.status in {"Cancelled", "Template"} or not (writable or assigned):
+            frappe.throw(_("You cannot change this task's status."), frappe.PermissionError)
+        if status not in PLAN_STATUSES:
+            frappe.throw(_("Choose Open, In Progress, Delayed, On Hold or Completed."))
+        if not item.meta.has_field("custom_bs_plan_status_managed"):
+            frappe.throw(_("The Project Plan work screen must be enabled by an administrator first."))
+        if not expected_modified or get_datetime(item.modified) != get_datetime(expected_modified):
+            frappe.throw(_("This task changed. Refresh the row before changing its status."))
+        if item.status == "Completed" and status != "Completed":
+            item.progress = 0
+            item.completed_on = None
+            item.completed_by = None
+        item.status = status
+        item.custom_bs_plan_status_managed = 1
+        # The assigned-user exception is limited to this status-only endpoint.
+        # Native validation, dependencies, assignment closure and audit run.
+        item.save(ignore_permissions=not writable)
+        return {"name": item.name, "status": item.status, "modified": item.modified}
+    except Exception:
+        frappe.db.rollback(save_point=savepoint)
+        raise
 
 
 @frappe.whitelist()

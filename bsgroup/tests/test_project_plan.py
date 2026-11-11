@@ -23,6 +23,8 @@ class ProjectPlanTests(unittest.TestCase):
         self.f.throw = throw
         self.f.parse_json = json.loads
         self.f.generate_hash = lambda **kw: 'testhash'
+        self.f.session = Record(user='assigned@example.com')
+        self.f.get_meta = Mock(return_value=Record(has_field=lambda name:True))
         self.project = Record(name='P-A',project_name='Project A',company='A',status='Open',check_permission=Mock())
         self.task = Record(name='TASK-A',project='P-A',subject='Activity',description='Scope',status='Open',modified='2026-11-10 12:00:00',
                            exp_start_date=None,exp_end_date=None,priority='Medium',check_permission=Mock(),save=Mock())
@@ -30,9 +32,9 @@ class ProjectPlanTests(unittest.TestCase):
         self.f.has_permission = Mock(return_value=True)
         self.f.get_list = Mock(return_value=[])
         self.f.get_all = Mock(return_value=[])
-        self.f.db = Record(savepoint=Mock(),rollback=Mock(),get_value=Mock(return_value=Record(enabled=1,user_type='System User')))
+        self.f.db = Record(savepoint=Mock(),rollback=Mock(),exists=Mock(return_value=False),get_value=Mock(return_value=Record(enabled=1,user_type='System User')))
         utils=types.ModuleType('frappe.utils')
-        utils.getdate=lambda value: datetime.fromisoformat(str(value)).date()
+        utils.getdate=lambda value=None: datetime.fromisoformat(str(value or '2026-11-11')).date()
         utils.get_datetime=lambda value: datetime.fromisoformat(str(value))
         utils.strip_html=lambda value:value
         self.assign=Record(add=Mock(),remove=Mock())
@@ -41,6 +43,7 @@ class ProjectPlanTests(unittest.TestCase):
         self.patch.start()
         spec=importlib.util.spec_from_file_location('plan_test',Path(__file__).resolve().parents[1]/'project_plan.py')
         self.plan=importlib.util.module_from_spec(spec);spec.loader.exec_module(self.plan)
+        self.task.meta=Record(has_field=lambda name:True)
 
     def tearDown(self):self.patch.stop()
 
@@ -120,6 +123,64 @@ class ProjectPlanTests(unittest.TestCase):
         self.task.update(is_template=1,status='Template')
         self.plan.validate_template_status(self.task)
         self.assertEqual(self.task.status,'Template')
+
+    def test_assigned_user_status_write_is_narrow_and_native(self):
+        self.f.has_permission.return_value=False
+        self.f.db.exists.return_value=True
+        result=self.plan.set_task_status('P-A','TASK-A','In Progress',self.task.modified)
+        self.assertEqual(result['status'],'In Progress')
+        self.task.save.assert_called_once_with(ignore_permissions=True)
+        self.assertEqual(self.task.subject,'Activity')
+        self.assertEqual(self.task.custom_bs_plan_status_managed,1)
+
+    def test_unassigned_status_write_and_forged_status_rejected(self):
+        self.f.has_permission.return_value=False
+        with self.assertRaises(PermissionError): self.plan.set_task_status('P-A','TASK-A','Completed',self.task.modified)
+        self.f.has_permission.return_value=True
+        with self.assertRaises(ValueError): self.plan.set_task_status('P-A','TASK-A','Administrator',self.task.modified)
+        with self.assertRaises(ValueError): self.plan.set_task_status('P-A','TASK-A','Open','2000-01-01')
+        self.task.save.assert_not_called()
+
+    def test_status_cross_project_and_native_failure_roll_back(self):
+        self.task.project='P-B'
+        with self.assertRaises(PermissionError):self.plan.set_task_status('P-A','TASK-A','Open',self.task.modified)
+        self.task.project='P-A';self.task.save.side_effect=ValueError('dependency still open')
+        with self.assertRaises(ValueError):self.plan.set_task_status('P-A','TASK-A','Completed',self.task.modified)
+        self.assertEqual(self.f.db.rollback.call_count,2)
+
+    def test_completed_task_reopen_requires_native_write(self):
+        self.task.status='Completed';self.f.has_permission.return_value=False;self.f.db.exists.return_value=True
+        with self.assertRaises(PermissionError):self.plan.set_task_status('P-A','TASK-A','Open',self.task.modified)
+        self.task.save.assert_not_called()
+
+    def test_work_requires_assignment_and_readable_project(self):
+        with self.assertRaises(PermissionError):self.plan.save_work('P-A','TASK-A','Work')
+        self.f.db.exists.return_value=True
+        with self.assertRaises(ValueError):self.plan.save_work('P-A','TASK-A','  ')
+        self.task.project='P-B'
+        with self.assertRaises(PermissionError):self.plan.save_work('P-A','TASK-A','Work')
+
+    def test_work_author_and_reference_are_server_controlled_and_html_escaped(self):
+        self.f.db.exists.return_value=True;self.f.db.get_value.return_value='Assigned User'
+        entry=Record(name='COMMENT-A',insert=Mock())
+        entry.insert.return_value=entry
+        def get_doc(dt,name=None,**kw):
+            if isinstance(dt,dict):entry.update(dt);return entry
+            return self.project if dt=='Project' else self.task
+        self.f.get_doc.side_effect=get_doc
+        self.plan.save_work('P-A','TASK-A','<img src=x onerror=alert(1)>\nInstalled camera')
+        self.assertEqual(entry.reference_name,'TASK-A')
+        self.assertEqual(entry.comment_email,'assigned@example.com')
+        self.assertIn('&lt;img',entry.content);self.assertNotIn('<img',entry.content)
+        self.assertIn('2026-11-11',entry.content)
+
+    def test_deadline_job_preserves_only_managed_execution_status(self):
+        base=type('Base',(),{'update_status':lambda self:'native','get':lambda self,name:self.managed})
+        mixed=type('Mixed',(self.plan.ProjectPlanTaskMixin,base),{})
+        task=mixed();task.managed=True;task.status='In Progress'
+        self.assertIsNone(task.update_status())
+        task.managed=False;self.assertEqual(task.update_status(),'native')
+        task.managed=True;task.status='Pending from Client';self.assertEqual(task.update_status(),'native')
 
 
 if __name__=='__main__':unittest.main()
