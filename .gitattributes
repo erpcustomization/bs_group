@@ -1,3 +1,4 @@
 deployment/project-hide-history-uae-crlf-1111.patch -text
 deployment/sales-project-fields-1111.patch -text
 deployment/approval-request-inbox-1112.patch -text
+deployment/approval-request-inbox-oman-1112.patch -text
