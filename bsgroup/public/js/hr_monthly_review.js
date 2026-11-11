@@ -27,7 +27,7 @@ window.bsHRMonthlyReview=async function(main){
             opening=`Dear ${e.employee_name}, the ${month} attendance report records ${number(t.late_day)} completed late-arrival days (${hours(t.late_minutes)} after the scheduled start) and ${number(t.hr_absent)} submitted HR Absent days. Please review the dates below and provide any relevant explanation or correction request to HR. Missing or conflicting punches require HR review. This message does not change your attendance or pay.`;
             rows=e.days.filter(d=>d.late_day||d.hr_absent);
         }
-        const daily=rows.length?`<table border="1" cellpadding="6" cellspacing="0"><tr><td><b>Date</b></td><td><b>Completed IN → OUT pairs</b></td><td><b>Late</b></td><td><b>After 6 PM</b></td><td><b>HR status / review</b></td></tr>${rows.map(d=>`<tr><td>${esc(d.date)}</td><td>${d.completed_pairs.map(p=>esc(p.check_in.slice(0,19).replace('T',' ')+' → '+p.check_out.slice(0,19).replace('T',' '))).join('<br>')||'No completed pair'}</td><td>${esc(hours(d.late_minutes))}</td><td>${esc(hours(d.after_minutes))}</td><td>${esc([...d.attendance.map(x=>x.status),...d.flags].join('; '))}</td></tr>`).join('')}</table><p>Times are Dubai time. Durations are displayed in whole minutes. Data reviewed as of ${esc(data.as_of.slice(0,19).replace('T',' '))}.</p>`:'';
+        const daily=rows.length?`<table border="1" cellpadding="6" cellspacing="0"><tr><td><b>Date</b></td><td><b>Completed IN → OUT pairs</b></td><td><b>Late</b></td><td><b>After 6 PM</b></td><td><b>HR status / review</b></td></tr>${rows.map(d=>`<tr><td>${esc(d.date)}</td><td>${d.completed_pairs.map(p=>esc(p.check_in.slice(0,19).replace('T',' ')+' → '+p.check_out.slice(0,19).replace('T',' '))).join('<br>')||'No completed pair'}</td><td>${esc(hours(d.late_minutes))}</td><td>${esc(hours(d.after_minutes))}</td><td>${esc([...d.attendance.map(x=>x.status),...d.flags].join('; '))}</td></tr>`).join('')}</table><p>Times are Gulf Standard Time (UTC+4). Durations are displayed in whole minutes. Data reviewed as of ${esc(data.as_of.slice(0,19).replace('T',' '))}.</p>`:'';
         return{subject,message:`<p>${esc(opening)}</p>${daily}<p>Regards,<br>HR</p>`};
     }
     function actions(e,holder){
@@ -93,7 +93,7 @@ window.bsHRMonthlyReview=async function(main){
     }
     function render(){
         root.empty();
-        $('<div class="hr-review-note">').html('<b>Monthly HR review</b> · Full 9 AM–6 PM office window; no lunch deduction. Hours use completed recorded IN/OUT pairs. After-hours work is shown separately from approved overtime.').appendTo(root);
+        $('<div class="hr-review-note">').html('<b>Monthly HR review</b> · Full assigned shift window; no automatic lunch deduction. Hours use completed recorded IN/OUT pairs. After-hours work is shown separately from approved overtime.').appendTo(root);
         const controls=$('<div class="hr-review-controls">').appendTo(root);
         $('<label>Month</label>').append($('<input class="form-control input-sm" type="month" aria-label="Review month">').val(month).on('change',function(){month=this.value;load();})).appendTo(controls);
         const companyInput=$('<select class="form-control input-sm" aria-label="Review company">').append('<option value="">All permitted companies</option>');
@@ -103,7 +103,7 @@ window.bsHRMonthlyReview=async function(main){
         $('<label>Employee</label>').append($('<input class="form-control input-sm" type="search" aria-label="Find employee in monthly review" placeholder="Name or employee ID">').val(search).on('input',function(){search=this.value;drawRows();})).appendTo(controls);
         $('<button class="btn btn-default btn-sm">').text('Refresh report').on('click',load).appendTo(controls);
         $('<button class="btn btn-default btn-sm">').text('Review proposed automatic rules').on('click',rules).appendTo(controls);
-        $('<p class="hrm-muted">').text(`Automatic sending: awaiting approval · Data as of ${data.as_of?.slice(0,19).replace('T',' ')} Dubai time.`).appendTo(root);
+        $('<p class="hrm-muted">').text(`Automatic sending: awaiting approval · Data as of ${data.as_of?.slice(0,19).replace('T',' ')} Gulf Standard Time (UTC+4).`).appendTo(root);
         if(data.restricted.length)$('<p class="hr-review-note">').text('Restricted sources: '+data.restricted.join(', ')+'. A dash means unavailable, not zero.').appendTo(root);
         $('<div class="hr-review-count">').appendTo(root);
         const panel=$('<section class="hrm-panel"><div class="hrm-table-wrap"><table class="hrm-table hr-review-table"><thead><tr><th>Employee / details</th><th>Annual allocated / available</th><th>Leave taken this month</th><th>HR absent days</th><th>Late days / time</th><th>Scheduled hours — full month</th><th>Expected hours due</th><th>Recorded office hours</th><th>After 6 PM days / hours</th><th>Missing check-in / review</th></tr></thead><tbody></tbody></table></div></section>').appendTo(root);
