@@ -4,10 +4,10 @@
     const call = async (method, args) => (await frappe.call({method:base+method,args,freeze:true})).message;
     async function install(frm) {
         const result = await call('install', {});
-        if (result?.enabled) { frappe.msgprint(__('Oman quotation pilot enabled. Reloading…')); window.location.reload(); }
+        if (result?.enabled) { frappe.msgprint(__('Quotation workflow enabled. Reloading…')); window.location.reload(); }
     }
     function installationButton(frm, data) {
-        if (data.can_install) frm.add_custom_button(__('Enable Oman Quotation Pilot'), () => install(frm), __('Pilot setup'));
+        if (data.can_install) frm.add_custom_button(__('Enable {0}',[data.workflow_label || 'Oman Quotation Pilot']), () => install(frm), __('Workflow setup'));
         if(data.can_install_descriptions) frm.add_custom_button(__('Enable CO Item Descriptions'),async()=>{
             const result=(await frappe.call({method:'bsgroup.oman_item_description.install',freeze:true})).message;
             if(result?.enabled) window.location.reload();
@@ -116,6 +116,12 @@
             clientGrid(frm,frm.__oman_client_descriptions);
             if(frm.fields_dict?.custom_oman_revision_no) frm.toggle_display('custom_oman_revision_no',!!data.enabled);
             if(!data.enabled) return;
+            if(data.conflict){
+                frm.set_intro(__('This DCS has multiple active quotations. Review the existing quotations before saving, revising or finalising. No quotation has been merged or deleted.'),'red');
+                frm.page.clear_primary_action();
+                frm.remove_custom_button(__('Send to Procurement'));
+                return;
+            }
             if(data.discount_before_vat && data.editable){
                 frm.set_df_property('apply_discount_on','read_only',1);
                 frm.set_df_property('apply_discount_on','description',__('Discounts are deducted from the net amount before VAT is calculated.'));
@@ -180,6 +186,15 @@
             if(!data.enabled) return;
             frm.__oman_quotation_pilot=!!data.auto_sync;
             frm.remove_custom_button(__('Create Quotation'),__('More actions'));
+            if(data.conflict){
+                frm.remove_custom_button(__('Revise BOQ'));
+                frm.set_intro(__('This DCS has multiple active quotations. Review the existing quotation links before creating, revising or finalising. No records have been changed.'),'red');
+                return;
+            }
+            if(frm.doc.docstatus===1 && !data.quotation) frm.add_custom_button(__('Create Linked Draft Quotation'),async()=>{
+                const result=await frappe.call({method:'bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet.make_quotation',args:{source_name:frm.doc.name},freeze:true});
+                if(result.message) frappe.set_route('Form','Quotation',result.message);
+            });
             if(data.terminal) frm.remove_custom_button(__('Revise BOQ'));
             if(data.quotation) frm.add_custom_button(__('View Linked Quotation'),()=>frappe.set_route('Form','Quotation',data.quotation));
             if(frm.doc.docstatus===1 && data.auto_sync) frm.set_intro(data.terminal ? __('The linked quotation is Won or Lost. Costing and quotation revisions are locked.') : __('Use Revise BOQ to edit costing. The linked Draft Quotation updates automatically with revision history; no new quotation is created.'),'blue');

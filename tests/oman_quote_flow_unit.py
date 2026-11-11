@@ -204,9 +204,9 @@ class FlowTests(unittest.TestCase):
         with self.mod('bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet',quotation_deal_identity=lambda s,q:''),self.mod('bsgroup.dcs.currency',money_tolerance=lambda c:0.001):
             with self.assertRaisesRegex(ValidationError,'currency'):flow.sync_draft(self.s)
         self.assertIn('write',self.q._permissions);self.assertIsNone(self.q.saved)
-    def test_install_denied_outside_oman_and_for_sales(self):
+    def test_install_denied_outside_supported_sites_and_for_sales(self):
         with self.assertRaises(ValidationError):flow.install()
-        frappe.session.user='Administrator';frappe.local.site='erp-bitssecureit.u.frappe.cloud'
+        frappe.session.user='Administrator';frappe.local.site='unrelated.example.com'
         with self.assertRaises(ValidationError):flow.install()
     def test_read_only_context_filters_win_by_role(self):
         frappe.get_doc.return_value=self.q

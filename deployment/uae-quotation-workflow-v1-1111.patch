@@ -1,0 +1,1206 @@
+UAE quotation lifecycle rollout 1111 unique v1
+
+diff --git a/bsgroup/oman_quotation_flow.py b/bsgroup/oman_quotation_flow.py
+new file mode 100644
+--- /dev/null
++++ b/bsgroup/oman_quotation_flow.py
+@@ -0,0 +1,515 @@
++"""Opt-in Oman pilot. Draft quotations follow their DCS; terminal offers stay frozen.
++
++Activation installs only the pilot's fields/options, never roles or purchasing rules.
++All writes use existing document permissions and governed DCS/procurement services.
++"""
++from contextlib import contextmanager
++from contextvars import ContextVar
++import inspect
++import json
++
++import frappe
++from frappe.utils import cint, flt, now_datetime, today
++
++OMAN_SITES = {"erp-om.k.frappe.cloud"}
++UAE_SITES = {"erp-bitssecureit.u.frappe.cloud"}
++UAE_FLAG = "bs_uae_quotation_flow"
++FLAG = "bs_oman_quotation_flow"
++SOURCE_PRINT_FORMAT = "Enterprise Quotation - Class A - OM"
++PILOT_PRINT_FORMAT = "Enterprise Quotation - Oman Pilot"
++TERMINAL = {"Won", "Lost"}
++STAGES = {"Draft", "Sent", "Follow-up", "Delayed", "Cancelled", "Expired", "Won", "Lost"}
++_operation = ContextVar("oman_quote_operation", default=None)
++
++
++def enabled():
++    site = getattr(frappe.local, "site", None)
++    flag = UAE_FLAG if site in UAE_SITES else FLAG if site in OMAN_SITES else None
++    return bool(flag and cint(frappe.defaults.get_global_default(flag)) == 1)
++
++
++def uae():
++    return getattr(frappe.local, "site", None) in UAE_SITES
++
++
++def setup_authorised():
++    if uae():
++        return frappe.session.user == "Administrator" or "System Manager" in frappe.get_roles()
++    return getattr(frappe.local, "site", None) in OMAN_SITES and frappe.session.user == "Administrator"
++
++
++def print_formats():
++    return ("EnterPrise Quotation 3", "Enterprise Quotation - UAE Workflow") if uae() else (SOURCE_PRINT_FORMAT, PILOT_PRINT_FORMAT)
++
++
++def active_quotes(sheet):
++    return frappe.get_all("Quotation", filters={"custom_deal_cost_sheet": sheet.name,
++        "docstatus": ["!=", 2]}, pluck="name")
++
++
++def require_single_quote(sheet):
++    if len(active_quotes(sheet)) > 1:
++        frappe.throw("This DCS has multiple active quotations. Review and resolve the existing quotation links before creating, revising or finalising a quotation. No records were changed.")
++
++
++def pilot(q):
++    previous = q.get_doc_before_save()
++    return bool(enabled() and q.get("custom_deal_cost_sheet")
++                and (q.docstatus == 0 or q.get("custom_oman_flow")
++                     or (previous and previous.get("custom_oman_flow"))))
++
++
++def before_validate(q, method=None):
++    """Choose the tax-exclusive basis before ERPNext calculates amounts.
++
++    Keep the entered percentage / amount and let the native tax engine allocate
++    the discount and recalculate VAT, currency conversions and rounding.
++    Historical submitted offers retain their saved financial position.
++    """
++    if not pilot(q) or q.docstatus == 2:
++        return
++    previous = q.get_doc_before_save()
++    if previous and previous.docstatus != 0:
++        return
++    if q.docstatus != 0 and not previous:
++        return
++    q.apply_discount_on = "Net Total"
++
++
++def discount_basis_ready(q):
++    return (q.docstatus != 0 or not (
++        flt(q.get("discount_amount")) or flt(q.get("additional_discount_percentage")))
++        or q.get("apply_discount_on") == "Net Total")
++
++
++def require_net_discount(q, method=None, print_settings=None):
++    if pilot(q) and not discount_basis_ready(q):
++        frappe.throw("Save this quotation to apply its discount before VAT, then review the totals before creating a PDF.")
++
++
++@contextmanager
++def operation(q, action):
++    token = _operation.set((q.name, action))
++    try:
++        yield
++    finally:
++        _operation.reset(token)
++
++
++def check_editable(q):
++    if q.docstatus != 0 or q.custom_pipeline_stage in TERMINAL:
++        frappe.throw("Only an open Draft quotation can be revised. Won, Lost and submitted quotations are frozen.")
++    if q.get("custom_bsp_material_request") or q.get("custom_purchase_request"):
++        frappe.throw("This quotation was already handed over to Procurement.")
++
++
++def snapshot(q, label):
++    # Version is the native private audit store. Snapshots retain the complete
++    # quotation, including terms/taxes, rather than only the changed BOQ values.
++    frappe.get_doc(dict(doctype="Version", ref_doctype="Quotation", docname=q.name,
++        data=frappe.as_json({"changed": [], "added": [], "removed": [], "row_changed": [], "oman_quotation_revision": {
++            "revision": cint(q.get("custom_oman_revision_no")), "event": label,
++            "dcs_revision": q.get("custom_dcs_revision_reference"),
++            "quotation": q.as_dict()}}))).insert(ignore_permissions=True)
++    q.add_comment("Info", f"Quotation R{cint(q.get('custom_oman_revision_no'))}: {label}")
++
++
++def ensure_draft(sheet):
++    """DCS row lock makes concurrent submit/retry/create actions idempotent."""
++    from bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet import (
++        _create_quotation, quotation_deal_identity, refuse_stale_quotation_source)
++    sheet = frappe.get_doc("Deal Cost Sheet", sheet.name, for_update=True)
++    refuse_stale_quotation_source(sheet)
++    names = frappe.get_all("Quotation", filters={"custom_deal_cost_sheet": sheet.name,
++        "docstatus": ["!=", 2]}, pluck="name")
++    if len(names) > 1:
++        frappe.throw("This DCS already has multiple quotations. Review its existing links before using the Oman flow.")
++    name = sheet.custom_quotation or (names[0] if names else None)
++    if name:
++        q = frappe.get_doc("Quotation", name, for_update=True)
++        q.check_permission("read")
++        if q.docstatus == 2 or q.custom_deal_cost_sheet != sheet.name or quotation_deal_identity(sheet, q):
++            frappe.throw("The existing quotation link does not match this DCS. No new quotation was created.")
++        if names and names[0] != name:
++            frappe.throw("The DCS quotation links conflict. No new quotation was created.")
++    else:
++        name = _create_quotation(sheet)
++        q = frappe.get_doc("Quotation", name)
++        snapshot(q, "Created from submitted DCS")
++    if sheet.custom_quotation != name:
++        frappe.db.set_value("Deal Cost Sheet", sheet.name, "custom_quotation", name)
++        sheet.custom_quotation = name
++    return name
++
++
++def dcs_submitted(doc, method=None):
++    if enabled():
++        ensure_draft(doc)
++
++
++def linked_quotation(sheet, strict=False):
++    if uae() and len(active_quotes(sheet)) > 1:
++        if strict:
++            require_single_quote(sheet)
++        return None
++    if sheet.custom_quotation:
++        return sheet.custom_quotation
++    names = frappe.get_all("Quotation", filters={"custom_deal_cost_sheet": sheet.name,
++        "docstatus": ["!=", 2]}, pluck="name")
++    if len(names) > 1:
++        if strict:
++            frappe.throw("This DCS has multiple quotations and no current quotation link. Review the links before revising; no quotation was changed.")
++        return None
++    return names[0] if names else None
++
++
++def guard_dcs_revision(sheet, attach=False):
++    if not enabled():
++        return False
++    name = linked_quotation(sheet, strict=True)
++    if not name:
++        return False
++    q = frappe.get_doc("Quotation", name, for_update=True)
++    if pilot(q):
++        check_editable(q)
++        if attach:
++            from bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet import quotation_deal_identity
++            q.check_permission("write")
++            if q.custom_deal_cost_sheet != sheet.name or quotation_deal_identity(sheet, q):
++                frappe.throw("The existing quotation does not match this DCS. Its link was not changed.")
++            if not sheet.custom_quotation:
++                frappe.db.set_value("Deal Cost Sheet", sheet.name, "custom_quotation", name)
++                sheet.custom_quotation = name
++        return True
++    return False
++
++
++def sync_draft(sheet, previous_sheet=None):
++    from bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet import quotation_deal_identity
++    from bsgroup.dcs.currency import money_tolerance
++    q = frappe.get_doc("Quotation", sheet.custom_quotation, for_update=True)
++    q.check_permission("write")
++    check_editable(q)
++    if q.custom_deal_cost_sheet != sheet.name or quotation_deal_identity(sheet, q) or q.currency != sheet.currency:
++        frappe.throw("The quotation identity or currency differs from this DCS. Revision was not saved.")
++    snapshot(q, "Before DCS revision")
++    from bsgroup import oman_item_description as descriptions
++    wording = descriptions.preserved_wording(q, previous_sheet or sheet)
++    rows = []
++    for row in sheet.items:
++        item = frappe.db.get_value("Item", row.item_code, ["item_name", "stock_uom"], as_dict=True)
++        description = row.description or (row.item_name if row.exclude_item_name_and_brand else
++            " - ".join(str(v) for v in (row.brand, row.item_code, row.item_name) if v)) or item.item_name
++        customer_text = wording.get(row.name)
++        rows.append(dict(item_code=row.item_code, item_name=row.item_name or item.item_name,
++            brand=row.brand, uom=item.stock_uom, stock_uom=item.stock_uom, conversion_factor=1,
++            description=description, custom_header=row.header,
++            custom_oman_dcs_row=row.name,
++            custom_oman_client_description=customer_text[1] if customer_text and customer_text[0] == row.item_code else "",
++            custom_oman_use_costing_description=customer_text[2] if customer_text and customer_text[0] == row.item_code else 0,
++            custom_exclude_item_name_and_brand=row.exclude_item_name_and_brand,
++            qty=row.qty, custom_cost_rate=row.cost_rate, custom_selling_rate=row.selling_rate,
++            price_list_rate=row.selling_rate, discount_percentage=0, rate=row.selling_rate))
++    charges = sum(flt(r.get("selling_amount")) for r in sheet.addtional_charges or [])
++    if charges:
++        code = frappe.db.get_single_value("BS Group Settings", "dcs_addtional_item")
++        if not code:
++            frappe.throw("Configure the existing DCS Additional Item before synchronising charges.")
++        item = frappe.db.get_value("Item", code, ["item_name", "stock_uom"], as_dict=True)
++        customer_text = wording.get(descriptions.ADDITIONAL)
++        rows.append(dict(item_code=code, item_name=item.item_name, description=item.item_name,
++            custom_oman_dcs_row=descriptions.ADDITIONAL,
++            custom_oman_client_description=customer_text[1] if customer_text and customer_text[0] == code else "",
++            custom_oman_use_costing_description=customer_text[2] if customer_text and customer_text[0] == code else 0,
++            qty=1, uom=item.stock_uom, stock_uom=item.stock_uom, conversion_factor=1,
++            rate=charges, price_list_rate=charges, discount_percentage=0))
++    q.set("items", rows)
++    q.custom_oman_flow = 1
++    q.custom_oman_revision_no = cint(q.get("custom_oman_revision_no")) + 1
++    q.flags.ignore_mandatory = True  # Incomplete commercial details remain a Draft.
++    with operation(q, "revise"):
++        q.save()
++    if abs(flt(q.total) - flt(sheet.total_selling)) > money_tolerance(sheet.currency):
++        frappe.throw("Quotation discounts or pricing rules changed the DCS total. The revision was not saved.")
++    snapshot(q, "After DCS revision")
++    return f"Quotation {q.name} updated in place · R{q.custom_oman_revision_no}."
++
++
++def validate(q, method=None):
++    if not pilot(q):
++        return
++    if uae():
++        sheet = frappe.get_doc("Deal Cost Sheet", q.custom_deal_cost_sheet, for_update=True)
++        require_single_quote(sheet)
++        if q.is_new() and active_quotes(sheet):
++            frappe.throw("A quotation already exists for this DCS. Open the existing quotation; use Revise Costing Sheet for changes.")
++    before = q.get_doc_before_save()
++    if before and before.custom_pipeline_stage in TERMINAL:
++        frappe.throw("Won and Lost quotations are frozen; they cannot be edited or reopened.")
++    if q.docstatus == 2:
++        frappe.throw("Use the commercial Cancelled status; native cancellation is outside the editable pilot flow.")
++    action = _operation.get()
++    allowed = action and action[0] == q.name
++    if before and before.docstatus == 0 and q.docstatus == 1 and (not allowed or action[1] != "status"):
++        frappe.throw("Use Change Status → Won or Lost to finalise an managed quotation.")
++    if before and before.docstatus == 1 and not before.get("custom_oman_flow"):
++        frappe.throw("Historical submitted quotations cannot be enrolled in the draft pilot.")
++    if before and before.get("custom_oman_flow") and not q.get("custom_oman_flow"):
++        frappe.throw("The Quotation workflow flag cannot be cleared.")
++    if not before and cint(q.get("custom_oman_revision_no")):
++        frappe.throw("New quotations must start at revision R0.")
++    if before and cint(q.get("custom_oman_revision_no")) != cint(before.get("custom_oman_revision_no")):
++        if not allowed or action[1] != "revise":
++            frappe.throw("Quotation revision numbers are managed by the DCS revision service.")
++    if before and q.custom_pipeline_stage != before.custom_pipeline_stage and not allowed:
++        frappe.throw("Use Change Status to preserve the quotation and procurement controls.")
++    q.custom_oman_flow = 1
++    from bsgroup.oman_item_description import prepare
++    prepare(q)
++
++
++def validate_stage(q):
++    if not pilot(q):
++        return False
++    stage = q.custom_pipeline_stage or "Draft"
++    if stage not in STAGES:
++        frappe.throw("Invalid quotation status.")
++    before = q.get_doc_before_save()
++    if before and before.custom_pipeline_stage in TERMINAL and before.custom_pipeline_stage != stage:
++        frappe.throw("Won and Lost quotations cannot be reopened in this workflow.")
++    if stage in TERMINAL and q.docstatus != 1:
++        frappe.throw("The quotation must pass native submission checks before Won or Lost is recorded.")
++    if stage in {"Lost", "Cancelled", "Delayed"} and not (q.custom_lost_reason or "").strip():
++        frappe.throw("A reason is required for Lost, Delayed or Cancelled.")
++    q.custom_won_date = today() if stage == "Won" else None
++    q.custom_lost_date = today() if stage in {"Lost", "Cancelled"} else None
++    if stage not in {"Lost", "Cancelled", "Delayed"}:
++        q.custom_lost_reason = None
++    return True
++
++
++def guard_cancel(q, method=None):
++    if pilot(q):
++        frappe.throw("Use the commercial Cancelled status for editable quotations. Won and Lost quotations remain frozen.")
++
++
++def _quotation(name, write=False, lock=False):
++    q = frappe.get_doc("Quotation", name, for_update=lock)
++    q.check_permission("write" if write else "read")
++    if not pilot(q):
++        frappe.throw("This workflow applies only to new/Draft quotations and quotations created through this workflow.")
++    if uae() and (write or lock):
++        require_single_quote(frappe.get_doc("Deal Cost Sheet", q.custom_deal_cost_sheet))
++    return q
++
++
++@frappe.whitelist()
++def context(quotation):
++    q = frappe.get_doc("Quotation", quotation)
++    q.check_permission("read")
++    if not pilot(q):
++        return {"enabled": False, "can_install": can_install(), "workflow_label": "UAE Quotation Workflow" if uae() else "Oman Quotation Pilot"}
++    conflict = uae() and len(active_quotes(frappe.get_doc("Deal Cost Sheet", q.custom_deal_cost_sheet))) > 1
++    from bsgroup.dcs.procurement import SEND_ROLES
++    can_win = frappe.session.user == "Administrator" or bool(set(frappe.get_roles()) & SEND_ROLES)
++    complete = not any(d._get_missing_mandatory_fields() for d in [q] + q.get_all_children())
++    from bsgroup import oman_item_description as descriptions
++    client_descriptions = descriptions.managed(q)
++    complete = complete and not descriptions.missing_rows(q)
++    return dict(enabled=True, revision=cint(q.get("custom_oman_revision_no")),
++        editable=q.docstatus == 0 and q.custom_pipeline_stage not in TERMINAL and not conflict,
++        conflict=conflict,
++        can_write=frappe.has_permission("Quotation", "write", doc=q),
++        can_print=frappe.has_permission("Quotation", "print", doc=q),
++        ready_to_convert=complete and discount_basis_ready(q) and not conflict,
++        discount_before_vat=True,
++        client_descriptions=client_descriptions,
++        can_install_descriptions=setup_authorised() and (not descriptions.enabled()
++            or not frappe.db.exists("Custom Field", "Quotation Item-" + descriptions.COSTING)),
++        can_win=can_win, statuses=[s for s in ("Sent", "Delayed", "Cancelled", "Lost", "Won") if s != "Won" or can_win])
++
++
++def can_install():
++    return setup_authorised() and not enabled()
++
++
++@frappe.whitelist()
++def dcs_context(dcs):
++    sheet = frappe.get_doc("Deal Cost Sheet", dcs)
++    sheet.check_permission("read")
++    active = enabled()
++    conflict = bool(active and uae() and len(active_quotes(sheet)) > 1)
++    name = linked_quotation(sheet) if active else sheet.custom_quotation
++    q = frappe.get_doc("Quotation", name) if active and name else None
++    managed = bool(q and pilot(q))
++    return dict(enabled=active, can_install=can_install(), quotation=name, conflict=conflict,
++        workflow_label="UAE Quotation Workflow" if uae() else "Oman Quotation Pilot",
++        auto_sync=managed, terminal=bool(managed and q.custom_pipeline_stage in TERMINAL))
++
++
++@frappe.whitelist()
++def won_context(quotation):
++    q = _quotation(quotation, write=True)
++    check_editable(q)
++    from bsgroup.dcs.procurement import SEND_ROLES, source_items, handover_warehouses, send_to_procurement
++    if frappe.session.user != "Administrator" and not set(frappe.get_roles()) & SEND_ROLES:
++        frappe.throw("Sales or commercial-manager access to this deal is required to record Won and send to Procurement.", frappe.PermissionError)
++    sheet = frappe.get_doc("Deal Cost Sheet", q.custom_deal_cost_sheet)
++    sheet.check_permission("write")
++    result = dict(required_by=today(), warehouses=handover_warehouses(sheet.company),
++        stock_items=any(r["is_stock_item"] for r in source_items(sheet)))
++    # The Oman bench predates UAE's optional Project handover extension.
++    # Honour that extension when present, without silently installing it in Oman.
++    result["project_required"] = "project_modules" in inspect.signature(send_to_procurement).parameters
++    if result["project_required"]:
++        from bsgroup.project_handover import context as project_context, sales_handover
++        with sales_handover(q, sheet):
++            result.update(project_context(q, sheet))
++    return result
++
++
++@frappe.whitelist(methods=["POST"])
++def change_status(quotation, stage, expected_modified, reason=None, schedule_date=None,
++                  warehouse=None, project_modules=None, project_details=None,
++                  customer_po=None, customer_po_reference=None):
++    from bsgroup.dcs.presales_lineage import atomic_lifecycle
++    return atomic_lifecycle(lambda: _change_status(quotation, stage, expected_modified,
++        reason, schedule_date, warehouse, project_modules, project_details, customer_po, customer_po_reference))
++
++
++def _change_status(quotation, stage, expected_modified, reason=None, schedule_date=None,
++                   warehouse=None, project_modules=None, project_details=None,
++                   customer_po=None, customer_po_reference=None):
++    q = _quotation(quotation, write=True, lock=True)
++    # Successful duplicate Won requests reuse the existing requisition. Never
++    # re-award, regenerate evidence or create another purchasing request.
++    if stage == "Won" and q.custom_pipeline_stage == "Won" and q.get("custom_bsp_material_request"):
++        return dict(quotation=q.name, requisition=q.custom_bsp_material_request, already_sent=True)
++    check_editable(q)
++    if str(q.modified) != str(expected_modified):
++        frappe.throw("The quotation changed. Reload it before changing status.")
++    if stage not in {"Sent", "Delayed", "Cancelled", "Lost", "Won"}:
++        frappe.throw("Choose a valid quotation status.")
++    if stage == "Won":
++        won_context(q.name)  # Keep the same role and source restrictions.
++    q.custom_oman_flow = 1
++    with operation(q, "status"):
++        if stage == "Won":
++            q.custom_customer_po = customer_po or q.custom_customer_po
++            q.custom_customer_po_reference = customer_po_reference or q.custom_customer_po_reference
++        if stage in TERMINAL:
++            q.check_permission("submit")
++            q.submit()  # Includes DCS approval, mandatory fields and stale-position checks.
++        q.custom_pipeline_stage = stage
++        q.custom_lost_reason = reason
++        q.save()
++    result = dict(quotation=q.name, status=stage)
++    if stage == "Won":
++        from bsgroup.dcs.procurement import send_to_procurement
++        args = dict(quotation=q.name, schedule_date=schedule_date, warehouse=warehouse)
++        if "project_modules" in inspect.signature(send_to_procurement).parameters:
++            args.update(project_modules=project_modules, project_details=project_details)
++        sent = send_to_procurement(**args)
++        result["requisition"] = sent["name"]
++        result["project"] = sent.get("project")
++    snapshot(q, "Status changed to " + stage)
++    return result
++
++
++@frappe.whitelist(methods=["POST"])
++def convert_pdf(quotation, expected_modified):
++    q = _quotation(quotation, lock=True)
++    q.check_permission("print")
++    if str(q.modified) != str(expected_modified):
++        frappe.throw("The quotation changed. Save and reload before converting to PDF.")
++    require_net_discount(q)
++    if q.docstatus == 0:
++        q._validate_mandatory()
++    from bsgroup.dcs.quotation_control import validate_position
++    validate_position(frappe.get_doc("Deal Cost Sheet", q.custom_deal_cost_sheet), q)
++    pdf = render_pdf(q)
++    name = f"{q.name}-R{cint(q.get('custom_oman_revision_no'))}-{now_datetime().strftime('%Y%m%d%H%M%S%f')}.pdf"
++    file = frappe.get_doc(dict(doctype="File", file_name=name, content=pdf, is_private=1,
++        attached_to_doctype="Quotation", attached_to_name=q.name)).insert(ignore_permissions=True)
++    snapshot(q, "PDF issued: " + file.name)
++    return dict(file_url=file.file_url, revision=cint(q.get("custom_oman_revision_no")))
++
++
++def render_pdf(q, no_letterhead=None):
++    """Use Oman's approved customer format and its configured PDF generator."""
++    from bsgroup.oman_item_description import require_client_wording, managed, PARENT
++    require_client_wording(q)
++    if managed(q):
++        q.set(PARENT, 1)
++    target_format = print_formats()[1]
++    if not frappe.db.exists("Print Format", target_format):
++        frappe.throw("The quotation workflow print format is not installed. Complete workflow setup.")
++    letterhead = q.get("letter_head") or frappe.db.get_value("Letter Head", {"is_default": 1, "disabled": 0}, "name")
++    return frappe.get_print("Quotation", q.name, target_format, as_pdf=True, doc=q,
++        letterhead=letterhead, no_letterhead=(not bool(letterhead)) if no_letterhead is None else no_letterhead)
++
++
++def install_print_format():
++    # Clone the live approved format; retain all readiness checks, branding,
++    # margins and generator settings. Historical offers keep the original.
++    source_format, target_format = print_formats()
++    if frappe.db.exists("Print Format", target_format):
++        return
++    source = frappe.get_doc("Print Format", source_format)
++    if source.doc_type != "Quotation" or source.disabled:
++        frappe.throw("The approved Enterprise quotation format must be enabled before pilot setup.")
++    old_revision = '{%- set rev = doc.name.split("-")|last if doc.amended_from else "0" -%}'
++    old_row = '+ ([("Revision", rev)] if doc.amended_from else [])'
++    if (source.html or "").count(old_revision) != 1 or source.html.count(old_row) != 1:
++        frappe.throw("The Enterprise template revision layout changed. Review it before enabling the pilot.")
++    target = frappe.copy_doc(source)
++    target.name = target_format
++    target.standard = "No"
++    target.custom_format = 1
++    target.html = source.html.replace(old_revision,
++        '{%- set rev = (doc.get("custom_oman_revision_no") or 0) if doc.get("custom_oman_flow") or doc.docstatus == 0 else (doc.name.split("-")|last if doc.amended_from else "0") -%}')
++    target.html = target.html.replace(old_row,
++        '+ ([("Revision", rev)] if doc.get("custom_oman_flow") or doc.docstatus == 0 or doc.amended_from else [])')
++    target.insert(ignore_permissions=True)
++
++
++def install_pdf_action():
++    # Preserve the site's readiness diagnostics; replace only its old PDF button
++    # for pilot forms, whose Save/Convert action archives the actual revision.
++    if uae():
++        return
++    name = "Quotation Readiness - Class A OM"
++    if not frappe.db.exists("Client Script", name):
++        return
++    script = frappe.get_doc("Client Script", name)
++    if "frm.__oman_quotation_pilot" in script.script:
++        return
++    old = "if (frm.is_new()) return;\n\t\tfrm.add_custom_button(__('Download Enterprise PDF')"
++    if script.script.count(old) != 1:
++        frappe.throw("The Oman PDF button script changed. Review it before enabling the pilot.")
++    script.script = script.script.replace(old,
++        "if (frm.is_new() || frm.__oman_quotation_pilot) return;\n\t\tfrm.add_custom_button(__('Download Enterprise PDF')")
++    script.save(ignore_permissions=True)
++
++
++@frappe.whitelist(methods=["POST"])
++def install():
++    if not setup_authorised():
++        frappe.throw("Workflow setup requires the site's authorised administrator.", frappe.PermissionError)
++    from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
++    create_custom_fields({"Quotation": [
++        dict(fieldname="custom_oman_flow", label="Managed quotation workflow", fieldtype="Check", read_only=1, hidden=1),
++        dict(fieldname="custom_oman_revision_no", label="Quotation Revision", fieldtype="Int", default="0", read_only=1),
++    ]})
++    from frappe.custom.doctype.property_setter.property_setter import make_property_setter
++    options = frappe.get_meta("Quotation").get_field("custom_pipeline_stage").options.splitlines()
++    if "Delayed" not in options:
++        make_property_setter("Quotation", "custom_pipeline_stage", "options", "\n".join(options + ["Delayed"]), "Text")
++    install_print_format()
++    install_pdf_action()
++    frappe.defaults.set_global_default(UAE_FLAG if uae() else FLAG, 1)
++    if uae():
++        from bsgroup.oman_item_description import install as install_descriptions
++        install_descriptions()
++    frappe.clear_cache()
++    return dict(enabled=True, site=frappe.local.site, roles_changed=False, historical_submitted_quotes_changed=False)
+diff --git a/bsgroup/oman_item_description.py b/bsgroup/oman_item_description.py
+new file mode 100644
+--- /dev/null
++++ b/bsgroup/oman_item_description.py
+@@ -0,0 +1,257 @@
++"""Oman-only separation of costing text from customer quotation wording."""
++from html.parser import HTMLParser
++
++import frappe
++from frappe.utils import cint, flt
++
++FLAG = "bs_oman_client_descriptions"
++FIELD = "custom_oman_client_description"
++COSTING = "custom_oman_use_costing_description"
++CO = "custom_oman_use_co_description"
++SOURCE = "custom_oman_dcs_row"
++PARENT = "custom_oman_client_descriptions"
++ADDITIONAL = "__additional_charges__"
++PRINT_MODE = '(doc.get("custom_oman_client_descriptions") or (doc.docstatus == 0 and doc.get("custom_deal_cost_sheet")))'
++
++
++def enabled():
++    from bsgroup.oman_quotation_flow import enabled as pilot_enabled
++    return pilot_enabled() and cint(frappe.defaults.get_global_default(FLAG)) == 1
++
++
++def managed(q):
++    from bsgroup.oman_quotation_flow import pilot
++    before = q.get_doc_before_save()
++    return bool(enabled() and pilot(q) and (q.docstatus == 0 or q.get(PARENT)
++        or (before and before.docstatus == 0)))
++
++
++class _Text(HTMLParser):
++    def __init__(self):
++        super().__init__(convert_charrefs=True)
++        self.parts, self.skip = [], 0
++
++    def handle_starttag(self, tag, attrs):
++        if tag in ("script", "style"):
++            self.skip += 1
++
++    def handle_endtag(self, tag):
++        if tag in ("script", "style"):
++            self.skip = max(0, self.skip - 1)
++
++    def handle_data(self, data):
++        if not self.skip:
++            self.parts.append(data)
++
++
++def visible_text(value):
++    parser = _Text()
++    parser.feed(str(value or ""))
++    return " ".join(" ".join(parser.parts).replace("\u00a0", " ").split())
++
++
++def missing_rows(q):
++    if not managed(q):
++        return []
++    return [r.idx or i for i, r in enumerate(q.items, 1)
++        if visible_text(r.description if cint(r.get(COSTING)) else r.get(FIELD)).casefold() in ("", "generic", "item")]
++
++
++def require_client_wording(q):
++    missing = missing_rows(q)
++    if missing:
++        frappe.throw("Enter the selected Item Description or CO Item Description for quotation line(s) "
++            + ", ".join(map(str, missing))
++            + ". Only the selected wording is printed; CO wording never falls back to costing text.")
++
++
++def signature(row):
++    return (row.get("item_code"), round(flt(row.get("qty")), 6),
++        round(flt(row.get("rate", row.get("selling_rate"))), 3))
++
++
++def sources(sheet):
++    result = []
++    for row in sheet.items:
++        name = row.item_name or frappe.db.get_value("Item", row.item_code, "item_name") or row.item_code
++        description = row.description or (name if row.exclude_item_name_and_brand else
++            " - ".join(str(v) for v in (row.brand, row.item_code, name) if v))
++        result.append(dict(key=row.name, item_code=row.item_code, qty=row.qty,
++            rate=row.selling_rate, description=description))
++    charges = sum(flt(r.get("selling_amount")) for r in sheet.addtional_charges or [])
++    if charges:
++        code = frappe.db.get_single_value("BS Group Settings", "dcs_addtional_item")
++        name = frappe.db.get_value("Item", code, "item_name") or code
++        result.append(dict(key=ADDITIONAL, item_code=code, qty=1, rate=charges, description=name))
++    return result
++
++
++def bind(q, sheet, restore_internal=True):
++    """Resolve legacy lines once; revisions subsequently follow immutable DCS row IDs."""
++    expected = sources(sheet)
++    by_key = {r["key"]: r for r in expected}
++    used, bindings = set(), []
++    ordered = len(q.items) == len(expected) and all(signature(a) == signature(b)
++        for a, b in zip(q.items, expected))
++    for i, row in enumerate(q.items):
++        key = row.get(SOURCE)
++        source = by_key.get(key) if key else None
++        if key and (not source or signature(row) != signature(source)):
++            frappe.throw("Quotation source lines changed. Use Revise Costing Sheet to update the linked quotation.")
++        if not source and ordered:
++            source = expected[i]
++        if not source:
++            candidates = [r for r in expected if r["key"] not in used and signature(row) == signature(r)]
++            matching = [r for r in candidates if visible_text(r["description"]) == visible_text(row.description)]
++            source = matching[0] if len(matching) == 1 else candidates[0] if len(candidates) == 1 else None
++        if not source or source["key"] in used:
++            frappe.throw("Quotation lines cannot be matched safely to costing. Review the DCS links before saving.")
++        used.add(source["key"])
++        row.set(SOURCE, source["key"])
++        if restore_internal:
++            row.description = source["description"]
++        bindings.append((row, source))
++    if len(used) != len(expected):
++        frappe.throw("Quotation scope differs from costing. Use Revise Costing Sheet.")
++    return bindings
++
++
++def prepare(q):
++    if not managed(q):
++        return
++    before = q.get_doc_before_save()
++    from bsgroup.oman_quotation_flow import _operation
++    revising = _operation.get() == (q.name, "revise")
++    prior = {r.name: r for r in before.items} if before else {}
++    if not revising:
++        for row in q.items:
++            old = prior.get(row.name)
++            if old and old.get(SOURCE) and row.get(SOURCE) != old.get(SOURCE):
++                frappe.throw("Costing source references are maintained by the quotation service.")
++    sheet = frappe.get_doc("Deal Cost Sheet", q.custom_deal_cost_sheet)
++    bind(q, sheet)
++    for row in q.items:
++        row.set(COSTING, 1 if cint(row.get(COSTING)) else 0)
++        row.set(CO, 0 if cint(row.get(COSTING)) else 1)
++    q.set(PARENT, 1)
++
++
++def preserved_wording(q, previous_sheet):
++    if not managed(q):
++        return {}
++    return {source["key"]: (row.item_code, row.get(FIELD) or "", cint(row.get(COSTING)))
++        for row, source in bind(q, previous_sheet, restore_internal=False)}
++
++
++def print_html(html):
++    """Patch only the pilot format; keep historical offers' legacy branch intact."""
++    marker = "{# Oman description choice v3 #}"
++    if marker in html:
++        return html
++    old = '(row.get("custom_oman_client_description") or "")'
++    new = '((row.description or "") if row.get("custom_oman_use_costing_description") else (row.get("custom_oman_client_description") or ""))'
++    html = _print_html_v2(html)
++    if html.count(old) != 1:
++        frappe.throw("Review the Oman description selection print expression before setup.")
++    return html.replace("{# Oman CO descriptions v2 #}", marker).replace(old, new)
++
++
++def _print_html_v2(html):
++    marker = "{# Oman CO descriptions v2 #}"
++    if marker in html:
++        return html
++    if "{# Oman CO descriptions v1 #}" in html:
++        old_mode = 'doc.get("custom_oman_client_descriptions")'
++        if html.count(old_mode) != 4:
++            frappe.throw("Review the existing Oman client-description print conditions before setup.")
++        return html.replace("{# Oman CO descriptions v1 #}", marker).replace(old_mode, PRINT_MODE)
++    replacements = {
++        '{%- set raw = row.description or row.item_name or "" -%}':
++            '{%- set raw = (row.get("custom_oman_client_description") or "") if ' + PRINT_MODE + ' else (row.description or row.item_name or "") -%}',
++        '{%- set head = parts[0] if parts|length else (row.item_name or "") -%}':
++            '{%- set head = parts[0] if parts|length else ("" if ' + PRINT_MODE + ' else (row.item_name or "")) -%}',
++        '{% if row.item_code and row.item_code not in PLACEHOLDERS %}':
++            '{% if not ' + PRINT_MODE + ' and row.item_code and row.item_code not in PLACEHOLDERS %}',
++    }
++    for old, new in replacements.items():
++        count = 2 if old.startswith("{% if row.item_code") else 1
++        if html.count(old) != count:
++            frappe.throw("The Oman print layout changed. Review the description and item-code sections before setup.")
++        html = html.replace(old, new)
++    return marker + "\n" + html
++
++
++def readiness_script(script):
++    marker = "// Oman description choice v3"
++    if marker in script:
++        return script
++    script = _readiness_v2(script)
++    old = "clientWording ? (r.custom_oman_client_description || '') : (r.description || r.item_name || '')"
++    new = "clientWording ? (r.custom_oman_use_costing_description ? (r.description || '') : (r.custom_oman_client_description || '')) : (r.description || r.item_name || '')"
++    if script.count(old) != 1:
++        frappe.throw("Review the Oman selected-description readiness check before setup.")
++    return script.replace("// Oman CO descriptions v2", marker).replace(old,new).replace("clientWording ? 'CO Item Description'", "clientWording ? 'Selected Item / CO Item Description'")
++
++
++def _readiness_v2(script):
++    marker = "// Oman CO descriptions v2"
++    if marker in script:
++        return script
++    declaration = "const clientWording = !!(d.custom_oman_client_descriptions || (d.docstatus === 0 && d.custom_deal_cost_sheet) || frm.__oman_client_descriptions);"
++    if "// Oman CO descriptions v1" in script:
++        return script.replace("// Oman CO descriptions v1", marker).replace(
++            "const clientWording = !!(d.custom_oman_client_descriptions || frm.__oman_client_descriptions);", declaration)
++    anchor = "const items = d.items || [];"
++    expression = "const t = eqa_flatten(r.description || r.item_name || '');"
++    if script.count(anchor) != 1 or script.count(expression) != 1:
++        frappe.throw("The Oman readiness script changed. Review its description checks before setup.")
++    script = script.replace(anchor, anchor + "\n\t" + marker
++        + "\n\t" + declaration)
++    script = script.replace(expression,
++        "const t = eqa_flatten(clientWording ? (r.custom_oman_client_description || '') : (r.description || r.item_name || ''));")
++    script = script.replace("'items[].description (empty or placeholder-only) · line(s) '",
++        "(clientWording ? 'CO Item Description' : 'items[].description') + ' (empty or placeholder-only) · line(s) '")
++    return script.replace("'items[].description · line(s) '",
++        "(clientWording ? 'CO Item Description' : 'items[].description') + ' · line(s) '")
++
++
++@frappe.whitelist(methods=["POST"])
++def install():
++    from bsgroup.oman_quotation_flow import print_formats, setup_authorised, uae
++    source_format, target_format = print_formats()
++    if not setup_authorised():
++        frappe.throw("CO Item Description setup requires the site's authorised administrator.", frappe.PermissionError)
++    if not frappe.db.exists("Print Format", target_format):
++        frappe.throw("Complete the existing Oman quotation pilot setup first.")
++    # Validate live templates before any schema/configuration mutation.
++    formats = [frappe.get_doc("Print Format", name) for name in ((target_format,) if uae() else (target_format, source_format))]
++    rendered = [(fmt, print_html(fmt.html)) for fmt in formats]
++    script = None if uae() else frappe.get_doc("Client Script", "Quotation Readiness - Class A OM")
++    code = readiness_script(script.script) if script else None
++    from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
++    create_custom_fields({"Quotation": [dict(fieldname=PARENT, label="Client description mode",
++        fieldtype="Check", hidden=1, read_only=1, print_hide=1, no_copy=1)],
++        "Quotation Item": [
++            dict(fieldname=COSTING, label="Use Item Description (Costing)", fieldtype="Check",
++                insert_after="item_name", default="0", print_hide=1,
++                description="Print the original costing description on this line, including any part numbers it contains."),
++            dict(fieldname=CO, label="Use CO Item Description", fieldtype="Check",
++                insert_after=COSTING, default="1", print_hide=1,
++                description="Print the editable CO wording instead. Select one description per line."),
++            dict(fieldname=FIELD, label="CO Item Description", fieldtype="Text Editor",
++                insert_after="description", in_list_view=1, columns=3,
++                read_only_depends_on="eval:doc.custom_oman_use_costing_description == 1",
++                description="Printed only when Use CO Item Description is selected. Your wording is retained when you switch choices."),
++            dict(fieldname=SOURCE, label="Oman costing source row", fieldtype="Data",
++                hidden=1, read_only=1, print_hide=1, no_copy=1),
++        ]})
++    for fmt, html in rendered:
++        if fmt.html != html:
++            fmt.html = html
++            fmt.save(ignore_permissions=True)
++    if script and script.script != code:
++        script.script = code
++        script.save(ignore_permissions=True)
++    frappe.defaults.set_global_default(FLAG, 1)
++    frappe.clear_cache()
++    return dict(enabled=True, roles_changed=False, historical_quotations_changed=False)
+diff --git a/bsgroup/quotation_workflow_hooks.py b/bsgroup/quotation_workflow_hooks.py
+new file mode 100644
+--- /dev/null
++++ b/bsgroup/quotation_workflow_hooks.py
+@@ -0,0 +1,21 @@
++"""Add the shared, site-opt-in quotation workflow without replacing other hooks."""
++
++
++def configure(namespace):
++    def append(mapping, key, value, first=False):
++        prior = mapping.get(key, [])
++        values = [prior] if isinstance(prior, str) else list(prior)
++        if value not in values:
++            values.insert(0, value) if first else values.append(value)
++        mapping[key] = values
++
++    events = namespace['doc_events']
++    base = 'bsgroup.oman_quotation_flow.'
++    append(events.setdefault('Deal Cost Sheet', {}), 'on_submit', base+'dcs_submitted')
++    for event, handler in [('validate','validate'), ('before_update_after_submit','validate'),
++                           ('before_cancel','guard_cancel'), ('before_validate','before_validate'),
++                           ('before_print','require_net_discount')]:
++        append(events.setdefault('Quotation', {}), event, base+handler, first=event=='validate')
++    for dt in ('Quotation','Deal Cost Sheet'):
++        append(namespace['doctype_js'], dt, 'public/js/oman_quotation_flow.js')
++    append(namespace['doctype_list_js'], 'Quotation', 'public/js/oman_quotation_flow_list.js')
+diff --git a/bsgroup/public/js/oman_quotation_flow.js b/bsgroup/public/js/oman_quotation_flow.js
+new file mode 100644
+--- /dev/null
++++ b/bsgroup/public/js/oman_quotation_flow.js
+@@ -0,0 +1,203 @@
++// Oman-only draft quotation pilot. All authority remains on the server.
++(() => {
++    const base = 'bsgroup.oman_quotation_flow.';
++    const call = async (method, args) => (await frappe.call({method:base+method,args,freeze:true})).message;
++    async function install(frm) {
++        const result = await call('install', {});
++        if (result?.enabled) { frappe.msgprint(__('Quotation workflow enabled. Reloading…')); window.location.reload(); }
++    }
++    function installationButton(frm, data) {
++        if (data.can_install) frm.add_custom_button(__('Enable {0}',[data.workflow_label || 'Oman Quotation Pilot']), () => install(frm), __('Workflow setup'));
++        if(data.can_install_descriptions) frm.add_custom_button(__('Enable CO Item Descriptions'),async()=>{
++            const result=(await frappe.call({method:'bsgroup.oman_item_description.install',freeze:true})).message;
++            if(result?.enabled) window.location.reload();
++        },__('Pilot setup'));
++    }
++    function clientGrid(frm, active) {
++        const grid=frm.fields_dict?.items?.grid;
++        if(!grid?.fields_map?.custom_oman_client_description) return;
++        // CO is the display complement of the stored costing choice, including
++        // existing draft rows whose newly installed Check column starts at zero.
++        if(active) for(const row of frm.doc.items || []) {
++            row.custom_oman_use_co_description=Number(row.custom_oman_use_costing_description)?0:1;
++        }
++        const description=grid.fields_map.description;
++        grid._oman_original_description ||= {label:description.label,read_only:description.read_only};
++        grid.update_docfield_property('description','label',active?__('Item Description (Costing)'):grid._oman_original_description.label);
++        grid.update_docfield_property('description','read_only',active?1:grid._oman_original_description.read_only);
++        grid.update_docfield_property('custom_oman_client_description','hidden',active?0:1);
++        for(const field of ['custom_oman_use_costing_description','custom_oman_use_co_description']) {
++            if(grid.fields_map[field]) grid.update_docfield_property(field,'hidden',active?0:1);
++        }
++        if(!grid._oman_columns_wrapped){
++            const original=grid.setup_user_defined_columns;
++            grid.setup_user_defined_columns=function(...args){
++                const result=original.apply(this,args);
++                if(frm.__oman_client_descriptions) this.user_defined_columns=[
++                    ['custom_oman_use_costing_description',1],['description',2],
++                    ['custom_oman_use_co_description',1],['custom_oman_client_description',2],['qty',1],['rate',1],['amount',2]
++                ].map(([name,columns])=>({...this.fields_map[name],in_list_view:1,columns}));
++                return result;
++            };
++            grid._oman_columns_wrapped=true;
++        }
++        grid.reset_grid();
++    }
++    async function pdf(frm) {
++        if (frm.is_dirty()) { frappe.msgprint(__('Save the quotation before converting to PDF.')); return; }
++        const result = await call('convert_pdf',{quotation:frm.doc.name,expected_modified:String(frm.doc.modified)});
++        if (result?.file_url) window.open(result.file_url,'_blank','noopener');
++    }
++    function projectFields(data) {
++        if (!data.project_required) return [];
++        const modules=[['elv','ELV Project'],['3cx','3CX Project'],['infra','Infra Project'],['supply','Supply Only']];
++        return [
++            {fieldtype:'Section Break',label:__('Select Project Category — choose one or more')},
++            {fieldtype:'HTML',options:'<p><strong>'+__(data.project ? 'The existing linked project will be used.' : 'A project will be created automatically.')+'</strong> '+__('An AI-generated draft project plan will be prepared using the quotation and costing sheet. Please select ELV Project, 3CX Project, Infra Project or Supply Only (choose all that apply). Existing activities are retained. If AI is unavailable, the project remains created and its plan shows the action required.')+'</p>'},
++            ...modules.map(([key,label])=>({fieldtype:'Check',fieldname:'module_'+key,label:__(label),default:(data.project_modules||[]).includes(key)?1:0})),
++            ...(data.project ? [{fieldtype:'HTML',options:`<p>${__('Existing Project')}: ${frappe.utils.escape_html(data.project)}</p>`}] : [
++                {fieldtype:'Link',fieldname:'project_type',label:__('Project Type'),options:'Project Type',reqd:1},
++                {fieldtype:'Link',fieldname:'custom_project_manager',label:__('Project Manager'),options:'Employee',reqd:1},
++                {fieldtype:'Date',fieldname:'expected_start_date',label:__('Start Date'),reqd:1,default:data.required_by},
++                {fieldtype:'Date',fieldname:'expected_end_date',label:__('End Date'),reqd:1},
++                {fieldtype:'Link',fieldname:'customer',label:__('Customer'),options:'Customer',reqd:1,default:data.project_customer},
++                {fieldtype:'Small Text',fieldname:'custom_project_description',label:__('Project Description'),reqd:1,default:data.project_description},
++            ])
++        ];
++    }
++    async function statusDetails(frm, stage) {
++        const won=stage==='Won';
++        const data=won ? await call('won_context',{quotation:frm.doc.name}) : {};
++        let dialog;
++        const fields=[
++            {fieldtype:'HTML',options:won ? '<p>'+__('Won will submit the quotation, record the approved award and create one draft Purchase Requisition with the DCS, quotation and customer PO. Existing purchasing approval remains required.')+'</p>' : ''},
++            ...(won ? [
++                {fieldtype:'Data',fieldname:'customer_po_reference',label:__('Customer PO Reference'),reqd:1,default:frm.doc.custom_customer_po_reference},
++                {fieldtype:'Data',fieldname:'customer_po',label:__('Attached Customer PO'),read_only:1,reqd:1,default:frm.doc.custom_customer_po},
++                {fieldtype:'Button',fieldname:'upload_po',label:__('Upload Customer PO'),click(){
++                    new frappe.ui.FileUploader({doctype:'Quotation',docname:frm.doc.name,is_private:1,
++                        on_success(file){dialog.set_value('customer_po',file.file_url);}});
++                }},
++                {fieldtype:'Date',fieldname:'schedule_date',label:__('Required By'),reqd:1,default:data.required_by},
++                {fieldtype:'Select',fieldname:'warehouse',label:__('Target Warehouse'),options:['',...data.warehouses],reqd:data.stock_items?1:0,
++                    default:data.warehouses.length===1?data.warehouses[0]:''},
++                ...projectFields(data),
++            ] : []),
++            {fieldtype:'Small Text',fieldname:'reason',label:__('Reason'),reqd:['Lost','Cancelled','Delayed'].includes(stage)?1:0},
++        ];
++        dialog=new frappe.ui.Dialog({title:__('Mark quotation {0}',[stage]),fields,
++            primary_action_label:won?__('Confirm Won, Create Project and Send'):__('Save Status'),
++            async primary_action(values){
++                dialog.disable_primary_action();
++                try {
++                    const projectModules=['supply','elv','3cx','infra'].filter(key=>values['module_'+key]);
++                    if(won && data.project_required && !projectModules.length) {frappe.msgprint(__('Choose at least one project module.'));return;}
++                    const result=await call('change_status',{quotation:frm.doc.name,stage,expected_modified:String(frm.doc.modified),
++                        reason:values.reason,customer_po:values.customer_po,customer_po_reference:values.customer_po_reference,
++                        schedule_date:values.schedule_date,warehouse:values.warehouse,
++                        project_modules:JSON.stringify(projectModules),project_details:JSON.stringify(Object.fromEntries(
++                            ['project_type','custom_project_manager','expected_start_date','expected_end_date','customer','custom_project_description'].map(key=>[key,values[key]])))});
++                    dialog.hide();await frm.reload_doc();
++                    if(result?.requisition) frappe.msgprint(__('Purchase Requisition created: {0}',[frappe.utils.escape_html(result.requisition)]));
++                    if(result?.project) frappe.msgprint(__('Project created/linked: {0}. Open Project Plan to follow automatic planning.',[frappe.utils.escape_html(result.project)]));
++                } finally {dialog.enable_primary_action();}
++            }});
++        dialog.show();
++    }
++    frappe.ui.form.on('Quotation',{
++        async refresh(frm){
++            if(frm.is_new()) return;
++            const name=frm.doc.name;
++            const data=await call('context',{quotation:name});
++            if(frm.doc.name!==name) return;
++            installationButton(frm,data);
++            frm.__oman_quotation_pilot=!!data.enabled;
++            frm.__oman_client_descriptions=!!data.client_descriptions;
++            clientGrid(frm,frm.__oman_client_descriptions);
++            if(frm.fields_dict?.custom_oman_revision_no) frm.toggle_display('custom_oman_revision_no',!!data.enabled);
++            if(!data.enabled) return;
++            if(data.conflict){
++                frm.set_intro(__('This DCS has multiple active quotations. Review the existing quotations before saving, revising or finalising. No quotation has been merged or deleted.'),'red');
++                frm.page.clear_primary_action();
++                frm.remove_custom_button(__('Send to Procurement'));
++                return;
++            }
++            if(data.discount_before_vat && data.editable){
++                frm.set_df_property('apply_discount_on','read_only',1);
++                frm.set_df_property('apply_discount_on','description',__('Discounts are deducted from the net amount before VAT is calculated.'));
++                if(data.can_write && frm.doc.apply_discount_on!=='Net Total'){
++                    await frm.set_value('apply_discount_on','Net Total');
++                }
++            }
++            frm.set_df_property('custom_pipeline_stage','read_only',1);
++            frm.remove_custom_button(__('Download Enterprise PDF'));
++            frm.remove_custom_button(__('Send to Procurement'));
++            frm.remove_custom_button(__('Set as Lost'));
++            frm.set_intro(__('Quotation revision R{0}. DCS revisions update this same quotation. Won and Lost are locked.',[data.revision]),'blue');
++            if(data.client_descriptions) frm.set_intro(__('Choose one description per line: Use Item Description (Costing) prints the original costing wording, including any part numbers. Use CO Item Description prints your editable client wording. Choices and CO wording are retained during costing revisions.'),'blue');
++            frm.dashboard.set_headline(__('Quotation Status: {0} · R{1}',[frappe.utils.escape_html(frm.doc.custom_pipeline_stage || 'Draft'),data.revision]));
++            if(data.editable && data.can_write){
++                frm.add_custom_button(__('Revise Costing Sheet'),()=>frappe.set_route('Form','Deal Cost Sheet',frm.doc.custom_deal_cost_sheet));
++                frm.add_custom_button(__('Change Status'),()=>{
++                    if(frm.is_dirty()){frappe.msgprint(__('Save the quotation before changing status.'));return;}
++                    frappe.prompt([{fieldtype:'Select',fieldname:'stage',label:__('Status'),options:data.statuses,reqd:1}],
++                        values=>statusDetails(frm,values.stage),__('Change quotation status'),__('Continue'));
++                });
++            }
++            if(!frm.is_dirty() && data.can_print && data.ready_to_convert) frm.add_custom_button(__('Convert to PDF'),()=>pdf(frm));
++            if(data.editable && data.can_write){
++                if(frm.is_dirty() || !data.ready_to_convert) frm.page.set_primary_action(__('Save'),()=>frm.save());
++                else if(data.can_print) frm.page.set_primary_action(__('Convert to PDF'),()=>pdf(frm));
++                else frm.page.clear_primary_action();
++            }
++        }
++    });
++    async function selectDescription(frm,cdt,cdn,costing) {
++        if(!frm.__oman_client_descriptions || frm.__oman_description_selecting) return;
++        frm.__oman_description_selecting=true;
++        try {
++            await frappe.model.set_value(cdt,cdn,{
++                custom_oman_use_costing_description:costing?1:0,
++                custom_oman_use_co_description:costing?0:1
++            });
++            frm.refresh_field('items');
++            frm.remove_custom_button(__('Convert to PDF'));
++            frm.page.set_primary_action(__('Save'),()=>frm.save());
++            if(typeof window.eqa_readiness==='function') window.eqa_readiness(frm);
++        } finally {frm.__oman_description_selecting=false;}
++    }
++    frappe.ui.form.on('Quotation Item',{
++        custom_oman_use_costing_description(frm,cdt,cdn){
++            return selectDescription(frm,cdt,cdn,!!frappe.get_doc(cdt,cdn).custom_oman_use_costing_description);
++        },
++        custom_oman_use_co_description(frm,cdt,cdn){
++            return selectDescription(frm,cdt,cdn,!frappe.get_doc(cdt,cdn).custom_oman_use_co_description);
++        },
++        custom_oman_client_description(frm){
++            if(frm.__oman_client_descriptions && typeof window.eqa_readiness==='function') window.eqa_readiness(frm);
++        }
++    });
++    frappe.ui.form.on('Deal Cost Sheet',{
++        async refresh(frm){
++            if(frm.is_new()) return;
++            const name=frm.doc.name,data=await call('dcs_context',{dcs:frm.doc.name});
++            if(frm.doc.name!==name) return;
++            installationButton(frm,data);
++            if(!data.enabled) return;
++            frm.__oman_quotation_pilot=!!data.auto_sync;
++            frm.remove_custom_button(__('Create Quotation'),__('More actions'));
++            if(data.conflict){
++                frm.remove_custom_button(__('Revise BOQ'));
++                frm.set_intro(__('This DCS has multiple active quotations. Review the existing quotation links before creating, revising or finalising. No records have been changed.'),'red');
++                return;
++            }
++            if(frm.doc.docstatus===1 && !data.quotation) frm.add_custom_button(__('Create Linked Draft Quotation'),async()=>{
++                const result=await frappe.call({method:'bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet.make_quotation',args:{source_name:frm.doc.name},freeze:true});
++                if(result.message) frappe.set_route('Form','Quotation',result.message);
++            });
++            if(data.terminal) frm.remove_custom_button(__('Revise BOQ'));
++            if(data.quotation) frm.add_custom_button(__('View Linked Quotation'),()=>frappe.set_route('Form','Quotation',data.quotation));
++            if(frm.doc.docstatus===1 && data.auto_sync) frm.set_intro(data.terminal ? __('The linked quotation is Won or Lost. Costing and quotation revisions are locked.') : __('Use Revise BOQ to edit costing. The linked Draft Quotation updates automatically with revision history; no new quotation is created.'),'blue');
++        }
++    });
++})();
+diff --git a/bsgroup/public/js/oman_quotation_flow_list.js b/bsgroup/public/js/oman_quotation_flow_list.js
+new file mode 100644
+--- /dev/null
++++ b/bsgroup/public/js/oman_quotation_flow_list.js
+@@ -0,0 +1,36 @@
++// Show the business status of pilot offers while their native document is Draft.
++(() => {
++    if (!frappe.meta.has_field('Quotation','custom_oman_flow')) return;
++    const proto=frappe.views.ListView.prototype;
++    if(proto._oman_quote_indicator_installed) return;
++    proto._oman_quote_indicator_installed=true;
++    const getArgs=proto.get_args,beforeRender=proto.before_render;
++    proto.get_args=function(...args){
++        const result=getArgs.apply(this,args);
++        if(this.doctype==='Quotation') {
++            result.fields=[...(result.fields||[])];
++            for(const field of ['custom_oman_flow','custom_pipeline_stage']) {
++                const name='`tabQuotation`.`'+field+'`';
++                if(!result.fields.includes(name)) result.fields.push(name);
++            }
++        }
++        return result;
++    };
++    proto.before_render=function(...args){
++        if(this.doctype==='Quotation' && !this.settings.get_indicator?._oman_pilot){
++            const original=this.settings.get_indicator;
++            const indicator=function(row){
++                if(row.custom_oman_flow){
++                    const stage=row.custom_pipeline_stage||'Draft';
++                    const colors={Won:'green',Lost:'red',Delayed:'orange',Cancelled:'gray',Sent:'blue','Follow-up':'orange',Expired:'gray',Draft:'gray'};
++                    return [stage,colors[stage]||'gray','custom_pipeline_stage,=,'+stage];
++                }
++                return original?.call(this,row);
++            };
++            indicator._oman_pilot=true;
++            this.settings.get_indicator=indicator;
++            this.settings.has_indicator_for_draft=true;
++        }
++        return beforeRender.apply(this,args);
++    };
++})();
+diff --git a/bsgroup/bs_group/doctype/deal_cost_sheet/deal_cost_sheet.py b/bsgroup/bs_group/doctype/deal_cost_sheet/deal_cost_sheet.py
+--- a/bsgroup/bs_group/doctype/deal_cost_sheet/deal_cost_sheet.py
++++ b/bsgroup/bs_group/doctype/deal_cost_sheet/deal_cost_sheet.py
+@@ -40,6 +40,8 @@
+ 	def before_insert(self):
+ 		from bsgroup.dcs.creation import guard_creation
+ 		guard_creation(self)
++		if self.meta.has_field("workflow_state") and not self.get("workflow_state") and not frappe.db.exists("Workflow", {"document_type":"Deal Cost Sheet", "is_active":1}):
++			self.workflow_state = "Draft"
+ 		# Every insertion is a new commercial record, including Duplicate and API copies.
+ 		# Decisions and revision references belong to the original sheet's history.
+ 		from bsgroup.dcs.obligation import guard_amendment
+@@ -138,7 +140,14 @@
+ 	frappe.has_permission("Quotation", "create", throw=True)
+ 	source = frappe.get_doc("Deal Cost Sheet", source_name)
+ 	refuse_stale_quotation_source(source)
+-
++	from bsgroup.oman_quotation_flow import enabled, ensure_draft
++	if enabled():
++		return ensure_draft(source)
++	return _create_quotation(source)
++
++
++def _create_quotation(source):
++	"""Internal creation shared by the permitted action and Oman submit workflow."""
+ 	opp = frappe.db.get_value(
+ 		"Opportunity",
+ 		source.opportunity,
+diff --git a/bsgroup/api/dcs/boq_revision.py b/bsgroup/api/dcs/boq_revision.py
+--- a/bsgroup/api/dcs/boq_revision.py
++++ b/bsgroup/api/dcs/boq_revision.py
+@@ -175,7 +175,10 @@
+     return proposed, history
+ 
+ 
+-def _sync_quotation(sheet, requested):
++def _sync_quotation(sheet, requested, previous_sheet=None):
++    from bsgroup.oman_quotation_flow import enabled, pilot, sync_draft
++    if enabled() and sheet.custom_quotation and pilot(frappe.get_doc("Quotation", sheet.custom_quotation)):
++        return sync_draft(sheet, previous_sheet=previous_sheet)
+     if not requested:
+         return "Linked Quotation was not changed; review it against this revision before sending."
+     from bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet import quotation_deal_identity
+@@ -243,6 +246,10 @@
+         frappe.throw("BOQ Revision requires a submitted sheet; edit draft rows normally.")
+     if str(args.get("expected_modified") or "") != str(sheet.modified):
+         frappe.throw("The sheet has changed since the revision dialog opened. Refresh and try again.")
++    from bsgroup.oman_quotation_flow import enabled, guard_dcs_revision
++    if enabled() and guard_dcs_revision(sheet, attach=True):
++        # Adopt only an unambiguous reverse-linked Draft, inside this transaction.
++        args = dict(args, update_quotation=1)
+     if sheet.custom_award_state == "Awarded" or sheet.custom_delivery_release_state in ("Released", "Released with MD Override"):
+         frappe.throw("Reverse the award before changing its BOQ. An awarded or released scope is locked.")
+     if args.get("source") not in ["Customer", "Vendor", "Technical", "Internal"]:
+@@ -313,7 +320,7 @@
+     proposed.reload()
+     from bsgroup.dcs.quotation_control import supersede_submitted
+     supersession_changes = supersede_submitted(proposed)
+-    quotation_note = _sync_quotation(proposed, truthy_flag(args.get("update_quotation")))
++    quotation_note = _sync_quotation(proposed, truthy_flag(args.get("update_quotation")), previous_sheet=sheet)
+     changes = diff_changes(D2A_FIELDS, before, snapshot("Deal Cost Sheet", sheet.name, D2A_FIELDS), "Deal Cost Sheet", sheet.name)
+     changes += supersession_changes
+     if quote_changed and sheet.custom_quotation and not truthy_flag(args.get("update_quotation")):
+diff --git a/bsgroup/api/dcs/negotiation.py b/bsgroup/api/dcs/negotiation.py
+--- a/bsgroup/api/dcs/negotiation.py
++++ b/bsgroup/api/dcs/negotiation.py
+@@ -157,6 +157,9 @@
+ 	else:
+ 		sheet = frappe.get_doc("Deal Cost Sheet", dcs_name, for_update=True)
+ 		sheet.check_permission("write")
++		from bsgroup.oman_quotation_flow import guard_dcs_revision
++		if guard_dcs_revision(sheet):
++			return {"ok": 0, "error": "Use Revise BOQ for this managed quotation. Its items, prices and revision history must update together.", "state": {}}
+ 		from bsgroup.api.dcs.boq_revision import boq_managed
+ 		if boq_managed(sheet.name, locking=True):
+ 			return {"ok": 0, "error": "This sheet uses governed BOQ revisions. Use BOQ Revision to change item or labour rates and keep totals aligned with its rows.", "state": {}}
+diff --git a/bsgroup/utils/quotation.py b/bsgroup/utils/quotation.py
+--- a/bsgroup/utils/quotation.py
++++ b/bsgroup/utils/quotation.py
+@@ -84,6 +84,9 @@
+ 	and Won/Lost date maintenance. Server-side guard - the popup on the form
+ 	is the primary UX, this makes the rule hold for API/bench updates too,
+ 	not just the form."""
++	from bsgroup.oman_quotation_flow import validate_stage
++	if validate_stage(doc):
++		return
+ 	stage = doc.custom_pipeline_stage
+ 	previous_stage = _get_previous_pipeline_stage(doc)
+ 
+diff --git a/bsgroup/bs_group/doctype/deal_cost_sheet/deal_cost_sheet.js b/bsgroup/bs_group/doctype/deal_cost_sheet/deal_cost_sheet.js
+--- a/bsgroup/bs_group/doctype/deal_cost_sheet/deal_cost_sheet.js
++++ b/bsgroup/bs_group/doctype/deal_cost_sheet/deal_cost_sheet.js
+@@ -3586,6 +3586,7 @@
+ 
+ // Governed submitted BOQ editor. The ordinary form remains locked.
+ function dcs_boq_revision_dialog(frm, cap) {
++    var omanPilot = !!frm.__oman_quotation_pilot;
+     // Complete BOQ preparation is distinct from customer-side negotiation.
+     // The server still enforces assignment, per-line authority and approvals.
+     if (cap.can_prepare_boq) {
+@@ -3645,8 +3646,8 @@
+             {fieldtype:'Table',fieldname:'boq_resources',label:__('Labour / Resources'),fields:resourceFields,data:fields(frm.doc.resources,resourceKeys),cannot_add_rows:!cap.can_vendor_side,cannot_delete_rows:!cap.can_vendor_side,onchange:preview},
+             {fieldtype:'HTML',fieldname:'preview'},
+             {fieldtype:'Check',fieldname:'reconcile_header_adjustments',label:__('Replace earlier totals-only adjustments with this complete BOQ'),hidden:!gap || !frappe.user.has_role('Managing Director'),description:__('No hidden adjustment is carried forward. Ensure every intended cost and selling change is represented above.')},
+-            {fieldtype:'Check',fieldname:'update_quotation',label:__('Update the linked Draft Quotation from this BOQ'),description:__('Requires Quotation write permission. Only this sheet’s verified Draft Quotation may be updated; otherwise the entire revision is refused.')},
+-            {fieldtype:'Check',fieldname:'acknowledge_quote_review',label:__('Keep the existing quotation for separate review'),description:__('Required if quoted scope/selling changes and you are not updating the Draft Quotation. The sheet will return from Quoted to Submitted to Sales; Won/Lost outcomes are preserved.'),hidden:!frm.doc.custom_quotation}
++            {fieldtype:omanPilot?'HTML':'Check',fieldname:'update_quotation',label:__('Update the linked Draft Quotation from this BOQ'),options:omanPilot?'<div class="alert alert-info">'+__('The same quotation updates automatically with a new revision. No additional quotation is created. Quotation write permission remains required.')+'</div>':undefined,default:0,description:__('Requires Quotation write permission. Only this sheet’s verified Draft Quotation may be updated; otherwise the entire revision is refused.')},
++            {fieldtype:'Check',fieldname:'acknowledge_quote_review',label:__('Keep the existing quotation for separate review'),description:__('Required if quoted scope/selling changes and you are not updating the Draft Quotation. The sheet will return from Quoted to Submitted to Sales; Won/Lost outcomes are preserved.'),hidden:omanPilot||!frm.doc.custom_quotation}
+         ],
+         primary_action_label:__('Record BOQ Revision'),
+         primary_action:function (v) {
+@@ -3661,7 +3662,7 @@
+                 dcs:frm.doc.name,expected_modified:frm.doc.modified,source:v.source,reason:v.reason,
+                 technical_impact:v.technical_impact,items:clean(v.boq_items || [],itemKeys,true),
+                 resources:clean(v.boq_resources || [],resourceKeys,false),
+-                reconcile_header_adjustments:v.reconcile_header_adjustments || 0,update_quotation:v.update_quotation || 0,
++                reconcile_header_adjustments:v.reconcile_header_adjustments || 0,update_quotation:omanPilot?1:(v.update_quotation || 0),
+                 acknowledge_quote_review:v.acknowledge_quote_review || 0
+             },d);
+         }
+diff --git a/bsgroup/hooks.py b/bsgroup/hooks.py
+--- a/bsgroup/hooks.py
++++ b/bsgroup/hooks.py
+@@ -729,6 +729,10 @@
+ 
+ after_migrate.append("bsgroup.project_modules.install")
+ after_migrate.append("bsgroup.project_boq_schedule.install")
++
++# Shared quotation workflow is opt-in on each site.
++from bsgroup.quotation_workflow_hooks import configure as _quotation_workflow_hooks
++_quotation_workflow_hooks(globals())
+ _prior = doc_events["Project"].get("before_validate", [])
+ doc_events["Project"]["before_validate"] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.project_boq_schedule.validate"]
+ 
+diff --git a/bsgroup/dcs/procurement.py b/bsgroup/dcs/procurement.py
+--- a/bsgroup/dcs/procurement.py
++++ b/bsgroup/dcs/procurement.py
+@@ -289,7 +289,8 @@
+     source = po_file(q)
+     data = costing_snapshot(sheet)
+     # Render before inserting: a rendering failure cannot leave a half-created PR.
+-    quote_pdf = frappe.get_print("Quotation", q.name, as_pdf=True, no_letterhead=1)
++    from bsgroup.oman_quotation_flow import pilot, render_pdf
++    quote_pdf = render_pdf(q, no_letterhead=1) if pilot(q) else frappe.get_print("Quotation", q.name, as_pdf=True, no_letterhead=1)
+     cost_pdf = costing_pdf(data)
+     from bsgroup.project_handover import save_project, selections, sales_handover
+     selected_modules = selections(project_modules)

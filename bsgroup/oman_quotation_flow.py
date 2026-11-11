@@ -12,6 +12,8 @@ import frappe
 from frappe.utils import cint, flt, now_datetime, today
 
 OMAN_SITES = {"erp-om.k.frappe.cloud"}
+UAE_SITES = {"erp-bitssecureit.u.frappe.cloud"}
+UAE_FLAG = "bs_uae_quotation_flow"
 FLAG = "bs_oman_quotation_flow"
 SOURCE_PRINT_FORMAT = "Enterprise Quotation - Class A - OM"
 PILOT_PRINT_FORMAT = "Enterprise Quotation - Oman Pilot"
@@ -21,8 +23,33 @@ _operation = ContextVar("oman_quote_operation", default=None)
 
 
 def enabled():
-    return (getattr(frappe.local, "site", None) in OMAN_SITES
-            and cint(frappe.defaults.get_global_default(FLAG)) == 1)
+    site = getattr(frappe.local, "site", None)
+    flag = UAE_FLAG if site in UAE_SITES else FLAG if site in OMAN_SITES else None
+    return bool(flag and cint(frappe.defaults.get_global_default(flag)) == 1)
+
+
+def uae():
+    return getattr(frappe.local, "site", None) in UAE_SITES
+
+
+def setup_authorised():
+    if uae():
+        return frappe.session.user == "Administrator" or "System Manager" in frappe.get_roles()
+    return getattr(frappe.local, "site", None) in OMAN_SITES and frappe.session.user == "Administrator"
+
+
+def print_formats():
+    return ("EnterPrise Quotation 3", "Enterprise Quotation - UAE Workflow") if uae() else (SOURCE_PRINT_FORMAT, PILOT_PRINT_FORMAT)
+
+
+def active_quotes(sheet):
+    return frappe.get_all("Quotation", filters={"custom_deal_cost_sheet": sheet.name,
+        "docstatus": ["!=", 2]}, pluck="name")
+
+
+def require_single_quote(sheet):
+    if len(active_quotes(sheet)) > 1:
+        frappe.throw("This DCS has multiple active quotations. Review and resolve the existing quotation links before creating, revising or finalising a quotation. No records were changed.")
 
 
 def pilot(q):
@@ -84,7 +111,7 @@ def snapshot(q, label):
             "revision": cint(q.get("custom_oman_revision_no")), "event": label,
             "dcs_revision": q.get("custom_dcs_revision_reference"),
             "quotation": q.as_dict()}}))).insert(ignore_permissions=True)
-    q.add_comment("Info", f"Oman quotation R{cint(q.get('custom_oman_revision_no'))}: {label}")
+    q.add_comment("Info", f"Quotation R{cint(q.get('custom_oman_revision_no'))}: {label}")
 
 
 def ensure_draft(sheet):
@@ -100,6 +127,7 @@ def ensure_draft(sheet):
     name = sheet.custom_quotation or (names[0] if names else None)
     if name:
         q = frappe.get_doc("Quotation", name, for_update=True)
+        q.check_permission("read")
         if q.docstatus == 2 or q.custom_deal_cost_sheet != sheet.name or quotation_deal_identity(sheet, q):
             frappe.throw("The existing quotation link does not match this DCS. No new quotation was created.")
         if names and names[0] != name:
@@ -120,6 +148,10 @@ def dcs_submitted(doc, method=None):
 
 
 def linked_quotation(sheet, strict=False):
+    if uae() and len(active_quotes(sheet)) > 1:
+        if strict:
+            require_single_quote(sheet)
+        return None
     if sheet.custom_quotation:
         return sheet.custom_quotation
     names = frappe.get_all("Quotation", filters={"custom_deal_cost_sheet": sheet.name,
@@ -206,26 +238,31 @@ def sync_draft(sheet, previous_sheet=None):
 def validate(q, method=None):
     if not pilot(q):
         return
+    if uae():
+        sheet = frappe.get_doc("Deal Cost Sheet", q.custom_deal_cost_sheet, for_update=True)
+        require_single_quote(sheet)
+        if q.is_new() and active_quotes(sheet):
+            frappe.throw("A quotation already exists for this DCS. Open the existing quotation; use Revise Costing Sheet for changes.")
     before = q.get_doc_before_save()
     if before and before.custom_pipeline_stage in TERMINAL:
-        frappe.throw("Won and Lost pilot quotations are frozen; they cannot be edited or reopened.")
+        frappe.throw("Won and Lost quotations are frozen; they cannot be edited or reopened.")
     if q.docstatus == 2:
         frappe.throw("Use the commercial Cancelled status; native cancellation is outside the editable pilot flow.")
     action = _operation.get()
     allowed = action and action[0] == q.name
     if before and before.docstatus == 0 and q.docstatus == 1 and (not allowed or action[1] != "status"):
-        frappe.throw("Use Change Status → Won or Lost to finalise an Oman pilot quotation.")
+        frappe.throw("Use Change Status → Won or Lost to finalise an managed quotation.")
     if before and before.docstatus == 1 and not before.get("custom_oman_flow"):
         frappe.throw("Historical submitted quotations cannot be enrolled in the draft pilot.")
     if before and before.get("custom_oman_flow") and not q.get("custom_oman_flow"):
-        frappe.throw("The Oman quotation workflow flag cannot be cleared.")
+        frappe.throw("The Quotation workflow flag cannot be cleared.")
     if not before and cint(q.get("custom_oman_revision_no")):
         frappe.throw("New quotations must start at revision R0.")
     if before and cint(q.get("custom_oman_revision_no")) != cint(before.get("custom_oman_revision_no")):
         if not allowed or action[1] != "revise":
             frappe.throw("Quotation revision numbers are managed by the DCS revision service.")
     if before and q.custom_pipeline_stage != before.custom_pipeline_stage and not allowed:
-        frappe.throw("Use Change Status to preserve the Oman quotation and procurement controls.")
+        frappe.throw("Use Change Status to preserve the quotation and procurement controls.")
     q.custom_oman_flow = 1
     from bsgroup.oman_item_description import prepare
     prepare(q)
@@ -236,10 +273,10 @@ def validate_stage(q):
         return False
     stage = q.custom_pipeline_stage or "Draft"
     if stage not in STAGES:
-        frappe.throw("Invalid Oman quotation status.")
+        frappe.throw("Invalid quotation status.")
     before = q.get_doc_before_save()
     if before and before.custom_pipeline_stage in TERMINAL and before.custom_pipeline_stage != stage:
-        frappe.throw("Won and Lost quotations cannot be reopened in the Oman pilot.")
+        frappe.throw("Won and Lost quotations cannot be reopened in this workflow.")
     if stage in TERMINAL and q.docstatus != 1:
         frappe.throw("The quotation must pass native submission checks before Won or Lost is recorded.")
     if stage in {"Lost", "Cancelled", "Delayed"} and not (q.custom_lost_reason or "").strip():
@@ -260,7 +297,9 @@ def _quotation(name, write=False, lock=False):
     q = frappe.get_doc("Quotation", name, for_update=lock)
     q.check_permission("write" if write else "read")
     if not pilot(q):
-        frappe.throw("The Oman pilot applies only to new/Draft quotations and quotations created through this pilot.")
+        frappe.throw("This workflow applies only to new/Draft quotations and quotations created through this workflow.")
+    if uae() and (write or lock):
+        require_single_quote(frappe.get_doc("Deal Cost Sheet", q.custom_deal_cost_sheet))
     return q
 
 
@@ -269,7 +308,8 @@ def context(quotation):
     q = frappe.get_doc("Quotation", quotation)
     q.check_permission("read")
     if not pilot(q):
-        return {"enabled": False, "can_install": can_install()}
+        return {"enabled": False, "can_install": can_install(), "workflow_label": "UAE Quotation Workflow" if uae() else "Oman Quotation Pilot"}
+    conflict = uae() and len(active_quotes(frappe.get_doc("Deal Cost Sheet", q.custom_deal_cost_sheet))) > 1
     from bsgroup.dcs.procurement import SEND_ROLES
     can_win = frappe.session.user == "Administrator" or bool(set(frappe.get_roles()) & SEND_ROLES)
     complete = not any(d._get_missing_mandatory_fields() for d in [q] + q.get_all_children())
@@ -277,19 +317,20 @@ def context(quotation):
     client_descriptions = descriptions.managed(q)
     complete = complete and not descriptions.missing_rows(q)
     return dict(enabled=True, revision=cint(q.get("custom_oman_revision_no")),
-        editable=q.docstatus == 0 and q.custom_pipeline_stage not in TERMINAL,
+        editable=q.docstatus == 0 and q.custom_pipeline_stage not in TERMINAL and not conflict,
+        conflict=conflict,
         can_write=frappe.has_permission("Quotation", "write", doc=q),
         can_print=frappe.has_permission("Quotation", "print", doc=q),
-        ready_to_convert=complete and discount_basis_ready(q),
+        ready_to_convert=complete and discount_basis_ready(q) and not conflict,
         discount_before_vat=True,
         client_descriptions=client_descriptions,
-        can_install_descriptions=frappe.session.user == "Administrator" and (not descriptions.enabled()
+        can_install_descriptions=setup_authorised() and (not descriptions.enabled()
             or not frappe.db.exists("Custom Field", "Quotation Item-" + descriptions.COSTING)),
         can_win=can_win, statuses=[s for s in ("Sent", "Delayed", "Cancelled", "Lost", "Won") if s != "Won" or can_win])
 
 
 def can_install():
-    return getattr(frappe.local, "site", None) in OMAN_SITES and frappe.session.user == "Administrator" and not enabled()
+    return setup_authorised() and not enabled()
 
 
 @frappe.whitelist()
@@ -297,10 +338,12 @@ def dcs_context(dcs):
     sheet = frappe.get_doc("Deal Cost Sheet", dcs)
     sheet.check_permission("read")
     active = enabled()
+    conflict = bool(active and uae() and len(active_quotes(sheet)) > 1)
     name = linked_quotation(sheet) if active else sheet.custom_quotation
     q = frappe.get_doc("Quotation", name) if active and name else None
     managed = bool(q and pilot(q))
-    return dict(enabled=active, can_install=can_install(), quotation=name,
+    return dict(enabled=active, can_install=can_install(), quotation=name, conflict=conflict,
+        workflow_label="UAE Quotation Workflow" if uae() else "Oman Quotation Pilot",
         auto_sync=managed, terminal=bool(managed and q.custom_pipeline_stage in TERMINAL))
 
 
@@ -398,28 +441,31 @@ def render_pdf(q, no_letterhead=None):
     require_client_wording(q)
     if managed(q):
         q.set(PARENT, 1)
-    if not frappe.db.exists("Print Format", PILOT_PRINT_FORMAT):
-        frappe.throw("The Oman pilot print format is not installed. Ask Administrator to complete pilot setup.")
+    target_format = print_formats()[1]
+    if not frappe.db.exists("Print Format", target_format):
+        frappe.throw("The quotation workflow print format is not installed. Complete workflow setup.")
     letterhead = q.get("letter_head") or frappe.db.get_value("Letter Head", {"is_default": 1, "disabled": 0}, "name")
-    return frappe.get_print("Quotation", q.name, PILOT_PRINT_FORMAT, as_pdf=True, doc=q,
+    return frappe.get_print("Quotation", q.name, target_format, as_pdf=True, doc=q,
         letterhead=letterhead, no_letterhead=(not bool(letterhead)) if no_letterhead is None else no_letterhead)
 
 
 def install_print_format():
     # Clone the live approved format; retain all readiness checks, branding,
     # margins and generator settings. Historical offers keep the original.
-    if frappe.db.exists("Print Format", PILOT_PRINT_FORMAT):
+    source_format, target_format = print_formats()
+    if frappe.db.exists("Print Format", target_format):
         return
-    source = frappe.get_doc("Print Format", SOURCE_PRINT_FORMAT)
+    source = frappe.get_doc("Print Format", source_format)
     if source.doc_type != "Quotation" or source.disabled:
-        frappe.throw("The approved Oman Enterprise quotation format must be enabled before pilot setup.")
+        frappe.throw("The approved Enterprise quotation format must be enabled before pilot setup.")
     old_revision = '{%- set rev = doc.name.split("-")|last if doc.amended_from else "0" -%}'
     old_row = '+ ([("Revision", rev)] if doc.amended_from else [])'
     if (source.html or "").count(old_revision) != 1 or source.html.count(old_row) != 1:
-        frappe.throw("The Oman Enterprise template revision layout changed. Review it before enabling the pilot.")
+        frappe.throw("The Enterprise template revision layout changed. Review it before enabling the pilot.")
     target = frappe.copy_doc(source)
-    target.name = PILOT_PRINT_FORMAT
+    target.name = target_format
     target.standard = "No"
+    target.custom_format = 1
     target.html = source.html.replace(old_revision,
         '{%- set rev = (doc.get("custom_oman_revision_no") or 0) if doc.get("custom_oman_flow") or doc.docstatus == 0 else (doc.name.split("-")|last if doc.amended_from else "0") -%}')
     target.html = target.html.replace(old_row,
@@ -430,6 +476,8 @@ def install_print_format():
 def install_pdf_action():
     # Preserve the site's readiness diagnostics; replace only its old PDF button
     # for pilot forms, whose Save/Convert action archives the actual revision.
+    if uae():
+        return
     name = "Quotation Readiness - Class A OM"
     if not frappe.db.exists("Client Script", name):
         return
@@ -446,11 +494,11 @@ def install_pdf_action():
 
 @frappe.whitelist(methods=["POST"])
 def install():
-    if getattr(frappe.local, "site", None) not in OMAN_SITES or frappe.session.user != "Administrator":
-        frappe.throw("Only Administrator on the Oman site can enable this pilot.", frappe.PermissionError)
+    if not setup_authorised():
+        frappe.throw("Workflow setup requires the site's authorised administrator.", frappe.PermissionError)
     from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
     create_custom_fields({"Quotation": [
-        dict(fieldname="custom_oman_flow", label="Oman quotation pilot", fieldtype="Check", read_only=1, hidden=1),
+        dict(fieldname="custom_oman_flow", label="Managed quotation workflow", fieldtype="Check", read_only=1, hidden=1),
         dict(fieldname="custom_oman_revision_no", label="Quotation Revision", fieldtype="Int", default="0", read_only=1),
     ]})
     from frappe.custom.doctype.property_setter.property_setter import make_property_setter
@@ -459,6 +507,9 @@ def install():
         make_property_setter("Quotation", "custom_pipeline_stage", "options", "\n".join(options + ["Delayed"]), "Text")
     install_print_format()
     install_pdf_action()
-    frappe.defaults.set_global_default(FLAG, 1)
+    frappe.defaults.set_global_default(UAE_FLAG if uae() else FLAG, 1)
+    if uae():
+        from bsgroup.oman_item_description import install as install_descriptions
+        install_descriptions()
     frappe.clear_cache()
     return dict(enabled=True, site=frappe.local.site, roles_changed=False, historical_submitted_quotes_changed=False)

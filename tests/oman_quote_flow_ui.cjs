@@ -24,6 +24,9 @@ async function form(data,{dirty=false,doctype='Quotation',fresh=false,withGrid=f
  r=await form({enabled:true,editable:false,can_write:true,can_print:true});assert(!r.buttons.has('Change Status'));assert(!r.buttons.has('Revise Costing Sheet'));
  r=await form({enabled:true,editable:true,can_write:false,can_print:false});assert.equal(r.buttons.size,0);assert.deepEqual(r.primary,[]);
  r=await form({enabled:true,quotation:'Q1'},{doctype:'Deal Cost Sheet'});assert(r.buttons.has('View Linked Quotation'));assert(r.calls.some(c=>Array.isArray(c)&&c[1]==='Create Quotation'));
+ r=await form({enabled:true,conflict:true,editable:false,can_write:true,can_print:true});assert.equal(r.buttons.size,0);assert.deepEqual(r.primary,['clear']);
+ r=await form({enabled:true,conflict:true},{doctype:'Deal Cost Sheet'});assert(!r.buttons.has('Create Linked Draft Quotation'));assert(r.calls.some(c=>Array.isArray(c)&&c[1]==='Revise BOQ'));
+ r=await form({enabled:true,quotation:null},{doctype:'Deal Cost Sheet'});assert(r.buttons.has('Create Linked Draft Quotation'));
  r=await form({enabled:true,editable:true,can_write:true,can_print:true,client_descriptions:true},{withGrid:true});
  assert.equal(r.grid.fields_map.description.label,'Item Description (Costing)');assert.equal(r.grid.fields_map.description.read_only,1);
  assert.equal(r.frm.doc.items[0].custom_oman_use_co_description,1);assert.equal(r.frm.doc.items[1].custom_oman_use_co_description,0);

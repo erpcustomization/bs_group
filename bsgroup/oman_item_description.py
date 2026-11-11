@@ -217,16 +217,17 @@ def _readiness_v2(script):
 
 @frappe.whitelist(methods=["POST"])
 def install():
-    from bsgroup.oman_quotation_flow import OMAN_SITES, PILOT_PRINT_FORMAT, SOURCE_PRINT_FORMAT
-    if frappe.local.site not in OMAN_SITES or frappe.session.user != "Administrator":
-        frappe.throw("Only Administrator on Oman can enable CO Item Descriptions.", frappe.PermissionError)
-    if not frappe.db.exists("Print Format", PILOT_PRINT_FORMAT):
+    from bsgroup.oman_quotation_flow import print_formats, setup_authorised, uae
+    source_format, target_format = print_formats()
+    if not setup_authorised():
+        frappe.throw("CO Item Description setup requires the site's authorised administrator.", frappe.PermissionError)
+    if not frappe.db.exists("Print Format", target_format):
         frappe.throw("Complete the existing Oman quotation pilot setup first.")
     # Validate live templates before any schema/configuration mutation.
-    formats = [frappe.get_doc("Print Format", name) for name in (PILOT_PRINT_FORMAT, SOURCE_PRINT_FORMAT)]
+    formats = [frappe.get_doc("Print Format", name) for name in ((target_format,) if uae() else (target_format, source_format))]
     rendered = [(fmt, print_html(fmt.html)) for fmt in formats]
-    script = frappe.get_doc("Client Script", "Quotation Readiness - Class A OM")
-    code = readiness_script(script.script)
+    script = None if uae() else frappe.get_doc("Client Script", "Quotation Readiness - Class A OM")
+    code = readiness_script(script.script) if script else None
     from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
     create_custom_fields({"Quotation": [dict(fieldname=PARENT, label="Client description mode",
         fieldtype="Check", hidden=1, read_only=1, print_hide=1, no_copy=1)],
@@ -248,7 +249,7 @@ def install():
         if fmt.html != html:
             fmt.html = html
             fmt.save(ignore_permissions=True)
-    if script.script != code:
+    if script and script.script != code:
         script.script = code
         script.save(ignore_permissions=True)
     frappe.defaults.set_global_default(FLAG, 1)

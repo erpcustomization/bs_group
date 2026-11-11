@@ -80,9 +80,9 @@ class DescriptionTests(unittest.TestCase):
   self.assertIn('else (row.description or row.item_name or "")',html)
  def test_changed_print_layout_is_refused(self):
   with self.assertRaisesRegex(ValidationError,'print layout changed'):desc.print_html('new unknown template')
- def test_setup_cannot_run_for_sales_or_uae(self):
+ def test_setup_cannot_run_for_sales_or_unrelated_site(self):
   with self.assertRaises(ValidationError):desc.install()
-  frappe.session.user='Administrator';frappe.local.site='erp-bitssecureit.u.frappe.cloud'
+  frappe.session.user='Administrator';frappe.local.site='unrelated.example.com'
   with self.assertRaises(ValidationError):desc.install()
 
 if __name__=='__main__':unittest.main(verbosity=2)
