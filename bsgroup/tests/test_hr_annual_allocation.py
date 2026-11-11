@@ -46,6 +46,16 @@ class AnnualAllocationTests(unittest.TestCase):
         for value in [-1, 26.01, 30, 'nan', 'Infinity', 'bad', None]:
             with self.assertRaises(ValueError): self.m.allocation_days(value)
 
+    def test_oman_keeps_native_policy_and_never_copies_uae_cap(self):
+        self.f.conf = {'host_name': 'https://erp-om.bitssecureit.com'}
+        self.f.get_cached_value = Mock(return_value=30)
+        self.assertEqual(self.m.allocation_limit(), 30)
+        self.assertEqual(self.m.allocation_days(30), 30)
+        with self.assertRaisesRegex(ValueError, '30'): self.m.allocation_days(30.01)
+        self.f.get_cached_value.return_value = 0
+        self.assertIsNone(self.m.allocation_limit())
+        self.assertEqual(self.m.allocation_days(35), 35)
+
     def test_guard_and_document_permission_precede_mutation(self):
         self.guard.side_effect = PermissionError()
         with self.assertRaises(PermissionError): self.m.save('LAL', 26, 'version-1', 'Cap')

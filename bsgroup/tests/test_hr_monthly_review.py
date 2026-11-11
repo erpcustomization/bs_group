@@ -84,6 +84,15 @@ class MonthlyHRReviewTests(unittest.TestCase):
     def test_empty_scope_keeps_automatic_sending_disabled(self):
         r=self.m.report('2026-11');self.assertEqual(r['employees'],[]);self.assertFalse(r['automation_enabled'])
 
+    def test_oman_without_allocation_never_uses_uae_reference(self):
+        native=types.ModuleType('hrms.hr.doctype.leave_application.leave_application')
+        native.get_leave_details=lambda *a: {'leave_allocation': {}}
+        oman=types.ModuleType('bsgroup.hr_oman');oman.is_oman=lambda:True
+        with patch.dict(sys.modules, {'hrms.hr.doctype.leave_application.leave_application':native,
+                'bsgroup.hr_oman':oman, 'bsgroup.dashboard_leave_balance':None}):
+            result=self.m._annual(types.SimpleNamespace(name='OM-1',user_id='test'),self.day,[])
+        self.assertEqual(result['source'],'unavailable')
+
     def test_holiday_assignment_changes_are_date_effective(self):
         rows=[dict(assigned_to='UAE',from_date='2026-01-01',holiday_list='company'),
               dict(assigned_to='staff',from_date='2026-11-01',holiday_list='old'),

@@ -9,13 +9,26 @@ ANNUAL = 'Annual Vacation'
 LIMIT = 26
 
 
+def allocation_limit():
+    # The UAE-specific 26-day decision must not replace Oman's HR policy.
+    from urllib.parse import urlparse
+    host = urlparse((getattr(frappe, 'conf', None) or {}).get('host_name') or '').hostname
+    site = getattr(getattr(frappe, 'local', None), 'site', None)
+    if host in {'erp-om.bitssecureit.com', 'erp-om.k.frappe.cloud'} or site == 'erp-om.k.frappe.cloud':
+        native = flt(frappe.get_cached_value('Leave Type', ANNUAL, 'max_leaves_allowed'))
+        return native if native > 0 else None
+    return LIMIT
+
+
 def allocation_days(value):
     try:
         days = Decimal(str(value))
     except (InvalidOperation, ValueError):
         frappe.throw('Enter a valid number of annual-leave days.')
-    if not days.is_finite() or days < 0 or days > LIMIT:
-        frappe.throw('Annual-leave allocation must be between 0 and 26 days, including carried-forward days.')
+    limit = allocation_limit()
+    if not days.is_finite() or days < 0 or (limit is not None and days > Decimal(str(limit))):
+        message = f'between 0 and {limit:g} days' if limit is not None else 'a non-negative number of days'
+        frappe.throw(f'Annual-leave allocation must be {message}, including carried-forward days.')
     return float(days)
 
 
@@ -52,7 +65,7 @@ def context(employee, date=None):
     draft = frappe.new_doc('Leave Allocation')
     draft.employee, draft.company, draft.leave_type = emp.name, emp.company, ANNUAL
     return dict(employee=emp.name, employee_name=emp.employee_name, company=emp.company,
-                allocations=rows, limit=LIMIT, can_create=frappe.has_permission('Leave Allocation', 'create', doc=draft), date=at)
+                allocations=rows, limit=allocation_limit(), can_create=frappe.has_permission('Leave Allocation', 'create', doc=draft), date=at)
 
 
 @frappe.whitelist(methods=['POST'])

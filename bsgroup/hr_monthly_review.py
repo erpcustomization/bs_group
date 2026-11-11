@@ -125,6 +125,10 @@ def _annual(employee, at, restricted):
         return dict(source='hrms',allocated=flt(allocation.get('total_leaves')),balance=balance,
                     available=max(0,balance-pending),pending=pending,
                     used_in_allocation=flt(allocation.get('leaves_taken')),as_of=str(at))
+    # Oman's balances come only from its native HRMS; UAE imports are not a source.
+    from bsgroup.hr_oman import is_oman
+    if is_oman():
+        return dict(source='unavailable',note='No annual-leave allocation for this date.')
     # Imported negative/unknown values remain visible only with access to the private source.
     from bsgroup.dashboard_leave_balance import SOURCE_FILE_ID, imported_reference
     if employee.user_id and frappe.has_permission('File','read',doc=SOURCE_FILE_ID):

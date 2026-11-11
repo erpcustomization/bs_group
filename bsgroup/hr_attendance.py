@@ -55,6 +55,7 @@ def calendar_days(start, end, logs, leaves, attendance, requests, today):
 @frappe.whitelist()
 def month_view(month, employee=None):
     _guard()
+    from bsgroup.hr_oman import is_oman
     start, end = month_bounds(month)
     if not frappe.has_permission("Employee", "read"):
         frappe.throw("Employee records are restricted by your existing access.", frappe.PermissionError)
@@ -82,7 +83,7 @@ def month_view(month, employee=None):
                      "half_day", "half_day_date"], overlap, restricted)
     return dict(employees=employees, employee=employee, company=emp.company, today=nowdate(),
                 days=calendar_days(start, end, logs, leaves, attendance, requests, nowdate()),
-                repair_mithun=employee == "1047" and str(start) == "2026-11-01" and
+                repair_mithun=not is_oman() and employee == "1047" and str(start) == "2026-11-01" and
                     "System Manager" in frappe.get_roles() and any(
                         r.name in ("HR-ATT-2026-03642", "HR-ATT-2026-03658") and r.docstatus == 1
                         for r in attendance),
@@ -145,6 +146,9 @@ MITHUN_REPAIR = (
 def repair_mithun_november():
     """Cancel/amend erroneous absences using native validation and original punches."""
     frappe.only_for("System Manager")
+    from bsgroup.hr_oman import is_oman
+    if is_oman():
+        frappe.throw('This historical UAE correction is not available on the Oman site.')
     from frappe.utils import getdate, get_datetime
     frappe.db.get_value("Employee", "1047", "name", for_update=True)
     shift = frappe.get_doc("Shift Type", "General - UAE")

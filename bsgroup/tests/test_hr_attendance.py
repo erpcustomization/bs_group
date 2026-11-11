@@ -51,6 +51,14 @@ class HRCalendarTests(unittest.TestCase):
         self.assertEqual(self.m.month_bounds('2026-12'),(date(2026,12,1),date(2027,1,1)))
         with self.assertRaises(ValueError): self.m.month_bounds('2026-13')
 
+    def test_oman_rejects_historical_uae_repair_before_reading_records(self):
+        oman=types.ModuleType('bsgroup.hr_oman');oman.is_oman=lambda:True
+        self.f.only_for=Mock()
+        with patch.dict(sys.modules, {'bsgroup.hr_oman':oman}):
+            with self.assertRaisesRegex(ValueError, 'not available on the Oman site'):
+                self.m.repair_mithun_november()
+        self.f.get_doc.assert_not_called()
+
     def test_calendar_keeps_all_punches_and_does_not_turn_manual_present_into_punch(self):
         result=self.m.calendar_days(date(2026,11,1),date(2026,12,1),
             [dict(name='out',time='2026-11-02 18:00:00',log_type='OUT'),dict(name='in',time='2026-11-02 09:00:00',log_type='IN')],[],

@@ -747,3 +747,7 @@ after_migrate.append("bsgroup.project_ai_plan.install")
 # Oman-only, explicitly enabled HR sending; no change to other mail routes.
 from bsgroup.hr_email import configure_hooks as _hr_email_hooks
 _hr_email_hooks(globals())
+
+# Oman HR feature parity uses native local leave policy and existing access.
+from bsgroup.hr_oman import configure_hooks as _hr_oman_hooks
+_hr_oman_hooks(globals())
