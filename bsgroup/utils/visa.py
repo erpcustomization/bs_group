@@ -71,5 +71,4 @@ def send_visa_status_email(employee, status):
             "Please contact HR to begin the renewal process.<br><br>Regards,<br>HR Team"
         )
 
-    frappe.sendmail(recipients=[recipient], subject=subject, message=message, now=False,
-                    reference_doctype="Employee", reference_name=employee.name)
+    frappe.sendmail(recipients=[recipient], subject=subject, message=message, now=False)

@@ -81,8 +81,6 @@ def send_login_details(employee):
 		recipients=[doc.user_id],
 		subject=_("Your Account Login Details"),
 		message=message,
-		reference_doctype="Employee",
-		reference_name=doc.name,
 		now=True,
 	)
 

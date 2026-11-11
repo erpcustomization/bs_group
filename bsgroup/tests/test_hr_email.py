@@ -123,10 +123,12 @@ class HREmailTests(unittest.TestCase):
         before = dict(q)
         self.m.route_queue(q)
         self.assertEqual(q, before)
-        namespace = {"__name__": "hrms.hr.doctype.leave_application.leave_application", "route": self.m.route_queue}
-        exec("def send(q):\n    route(q)", namespace)
-        namespace["send"](q)
-        self.assertEqual(q.email_account, "HR Notifications")
+        for module in ("hrms.hr.doctype.leave_application.leave_application", "bsgroup.utils.employee", "bsgroup.utils.visa"):
+            q = self.queue(None)
+            namespace = {"__name__": module, "route": self.m.route_queue}
+            exec("def send(q):\n    route(q)", namespace)
+            namespace["send"](q)
+            self.assertEqual(q.email_account, "HR Notifications")
 
     def test_enabling_and_disabling_restores_native_hr_reminder_senders(self):
         old = Doc(custom_bs_hr_email_enabled=0)

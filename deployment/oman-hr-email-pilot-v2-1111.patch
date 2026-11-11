@@ -1,0 +1,167 @@
+diff --git a/bsgroup/hr_email.py b/bsgroup/hr_email.py
+new file mode 100644
+index 0000000..129dd64
+--- /dev/null
++++ b/bsgroup/hr_email.py
+@@ -0,0 +1,152 @@
++"""Opt-in Oman HR sender routing. Never changes default or incoming accounts."""
++import inspect
++import json
++from email.parser import Parser
++from email.policy import SMTP
++from email.utils import formataddr
++from urllib.parse import urlparse
++
++import frappe
++
++OMAN_HOSTS = {"erp-om.bitssecureit.com", "erp-om.k.frappe.cloud"}
++OMAN_EMAIL = "hr-notifications-om@bitssecureit.com"
++CUSTOM_HR_TYPES = {"HR Service Request", "HR Warning"}
++
++
++def is_oman():
++    host = urlparse(frappe.conf.get("host_name") or "").hostname
++    return host in OMAN_HOSTS or getattr(frappe.local, "site", None) in OMAN_HOSTS
++
++
++def hr_document(doctype, name=None, depth=0):
++    if not doctype or depth > 3:
++        return False
++    if doctype in CUSTOM_HR_TYPES:
++        return True
++    if doctype in ("Communication", "Notification Log") and name:
++        fields = (["reference_doctype", "reference_name"] if doctype == "Communication"
++                  else ["document_type", "document_name"])
++        ref = frappe.db.get_value(doctype, name, fields)
++        return bool(ref and hr_document(*ref, depth=depth + 1))
++    module = frappe.get_cached_value("DocType", doctype, "module")
++    return module in ("HR", "Payroll")
++
++
++def hr_origin():
++    """Legacy HRMS leave/reminder calls omit document references.
++
++    Inspect code-module names only, never message text, recipient identity or
++    frame locals. Reference-bearing non-HR mail is excluded before this call.
++    Native HR reminder Sender settings also cover separately queued bulk mail.
++    """
++    frame = inspect.currentframe()
++    try:
++        for _ in range(60):
++            frame = frame.f_back
++            if frame is None:
++                break
++            module = frame.f_globals.get("__name__", "")
++            if module.startswith(("hrms.hr.", "hrms.payroll.")) or module in (
++                    "hrms.controllers.employee_reminders", "bsgroup.utils.employee", "bsgroup.utils.visa"):
++                return True
++        return False
++    finally:
++        del frame
++
++
++def configured_account():
++    if not is_oman():
++        return None
++    settings = frappe.get_cached_doc("HR Settings")
++    if not settings.get("custom_bs_hr_email_enabled"):
++        return None
++    account = frappe.get_cached_doc("Email Account", settings.custom_bs_hr_email_account)
++    validate_account(account)
++    return account
++
++
++def validate_account(account):
++    if (account.email_id != OMAN_EMAIL or not account.enable_outgoing
++            or account.default_outgoing or account.enable_incoming):
++        frappe.throw("The Oman HR sender must be the enabled, non-default, outgoing-only Oman HR mailbox.")
++
++
++def route_queue(doc, method=None):
++    # Only new mail; historical and retry queues retain their original route.
++    if not is_oman():
++        return
++    doctype, name = doc.get("reference_doctype"), doc.get("reference_name")
++    if not doctype and doc.get("communication"):
++        doctype, name = "Communication", doc.communication
++    if not (hr_document(doctype, name) if doctype else hr_origin()):
++        return
++    account = configured_account()
++    if not account:
++        return
++    # Preserve MIME parts, attachments, recipient lists, subject, message ID and
++    # Reply-To (daily work summaries rely on their existing reply collection).
++    message = Parser(policy=SMTP.clone(refold_source="none")).parsestr(doc.message)
++    sender = formataddr(("HR Oman", account.email_id))
++    if "From" in message:
++        message.replace_header("From", sender)
++    else:
++        message["From"] = sender
++    for header in ("Sender", "Return-Path"):
++        if header in message:
++            message.replace_header(header, sender if header == "Sender" else account.email_id)
++    doc.sender = sender
++    doc.email_account = account.name
++    doc.message = message.as_string()
++    if doc.get("communication") and frappe.db.exists("Communication", doc.communication):
++        frappe.db.set_value("Communication", doc.communication,
++                            {"sender": account.email_id, "sender_full_name": "HR Oman"}, update_modified=False)
++
++
++def validate_settings(doc, method=None):
++    old = doc.get_doc_before_save()
++    fields = ("custom_bs_hr_email_enabled", "custom_bs_hr_email_account")
++    if old and any(old.get(f) != doc.get(f) for f in fields):
++        frappe.only_for("System Manager")
++    native = ("sender", "sender_email", "hiring_sender", "hiring_sender_email")
++    if not doc.get("custom_bs_hr_email_enabled"):
++        if old and old.get("custom_bs_hr_email_enabled"):
++            saved = json.loads(old.get("custom_bs_hr_email_previous_senders") or "{}")
++            for field in native:
++                if doc.get(field) in (old.get("custom_bs_hr_email_account"), OMAN_EMAIL):
++                    doc.set(field, saved.get(field))
++            doc.custom_bs_hr_email_previous_senders = None
++        return
++    if not is_oman():
++        frappe.throw("HR email routing is currently an Oman-only pilot.")
++    validate_account(frappe.get_doc("Email Account", doc.custom_bs_hr_email_account))
++    if not old or not old.get("custom_bs_hr_email_enabled"):
++        doc.custom_bs_hr_email_previous_senders = json.dumps({f: doc.get(f) for f in native})
++    # Native sender settings ensure reminders retain the route in bulk jobs.
++    doc.sender = doc.hiring_sender = doc.custom_bs_hr_email_account
++    doc.sender_email = doc.hiring_sender_email = OMAN_EMAIL
++
++
++def install():
++    if not is_oman():
++        return
++    from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
++    definitions = [
++        dict(fieldname="custom_bs_hr_email_section", label="HR Email Routing", fieldtype="Section Break", insert_after="hiring_sender_email"),
++        dict(fieldname="custom_bs_hr_email_account", label="HR Outgoing Email Account", fieldtype="Link", options="Email Account", insert_after="custom_bs_hr_email_section"),
++        dict(fieldname="custom_bs_hr_email_enabled", label="Use Oman HR sender for HR emails", fieldtype="Check", default="0", insert_after="custom_bs_hr_email_account",
++             description="HR emails use the Oman mailbox. Default and incoming mail accounts are unchanged. Existing recipients and reply handling are preserved."),
++        dict(fieldname="custom_bs_hr_email_previous_senders", label="Previous HR Senders", fieldtype="Small Text", hidden=1, read_only=1, insert_after="custom_bs_hr_email_enabled"),
++    ]
++    meta = frappe.get_meta("HR Settings")
++    missing = [d for d in definitions if not meta.has_field(d["fieldname"])]
++    if missing:
++        create_custom_fields({"HR Settings": missing}, update=False)
++
++
++def configure_hooks(hooks):
++    hooks.setdefault("after_migrate", []).append("bsgroup.hr_email.install")
++    for doctype, event, method in (("Email Queue", "before_insert", "route_queue"),
++                                   ("HR Settings", "validate", "validate_settings")):
++        mapping = hooks.setdefault("doc_events", {}).setdefault(doctype, {})
++        prior = mapping.get(event, [])
++        mapping[event] = ([prior] if isinstance(prior, str) else list(prior)) + ["bsgroup.hr_email." + method]
+diff --git a/bsgroup/hooks.py b/bsgroup/hooks.py
+--- a/bsgroup/hooks.py
++++ b/bsgroup/hooks.py
+@@ -711,3 +711,5 @@
+ from bsgroup.quotation_numbering import configure_hooks as _quotation_numbering_hooks
+ _quotation_numbering_hooks(globals())
++from bsgroup.hr_email import configure_hooks as _hr_email_hooks
++_hr_email_hooks(globals())
+ override_whitelisted_methods["frappe.desk.form.assign_to.add"] = "bsgroup.lead_assignment.assign"

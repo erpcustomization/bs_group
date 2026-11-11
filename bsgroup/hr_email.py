@@ -46,7 +46,8 @@ def hr_origin():
             if frame is None:
                 break
             module = frame.f_globals.get("__name__", "")
-            if module.startswith(("hrms.hr.", "hrms.payroll.")) or module == "hrms.controllers.employee_reminders":
+            if module.startswith(("hrms.hr.", "hrms.payroll.")) or module in (
+                    "hrms.controllers.employee_reminders", "bsgroup.utils.employee", "bsgroup.utils.visa"):
                 return True
         return False
     finally:
@@ -140,3 +141,12 @@ def install():
     missing = [d for d in definitions if not meta.has_field(d["fieldname"])]
     if missing:
         create_custom_fields({"HR Settings": missing}, update=False)
+
+
+def configure_hooks(hooks):
+    hooks.setdefault("after_migrate", []).append("bsgroup.hr_email.install")
+    for doctype, event, method in (("Email Queue", "before_insert", "route_queue"),
+                                   ("HR Settings", "validate", "validate_settings")):
+        mapping = hooks.setdefault("doc_events", {}).setdefault(doctype, {})
+        prior = mapping.get(event, [])
+        mapping[event] = ([prior] if isinstance(prior, str) else list(prior)) + ["bsgroup.hr_email." + method]
