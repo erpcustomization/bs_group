@@ -42,3 +42,5 @@ def configure_hooks(hooks):
     events = hooks.setdefault('doc_events', {}).setdefault('Leave Allocation', {})
     for event in ('validate', 'before_update_after_submit'):
         append(events, event, 'bsgroup.hr_annual_allocation.validate_allocation')
+    cron = hooks.setdefault('scheduler_events', {}).setdefault('cron', {})
+    append(cron, '* * * * *', 'bsgroup.oman_attendance_email.send_reminders')

@@ -252,7 +252,13 @@ def report(month, employee=None):
             leave_taken=round(leave_total,2) if 'Leave Application' not in restricted else None,
             totals={k:total(k) for k in ('scheduled_minutes','expected_due_minutes','office_minutes','after_minutes','after_day','late_minutes','late_day','hr_absent','missing_checkin')},
             review_days=sum(bool(d['flags']) for d in daily if not d['future']),days=daily))
+    from bsgroup.hr_oman import is_oman
+    checkin_emails = None
+    if is_oman() and 'System Manager' in frappe.get_roles():
+        checkin_emails = dict(enabled=bool(frappe.get_cached_doc('HR Settings').get('custom_bs_oman_checkin_email')),
+            url='/api/method/bsgroup.oman_attendance_email.page')
     return dict(month=month,as_of=now.isoformat(),employees=results,restricted=sorted(set(restricted)),
+                checkin_emails=checkin_emails,
                 rules=PROPOSED_RULES,automation_enabled=False,
                 can_warning=frappe.has_permission('HR Warning','create'),
                 can_request=frappe.has_permission('HR Service Request','create'),

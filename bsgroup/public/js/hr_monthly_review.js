@@ -103,7 +103,8 @@ window.bsHRMonthlyReview=async function(main){
         $('<label>Employee</label>').append($('<input class="form-control input-sm" type="search" aria-label="Find employee in monthly review" placeholder="Name or employee ID">').val(search).on('input',function(){search=this.value;drawRows();})).appendTo(controls);
         $('<button class="btn btn-default btn-sm">').text('Refresh report').on('click',load).appendTo(controls);
         $('<button class="btn btn-default btn-sm">').text('Review proposed automatic rules').on('click',rules).appendTo(controls);
-        $('<p class="hrm-muted">').text(`Automatic sending: awaiting approval · Data as of ${data.as_of?.slice(0,19).replace('T',' ')} Gulf Standard Time (UTC+4).`).appendTo(root);
+        if(data.checkin_emails) $('<a class="btn btn-default btn-sm">').text(`Daily check-in emails: ${data.checkin_emails.enabled?'Enabled':'Disabled'}`).attr('href',data.checkin_emails.url).appendTo(controls);
+        $('<p class="hrm-muted">').text(`Monthly review rule emails: awaiting approval · Data as of ${data.as_of?.slice(0,19).replace('T',' ')} Gulf Standard Time (UTC+4).`).appendTo(root);
         if(data.restricted.length)$('<p class="hr-review-note">').text('Restricted sources: '+data.restricted.join(', ')+'. A dash means unavailable, not zero.').appendTo(root);
         $('<div class="hr-review-count">').appendTo(root);
         const panel=$('<section class="hrm-panel"><div class="hrm-table-wrap"><table class="hrm-table hr-review-table"><thead><tr><th>Employee / details</th><th>Annual allocated / available</th><th>Leave taken this month</th><th>HR absent days</th><th>Late days / time</th><th>Scheduled hours — full month</th><th>Expected hours due</th><th>Recorded office hours</th><th>After 6 PM days / hours</th><th>Missing check-in / review</th></tr></thead><tbody></tbody></table></div></section>').appendTo(root);

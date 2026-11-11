@@ -1,0 +1,323 @@
+diff --git a/bsgroup/hr_monthly_review.py b/bsgroup/hr_monthly_review.py
+index d9d2268..6fed8d2 100644
+--- a/bsgroup/hr_monthly_review.py
++++ b/bsgroup/hr_monthly_review.py
+@@ -252,7 +252,13 @@ def report(month, employee=None):
+             leave_taken=round(leave_total,2) if 'Leave Application' not in restricted else None,
+             totals={k:total(k) for k in ('scheduled_minutes','expected_due_minutes','office_minutes','after_minutes','after_day','late_minutes','late_day','hr_absent','missing_checkin')},
+             review_days=sum(bool(d['flags']) for d in daily if not d['future']),days=daily))
++    from bsgroup.hr_oman import is_oman
++    checkin_emails = None
++    if is_oman() and 'System Manager' in frappe.get_roles():
++        checkin_emails = dict(enabled=bool(frappe.get_cached_doc('HR Settings').get('custom_bs_oman_checkin_email')),
++            url='/api/method/bsgroup.oman_attendance_email.page')
+     return dict(month=month,as_of=now.isoformat(),employees=results,restricted=sorted(set(restricted)),
++                checkin_emails=checkin_emails,
+                 rules=PROPOSED_RULES,automation_enabled=False,
+                 can_warning=frappe.has_permission('HR Warning','create'),
+                 can_request=frappe.has_permission('HR Service Request','create'),
+diff --git a/bsgroup/hr_oman.py b/bsgroup/hr_oman.py
+index 8dcb244..9b19095 100644
+--- a/bsgroup/hr_oman.py
++++ b/bsgroup/hr_oman.py
+@@ -42,3 +42,5 @@ def configure_hooks(hooks):
+     events = hooks.setdefault('doc_events', {}).setdefault('Leave Allocation', {})
+     for event in ('validate', 'before_update_after_submit'):
+         append(events, event, 'bsgroup.hr_annual_allocation.validate_allocation')
++    cron = hooks.setdefault('scheduler_events', {}).setdefault('cron', {})
++    append(cron, '* * * * *', 'bsgroup.oman_attendance_email.send_reminders')
+diff --git a/bsgroup/oman_attendance_email.py b/bsgroup/oman_attendance_email.py
+new file mode 100644
+index 0000000..1e16532
+--- /dev/null
++++ b/bsgroup/oman_attendance_email.py
+@@ -0,0 +1,275 @@
++"""Opt-in Oman check-in reminders. No attendance, pay or warning decisions."""
++from datetime import date, datetime, time, timedelta
++from email.utils import formataddr
++from hashlib import sha256
++from html import escape
++from zoneinfo import ZoneInfo
++
++import frappe
++from frappe.utils import getdate, to_timedelta
++
++from bsgroup.hr_email import configured_account, OMAN_EMAIL
++from bsgroup.hr_oman import is_oman
++
++TZ = ZoneInfo('Asia/Muscat')
++COMPANY = 'Bits Secure IT Infrastructure LLC - OM'
++START_DATE = date(2026, 11, 12)
++METHOD = 'bsgroup.oman_attendance_email.send_reminders'
++ENABLED = 'custom_bs_oman_checkin_email'
++SUBJECT = 'Attendance reminder — please check in'
++
++
++def shift_window(day, shift):
++    start = datetime.combine(day, time(), TZ) + to_timedelta(shift.start_time)
++    end = datetime.combine(day, time(), TZ) + to_timedelta(shift.end_time)
++    if end <= start:
++        end += timedelta(days=1)
++    return start, end
++
++
++def reminder_due(now, start, end):
++    # Zero grace. A scheduler run at the exact start may queue a reminder.
++    return start.date() >= START_DATE and start <= now < end
++
++
++def daily_key(employee, day):
++    return 'om-checkin-' + sha256((employee + ':' + str(day)).encode()).hexdigest()[:28]
++
++
++def employees():
++    return frappe.get_all('Employee', filters={'status': 'Active', 'company': COMPANY},
++        fields=['name', 'employee_name', 'user_id', 'company', 'default_shift',
++                'holiday_list', 'date_of_joining', 'relieving_date'], order_by='employee_name')
++
++
++def plan(employee, day):
++    """Read tomorrow's assigned shift and calendar without generating mail."""
++    result = dict(employee=employee.name, employee_name=employee.employee_name,
++                  recipient=employee.user_id or '', reason='', shift='', start=None, end=None)
++    if ((employee.date_of_joining and getdate(employee.date_of_joining) > day)
++            or (employee.relieving_date and getdate(employee.relieving_date) < day)):
++        result['reason'] = 'Outside employment dates'
++        return result
++    user = employee.user_id
++    if not user or user in ('Administrator', 'Guest') or not frappe.db.get_value('User', user, 'enabled'):
++        result['reason'] = 'No enabled employee login'
++        return result
++    if frappe.db.count('Employee', {'status': 'Active', 'user_id': user}) != 1:
++        result['reason'] = 'Employee login is linked to multiple active profiles; HR review required'
++        return result
++    if not frappe.utils.validate_email_address(user):
++        result['reason'] = 'Employee login is not a valid email address'
++        return result
++    assignments = frappe.get_all('Shift Assignment', filters={
++        'employee': employee.name, 'docstatus': 1, 'status': 'Active', 'start_date': ['<=', day]},
++        or_filters=[['end_date', 'is', 'not set'], ['end_date', '>=', day]], fields=['shift_type'])
++    names = {a.shift_type for a in assignments}
++    if len(names) > 1:
++        result['reason'] = 'Overlapping shift assignments; HR review required'
++        return result
++    name = next(iter(names), None) or employee.default_shift
++    if not name:
++        result['reason'] = 'No assigned or default shift'
++        return result
++    shift = frappe.get_cached_doc('Shift Type', name)
++    start, end = shift_window(day, shift)
++    result.update(shift=name, start=start, end=end)
++    from hrms.utils.holiday_list import get_holiday_list_for_employee
++    calendar = (shift.get('holiday_list')
++        or get_holiday_list_for_employee(employee.name, raise_exception=False, as_on=day)
++        or employee.holiday_list
++        or frappe.get_cached_value('Company', employee.company, 'default_holiday_list'))
++    if not calendar:
++        result['reason'] = 'Holiday calendar unavailable; HR review required'
++        return result
++    coverage = frappe.db.get_value('Holiday List', calendar, ['from_date', 'to_date'], as_dict=True)
++    if not coverage or not getdate(coverage.from_date) <= day <= getdate(coverage.to_date):
++        result['reason'] = 'Holiday calendar does not cover this date; HR review required'
++    elif frappe.db.exists('Holiday', {'parent': calendar, 'holiday_date': day}):
++        result['reason'] = 'Holiday / weekly day off'
++    elif frappe.db.exists('Leave Application', {'employee': employee.name, 'docstatus': 1,
++            'status': 'Approved', 'from_date': ['<=', day], 'to_date': ['>=', day]}):
++        # Half-day leave has no reliable morning/afternoon indicator: do not guess.
++        result['reason'] = 'Approved leave (including half-day)'
++    elif frappe.db.exists('Attendance Request', {'employee': employee.name, 'docstatus': 1,
++            'reason': ['in', ['On Duty', 'Work From Home']],
++            'from_date': ['<=', day], 'to_date': ['>=', day]}):
++        result['reason'] = 'Approved on-duty / work-from-home arrangement'
++    return result
++
++
++def pending_leave(employee, day):
++    return bool(frappe.db.exists('Leave Application', {'employee': employee,
++        'docstatus': ['!=', 2], 'status': 'Open',
++        'from_date': ['<=', day], 'to_date': ['>=', day]}))
++
++
++def has_attendance(employee, scheduled, now):
++    """Re-read original evidence immediately before queuing; no cached widget."""
++    day = scheduled['start'].date()
++    # Include early punches. Ambiguous/OUT-only evidence is left for HR review,
++    # rather than telling an employee who has recorded activity to check in again.
++    lower = datetime.combine(day, time(), TZ)
++    site = ZoneInfo(frappe.utils.get_system_timezone())
++    stamp = lambda value: value.astimezone(site).replace(tzinfo=None)
++    if frappe.db.exists('Employee Checkin', [
++            ['employee', '=', employee], ['time', '>=', stamp(lower)], ['time', '<=', stamp(now)]]):
++        return True
++    return bool(frappe.db.exists('Attendance', {'employee': employee, 'docstatus': 1,
++        'attendance_date': day, 'status': ['in', ['Present', 'Work From Home', 'Half Day', 'On Leave']]}))
++
++
++def message(scheduled, now, pending=False):
++    day = scheduled['start'].date()
++    action = ('Your leave application for today is already pending. Please follow up with HR; '
++              'you do not need to submit another application.' if pending else
++              'If you are away today, please submit the appropriate leave or attendance request.')
++    return (f'<p>Dear {escape(scheduled["employee_name"])},</p>'
++        f'<p>Your assigned shift on {day:%d %B %Y} starts at '
++        f'{scheduled["start"]:%H:%M} (Oman time). As of {now:%H:%M}, '
++        'your check-in has not been recorded.</p>'
++        '<p>If you have started work, please record your check-in in ERP. '
++        'If you have already checked in or the record is incorrect, please contact HR.</p>'
++        f'<p>{action}</p><p><a href="https://erp-om.bitssecureit.com/desk/my-work-dashboard">'
++        'Open your attendance dashboard</a></p>'
++        '<p>This is an attendance reminder; it does not mark you absent or change your pay.</p>'
++        '<p>Regards,<br>HR Oman</p>')
++
++
++def queue_one(employee, day, now, account):
++    key = daily_key(employee.name, day)
++    if frappe.db.exists('Notification Log', key):
++        return False
++    scheduled = plan(employee, day)
++    if scheduled['reason'] or not reminder_due(now, scheduled['start'], scheduled['end']):
++        return False
++    if has_attendance(employee.name, scheduled, now):
++        return False
++    body = message(scheduled, now, pending_leave(employee.name, day))
++    savepoint = 'oman_checkin_reminder'
++    frappe.db.savepoint(savepoint)
++    try:
++        # The primary key is an atomic daily reservation. Email Queue and this
++        # marker commit together; failures roll both back so normal retries work.
++        marker = frappe.get_doc(dict(doctype='Notification Log', name=key, type='Alert',
++            for_user=employee.user_id, from_user='Administrator', subject=SUBJECT,
++            email_content=body, link='/desk/my-work-dashboard',
++            document_type='Employee', document_name=employee.name))
++        marker.db_insert()
++    except frappe.DuplicateEntryError:
++        frappe.db.rollback(save_point=savepoint)
++        return False
++    try:
++        # Last check closes the normal scan-to-queue gap; future check-ins cannot
++        # be predicted. The message includes the actual observation time.
++        observed = max(now, datetime.now(TZ))
++        if has_attendance(employee.name, scheduled, observed):
++            frappe.db.rollback(save_point=savepoint)
++            return False
++        queue = frappe.sendmail(recipients=[employee.user_id],
++            sender=formataddr(('HR Oman', account.email_id)), reply_to=account.email_id,
++            subject=SUBJECT, message=body, reference_doctype='Employee', reference_name=employee.name,
++            message_id=f'<{key}@bitssecureit.com>', delayed=True, now=False,
++            add_unsubscribe_link=False, is_notification=True)
++        if not queue or queue.email_account != account.name or OMAN_EMAIL not in queue.sender:
++            frappe.throw('Oman attendance reminder was not queued through the dedicated HR account.')
++        frappe.publish_realtime('notification', user=employee.user_id, after_commit=True)
++        return True
++    except Exception:
++        frappe.db.rollback(save_point=savepoint)
++        raise
++
++
++def send_reminders():
++    if not is_oman():
++        return 0
++    now = datetime.now(TZ)
++    if now.date() < START_DATE or not frappe.get_cached_doc('HR Settings').get(ENABLED):
++        return 0
++    account = configured_account()
++    if not account:
++        frappe.throw('Oman HR email routing must be enabled before attendance reminders can send.')
++    sent = 0
++    for employee in employees():
++        try:
++            for day in (now.date(), now.date() - timedelta(days=1)):
++                if day >= START_DATE:
++                    sent += int(queue_one(employee, day, now, account))
++        except Exception:
++            frappe.log_error(title='Oman check-in reminder failed', message=frappe.get_traceback())
++    return sent
++
++
++def guard():
++    frappe.only_for('System Manager')
++    if not is_oman():
++        frappe.throw('Attendance reminder setup is available only in Oman.')
++
++
++@frappe.whitelist(methods=['GET'])
++def page():
++    guard()
++    from frappe.sessions import get_csrf_token
++    enabled = bool(frappe.get_cached_doc('HR Settings').get(ENABLED))
++    account = configured_account()
++    day = max(START_DATE, datetime.now(TZ).date() + timedelta(days=1))
++    rows = []
++    for employee in employees():
++        p = plan(employee, day)
++        cells = [p['employee_name'], p['recipient'], p['shift'],
++            p['start'].strftime('%H:%M') if p['start'] else '—',
++            p['reason'] or 'Eligible if check-in is missing at shift start']
++        rows.append('<tr>' + ''.join('<td>' + escape(str(x)) + '</td>' for x in cells) + '</tr>')
++    job = frappe.db.get_value('Scheduled Job Type', {'method': METHOD},
++        ['name', 'stopped', 'cron_format', 'last_execution'], as_dict=True)
++    job_text = ('Active — every minute' if job and not job.stopped and job.cron_format == '* * * * *'
++        else 'Not active')
++    token = escape(get_csrf_token(), quote=True)
++    body = f'''<h2>Daily Oman check-in emails</h2>
++    <p><b>Status: {'Enabled' if enabled else 'Disabled'}</b> · Starts 12 November 2026 · Oman time (UTC+4)</p>
++    <p>Sender: {escape(account.email_id) if account else 'HR email routing is not enabled'}</p>
++    <p>At each employee's exact assigned shift start, with no grace period. The scheduler checks every minute.
++    One email per employee per working day; no CC. Holidays, approved leave/on-duty/WFH and recorded attendance are excluded.
++    Missing calendars or conflicting employee/shift assignments are held for HR review.</p>
++    <p>Scheduler: {job_text}. Last run: {escape(str(job.last_execution or 'Not yet') if job else 'Not yet')}.</p>
++    <form method="post" action="/api/method/bsgroup.oman_attendance_email.configure">
++    <input type="hidden" name="csrf_token" value="{token}">
++    <input type="hidden" name="enabled" value="{'0' if enabled else '1'}">
++    <button class="btn btn-primary" type="submit">{'Pause daily emails' if enabled else 'Enable daily emails from 12 November'}</button></form>
++    <h3>Schedule check for {day:%d %B %Y}</h3>
++    <p>This preview sends no messages. Eligibility is checked again at the time of sending.</p>
++    <table class="table table-bordered"><thead><tr><th>Employee</th><th>Recipient</th><th>Assigned shift</th><th>Start</th><th>Rule</th></tr></thead>
++    <tbody>{''.join(rows)}</tbody></table>
++    <p><a href="/desk/bs-group/hr-dashboard?hr_section=review">Back to BS HR review</a> ·
++    <a href="/desk/email-queue">View email delivery log</a></p>'''
++    frappe.respond_as_web_page('Oman Attendance Emails', body, indicator_color='green' if enabled else 'orange')
++
++
++@frappe.whitelist(methods=['POST'])
++def configure(enabled):
++    guard()
++    value = int(enabled)
++    if value not in (0, 1):
++        frappe.throw('Enabled must be 0 or 1.')
++    if value and not configured_account():
++        frappe.throw('Enable the dedicated Oman HR sender first.')
++    from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
++    if not frappe.get_meta('HR Settings').has_field(ENABLED):
++        create_custom_fields({'HR Settings': [dict(fieldname=ENABLED,
++            label='Daily Oman check-in reminder emails', fieldtype='Check', default='0',
++            insert_after='custom_bs_hr_email_enabled',
++            description='From 12 November 2026: exact assigned shift start, no grace; one email per employee/day from Oman HR.')]}, update=False)
++    settings = frappe.get_doc('HR Settings')
++    settings.set(ENABLED, value)
++    settings.save()
++    from frappe.core.doctype.scheduled_job_type.scheduled_job_type import insert_single_event
++    insert_single_event('Cron', METHOD, '* * * * *')
++    job_name = frappe.db.get_value('Scheduled Job Type', {'method': METHOD}, 'name')
++    if not job_name:
++        frappe.throw('Unable to register the attendance reminder scheduler.')
++    job = frappe.get_doc('Scheduled Job Type', job_name)
++    # Keep the worker registered: the HR Settings checkbox is the single switch.
++    job.stopped = 0
++    job.save()
++    frappe.clear_cache(doctype='HR Settings')
++    frappe.local.response.update(type='redirect', location='/api/method/bsgroup.oman_attendance_email.page')
+diff --git a/bsgroup/public/js/hr_monthly_review.js b/bsgroup/public/js/hr_monthly_review.js
+index 0cb8667..67cc57b 100644
+--- a/bsgroup/public/js/hr_monthly_review.js
++++ b/bsgroup/public/js/hr_monthly_review.js
+@@ -103,7 +103,8 @@ window.bsHRMonthlyReview=async function(main){
+         $('<label>Employee</label>').append($('<input class="form-control input-sm" type="search" aria-label="Find employee in monthly review" placeholder="Name or employee ID">').val(search).on('input',function(){search=this.value;drawRows();})).appendTo(controls);
+         $('<button class="btn btn-default btn-sm">').text('Refresh report').on('click',load).appendTo(controls);
+         $('<button class="btn btn-default btn-sm">').text('Review proposed automatic rules').on('click',rules).appendTo(controls);
+-        $('<p class="hrm-muted">').text(`Automatic sending: awaiting approval · Data as of ${data.as_of?.slice(0,19).replace('T',' ')} Gulf Standard Time (UTC+4).`).appendTo(root);
++        if(data.checkin_emails) $('<a class="btn btn-default btn-sm">').text(`Daily check-in emails: ${data.checkin_emails.enabled?'Enabled':'Disabled'}`).attr('href',data.checkin_emails.url).appendTo(controls);
++        $('<p class="hrm-muted">').text(`Monthly review rule emails: awaiting approval · Data as of ${data.as_of?.slice(0,19).replace('T',' ')} Gulf Standard Time (UTC+4).`).appendTo(root);
+         if(data.restricted.length)$('<p class="hr-review-note">').text('Restricted sources: '+data.restricted.join(', ')+'. A dash means unavailable, not zero.').appendTo(root);
+         $('<div class="hr-review-count">').appendTo(root);
+         const panel=$('<section class="hrm-panel"><div class="hrm-table-wrap"><table class="hrm-table hr-review-table"><thead><tr><th>Employee / details</th><th>Annual allocated / available</th><th>Leave taken this month</th><th>HR absent days</th><th>Late days / time</th><th>Scheduled hours — full month</th><th>Expected hours due</th><th>Recorded office hours</th><th>After 6 PM days / hours</th><th>Missing check-in / review</th></tr></thead><tbody></tbody></table></div></section>').appendTo(root);
