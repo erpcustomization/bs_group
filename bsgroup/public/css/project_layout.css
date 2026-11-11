@@ -1,0 +1,6 @@
+/* Presentation only: retain Project history and Task daily-work comments. */
+@media screen {
+    .page-container[data-page-route="Project"] .form-footer > .after-save {
+        display: none !important;
+    }
+}

@@ -1,0 +1,24 @@
+diff --git a/bsgroup/public/css/project_layout.css b/bsgroup/public/css/project_layout.css
+new file mode 100644
+index 0000000..5f8aab4
+--- /dev/null
++++ b/bsgroup/public/css/project_layout.css
+@@ -0,0 +1,6 @@
++/* Presentation only: retain Project history and Task daily-work comments. */
++@media screen {
++    .page-container[data-page-route="Project"] .form-footer > .after-save {
++        display: none !important;
++    }
++}
+diff --git a/bsgroup/work_dashboard.py b/bsgroup/work_dashboard.py
+index b2c8dfc..0b44bf7 100644
+--- a/bsgroup/work_dashboard.py
++++ b/bsgroup/work_dashboard.py
+@@ -25,6 +25,7 @@ def navigation_script():
+     style = Path(frappe.get_app_path('bsgroup', 'public', 'css', 'portal_finish.css')).read_text()
+     style += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'css', 'attendance_widget.css')).read_text()
+     style += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'css', 'bs_sales_theme.css')).read_text()
++    style += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'css', 'project_layout.css')).read_text()
+     content += '\n(() => { const s=document.createElement("style"); s.id="bs-portal-theme"; s.textContent=' + json.dumps(style) + '; document.getElementById(s.id)?.remove(); document.head.append(s); document.body.classList.add("bs-premium"); })();'
+     frappe.local.response.update(type='download', filename='scoped_sales_access.js',
+                                  filecontent=content, content_type='application/javascript',
