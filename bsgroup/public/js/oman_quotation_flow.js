@@ -53,9 +53,9 @@
         const modules=[['elv','ELV Project'],['3cx','3CX Project'],['infra','Infra Project'],['supply','Supply Only']];
         return [
             {fieldtype:'Section Break',label:__('Select Project Category — choose one or more')},
-            {fieldtype:'HTML',options:'<p><strong>'+__(data.project ? 'The existing linked project will be used.' : 'A project will be created automatically.')+'</strong> '+__('An AI-generated draft project plan will be prepared using the quotation and costing sheet. Please select ELV Project, 3CX Project, Infra Project or Supply Only (choose all that apply). Existing activities are retained. If AI is unavailable, the project remains created and its plan shows the action required.')+'</p>'},
+            {fieldtype:'HTML',options:'<p><strong>'+__('A new project will be created automatically for this quotation.')+'</strong> '+__('An AI-generated draft project plan will be prepared using the quotation and costing sheet. Please select ELV Project, 3CX Project, Infra Project or Supply Only (choose all that apply). If AI is unavailable, the project remains created and its plan shows the action required.')+'</p>'},
             ...modules.map(([key,label])=>({fieldtype:'Check',fieldname:'module_'+key,label:__(label),default:(data.project_modules||[]).includes(key)?1:0})),
-            ...(data.project ? [{fieldtype:'HTML',options:`<p>${__('Existing Project')}: ${frappe.utils.escape_html(data.project)}</p>`}] : [
+            ...[
                 {fieldtype:'Link',fieldname:'project_type',label:__('Project Type'),options:'Project Type',reqd:1},
                 {fieldtype:'Link',fieldname:'custom_project_manager',label:__('Project Manager'),options:'Employee',reqd:1},
                 {fieldtype:'Date',fieldname:'expected_start_date',label:__('Start Date'),reqd:1,default:data.required_by},
@@ -63,7 +63,7 @@
                     description:__('Sales must enter this date before sending to Procurement. It sets the project completion date and the schedule for its project plan.')},
                 {fieldtype:'Link',fieldname:'customer',label:__('Customer'),options:'Customer',reqd:1,default:data.project_customer},
                 {fieldtype:'Small Text',fieldname:'custom_project_description',label:__('Project Description'),reqd:1,default:data.project_description},
-            ])
+            ]
         ];
     }
     async function statusDetails(frm, stage) {

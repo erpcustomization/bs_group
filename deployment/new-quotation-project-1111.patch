@@ -1,0 +1,249 @@
+diff --git a/bsgroup/dcs/procurement.py b/bsgroup/dcs/procurement.py
+index 2e4ed6b..feb24ca 100644
+--- a/bsgroup/dcs/procurement.py
++++ b/bsgroup/dcs/procurement.py
+@@ -298,8 +298,9 @@ def send_to_procurement(quotation, schedule_date=None, warehouse=None, project_m
+     selected_modules = selections(project_modules)
+     with sales_handover(q, sheet):
+         project = save_project(q, sheet, selected_modules, project_details)
+-    if not sheet.get("project"):
+-        frappe.db.set_value("Deal Cost Sheet", sheet.name, "project", project)
++    previous_project = sheet.get("project") or ""
++    frappe.db.set_value("Deal Cost Sheet", sheet.name, "project", project)
++    sheet.project = project
+     manifest = dict(costing=data, items=rows, files=[], source_po=source.name,
+                     schedule_date=str(schedule_date),
+                     customer_po_reference=q.custom_customer_po_reference,
+@@ -365,7 +366,9 @@ def send_to_procurement(quotation, schedule_date=None, warehouse=None, project_m
+         source_endpoint="send_to_procurement", revision_no=sheet.custom_frozen_revision_no,
+         revision_reference=sheet.custom_revision_reference, evidence_reference=request.name,
+         changes=[{"dt":"Quotation","dn":q.name,"field":"custom_bsp_material_request",
+-                  "old":q.get("custom_bsp_material_request") or "","new":request.name}])
++                  "old":q.get("custom_bsp_material_request") or "","new":request.name},
++                 {"dt":"Deal Cost Sheet","dn":sheet.name,"field":"project",
++                  "old":previous_project,"new":project}])
+     q.add_comment("Info", _("Sent to Procurement: {0}").format(request.name))
+     return {"name": request.name, "doctype": buying.MR, "already_sent": False, "project": project}
+ 
+diff --git a/bsgroup/dcs/project_link_repair.py b/bsgroup/dcs/project_link_repair.py
+new file mode 100644
+index 0000000..9bdd9d1
+--- /dev/null
++++ b/bsgroup/dcs/project_link_repair.py
+@@ -0,0 +1,75 @@
++"""Audited repair of an unsent quotation's stale link to a closed project."""
++from html import escape
++from urllib.parse import quote
++
++import frappe
++
++
++def _unsent_source(quotation, lock=False):
++    frappe.only_for("System Manager")
++    from bsgroup.dcs.procurement import source_documents
++    q, sheet = source_documents(quotation, lock=lock)
++    if (q.get("custom_bsp_material_request") or q.get("custom_purchase_request")
++            or frappe.db.exists("Material Request", {"custom_deal_cost_sheet": sheet.name})
++            or (frappe.db.exists("DocType", "DCS Purchase Request")
++                and frappe.db.exists("DCS Purchase Request", {"dcs": sheet.name}))):
++        frappe.throw("This deal already has a procurement handover. Its project link cannot be cleared here.")
++    return q, sheet
++
++
++@frappe.whitelist(methods=["POST"])
++def clear_closed_project_link(quotation, expected_project):
++    """Only changes the exact DCS link; never saves the linked Project or its tasks."""
++    from bsgroup.dcs.presales_lineage import atomic_lifecycle
++
++    def apply():
++        q, sheet = _unsent_source(quotation, lock=True)
++        if not sheet.get("project"):
++            return  # Safe retry: no extra audit or changes.
++        if not expected_project or sheet.project != expected_project:
++            frappe.throw("The project link changed. Refresh and review it before correcting it.")
++        project = frappe.get_doc("Project", expected_project, for_update=True)
++        project.check_permission("read")
++        if project.company != sheet.company or project.status not in ("Completed", "Cancelled"):
++            frappe.throw("Only a stale link to a closed project in the same company can be cleared here.")
++        from bsgroup.dcs.governance import record_governance_event
++        frappe.db.set_value("Deal Cost Sheet", sheet.name, "project", None)
++        record_governance_event(sheet.name, "DCS_PROJECT_LINK_CORRECTED",
++            action_label="Clear stale project link before first procurement handover",
++            source_endpoint="project_link_repair", revision_no=sheet.custom_dcs_revision_no,
++            revision_reference=sheet.custom_revision_reference, evidence_reference=q.name,
++            reason="Prepare a new project for quotation " + q.name + ". Closed project "
++                + expected_project + " and its records remain unchanged.",
++            changes=[dict(dt="Deal Cost Sheet", dn=sheet.name, field="project",
++                          old=expected_project, new="")])
++        q.add_comment("Info", "Cleared the costing sheet's stale link to " + expected_project
++            + ". A new project and planning request will be created when this quotation is sent to Procurement.")
++
++    atomic_lifecycle(apply)
++    return page(quotation, expected_project)
++
++
++@frappe.whitelist()
++def page(quotation, expected_project):
++    q, sheet = _unsent_source(quotation)
++    project = frappe.get_doc("Project", expected_project)
++    project.check_permission("read")
++    from frappe.sessions import get_csrf_token
++    e = lambda value: escape(str(value or ""), quote=True)
++    cleared = not sheet.get("project")
++    action = "" if cleared else f'''<form method="post" action="/api/method/bsgroup.dcs.project_link_repair.clear_closed_project_link">
++        <input type="hidden" name="csrf_token" value="{e(get_csrf_token())}">
++        <input type="hidden" name="quotation" value="{e(q.name)}">
++        <input type="hidden" name="expected_project" value="{e(expected_project)}">
++        <button type="submit" class="btn btn-primary">Clear this stale project link</button></form>'''
++    body = f'''<h2>{"Ready for a new project" if cleared else "Correct quotation project link"}</h2>
++        <p><b>Quotation:</b> {e(q.name)} — {e(q.get("custom_subject"))}</p>
++        <p><b>Costing sheet:</b> {e(sheet.name)}</p>
++        <p><b>Current project link:</b> {e(sheet.project) if sheet.get("project") else "None — a new project will be created at handover"}</p>
++        <p><b>Previous project:</b> {e(project.name)} — {e(project.project_name)}<br>
++        Status: {e(project.status)} · Last modified: {e(project.modified)}</p>
++        <p>The completed project, its activities and its history are preserved.
++        Sending this quotation to Procurement will create a new project, a Purchase Requisition
++        and an automatic planning request. Enter its category, manager and expected completion date.</p>
++        {action}<p><a href="/desk/quotation/{quote(q.name, safe='')}">Open quotation</a></p>'''
++    frappe.respond_as_web_page("Quotation project link", body, indicator_color="green" if cleared else "orange")
+diff --git a/bsgroup/project_handover.py b/bsgroup/project_handover.py
+index 40358c7..a1daa24 100644
+--- a/bsgroup/project_handover.py
++++ b/bsgroup/project_handover.py
+@@ -1,8 +1,8 @@
+ """Project copy of an awarded quotation: operational scope only, never commercial values.
+ 
+ Called inside the existing locked procurement transaction, after source authorisation.
+-Direct calls retain native Project permissions. A checked sales handover may
+-write only its linked project's BOQ; mandatory-field and company checks apply.
++Direct calls retain native Project permissions. A checked first sales handover
++creates a dedicated project. Procurement handles retries before this is called.
+ """
+ import json
+ from contextlib import contextmanager
+@@ -24,7 +24,7 @@ def _source_key(q, sheet):
+ 
+ @contextmanager
+ def sales_handover(q, sheet):
+-    """Authorise only the linked project's BOQ step inside a checked sales send.
++    """Authorise only a new project from this checked sales send.
+ 
+     Callers must first validate the current quotation/award. No general Project
+     role, document share or approval permission is granted to the sender.
+@@ -74,18 +74,11 @@ def boq_html(quotation):
+ 
+ 
+ def context(q, sheet):
+-    project = sheet.get("project")
+-    selected = []
+-    if project:
+-        doc = frappe.get_doc("Project", project)
+-        if not _scoped_handover(q, sheet):
+-            doc.check_permission("read")
+-        if doc.company != sheet.company:
+-            frappe.throw(_("The linked project must belong to the quotation company."))
+-        selected = [key for key, (_, field) in MODULES.items() if doc.get(field)]
+-    return dict(project=project, project_modules=selected,
++    # A legacy DCS project can belong to another job, including a completed one.
++    # It is never a destination for a new quotation's first procurement handover.
++    return dict(project=None, project_modules=[],
+                 project_customer=q.party_name if q.quotation_to == "Customer" else sheet.get("customer"),
+-                project_description=sheet.get("subject") or "")
++                project_description=q.get("custom_subject") or sheet.get("subject") or "")
+ 
+ 
+ def save_project(q, sheet, modules, details=None):
+@@ -100,34 +93,25 @@ def save_project(q, sheet, modules, details=None):
+     if any(not meta.has_field(field) for _, field in MODULES.values()) or not meta.has_field("custom_boq"):
+         frappe.throw(_("Install the project modules before sending this handover."))
+     scope = boq_html(q)
+-    if sheet.get("project"):
+-        project = frappe.get_doc("Project", sheet.project, for_update=True)
+-        if not scoped:
+-            project.check_permission("write")
+-        if project.company != sheet.company:
+-            frappe.throw(_("The linked project must belong to the quotation company."))
+-        if project.status in ("Completed", "Cancelled"):
+-            frappe.throw(_("The linked project is closed. Resolve the project link before handover."))
+-    else:
+-        project = frappe.new_doc("Project")
+-        if not scoped:
+-            project.check_permission("create")
+-        required = ("project_type", "custom_project_manager", "expected_start_date", "expected_end_date")
+-        if any(not details.get(field) for field in required):
+-            frappe.throw(_("Complete the project type, project manager and start/end dates."))
+-        if getdate(details["expected_end_date"]) < getdate(details["expected_start_date"]):
+-            frappe.throw(_("Project end date cannot be before its start date."))
+-        project.update({field: details[field] for field in required})
+-        project.update(dict(project_name=(sheet.get("subject") or "Project") + " - " + q.name,
+-            company=sheet.company, status="Open",
+-            customer=q.party_name if q.quotation_to == "Customer" else sheet.get("customer") or details.get("customer"),
+-            custom_project_description=details.get("custom_project_description") or sheet.get("subject")))
+-        if details.get("project_template"):
+-            project.project_template = details["project_template"]
+-    # Add memberships; never clear another module or overwrite existing scope.
++    project = frappe.new_doc("Project")
++    if not scoped:
++        project.check_permission("create")
++    required = ("project_type", "custom_project_manager", "expected_start_date", "expected_end_date")
++    if any(not details.get(field) for field in required):
++        frappe.throw(_("Complete the project type, project manager and start/end dates."))
++    if getdate(details["expected_end_date"]) < getdate(details["expected_start_date"]):
++        frappe.throw(_("Project end date cannot be before its start date."))
++    subject = q.get("custom_subject") or sheet.get("subject") or "Project"
++    project.update({field: details[field] for field in required})
++    project.update(dict(project_name=subject + " - " + q.name,
++        company=sheet.company, status="Open",
++        customer=q.party_name if q.quotation_to == "Customer" else sheet.get("customer") or details.get("customer"),
++        custom_project_description=details.get("custom_project_description") or subject))
++    if details.get("project_template"):
++        project.project_template = details["project_template"]
+     for key in selected:
+         project.set(MODULES[key][1], 1)
+-    project.custom_boq = (project.get("custom_boq") or "") + scope
++    project.custom_boq = scope
+     from bsgroup.project_boq_schedule import append_quotation, importing
+     append_quotation(project, q)
+     with importing():
+diff --git a/bsgroup/public/js/oman_quotation_flow.js b/bsgroup/public/js/oman_quotation_flow.js
+index b3def8d..7438de5 100644
+--- a/bsgroup/public/js/oman_quotation_flow.js
++++ b/bsgroup/public/js/oman_quotation_flow.js
+@@ -53,9 +53,9 @@
+         const modules=[['elv','ELV Project'],['3cx','3CX Project'],['infra','Infra Project'],['supply','Supply Only']];
+         return [
+             {fieldtype:'Section Break',label:__('Select Project Category — choose one or more')},
+-            {fieldtype:'HTML',options:'<p><strong>'+__(data.project ? 'The existing linked project will be used.' : 'A project will be created automatically.')+'</strong> '+__('An AI-generated draft project plan will be prepared using the quotation and costing sheet. Please select ELV Project, 3CX Project, Infra Project or Supply Only (choose all that apply). Existing activities are retained. If AI is unavailable, the project remains created and its plan shows the action required.')+'</p>'},
++            {fieldtype:'HTML',options:'<p><strong>'+__('A new project will be created automatically for this quotation.')+'</strong> '+__('An AI-generated draft project plan will be prepared using the quotation and costing sheet. Please select ELV Project, 3CX Project, Infra Project or Supply Only (choose all that apply). If AI is unavailable, the project remains created and its plan shows the action required.')+'</p>'},
+             ...modules.map(([key,label])=>({fieldtype:'Check',fieldname:'module_'+key,label:__(label),default:(data.project_modules||[]).includes(key)?1:0})),
+-            ...(data.project ? [{fieldtype:'HTML',options:`<p>${__('Existing Project')}: ${frappe.utils.escape_html(data.project)}</p>`}] : [
++            ...[
+                 {fieldtype:'Link',fieldname:'project_type',label:__('Project Type'),options:'Project Type',reqd:1},
+                 {fieldtype:'Link',fieldname:'custom_project_manager',label:__('Project Manager'),options:'Employee',reqd:1},
+                 {fieldtype:'Date',fieldname:'expected_start_date',label:__('Start Date'),reqd:1,default:data.required_by},
+@@ -63,7 +63,7 @@
+                     description:__('Sales must enter this date before sending to Procurement. It sets the project completion date and the schedule for its project plan.')},
+                 {fieldtype:'Link',fieldname:'customer',label:__('Customer'),options:'Customer',reqd:1,default:data.project_customer},
+                 {fieldtype:'Small Text',fieldname:'custom_project_description',label:__('Project Description'),reqd:1,default:data.project_description},
+-            ])
++            ]
+         ];
+     }
+     async function statusDetails(frm, stage) {
+diff --git a/bsgroup/public/js/quotation.js b/bsgroup/public/js/quotation.js
+index e7690b5..c58876b 100644
+--- a/bsgroup/public/js/quotation.js
++++ b/bsgroup/public/js/quotation.js
+@@ -349,10 +349,8 @@ frappe.ui.form.on("Quotation", {
+                     ? `<p>${data.resources} labour/resource rows and ${data.additional_charges} additional charge rows
+                        remain in the attached costing evidence. Only the Item lines below become purchasing lines.</p>` : "";
+                 const modules = [['elv','ELV Project'],['3cx','3CX Project'],['infra','Infra Project'],['supply','Supply Only']];
+-                const projectFields = data.project ? [
+-                    {fieldtype:'HTML',fieldname:'project_info',options:`<p>The quotation will be linked to existing project <strong>${esc(data.project)}</strong>. Its existing plan will be retained. If it has no activities, an AI-generated draft plan will be prepared from the quotation and costing sheet.</p>`}
+-                ] : [
+-                    {fieldtype:'HTML',fieldname:'project_info',options:'<p><strong>A project will be created automatically.</strong> An AI-generated draft project plan will be prepared using the quotation and costing sheet. Please select ELV Project, 3CX Project, Infra Project or Supply Only (choose all that apply). Complete the project manager and schedule below. If AI is unavailable, the project remains created and its plan shows the action required.</p>'},
++                const projectFields = [
++                    {fieldtype:'HTML',fieldname:'project_info',options:'<p><strong>A new project will be created automatically for this quotation.</strong> An AI-generated draft project plan will be prepared using the quotation and costing sheet. Please select ELV Project, 3CX Project, Infra Project or Supply Only (choose all that apply). Complete the project manager and schedule below. If AI is unavailable, the project remains created and its plan shows the action required.</p>'},
+                     {fieldname:'project_type',label:__('Project Type'),fieldtype:'Link',options:'Project Type',reqd:1},
+                     {fieldname:'project_template',label:__('From Template'),fieldtype:'Link',options:'Project Template'},
+                     {fieldname:'custom_project_manager',label:__('Project Manager'),fieldtype:'Link',options:'Employee',reqd:1},

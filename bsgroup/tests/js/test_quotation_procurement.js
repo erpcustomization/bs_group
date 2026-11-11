@@ -40,7 +40,7 @@ const frm={doc:{docstatus:1,custom_deal_cost_sheet:'DCS-1',custom_pipeline_stage
     flow.refresh(frm);
     check(!!buttons['Send to Procurement'],'Saved Won quotation exposes handover');
     response={dcs:'DCS-1',revision:'R1',customer_po:'<customer PO>',currency:'AED',required_by:'2026-10-27',
-        warehouses:['Stores - AE'],resources:1,additional_charges:1,
+        warehouses:['Stores - AE'],resources:1,additional_charges:1,project:'PROJ-OLD',
         items:[{item_code:'<item>',qty:3,uom:'Nos',rate:100,is_stock_item:1}]};
     await buttons['Send to Procurement']();
     check(calls.length===1 && calls[0].method.endsWith('.handover_context') && routes.length===0,
@@ -49,6 +49,10 @@ const frm={doc:{docstatus:1,custom_deal_cost_sheet:'DCS-1',custom_pipeline_stage
         'Stock handover requires a warehouse');
     check(dialog.options.fields.find(f=>f.fieldname==='schedule_date').reqd===1,
         'Handover requires a date');
+    check(dialog.options.fields.find(f=>f.fieldname==='expected_end_date').reqd===1,
+        'A legacy project link cannot suppress the new project completion date');
+    check(dialog.options.fields.find(f=>f.fieldname==='project_info').options.includes('A new project will be created automatically for this quotation.'),
+        'The popup promises a new project even when old data contains a project link');
     const summary=dialog.options.fields[0].options;
     check(summary.includes('&lt;item&gt;')&&summary.includes('&lt;customer PO&gt;'),
         'Source item and customer PO text are escaped');

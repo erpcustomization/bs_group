@@ -298,8 +298,9 @@ def send_to_procurement(quotation, schedule_date=None, warehouse=None, project_m
     selected_modules = selections(project_modules)
     with sales_handover(q, sheet):
         project = save_project(q, sheet, selected_modules, project_details)
-    if not sheet.get("project"):
-        frappe.db.set_value("Deal Cost Sheet", sheet.name, "project", project)
+    previous_project = sheet.get("project") or ""
+    frappe.db.set_value("Deal Cost Sheet", sheet.name, "project", project)
+    sheet.project = project
     manifest = dict(costing=data, items=rows, files=[], source_po=source.name,
                     schedule_date=str(schedule_date),
                     customer_po_reference=q.custom_customer_po_reference,
@@ -365,7 +366,9 @@ def send_to_procurement(quotation, schedule_date=None, warehouse=None, project_m
         source_endpoint="send_to_procurement", revision_no=sheet.custom_frozen_revision_no,
         revision_reference=sheet.custom_revision_reference, evidence_reference=request.name,
         changes=[{"dt":"Quotation","dn":q.name,"field":"custom_bsp_material_request",
-                  "old":q.get("custom_bsp_material_request") or "","new":request.name}])
+                  "old":q.get("custom_bsp_material_request") or "","new":request.name},
+                 {"dt":"Deal Cost Sheet","dn":sheet.name,"field":"project",
+                  "old":previous_project,"new":project}])
     q.add_comment("Info", _("Sent to Procurement: {0}").format(request.name))
     return {"name": request.name, "doctype": buying.MR, "already_sent": False, "project": project}
 

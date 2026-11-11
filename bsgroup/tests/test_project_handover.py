@@ -27,9 +27,10 @@ class ProjectHandoverTests(unittest.TestCase):
         self.f.session=Doc(user='sales@example.com')
         self.f.get_roles=Mock(return_value=['BS Scoped Sales'])
         self.f.get_meta = Mock(return_value=Doc(has_field=lambda field: True))
-        self.project = Doc(name='PROJ-1', company='AE', status='Open', custom_boq='<p>Existing scope</p>',
+        self.old_project = Doc(name='PROJ-OLD', company='AE', status='Completed', custom_boq='<p>Existing scope</p>',
             custom_bs_infra_projects=1, check_permission=Mock(), save=Mock())
-        self.f.get_doc = Mock(return_value=self.project)
+        self.project = Doc(name='PROJ-NEW', check_permission=Mock(), save=Mock())
+        self.f.get_doc = Mock(return_value=self.old_project)
         self.f.new_doc = Mock(return_value=self.project)
         utils = types.ModuleType('frappe.utils')
         utils.getdate = lambda value: value
@@ -38,7 +39,9 @@ class ProjectHandoverTests(unittest.TestCase):
         modules.MODULES = {key: (key, 'custom_bs_'+key+'_projects') for key in ('supply','elv','infra','3cx')}
         schedule = types.ModuleType('bsgroup.project_boq_schedule')
         schedule.append_quotation = Mock(); schedule.importing = nullcontext
-        self.p = patch.dict(sys.modules, {'frappe':self.f,'frappe.utils':utils,'bsgroup.project_modules':modules,'bsgroup.project_boq_schedule':schedule})
+        roles_spec=importlib.util.spec_from_file_location('bsgroup.dcs.sales_handover_access',Path(__file__).resolve().parents[1]/'dcs/sales_handover_access.py')
+        roles=importlib.util.module_from_spec(roles_spec);roles_spec.loader.exec_module(roles)
+        self.p = patch.dict(sys.modules, {'frappe':self.f,'frappe.utils':utils,'bsgroup.project_modules':modules,'bsgroup.project_boq_schedule':schedule,'bsgroup.dcs.sales_handover_access':roles})
         self.p.start()
         spec = importlib.util.spec_from_file_location('handover_test',Path(__file__).resolve().parents[1]/'project_handover.py')
         self.m = importlib.util.module_from_spec(spec); spec.loader.exec_module(self.m)
@@ -62,26 +65,28 @@ class ProjectHandoverTests(unittest.TestCase):
         for bad in (None,[],['bad'],{},'bad',[{}]):
             with self.assertRaises(ValueError): self.m.selections(bad)
 
-    def test_existing_project_preserves_scope_membership_and_checks_write(self):
-        self.assertEqual(self.m.save_project(self.q,self.sheet,['supply','elv']),'PROJ-1')
-        self.project.check_permission.assert_called_once_with('write')
-        self.assertTrue(self.project.custom_boq.startswith('<p>Existing scope</p>'))
-        self.assertTrue(all(self.project['custom_bs_'+key+'_projects'] for key in ('supply','elv','infra')))
-        self.f.new_doc.assert_not_called();self.project.save.assert_called_once_with()
+    def test_legacy_project_is_not_reused_or_modified(self):
+        self.assertEqual(self.m.save_project(self.q,self.sheet,['supply','elv'],self.details),'PROJ-NEW')
+        self.project.check_permission.assert_called_once_with('create')
+        self.assertNotIn('Existing scope',self.project.custom_boq)
+        self.assertTrue(all(self.project['custom_bs_'+key+'_projects'] for key in ('supply','elv')))
+        self.assertIsNone(self.project.custom_bs_infra_projects)
+        self.f.get_doc.assert_not_called();self.old_project.save.assert_not_called()
+        self.f.new_doc.assert_called_once_with('Project');self.project.save.assert_called_once_with()
 
     def test_permission_denial_cannot_save_or_classify(self):
         self.project.check_permission.side_effect = PermissionError()
-        with self.assertRaises(PermissionError): self.m.save_project(self.q,self.sheet,['supply'])
+        with self.assertRaises(PermissionError): self.m.save_project(self.q,self.sheet,['supply'],self.details)
         self.project.save.assert_not_called();self.assertIsNone(self.project.custom_bs_supply_projects)
 
-    def test_sales_handover_only_writes_the_validated_linked_project(self):
+    def test_sales_handover_only_creates_project_from_validated_source(self):
         self.project.check_permission.side_effect=PermissionError()
         with self.m.sales_handover(self.q,self.sheet):
-            self.assertEqual(self.m.save_project(self.q,self.sheet,['supply']),'PROJ-1')
+            self.assertEqual(self.m.save_project(self.q,self.sheet,['supply'],self.details),'PROJ-NEW')
         self.project.save.assert_called_once_with(ignore_permissions=True)
         self.q.check_permission.assert_called_once_with('write')
         self.sheet.check_permission.assert_called_once_with('write')
-        with self.assertRaises(PermissionError):self.m.save_project(self.q,self.sheet,['supply'])
+        with self.assertRaises(PermissionError):self.m.save_project(self.q,self.sheet,['supply'],self.details)
 
     def test_handover_context_does_not_leak_after_failure_or_to_other_source(self):
         with self.assertRaises(RuntimeError):
@@ -107,22 +112,26 @@ class ProjectHandoverTests(unittest.TestCase):
             with self.m.sales_handover(self.q,self.sheet):pass
         self.project.save.assert_not_called()
 
-    def test_sales_handover_still_validates_closed_project_company_and_required_fields(self):
+    def test_legacy_project_does_not_waive_new_project_details(self):
         with self.m.sales_handover(self.q,self.sheet):
-            self.project.status='Completed'
-            with self.assertRaises(ValueError):self.m.save_project(self.q,self.sheet,['supply'])
-            self.project.status='Open';self.project.company='OTHER'
             with self.assertRaises(ValueError):self.m.save_project(self.q,self.sheet,['supply'])
         self.sheet.project=None
         with self.m.sales_handover(self.q,self.sheet):
             with self.assertRaises(ValueError):self.m.save_project(self.q,self.sheet,['supply'],{})
         self.project.save.assert_not_called()
 
-    def test_wrong_company_or_closed_project_rejected(self):
+    def test_legacy_project_never_becomes_the_destination_in_popup(self):
         for field,value in [('company','OM'),('status','Completed'),('status','Cancelled')]:
-            self.project.company='AE';self.project.status='Open';self.project[field]=value
-            with self.assertRaises(ValueError): self.m.save_project(self.q,self.sheet,['supply'])
-        self.project.save.assert_not_called()
+            self.old_project[field]=value
+            context=self.m.context(self.q,self.sheet)
+            self.assertIsNone(context['project']);self.assertEqual(context['project_modules'],[])
+        self.f.get_doc.assert_not_called();self.old_project.save.assert_not_called()
+
+    def test_quotation_subject_names_the_new_project(self):
+        self.q.custom_subject='WiFi kitchen upgrade'
+        self.m.save_project(self.q,self.sheet,['infra'],self.details)
+        self.assertEqual(self.project.project_name,'WiFi kitchen upgrade - Q-1')
+        self.assertEqual(self.m.context(self.q,self.sheet)['project_description'],'WiFi kitchen upgrade')
 
     def test_new_project_keeps_native_required_fields_template_and_permissions(self):
         self.sheet.project=None

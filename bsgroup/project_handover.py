@@ -1,8 +1,8 @@
 """Project copy of an awarded quotation: operational scope only, never commercial values.
 
 Called inside the existing locked procurement transaction, after source authorisation.
-Direct calls retain native Project permissions. A checked sales handover may
-write only its linked project's BOQ; mandatory-field and company checks apply.
+Direct calls retain native Project permissions. A checked first sales handover
+creates a dedicated project. Procurement handles retries before this is called.
 """
 import json
 from contextlib import contextmanager
@@ -24,7 +24,7 @@ def _source_key(q, sheet):
 
 @contextmanager
 def sales_handover(q, sheet):
-    """Authorise only the linked project's BOQ step inside a checked sales send.
+    """Authorise only a new project from this checked sales send.
 
     Callers must first validate the current quotation/award. No general Project
     role, document share or approval permission is granted to the sender.
@@ -74,18 +74,11 @@ def boq_html(quotation):
 
 
 def context(q, sheet):
-    project = sheet.get("project")
-    selected = []
-    if project:
-        doc = frappe.get_doc("Project", project)
-        if not _scoped_handover(q, sheet):
-            doc.check_permission("read")
-        if doc.company != sheet.company:
-            frappe.throw(_("The linked project must belong to the quotation company."))
-        selected = [key for key, (_, field) in MODULES.items() if doc.get(field)]
-    return dict(project=project, project_modules=selected,
+    # A legacy DCS project can belong to another job, including a completed one.
+    # It is never a destination for a new quotation's first procurement handover.
+    return dict(project=None, project_modules=[],
                 project_customer=q.party_name if q.quotation_to == "Customer" else sheet.get("customer"),
-                project_description=sheet.get("subject") or "")
+                project_description=q.get("custom_subject") or sheet.get("subject") or "")
 
 
 def save_project(q, sheet, modules, details=None):
@@ -100,34 +93,25 @@ def save_project(q, sheet, modules, details=None):
     if any(not meta.has_field(field) for _, field in MODULES.values()) or not meta.has_field("custom_boq"):
         frappe.throw(_("Install the project modules before sending this handover."))
     scope = boq_html(q)
-    if sheet.get("project"):
-        project = frappe.get_doc("Project", sheet.project, for_update=True)
-        if not scoped:
-            project.check_permission("write")
-        if project.company != sheet.company:
-            frappe.throw(_("The linked project must belong to the quotation company."))
-        if project.status in ("Completed", "Cancelled"):
-            frappe.throw(_("The linked project is closed. Resolve the project link before handover."))
-    else:
-        project = frappe.new_doc("Project")
-        if not scoped:
-            project.check_permission("create")
-        required = ("project_type", "custom_project_manager", "expected_start_date", "expected_end_date")
-        if any(not details.get(field) for field in required):
-            frappe.throw(_("Complete the project type, project manager and start/end dates."))
-        if getdate(details["expected_end_date"]) < getdate(details["expected_start_date"]):
-            frappe.throw(_("Project end date cannot be before its start date."))
-        project.update({field: details[field] for field in required})
-        project.update(dict(project_name=(sheet.get("subject") or "Project") + " - " + q.name,
-            company=sheet.company, status="Open",
-            customer=q.party_name if q.quotation_to == "Customer" else sheet.get("customer") or details.get("customer"),
-            custom_project_description=details.get("custom_project_description") or sheet.get("subject")))
-        if details.get("project_template"):
-            project.project_template = details["project_template"]
-    # Add memberships; never clear another module or overwrite existing scope.
+    project = frappe.new_doc("Project")
+    if not scoped:
+        project.check_permission("create")
+    required = ("project_type", "custom_project_manager", "expected_start_date", "expected_end_date")
+    if any(not details.get(field) for field in required):
+        frappe.throw(_("Complete the project type, project manager and start/end dates."))
+    if getdate(details["expected_end_date"]) < getdate(details["expected_start_date"]):
+        frappe.throw(_("Project end date cannot be before its start date."))
+    subject = q.get("custom_subject") or sheet.get("subject") or "Project"
+    project.update({field: details[field] for field in required})
+    project.update(dict(project_name=subject + " - " + q.name,
+        company=sheet.company, status="Open",
+        customer=q.party_name if q.quotation_to == "Customer" else sheet.get("customer") or details.get("customer"),
+        custom_project_description=details.get("custom_project_description") or subject))
+    if details.get("project_template"):
+        project.project_template = details["project_template"]
     for key in selected:
         project.set(MODULES[key][1], 1)
-    project.custom_boq = (project.get("custom_boq") or "") + scope
+    project.custom_boq = scope
     from bsgroup.project_boq_schedule import append_quotation, importing
     append_quotation(project, q)
     with importing():
