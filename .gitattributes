@@ -3,3 +3,4 @@ deployment/sales-project-fields-1111.patch -text
 deployment/approval-request-inbox-1112.patch -text
 deployment/approval-request-inbox-oman-1112.patch -text
 deployment/bs-erp-app-1112.patch -text
+deployment/bs-erp-app-menu-1112.patch -text

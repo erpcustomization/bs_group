@@ -5,13 +5,14 @@ let count=0;const check=(label,value)=>{assert.ok(value,label);count++;};
 function fixture({host='erp.bitssecureit.com',user='mohan@bitssecureit.com',path='/desk/my-work-dashboard',iframe=false,installed=false}={}){
     const {document,Event}=parseHTML('<html><head></head><body><aside class="body-sidebar-container"><a href="/desk/quotation" id="permitted">Quotation</a><a href="/desk/payroll" hidden id="denied">Payroll</a></aside><main class="page-container"><button class="sidebar-toggle-btn">Menu</button></main><button data-bs-erp-install>Install</button><p class="bserp-install-status"></p><section id="install-guide"></section></body></html>');
     const events={},navigator={onLine:true},window={matchMedia:()=>({matches:installed}),addEventListener:(name,fn)=>events[name]=fn};
-    window.top=iframe?{}:window;window.self=window;let toggles=0,scrolls=0;
-    const toggle=document.querySelector('.sidebar-toggle-btn');toggle.getClientRects=()=>[{}];toggle.addEventListener('click',()=>toggles++);
+    window.top=iframe?{}:window;window.self=window;let toggles=0,scrolls=0,opened=false;
+    const toggle=document.querySelector('.sidebar-toggle-btn');toggle.getClientRects=()=>[{}];toggle.addEventListener('click',()=>{toggles++;opened=!opened;});
+    document.addEventListener('click',event=>{if(opened&&!event.target.closest('.sidebar-toggle-btn,.body-sidebar-container'))opened=false;});
     document.querySelector('#install-guide').scrollIntoView=()=>scrolls++;document.querySelector('#install-guide').focus=()=>{};
     const frappe={session:{user}};window.frappe=frappe;
     const context={window,document,frappe,navigator,location:{hostname:host,pathname:path}};
     vm.runInNewContext(source,context);
-    return {document,events,window,context,navigator,Event,get toggles(){return toggles;},get scrolls(){return scrolls;}};
+    return {document,events,window,context,navigator,Event,get toggles(){return toggles;},get scrolls(){return scrolls;},get opened(){return opened;}};
 }
 (async()=>{
     for(const user of ['mohan@bitssecureit.com','raj@bitssecureit.com','employee@example.com','Administrator']){
@@ -20,6 +21,7 @@ function fixture({host='erp.bitssecureit.com',user='mohan@bitssecureit.com',path
         check(user+' gets install manifest',f.document.querySelector('link[rel=manifest]').href.endsWith('bs_erp_app.manifest'));
     }
     let f=fixture();f.document.querySelector('[data-bserp-modules]').click();check('Modules delegates to native authorised menu',f.toggles===1);
+    check('Native click-away handler does not immediately close Modules',f.opened);
     vm.runInNewContext(source,f.context);check('SPA reload does not duplicate app navigation',f.document.querySelectorAll('.bserp-mobile-bar').length===1);
     check('UAE app named separately',f.document.querySelector('meta[name=apple-mobile-web-app-title]').content==='BS ERP UAE');
     f=fixture({host:'erp-om.bitssecureit.com'});check('Oman app named separately',f.document.querySelector('meta[name=apple-mobile-web-app-title]').content==='BS ERP Oman');

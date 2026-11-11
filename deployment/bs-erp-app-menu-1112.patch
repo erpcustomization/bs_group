@@ -1,0 +1,15 @@
+diff --git a/bsgroup/public/js/bs_erp_app.js b/bsgroup/public/js/bs_erp_app.js
+index e6dee53..827e809 100644
+--- a/bsgroup/public/js/bs_erp_app.js
++++ b/bsgroup/public/js/bs_erp_app.js
+@@ -44,7 +44,9 @@
+         const bar=document.createElement('nav');bar.className='bserp-mobile-bar';bar.setAttribute('aria-label','BS ERP app navigation');
+         bar.innerHTML='<a href="/desk/my-work-dashboard"><span aria-hidden="true">⌂</span>Home</a><button type="button" data-bserp-modules><span aria-hidden="true">☰</span>Modules</button><button type="button" data-bserp-app><span aria-hidden="true">▣</span>App</button>';
+         document.body.append(bar);
+-        bar.querySelector('[data-bserp-modules]').addEventListener('click',()=>{
++        bar.querySelector('[data-bserp-modules]').addEventListener('click',event=>{
++            // The outer toolbar click must not immediately trigger Desk's click-away close handler.
++            event.stopPropagation();
+             // Click the real Desk control so its authorised navigation and collapse state remain authoritative.
+             const toggle=[...document.querySelectorAll('.page-container .sidebar-toggle-btn')].find(e=>e.getClientRects().length)
+                 || document.querySelector('.body-sidebar-container .sidebar-collapse-arrow');
