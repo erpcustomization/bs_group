@@ -1,0 +1,152 @@
+diff --git a/bsgroup/project_handover.py b/bsgroup/project_handover.py
+index a1daa24..5aa13a5 100644
+--- a/bsgroup/project_handover.py
++++ b/bsgroup/project_handover.py
+@@ -11,11 +11,17 @@ from html import escape
+ 
+ import frappe
+ from frappe import _
+-from frappe.utils import getdate, strip_html
++from frappe.utils import getdate, strip_html, today
+ from bsgroup.project_modules import MODULES
+ 
+ 
+ _sales_handover = ContextVar("sales_project_handover", default=None)
++_creating_project = ContextVar("quotation_handover_project", default=None)
++
++
++def is_handover_project(project):
++    """Only this server-created document may defer type/manager assignment."""
++    return _creating_project.get() is project
+ 
+ 
+ def _source_key(q, sheet):
+@@ -96,27 +102,37 @@ def save_project(q, sheet, modules, details=None):
+     project = frappe.new_doc("Project")
+     if not scoped:
+         project.check_permission("create")
+-    required = ("project_type", "custom_project_manager", "expected_start_date", "expected_end_date")
+-    if any(not details.get(field) for field in required):
+-        frappe.throw(_("Complete the project type, project manager and start/end dates."))
+-    if getdate(details["expected_end_date"]) < getdate(details["expected_start_date"]):
++    if not details.get("expected_end_date"):
++        frappe.throw(_("Enter the expected project completion date."))
++    start_date = details.get("expected_start_date") or today()
++    if getdate(details["expected_end_date"]) < getdate(start_date):
+         frappe.throw(_("Project end date cannot be before its start date."))
+     subject = q.get("custom_subject") or sheet.get("subject") or "Project"
+-    project.update({field: details[field] for field in required})
++    project.update(dict(expected_start_date=start_date, expected_end_date=details["expected_end_date"]))
++    # Older clients can still provide these optional fields. New sales popups
++    # leave them for the project team, without inventing a manager or type.
++    for field in ("project_type", "custom_project_manager"):
++        if details.get(field):
++            project.set(field, details[field])
+     project.update(dict(project_name=subject + " - " + q.name,
+         company=sheet.company, status="Open",
+         customer=q.party_name if q.quotation_to == "Customer" else sheet.get("customer") or details.get("customer"),
+         custom_project_description=details.get("custom_project_description") or subject))
+-    if details.get("project_template"):
+-        project.project_template = details["project_template"]
++    # Sales handover always queues its source-based AI plan. A stale browser
++    # must not supply a template that would silently replace automatic planning.
++    project.project_template = None
+     for key in selected:
+         project.set(MODULES[key][1], 1)
+     project.custom_boq = scope
+     from bsgroup.project_boq_schedule import append_quotation, importing
+     append_quotation(project, q)
+-    with importing():
+-        if scoped:
+-            project.save(ignore_permissions=True)
+-        else:
+-            project.save()
++    token = _creating_project.set(project)
++    try:
++        with importing():
++            if scoped:
++                project.save(ignore_permissions=True)
++            else:
++                project.save()
++    finally:
++        _creating_project.reset(token)
+     return project.name
+diff --git a/bsgroup/public/js/oman_quotation_flow.js b/bsgroup/public/js/oman_quotation_flow.js
+index 7438de5..798433f 100644
+--- a/bsgroup/public/js/oman_quotation_flow.js
++++ b/bsgroup/public/js/oman_quotation_flow.js
+@@ -53,12 +53,9 @@
+         const modules=[['elv','ELV Project'],['3cx','3CX Project'],['infra','Infra Project'],['supply','Supply Only']];
+         return [
+             {fieldtype:'Section Break',label:__('Select Project Category — choose one or more')},
+-            {fieldtype:'HTML',options:'<p><strong>'+__('A new project will be created automatically for this quotation.')+'</strong> '+__('An AI-generated draft project plan will be prepared using the quotation and costing sheet. Please select ELV Project, 3CX Project, Infra Project or Supply Only (choose all that apply). If AI is unavailable, the project remains created and its plan shows the action required.')+'</p>'},
++            {fieldtype:'HTML',options:'<p><strong>'+__('A new project will be created automatically for this quotation.')+'</strong> '+__('Aira AI will automatically generate the project plan from the quotation and linked costing sheet. Please select ELV Project, 3CX Project, Infra Project or Supply Only (choose all that apply) and enter the expected completion date. The project start date will be set to today; the project team can assign a manager and refine the plan later. If AI is unavailable, the project remains created and its plan shows the action required.')+'</p>'},
+             ...modules.map(([key,label])=>({fieldtype:'Check',fieldname:'module_'+key,label:__(label),default:(data.project_modules||[]).includes(key)?1:0})),
+             ...[
+-                {fieldtype:'Link',fieldname:'project_type',label:__('Project Type'),options:'Project Type',reqd:1},
+-                {fieldtype:'Link',fieldname:'custom_project_manager',label:__('Project Manager'),options:'Employee',reqd:1},
+-                {fieldtype:'Date',fieldname:'expected_start_date',label:__('Start Date'),reqd:1,default:data.required_by},
+                 {fieldtype:'Date',fieldname:'expected_end_date',label:__('Expected Project Completion Date'),reqd:1,
+                     description:__('Sales must enter this date before sending to Procurement. It sets the project completion date and the schedule for its project plan.')},
+                 {fieldtype:'Link',fieldname:'customer',label:__('Customer'),options:'Customer',reqd:1,default:data.project_customer},
+@@ -97,7 +94,7 @@
+                         reason:values.reason,customer_po:values.customer_po,customer_po_reference:values.customer_po_reference,
+                         schedule_date:values.schedule_date,warehouse:values.warehouse,
+                         project_modules:JSON.stringify(projectModules),project_details:JSON.stringify(Object.fromEntries(
+-                            ['project_type','custom_project_manager','expected_start_date','expected_end_date','customer','custom_project_description'].map(key=>[key,values[key]])))});
++                            ['expected_end_date','customer','custom_project_description'].map(key=>[key,values[key]])))});
+                     dialog.hide();await frm.reload_doc();
+                     if(result?.requisition) frappe.msgprint(__('Purchase Requisition created: {0}',[frappe.utils.escape_html(result.requisition)]));
+                     if(result?.project) frappe.msgprint(__('Project created/linked: {0}. Open Project Plan to follow automatic planning.',[frappe.utils.escape_html(result.project)]));
+diff --git a/bsgroup/public/js/quotation.js b/bsgroup/public/js/quotation.js
+index c58876b..8c177a2 100644
+--- a/bsgroup/public/js/quotation.js
++++ b/bsgroup/public/js/quotation.js
+@@ -350,11 +350,7 @@ frappe.ui.form.on("Quotation", {
+                        remain in the attached costing evidence. Only the Item lines below become purchasing lines.</p>` : "";
+                 const modules = [['elv','ELV Project'],['3cx','3CX Project'],['infra','Infra Project'],['supply','Supply Only']];
+                 const projectFields = [
+-                    {fieldtype:'HTML',fieldname:'project_info',options:'<p><strong>A new project will be created automatically for this quotation.</strong> An AI-generated draft project plan will be prepared using the quotation and costing sheet. Please select ELV Project, 3CX Project, Infra Project or Supply Only (choose all that apply). Complete the project manager and schedule below. If AI is unavailable, the project remains created and its plan shows the action required.</p>'},
+-                    {fieldname:'project_type',label:__('Project Type'),fieldtype:'Link',options:'Project Type',reqd:1},
+-                    {fieldname:'project_template',label:__('From Template'),fieldtype:'Link',options:'Project Template'},
+-                    {fieldname:'custom_project_manager',label:__('Project Manager'),fieldtype:'Link',options:'Employee',reqd:1},
+-                    {fieldname:'expected_start_date',label:__('Project Start Date'),fieldtype:'Date',reqd:1,default:data.required_by},
++                    {fieldtype:'HTML',fieldname:'project_info',options:'<p><strong>A new project will be created automatically for this quotation.</strong> Aira AI will automatically generate the project plan from the quotation and linked costing sheet. Please select ELV Project, 3CX Project, Infra Project or Supply Only (choose all that apply) and enter the expected completion date. The project start date will be set to today; the project team can assign a manager and refine the plan later. If AI is unavailable, the project remains created and its plan shows the action required.</p>'},
+                     {fieldname:'expected_end_date',label:__('Expected Project Completion Date'),fieldtype:'Date',reqd:1,
+                         description:__('Sales must enter this date before sending to Procurement. It sets the project completion date and the schedule for its project plan.')},
+                     {fieldname:'customer',label:__('Customer'),fieldtype:'Link',options:'Customer',reqd:1,default:data.project_customer,read_only:!!data.project_customer},
+@@ -382,7 +378,7 @@ frappe.ui.form.on("Quotation", {
+                     async primary_action(values) {
+                         const selected=modules.filter(([key])=>values['module_'+key]).map(([key])=>key);
+                         if(!selected.length){frappe.msgprint(__('Choose at least one project module.'));return;}
+-                        const projectDetails=Object.fromEntries(['project_type','project_template','custom_project_manager','expected_start_date','expected_end_date','customer','custom_project_description'].map(key=>[key,values[key]]));
++                        const projectDetails=Object.fromEntries(['expected_end_date','customer','custom_project_description'].map(key=>[key,values[key]]));
+                         dialog.disable_primary_action();
+                         try {
+                             const result = await frappe.call({
+diff --git a/bsgroup/utils/project.py b/bsgroup/utils/project.py
+index 4deb138..ca6ed89 100644
+--- a/bsgroup/utils/project.py
++++ b/bsgroup/utils/project.py
+@@ -27,14 +27,17 @@ def close_labor_preapprovals_on_completion(doc, method):
+ 
+ 
+ def validate_mandatory_fields(doc, method):
+-    missing = [label for label, value in {
++    from bsgroup.project_handover import is_handover_project
++
++    required = {
+         "Project Description": doc.custom_project_description,
+         "Expected Start Date": doc.expected_start_date,
+         "Expected End Date": doc.expected_end_date,
+-        "Project Type": doc.project_type,
+         "Customer": doc.customer,
+-        "Project Manager": doc.custom_project_manager
+-    }.items() if not value]
++    }
++    if not is_handover_project(doc):
++        required.update({"Project Type": doc.project_type, "Project Manager": doc.custom_project_manager})
++    missing = [label for label, value in required.items() if not value]
+ 
+     if missing:
+         frappe.throw("The following mandatory fields must be completed before creating a new Project: " + ", ".join(missing))

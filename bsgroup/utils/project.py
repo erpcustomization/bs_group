@@ -27,14 +27,17 @@ def close_labor_preapprovals_on_completion(doc, method):
 
 
 def validate_mandatory_fields(doc, method):
-    missing = [label for label, value in {
+    from bsgroup.project_handover import is_handover_project
+
+    required = {
         "Project Description": doc.custom_project_description,
         "Expected Start Date": doc.expected_start_date,
         "Expected End Date": doc.expected_end_date,
-        "Project Type": doc.project_type,
         "Customer": doc.customer,
-        "Project Manager": doc.custom_project_manager
-    }.items() if not value]
+    }
+    if not is_handover_project(doc):
+        required.update({"Project Type": doc.project_type, "Project Manager": doc.custom_project_manager})
+    missing = [label for label, value in required.items() if not value]
 
     if missing:
         frappe.throw("The following mandatory fields must be completed before creating a new Project: " + ", ".join(missing))

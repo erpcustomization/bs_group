@@ -51,6 +51,8 @@ const frm={doc:{docstatus:1,custom_deal_cost_sheet:'DCS-1',custom_pipeline_stage
         'Handover requires a date');
     check(dialog.options.fields.find(f=>f.fieldname==='expected_end_date').reqd===1,
         'A legacy project link cannot suppress the new project completion date');
+    check(!dialog.options.fields.some(f=>['project_type','project_template','custom_project_manager','expected_start_date'].includes(f.fieldname)),
+        'Sales handover omits the four project team fields');
     check(dialog.options.fields.find(f=>f.fieldname==='project_info').options.includes('A new project will be created automatically for this quotation.'),
         'The popup promises a new project even when old data contains a project link');
     const summary=dialog.options.fields[0].options;
@@ -63,6 +65,8 @@ const frm={doc:{docstatus:1,custom_deal_cost_sheet:'DCS-1',custom_pipeline_stage
     check(calls.at(-1).method.endsWith('.send_to_procurement')&&calls.at(-1).args.warehouse==='Stores - AE',
         'Creation carries source quotation, date and warehouse');
     check(calls.at(-1).args.project_modules==='["elv","supply"]','Selected project modules reach server');
+    check(!Object.keys(JSON.parse(calls.at(-1).args.project_details)).some(k=>['project_type','project_template','custom_project_manager','expected_start_date'].includes(k)),
+        'Hidden project fields are not sent by Sales');
     check(routes.at(-1).args[0]==='bs-procurement'&&routes.at(-1).options.bsp_request==='PR-1',
         'Created standard PR opens in BS Procurement');
     check(dialog.hidden&&!dialog.disabled,'Creation closes dialog and restores action');

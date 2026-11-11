@@ -350,11 +350,7 @@ frappe.ui.form.on("Quotation", {
                        remain in the attached costing evidence. Only the Item lines below become purchasing lines.</p>` : "";
                 const modules = [['elv','ELV Project'],['3cx','3CX Project'],['infra','Infra Project'],['supply','Supply Only']];
                 const projectFields = [
-                    {fieldtype:'HTML',fieldname:'project_info',options:'<p><strong>A new project will be created automatically for this quotation.</strong> An AI-generated draft project plan will be prepared using the quotation and costing sheet. Please select ELV Project, 3CX Project, Infra Project or Supply Only (choose all that apply). Complete the project manager and schedule below. If AI is unavailable, the project remains created and its plan shows the action required.</p>'},
-                    {fieldname:'project_type',label:__('Project Type'),fieldtype:'Link',options:'Project Type',reqd:1},
-                    {fieldname:'project_template',label:__('From Template'),fieldtype:'Link',options:'Project Template'},
-                    {fieldname:'custom_project_manager',label:__('Project Manager'),fieldtype:'Link',options:'Employee',reqd:1},
-                    {fieldname:'expected_start_date',label:__('Project Start Date'),fieldtype:'Date',reqd:1,default:data.required_by},
+                    {fieldtype:'HTML',fieldname:'project_info',options:'<p><strong>A new project will be created automatically for this quotation.</strong> Aira AI will automatically generate the project plan from the quotation and linked costing sheet. Please select ELV Project, 3CX Project, Infra Project or Supply Only (choose all that apply) and enter the expected completion date. The project start date will be set to today; the project team can assign a manager and refine the plan later. If AI is unavailable, the project remains created and its plan shows the action required.</p>'},
                     {fieldname:'expected_end_date',label:__('Expected Project Completion Date'),fieldtype:'Date',reqd:1,
                         description:__('Sales must enter this date before sending to Procurement. It sets the project completion date and the schedule for its project plan.')},
                     {fieldname:'customer',label:__('Customer'),fieldtype:'Link',options:'Customer',reqd:1,default:data.project_customer,read_only:!!data.project_customer},
@@ -382,7 +378,7 @@ frappe.ui.form.on("Quotation", {
                     async primary_action(values) {
                         const selected=modules.filter(([key])=>values['module_'+key]).map(([key])=>key);
                         if(!selected.length){frappe.msgprint(__('Choose at least one project module.'));return;}
-                        const projectDetails=Object.fromEntries(['project_type','project_template','custom_project_manager','expected_start_date','expected_end_date','customer','custom_project_description'].map(key=>[key,values[key]]));
+                        const projectDetails=Object.fromEntries(['expected_end_date','customer','custom_project_description'].map(key=>[key,values[key]]));
                         dialog.disable_primary_action();
                         try {
                             const result = await frappe.call({

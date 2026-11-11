@@ -11,11 +11,17 @@ from html import escape
 
 import frappe
 from frappe import _
-from frappe.utils import getdate, strip_html
+from frappe.utils import getdate, strip_html, today
 from bsgroup.project_modules import MODULES
 
 
 _sales_handover = ContextVar("sales_project_handover", default=None)
+_creating_project = ContextVar("quotation_handover_project", default=None)
+
+
+def is_handover_project(project):
+    """Only this server-created document may defer type/manager assignment."""
+    return _creating_project.get() is project
 
 
 def _source_key(q, sheet):
@@ -96,27 +102,37 @@ def save_project(q, sheet, modules, details=None):
     project = frappe.new_doc("Project")
     if not scoped:
         project.check_permission("create")
-    required = ("project_type", "custom_project_manager", "expected_start_date", "expected_end_date")
-    if any(not details.get(field) for field in required):
-        frappe.throw(_("Complete the project type, project manager and start/end dates."))
-    if getdate(details["expected_end_date"]) < getdate(details["expected_start_date"]):
+    if not details.get("expected_end_date"):
+        frappe.throw(_("Enter the expected project completion date."))
+    start_date = details.get("expected_start_date") or today()
+    if getdate(details["expected_end_date"]) < getdate(start_date):
         frappe.throw(_("Project end date cannot be before its start date."))
     subject = q.get("custom_subject") or sheet.get("subject") or "Project"
-    project.update({field: details[field] for field in required})
+    project.update(dict(expected_start_date=start_date, expected_end_date=details["expected_end_date"]))
+    # Older clients can still provide these optional fields. New sales popups
+    # leave them for the project team, without inventing a manager or type.
+    for field in ("project_type", "custom_project_manager"):
+        if details.get(field):
+            project.set(field, details[field])
     project.update(dict(project_name=subject + " - " + q.name,
         company=sheet.company, status="Open",
         customer=q.party_name if q.quotation_to == "Customer" else sheet.get("customer") or details.get("customer"),
         custom_project_description=details.get("custom_project_description") or subject))
-    if details.get("project_template"):
-        project.project_template = details["project_template"]
+    # Sales handover always queues its source-based AI plan. A stale browser
+    # must not supply a template that would silently replace automatic planning.
+    project.project_template = None
     for key in selected:
         project.set(MODULES[key][1], 1)
     project.custom_boq = scope
     from bsgroup.project_boq_schedule import append_quotation, importing
     append_quotation(project, q)
-    with importing():
-        if scoped:
-            project.save(ignore_permissions=True)
-        else:
-            project.save()
+    token = _creating_project.set(project)
+    try:
+        with importing():
+            if scoped:
+                project.save(ignore_permissions=True)
+            else:
+                project.save()
+    finally:
+        _creating_project.reset(token)
     return project.name

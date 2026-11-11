@@ -34,6 +34,7 @@ class ProjectHandoverTests(unittest.TestCase):
         self.f.new_doc = Mock(return_value=self.project)
         utils = types.ModuleType('frappe.utils')
         utils.getdate = lambda value: value
+        utils.today = lambda: '2026-11-11'
         utils.strip_html = lambda value: re.sub('<[^>]*>', '', value)
         modules = types.ModuleType('bsgroup.project_modules')
         modules.MODULES = {key: (key, 'custom_bs_'+key+'_projects') for key in ('supply','elv','infra','3cx')}
@@ -133,11 +134,11 @@ class ProjectHandoverTests(unittest.TestCase):
         self.assertEqual(self.project.project_name,'WiFi kitchen upgrade - Q-1')
         self.assertEqual(self.m.context(self.q,self.sheet)['project_description'],'WiFi kitchen upgrade')
 
-    def test_new_project_keeps_native_required_fields_template_and_permissions(self):
+    def test_old_client_template_cannot_replace_automatic_plan(self):
         self.sheet.project=None
         self.m.save_project(self.q,self.sheet,['supply','3cx'],json.dumps(self.details))
         self.project.check_permission.assert_called_once_with('create')
-        self.assertEqual(self.project.project_template,'Template A')
+        self.assertIsNone(self.project.project_template)
         self.assertEqual(self.project.customer,'C-1')
         self.assertEqual(self.project.company,'AE')
         self.project.save.assert_called_once_with()
@@ -148,6 +149,36 @@ class ProjectHandoverTests(unittest.TestCase):
         self.details['expected_end_date']='2026-11-01'
         with self.assertRaises(ValueError): self.m.save_project(self.q,self.sheet,['elv'],self.details)
         self.project.save.assert_not_called()
+
+    def test_sales_can_create_without_type_manager_template_or_start(self):
+        self.m.save_project(self.q,self.sheet,['infra'],{'expected_end_date':'2026-11-30'})
+        self.assertEqual(self.project.expected_start_date,'2026-11-11')
+        self.assertEqual(self.project.expected_end_date,'2026-11-30')
+        for field in ('project_type','custom_project_manager','project_template'):
+            self.assertIsNone(self.project.get(field))
+        self.project.save.assert_called_once_with()
+
+    def test_hidden_start_date_still_rejects_past_completion(self):
+        with self.assertRaises(ValueError):
+            self.m.save_project(self.q,self.sheet,['infra'],{'expected_end_date':'2026-11-10'})
+        self.project.save.assert_not_called()
+
+    def test_optional_fields_apply_only_to_the_project_being_created(self):
+        spec=importlib.util.spec_from_file_location('project_validation_test',Path(__file__).resolve().parents[1]/'utils/project.py')
+        validation=importlib.util.module_from_spec(spec);spec.loader.exec_module(validation)
+        other=Doc(custom_project_description='Other job',expected_start_date='2026-11-11',
+            expected_end_date='2026-11-30',customer='C-1')
+        def save():
+            self.assertTrue(self.m.is_handover_project(self.project))
+            validation.validate_mandatory_fields(self.project,None)
+            with self.assertRaises(ValueError):validation.validate_mandatory_fields(other,None)
+            raise RuntimeError('save failed')
+        self.project.save.side_effect=save
+        with patch.dict(sys.modules,{'bsgroup.project_handover':self.m}):
+            with self.assertRaisesRegex(RuntimeError,'save failed'):
+                self.m.save_project(self.q,self.sheet,['infra'],{'expected_end_date':'2026-11-30'})
+            self.assertFalse(self.m.is_handover_project(self.project))
+            with self.assertRaises(ValueError):validation.validate_mandatory_fields(self.project,None)
 
     def test_missing_installation_or_empty_boq_blocks_save(self):
         self.q.items=[]
