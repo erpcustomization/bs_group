@@ -81,14 +81,72 @@ class HREmailTests(unittest.TestCase):
                 self.assertEqual(q, before)
             origin.assert_not_called()
 
-    def test_uae_never_reads_settings_or_changes_messages(self):
-        self.f.conf["host_name"] = "https://erp.bitssecureit.com"
-        self.f.local.site = "erp-bitssecureit.u.frappe.cloud"
+    def test_other_sites_never_read_settings_or_change_messages(self):
+        self.f.conf["host_name"] = "https://erp.siteexclusive.ae"
+        self.f.local.site = "stage-bitssecure.u.frappe.cloud"
         q = self.queue()
         before = dict(q)
         self.m.route_queue(q)
         self.assertEqual(q, before)
         self.f.get_cached_doc.assert_not_called()
+
+    def uae(self):
+        self.f.conf["host_name"] = "https://erp.bitssecureit.com"
+        self.f.local.site = "erp-bitssecureit.u.frappe.cloud"
+        self.account.email_id = self.m.UAE_EMAIL
+
+    def test_uae_hr_uses_only_uae_mailbox_and_sender_name(self):
+        self.uae()
+        q = self.queue()
+        old = Parser(policy=SMTP).parsestr(q.message)
+        self.m.route_queue(q)
+        new = Parser(policy=SMTP).parsestr(q.message)
+        self.assertEqual(q.email_account, "HR Notifications")
+        self.assertEqual(new['From'].addresses[0].addr_spec, self.m.UAE_EMAIL)
+        self.assertEqual(new['From'].addresses[0].display_name, 'HR UAE')
+        self.assertEqual(new['Reply-To'], old['Reply-To'])
+        self.assertEqual([p.get_payload(decode=True) for p in new.walk()],
+                         [p.get_payload(decode=True) for p in old.walk()])
+        with patch.dict(self.account, email_id=self.m.OMAN_EMAIL):
+            with self.assertRaises(ValueError):
+                self.m.route_queue(self.queue())
+
+    def test_uae_helpdesk_sales_procurement_and_reset_mail_are_unchanged(self):
+        self.uae()
+        with patch.object(self.m, 'hr_origin', return_value=True):
+            for dt in ('HD Ticket', 'Quotation', 'Material Request', 'User'):
+                q = self.queue(dt)
+                q.email_account = 'Help Desk'
+                q.sender = 'helpdesk@bitssecureit.com'
+                before = dict(q)
+                self.m.route_queue(q)
+                self.assertEqual(q, before)
+
+    def test_uae_disabled_route_and_native_settings(self):
+        self.uae()
+        self.settings.custom_bs_hr_email_enabled = 0
+        q = self.queue()
+        before = dict(q)
+        self.m.route_queue(q)
+        self.assertEqual(q, before)
+        old = Doc(custom_bs_hr_email_enabled=0)
+        self.settings.custom_bs_hr_email_enabled = 1
+        doc = Doc(self.settings)
+        doc.get_doc_before_save = lambda: old
+        self.m.validate_settings(doc)
+        self.assertEqual(doc.sender_email, self.m.UAE_EMAIL)
+        self.assertEqual(doc.hiring_sender_email, self.m.UAE_EMAIL)
+
+    def test_hook_registration_preserves_existing_handlers_and_is_idempotent(self):
+        hooks = dict(after_migrate=['existing.setup'],
+            doc_events={'Email Queue': {'before_insert': 'existing.mail'},
+                        'HD Ticket': {'on_update': 'existing.helpdesk'}})
+        self.m.configure_hooks(hooks)
+        self.m.configure_hooks(hooks)
+        self.assertEqual(hooks['after_migrate'], ['existing.setup', 'bsgroup.hr_email.install'])
+        self.assertEqual(hooks['doc_events']['Email Queue']['before_insert'],
+                         ['existing.mail', 'bsgroup.hr_email.route_queue'])
+        self.assertEqual(hooks['doc_events']['HD Ticket']['on_update'], 'existing.helpdesk')
 
     def test_disabled_pilot_does_not_change_hr_messages(self):
         self.settings.custom_bs_hr_email_enabled = 0

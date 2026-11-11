@@ -744,7 +744,7 @@ after_migrate.append("bsgroup.project_workspace.install")
 after_migrate.append("bsgroup.project_plan.install")
 after_migrate.append("bsgroup.project_ai_plan.install")
 
-# Oman-only, explicitly enabled HR sending; no change to other mail routes.
+# Regional, explicitly enabled HR sending; no change to other mail routes.
 from bsgroup.hr_email import configure_hooks as _hr_email_hooks
 _hr_email_hooks(globals())
 
