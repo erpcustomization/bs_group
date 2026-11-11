@@ -123,16 +123,14 @@ def message(scheduled, now, pending=False):
     day = scheduled['start'].date()
     action = ('Your leave application for today is already pending. Please follow up with HR; '
               'you do not need to submit another application.' if pending else
-              'If you are away today, please submit the appropriate leave or attendance request.')
+              'If you are away today, please submit the appropriate leave request.')
     return (f'<p>Dear {escape(scheduled["employee_name"])},</p>'
         f'<p>Your assigned shift on {day:%d %B %Y} starts at '
         f'{scheduled["start"]:%H:%M} (Oman time). As of {now:%H:%M}, '
         'your check-in has not been recorded.</p>'
         '<p>If you have started work, please record your check-in in ERP. '
         'If you have already checked in or the record is incorrect, please contact HR.</p>'
-        f'<p>{action}</p><p><a href="https://erp-om.bitssecureit.com/desk/my-work-dashboard">'
-        'Open your attendance dashboard</a></p>'
-        '<p>This is an attendance reminder; it does not mark you absent or change your pay.</p>'
+        f'<p>{action}</p>'
         '<p>Regards,<br>HR Oman</p>')
 
 
@@ -225,6 +223,8 @@ def page():
     job_text = ('Active — every minute' if job and not job.stopped and job.cron_format == '* * * * *'
         else 'Not active')
     token = escape(get_csrf_token(), quote=True)
+    sample_time = datetime.combine(day, time(8), TZ)
+    preview = message(dict(employee_name='[Employee Name]', start=sample_time), sample_time)
     body = f'''<style>
     .error-page {{height:auto!important;min-height:100vh;display:block!important;padding:32px 0}}
     .error-page>div {{max-width:1100px;margin:auto}}
@@ -237,6 +237,8 @@ def page():
     One email per employee per working day; no CC. Holidays, approved leave/on-duty/WFH and recorded attendance are excluded.
     Missing calendars or conflicting employee/shift assignments are held for HR review.</p>
     <p>Scheduler: {job_text}. Last run: {escape(str(job.last_execution or 'Not yet') if job else 'Not yet')}.</p>
+    <details><summary>Preview the reminder email</summary>
+    <p><b>Subject: {escape(SUBJECT)}</b></p>{preview}</details>
     <form method="post" action="/api/method/bsgroup.oman_attendance_email.configure">
     <input type="hidden" name="csrf_token" value="{token}">
     <input type="hidden" name="enabled" value="{'0' if enabled else '1'}">
