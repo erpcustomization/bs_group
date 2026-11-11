@@ -59,7 +59,8 @@
                 {fieldtype:'Link',fieldname:'project_type',label:__('Project Type'),options:'Project Type',reqd:1},
                 {fieldtype:'Link',fieldname:'custom_project_manager',label:__('Project Manager'),options:'Employee',reqd:1},
                 {fieldtype:'Date',fieldname:'expected_start_date',label:__('Start Date'),reqd:1,default:data.required_by},
-                {fieldtype:'Date',fieldname:'expected_end_date',label:__('End Date'),reqd:1},
+                {fieldtype:'Date',fieldname:'expected_end_date',label:__('Expected Project Completion Date'),reqd:1,
+                    description:__('Sales must enter this date before sending to Procurement. It sets the project completion date and the schedule for its project plan.')},
                 {fieldtype:'Link',fieldname:'customer',label:__('Customer'),options:'Customer',reqd:1,default:data.project_customer},
                 {fieldtype:'Small Text',fieldname:'custom_project_description',label:__('Project Description'),reqd:1,default:data.project_description},
             ])

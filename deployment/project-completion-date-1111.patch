@@ -1,0 +1,28 @@
+diff --git a/bsgroup/public/js/oman_quotation_flow.js b/bsgroup/public/js/oman_quotation_flow.js
+index ccbb2d8..b3def8d 100644
+--- a/bsgroup/public/js/oman_quotation_flow.js
++++ b/bsgroup/public/js/oman_quotation_flow.js
+@@ -59,7 +59,8 @@
+                 {fieldtype:'Link',fieldname:'project_type',label:__('Project Type'),options:'Project Type',reqd:1},
+                 {fieldtype:'Link',fieldname:'custom_project_manager',label:__('Project Manager'),options:'Employee',reqd:1},
+                 {fieldtype:'Date',fieldname:'expected_start_date',label:__('Start Date'),reqd:1,default:data.required_by},
+-                {fieldtype:'Date',fieldname:'expected_end_date',label:__('End Date'),reqd:1},
++                {fieldtype:'Date',fieldname:'expected_end_date',label:__('Expected Project Completion Date'),reqd:1,
++                    description:__('Sales must enter this date before sending to Procurement. It sets the project completion date and the schedule for its project plan.')},
+                 {fieldtype:'Link',fieldname:'customer',label:__('Customer'),options:'Customer',reqd:1,default:data.project_customer},
+                 {fieldtype:'Small Text',fieldname:'custom_project_description',label:__('Project Description'),reqd:1,default:data.project_description},
+             ])
+diff --git a/bsgroup/public/js/quotation.js b/bsgroup/public/js/quotation.js
+index 1cdbe8d..e7690b5 100644
+--- a/bsgroup/public/js/quotation.js
++++ b/bsgroup/public/js/quotation.js
+@@ -357,7 +357,8 @@ frappe.ui.form.on("Quotation", {
+                     {fieldname:'project_template',label:__('From Template'),fieldtype:'Link',options:'Project Template'},
+                     {fieldname:'custom_project_manager',label:__('Project Manager'),fieldtype:'Link',options:'Employee',reqd:1},
+                     {fieldname:'expected_start_date',label:__('Project Start Date'),fieldtype:'Date',reqd:1,default:data.required_by},
+-                    {fieldname:'expected_end_date',label:__('Project End Date'),fieldtype:'Date',reqd:1},
++                    {fieldname:'expected_end_date',label:__('Expected Project Completion Date'),fieldtype:'Date',reqd:1,
++                        description:__('Sales must enter this date before sending to Procurement. It sets the project completion date and the schedule for its project plan.')},
+                     {fieldname:'customer',label:__('Customer'),fieldtype:'Link',options:'Customer',reqd:1,default:data.project_customer,read_only:!!data.project_customer},
+                     {fieldname:'custom_project_description',label:__('Project Description'),fieldtype:'Small Text',reqd:1,default:data.project_description}
+                 ];

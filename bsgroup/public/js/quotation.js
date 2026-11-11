@@ -357,7 +357,8 @@ frappe.ui.form.on("Quotation", {
                     {fieldname:'project_template',label:__('From Template'),fieldtype:'Link',options:'Project Template'},
                     {fieldname:'custom_project_manager',label:__('Project Manager'),fieldtype:'Link',options:'Employee',reqd:1},
                     {fieldname:'expected_start_date',label:__('Project Start Date'),fieldtype:'Date',reqd:1,default:data.required_by},
-                    {fieldname:'expected_end_date',label:__('Project End Date'),fieldtype:'Date',reqd:1},
+                    {fieldname:'expected_end_date',label:__('Expected Project Completion Date'),fieldtype:'Date',reqd:1,
+                        description:__('Sales must enter this date before sending to Procurement. It sets the project completion date and the schedule for its project plan.')},
                     {fieldname:'customer',label:__('Customer'),fieldtype:'Link',options:'Customer',reqd:1,default:data.project_customer,read_only:!!data.project_customer},
                     {fieldname:'custom_project_description',label:__('Project Description'),fieldtype:'Small Text',reqd:1,default:data.project_description}
                 ];
