@@ -1,0 +1,18 @@
+diff --git a/bsgroup/oman_attendance_email.py b/bsgroup/oman_attendance_email.py
+index 1e16532..7524fd4 100644
+--- a/bsgroup/oman_attendance_email.py
++++ b/bsgroup/oman_attendance_email.py
+@@ -225,7 +225,12 @@ def page():
+     job_text = ('Active — every minute' if job and not job.stopped and job.cron_format == '* * * * *'
+         else 'Not active')
+     token = escape(get_csrf_token(), quote=True)
+-    body = f'''<h2>Daily Oman check-in emails</h2>
++    body = f'''<style>
++    .error-page {{height:auto!important;min-height:100vh;display:block!important;padding:32px 0}}
++    .error-page>div {{max-width:1100px;margin:auto}}
++    .error-page .details {{text-align:left}}
++    .error-page .details table {{font-size:13px}}
++    </style><h2>Daily Oman check-in emails</h2>
+     <p><b>Status: {'Enabled' if enabled else 'Disabled'}</b> · Starts 12 November 2026 · Oman time (UTC+4)</p>
+     <p>Sender: {escape(account.email_id) if account else 'HR email routing is not enabled'}</p>
+     <p>At each employee's exact assigned shift start, with no grace period. The scheduler checks every minute.
