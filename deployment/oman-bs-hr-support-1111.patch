@@ -1,0 +1,1648 @@
+diff --git a/bsgroup/hr_management.py b/bsgroup/hr_management.py
+new file mode 100644
+index 0000000..c818d65
+--- /dev/null
++++ b/bsgroup/hr_management.py
+@@ -0,0 +1,158 @@
++"""HR management navigation and summaries, using existing document permissions.
++
++No endpoint approves leave, changes attendance, issues warnings or offboards staff.
++"""
++import frappe
++from frappe.utils import nowdate
++
++HR_ROLES = {"HR User", "HR Manager", "System Manager"}
++HR_ACCESS_ROLE = "BS HR Management"
++HR_ACCESS_USER = "muskan@bitssecureit.com"
++SECTIONS = (
++    ("employees", "Employee Profiles", "Employee", "employee_name", "status", {"status": "Active"}),
++    ("onboarding", "Onboarding", "Employee Onboarding", "employee_name", "boarding_status", {"docstatus": ["!=", 2]}),
++    ("attendance", "Attendance", "Employee Checkin", "employee_name", "log_type", {}),
++    ("leave", "Leave Approvals", "Leave Application", "employee_name", "status", {"status": "Open", "docstatus": ["!=", 2]}),
++    ("policies", "Policies", "Organization Document", "document_title", "approval_status", {}),
++    ("warnings", "Warnings", "HR Warning", "subject", "status", {}),
++    ("exit", "Exit Interviews", "Exit Interview", "employee_name", "status", {"docstatus": ["!=", 2]}),
++    ("offboarding", "Offboarding", "Employee Separation", "employee_name", "boarding_status", {"docstatus": ["!=", 2]}),
++    ("requests", "HR Requests", "HR Service Request", "subject", "status", {}),
++)
++
++
++def can_manage():
++    return frappe.session.user != "Guest" and (
++        frappe.session.user in ("Administrator", HR_ACCESS_USER) or "System Manager" in frappe.get_roles())
++
++
++def _guard():
++    if not can_manage():
++        frappe.throw("BS HR is available to Muskan and system administrators.", frappe.PermissionError)
++
++
++def _section(spec):
++    key, label, dt, title, status, filters = spec
++    result = dict(key=key, label=label, doctype=dt, available=False, rows=[], count=None)
++    if not frappe.db.exists("DocType", dt):
++        result["reason"] = "Setup pending"
++        return result
++    if not frappe.has_permission(dt, "read"):
++        result["reason"] = "Restricted by your existing access"
++        return result
++    meta = frappe.get_meta(dt)
++    fields = ["name", "modified", "docstatus"]
++    for field in (title, status, "employee", "company", "time", "from_date", "to_date"):
++        if meta.has_field(field) and field not in fields:
++            fields.append(field)
++    filters = dict(filters)
++    if key == "attendance":
++        filters["time"] = ["between", [nowdate() + " 00:00:00", nowdate() + " 23:59:59"]]
++    # Native list permission filters apply to both totals and returned records.
++    count = frappe.get_list(dt, filters=filters, fields=[{"COUNT": "name", "as": "total"}])[0].total
++    rows = frappe.get_list(dt, filters=filters, fields=fields,
++                           order_by="modified desc", limit_page_length=10)
++    result.update(available=True, count=count, can_create=frappe.has_permission(dt, "create"),
++                  filters=filters, title_field=title, status_field=status, rows=rows)
++    return result
++
++
++@frappe.whitelist()
++def overview():
++    _guard()
++    sections = [_section(spec) for spec in SECTIONS]
++    return dict(date=nowdate(), sections=sections,
++                can_setup="System Manager" in frappe.get_roles(),
++                setup_pending=any(s.get("reason") == "Setup pending" and s["key"] in ("warnings", "requests") for s in sections))
++
++
++@frappe.whitelist()
++def organization():
++    """Read the recorded reporting lines without exposing inaccessible managers."""
++    _guard()
++    if not frappe.has_permission("Employee", "read"):
++        frappe.throw("Employee records are restricted by your existing access.", frappe.PermissionError)
++    rows = frappe.get_list("Employee", filters={"status": "Active"},
++                           fields=["name", "employee_name", "designation", "department", "company", "reports_to"],
++                           order_by="employee_name asc", limit_page_length=0)
++    visible = {row.name for row in rows}
++    for row in rows:
++        row["can_edit"] = frappe.has_permission("Employee", "write", doc=row.name)
++        row["manager_outside_view"] = bool(row.get("reports_to") and row.reports_to not in visible)
++        if row["manager_outside_view"]:
++            row["reports_to"] = None
++    return dict(employees=rows, can_create=frappe.has_permission("Employee", "create"),
++                can_create_team=frappe.has_permission("Department", "create"),
++                can_read_teams=frappe.has_permission("Department", "read"))
++
++
++@frappe.whitelist(methods=["POST"])
++def setup_registers():
++    """Install new empty registers. No user roles or existing permissions change."""
++    frappe.only_for("System Manager")
++    for name in ("hr_warning", "hr_service_request"):
++        # Never overwrite a site's existing/custom record definition.
++        dt = "HR Warning" if name == "hr_warning" else "HR Service Request"
++        if not frappe.db.exists("DocType", dt):
++            frappe.reload_doc("bs_group", "doctype", name, force=True)
++    return dict(installed=True)
++
++
++ACCESS_ADDITIONS = {
++    "HR Warning": {"read": 1, "write": 1, "create": 1, "report": 1},
++    "HR Service Request": {"read": 1, "write": 1, "create": 1, "report": 1},
++    "Organization Document": {"read": 1, "write": 1, "create": 1, "report": 1},
++    "Organization Document Category": {"read": 1, "select": 1},
++}
++
++
++@frappe.whitelist()
++def muskan_access_review():
++    frappe.only_for("System Manager")
++    user = frappe.get_doc("User", HR_ACCESS_USER)
++    return dict(user=user.name, full_name=user.full_name, roles=frappe.get_roles(user.name),
++                additions=ACCESS_ADDITIONS,
++                current=[dict(doctype=s[2], read=frappe.has_permission(s[2], "read", user=user.name),
++                              write=frappe.has_permission(s[2], "write", user=user.name),
++                              create=frappe.has_permission(s[2], "create", user=user.name)) for s in SECTIONS])
++
++
++@frappe.whitelist(methods=["POST"])
++def grant_muskan_access():
++    """Explicit administrator action, called only after access confirmation."""
++    frappe.only_for("System Manager")
++    from frappe.permissions import setup_custom_perms
++    user = frappe.get_doc("User", HR_ACCESS_USER)
++    if not user.enabled:
++        frappe.throw("Muskan's account is disabled. No access changes were made.")
++    other_holders = frappe.get_all("Has Role", filters={"role": HR_ACCESS_ROLE, "parenttype": "User"}, pluck="parent")
++    if any(u != HR_ACCESS_USER and "System Manager" not in frappe.get_roles(u) for u in other_holders):
++        frappe.throw("The BS HR Management role is already used by another account. Review its scope before granting access.")
++    if not frappe.db.exists("Role", HR_ACCESS_ROLE):
++        frappe.get_doc(dict(doctype="Role", role_name=HR_ACCESS_ROLE, desk_access=1)).insert()
++    for dt, values in ACCESS_ADDITIONS.items():
++        setup_custom_perms(dt)
++        name = frappe.db.get_value("Custom DocPerm", {"parent": dt, "role": HR_ACCESS_ROLE, "permlevel": 0, "if_owner": 0})
++        rule = frappe.get_doc("Custom DocPerm", name) if name else frappe.get_doc(dict(
++            doctype="Custom DocPerm", parent=dt, parenttype="DocType", parentfield="permissions",
++            role=HR_ACCESS_ROLE, permlevel=0, if_owner=0))
++        rule.update(values)
++        rule.save()
++        frappe.clear_cache(doctype=dt)
++    if not frappe.db.exists("Role Profile", HR_ACCESS_ROLE):
++        frappe.get_doc(dict(doctype="Role Profile", role_profile=HR_ACCESS_ROLE,
++                            roles=[dict(role=HR_ACCESS_ROLE)])).insert()
++    else:
++        profile = frappe.get_doc("Role Profile", HR_ACCESS_ROLE)
++        if {r.role for r in profile.roles} != {HR_ACCESS_ROLE}:
++            frappe.throw("The BS HR Management profile has unexpected roles. Review it before proceeding.")
++    # Preserve the existing HR profile and every existing role.
++    if user.meta.has_field("role_profiles") and user.get("role_profiles"):
++        if not any(r.role_profile == HR_ACCESS_ROLE for r in user.role_profiles):
++            user.append("role_profiles", {"role_profile": HR_ACCESS_ROLE})
++    elif not any(r.role == HR_ACCESS_ROLE for r in user.roles):
++        user.append("roles", {"role": HR_ACCESS_ROLE})
++    user.save()
++    user.add_comment("Info", "BS HR Management access added for confidential HR registers and organization policies. Existing HR roles, company restrictions and approvals retained.")
++    frappe.clear_cache(user=user.name)
++    return {"user": user.name, "role": HR_ACCESS_ROLE}
+diff --git a/bsgroup/hr_org.py b/bsgroup/hr_org.py
+new file mode 100644
+index 0000000..174eec2
+--- /dev/null
++++ b/bsgroup/hr_org.py
+@@ -0,0 +1,63 @@
++"""Organization editor using native Employee permissions, validation and audit."""
++import frappe
++from bsgroup.hr_management import _guard
++
++FIELDS = ("first_name", "middle_name", "last_name", "designation", "department", "reports_to")
++
++
++@frappe.whitelist()
++def employee_details(employee):
++    _guard()
++    doc = frappe.get_doc("Employee", employee)
++    doc.check_permission("read")
++    doc.check_permission("write")
++    return {**{key: doc.get(key) for key in FIELDS}, "name": doc.name,
++            "employee_name": doc.employee_name, "company": doc.company, "modified": str(doc.modified)}
++
++
++def _check_manager(employee, manager):
++    """Lock the chain so concurrent moves cannot create circular reporting."""
++    seen = {employee}
++    current = manager
++    first = True
++    while current:
++        if current in seen:
++            frappe.throw("This reporting line would create a circular hierarchy. Choose another manager.")
++        seen.add(current)
++        doc = frappe.get_doc("Employee", current, for_update=True)
++        if first:
++            doc.check_permission("read")
++            if doc.status != "Active":
++                frappe.throw("Choose an active reporting manager.")
++            first = False
++        current = doc.reports_to
++
++
++@frappe.whitelist(methods=["POST"])
++def save_employee(employee, values, modified):
++    _guard()
++    values = frappe.parse_json(values)
++    if not isinstance(values, dict) or not values or set(values) - set(FIELDS):
++        frappe.throw("Only name, designation, department and reporting manager can be edited here.")
++    if any(value is not None and (not isinstance(value, str) or len(value) > 140) for value in values.values()):
++        frappe.throw("Enter valid employee details (up to 140 characters per field).")
++    doc = frappe.get_doc("Employee", employee, for_update=True)
++    doc.check_permission("read")
++    doc.check_permission("write")
++    if str(doc.modified) != str(modified):
++        frappe.throw("This employee was updated by someone else. Refresh the chart and try again.")
++    if doc.status != "Active":
++        frappe.throw("This employee is no longer active. Open the HR profile to review it.")
++    if "reports_to" in values and values["reports_to"] != doc.reports_to and values["reports_to"]:
++        _check_manager(doc.name, values["reports_to"])
++    for field, doctype in (("department", "Department"), ("designation", "Designation")):
++        if values.get(field) and values[field] != doc.get(field):
++            linked = frappe.get_doc(doctype, values[field])
++            linked.check_permission("read")
++            if field == "department" and linked.company and linked.company != doc.company:
++                frappe.throw("Choose a department belonging to the employee’s company.")
++    doc.update(values)
++    # Native save retains field permissions, workflows, validation and Version history.
++    doc.save()
++    doc.add_comment("Info", "Employee profile updated from BS HR Organization Structure.")
++    return {"name": doc.name, "employee_name": doc.employee_name}
+diff --git a/bsgroup/hr_attendance.py b/bsgroup/hr_attendance.py
+new file mode 100644
+index 0000000..a852faf
+--- /dev/null
++++ b/bsgroup/hr_attendance.py
+@@ -0,0 +1,214 @@
++"""Permission-filtered HR calendar; manual entries never fabricate punches."""
++from datetime import date, timedelta
++import frappe
++from bsgroup.attendance_place import describe_location
++from frappe.utils import nowdate
++from bsgroup.hr_management import _guard
++
++
++def month_bounds(month):
++    try:
++        start = date.fromisoformat(str(month) + "-01")
++    except (ValueError, TypeError):
++        frappe.throw("Choose a valid month (YYYY-MM).")
++    end = date(start.year + (start.month == 12), start.month % 12 + 1, 1)
++    return start, end
++
++
++def _rows(dt, fields, filters, restricted):
++    if not frappe.has_permission(dt, "read"):
++        restricted.append(dt)
++        return []
++    return frappe.get_list(dt, fields=fields, filters=filters, limit_page_length=0)
++
++
++def calendar_days(start, end, logs, leaves, attendance, requests, today):
++    days = {}
++    day = start
++    while day < end:
++        key = day.isoformat()
++        days[key] = dict(date=key, punches=[], leaves=[], attendance=[], requests=[],
++                         future=key > today)
++        day += timedelta(days=1)
++    for row in logs:
++        key = str(row["time"])[:10]
++        if key in days:
++            days[key]["punches"].append(dict(row, location=describe_location(row.get("latitude"), row.get("longitude"))))
++    for row in attendance:
++        key = str(row["attendance_date"])[:10]
++        if key in days:
++            days[key]["attendance"].append(dict(row))
++    for kind, rows in (("leaves", leaves), ("requests", requests)):
++        for row in rows:
++            for key, entry in days.items():
++                if str(row["from_date"])[:10] <= key <= str(row["to_date"])[:10]:
++                    item = dict(row)
++                    item["is_half_day"] = bool(row.get("half_day") and str(row.get("half_day_date"))[:10] == key)
++                    if kind == "leaves":
++                        item["approved"] = row.get("docstatus") == 1 and row.get("status") == "Approved"
++                    entry[kind].append(item)
++    for entry in days.values():
++        entry["punches"].sort(key=lambda r: str(r["time"]))
++    return list(days.values())
++
++
++@frappe.whitelist()
++def month_view(month, employee=None):
++    _guard()
++    from bsgroup.hr_oman import is_oman
++    start, end = month_bounds(month)
++    if not frappe.has_permission("Employee", "read"):
++        frappe.throw("Employee records are restricted by your existing access.", frappe.PermissionError)
++    employees = frappe.get_list("Employee", fields=["name", "employee_name", "company", "status"],
++                                order_by="employee_name asc", limit_page_length=0)
++    if not employees:
++        return dict(employees=[], days=[], restricted=[])
++    employee = employee or employees[0].name
++    if employee not in {e.name for e in employees}:
++        frappe.throw("This employee is outside your permitted HR view.", frappe.PermissionError)
++    emp = frappe.get_doc("Employee", employee)
++    emp.check_permission("read")
++    restricted = []
++    logs = _rows("Employee Checkin", ["name", "time", "log_type", "latitude", "longitude"],
++                 [["employee", "=", employee], ["time", ">=", str(start) + " 00:00:00"],
++                  ["time", "<", str(end) + " 00:00:00"]], restricted)
++    overlap = [["employee", "=", employee], ["docstatus", "!=", 2],
++               ["from_date", "<", str(end)], ["to_date", ">=", str(start)]]
++    leaves = _rows("Leave Application", ["name", "from_date", "to_date", "leave_type", "status",
++                   "docstatus", "half_day", "half_day_date"], overlap, restricted)
++    attendance = _rows("Attendance", ["name", "attendance_date", "status", "docstatus"],
++                       [["employee", "=", employee], ["docstatus", "!=", 2],
++                        ["attendance_date", ">=", str(start)], ["attendance_date", "<", str(end)]], restricted)
++    requests = _rows("Attendance Request", ["name", "from_date", "to_date", "reason", "docstatus",
++                     "half_day", "half_day_date"], overlap, restricted)
++    return dict(employees=employees, employee=employee, company=emp.company, today=nowdate(),
++                days=calendar_days(start, end, logs, leaves, attendance, requests, nowdate()),
++                repair_mithun=not is_oman() and employee == "1047" and str(start) == "2026-11-01" and
++                    "System Manager" in frappe.get_roles() and any(
++                        r.name in ("HR-ATT-2026-03642", "HR-ATT-2026-03658") and r.docstatus == 1
++                        for r in attendance),
++                restricted=restricted,
++                can_record=frappe.has_permission("Attendance", "create") and
++                           frappe.has_permission("HR Service Request", "read"))
++
++
++@frappe.whitelist(methods=["POST"])
++def record_manual(employee, attendance_date, status, employee_request, reason):
++    """Prepare native Attendance for HR review/submission, with a required request trail."""
++    _guard()
++    if not frappe.has_permission("Attendance", "create"):
++        frappe.throw("Attendance creation is restricted by your existing access.", frappe.PermissionError)
++    try:
++        day = date.fromisoformat(str(attendance_date))
++    except (ValueError, TypeError):
++        frappe.throw("Choose a valid attendance date.")
++    if str(day) > nowdate():
++        frappe.throw("Manual attendance can only be recorded for today or a past date.")
++    if status not in ("Present", "Absent", "Half Day", "Work From Home"):
++        frappe.throw("Use the leave approval process to record leave.")
++    if not str(reason or "").strip() or not employee_request:
++        frappe.throw("An employee request and HR reason are required.")
++    emp = frappe.get_doc("Employee", employee)
++    emp.check_permission("read")
++    request = frappe.get_doc("HR Service Request", employee_request)
++    request.check_permission("read")
++    if request.employee != employee or request.company != emp.company:
++        frappe.throw("The request must belong to this employee and company.")
++    # Serialize calendar corrections for this employee. Native Attendance validation
++    # remains authoritative; no permission filters are bypassed for record writes.
++    frappe.db.get_value("Employee", employee, "name", for_update=True)
++    if frappe.db.exists("Attendance", {"employee": employee, "attendance_date": str(day), "docstatus": ["!=", 2]}):
++        frappe.throw("An attendance record already exists. Open it from the calendar and use the existing HR correction or amendment process.")
++    if frappe.db.exists("Leave Application", {"employee": employee, "docstatus": 1, "status": "Approved",
++                       "from_date": ["<=", str(day)], "to_date": [">=", str(day)]}):
++        frappe.throw("Approved leave covers this date. Review the leave application before recording a correction.")
++    doc = frappe.get_doc(dict(doctype="Attendance", employee=employee, company=emp.company,
++                             attendance_date=str(day), status=status))
++    doc.insert()
++    from frappe.utils import escape_html
++    doc.add_comment("Info", "Manual attendance prepared by HR upon employee request {0}. Reason: {1}. "
++                    "Original Employee Checkin records were not changed.".format(
++                        escape_html(employee_request), escape_html(str(reason).strip())))
++    return dict(name=doc.name, docstatus=doc.docstatus)
++
++
++# One-time, explicitly requested correction. No generic attendance override and
++# no broad shift reprocessing: only these two original attendance/punch pairs.
++MITHUN_REPAIR = (
++    ("2026-11-06", "HR-ATT-2026-03642", (("EMP-CKIN-11-2026-000100", "IN", "2026-11-06 09:01:37"),
++                                         ("EMP-CKIN-11-2026-000114", "OUT", "2026-11-06 21:17:34"))),
++    ("2026-11-07", "HR-ATT-2026-03658", (("EMP-CKIN-11-2026-000116", "IN", "2026-11-07 08:37:38"),
++                                         ("EMP-CKIN-11-2026-000129", "OUT", "2026-11-07 19:00:33"))),
++)
++
++
++@frappe.whitelist(methods=["POST"])
++def repair_mithun_november():
++    """Cancel/amend erroneous absences using native validation and original punches."""
++    frappe.only_for("System Manager")
++    from bsgroup.hr_oman import is_oman
++    if is_oman():
++        frappe.throw('This historical UAE correction is not available on the Oman site.')
++    from frappe.utils import getdate, get_datetime
++    frappe.db.get_value("Employee", "1047", "name", for_update=True)
++    shift = frappe.get_doc("Shift Type", "General - UAE")
++    shift.check_permission("read")
++    if int(shift.allow_check_out_after_shift_end_time or 0) < 360:
++        frappe.throw("Save the corrected evening checkout window before recalculating.")
++    if not frappe.has_permission("Attendance", "create") or not frappe.has_permission("Attendance", "submit"):
++        frappe.throw("Native Attendance create and submit permission are required.", frappe.PermissionError)
++    results = []
++    for day, old_name, expected in MITHUN_REPAIR:
++        old = frappe.get_doc("Attendance", old_name, for_update=True)
++        old.check_permission("read")
++        if old.docstatus == 2:
++            replacement = frappe.get_list("Attendance", filters={"amended_from":old_name,"docstatus":1},
++                                          fields=["name","status"], limit_page_length=2)
++            if len(replacement) == 1 and replacement[0].status == "Present":
++                results.append(dict(date=day,name=replacement[0].name,status="Present",already_done=True))
++                continue
++            frappe.throw("The original attendance was already cancelled. Review its amendment before continuing.")
++        old.check_permission("cancel")
++        old.check_permission("amend")
++        if old.employee != "1047" or str(getdate(old.attendance_date)) != day or old.docstatus != 1 or old.status != "Absent" or old.shift != shift.name:
++            frappe.throw("Attendance no longer matches the reviewed absence. No correction was applied.")
++        if frappe.db.exists("Leave Application", {"employee":"1047","docstatus":1,"status":"Approved",
++                            "from_date":["<=",day],"to_date":[">=",day]}):
++            frappe.throw("Approved leave now covers this date. HR review is required.")
++        logs=[]
++        for name, kind, stamp in expected:
++            log=frappe.get_doc("Employee Checkin",name,for_update=True)
++            log.check_permission("write")
++            if log.employee != "1047" or log.log_type != kind or get_datetime(log.time) != get_datetime(stamp) or log.skip_auto_attendance or log.attendance not in (None,"",old_name):
++                frappe.throw("The original punches changed or are excluded. No correction was applied.")
++            logs.append(log)
++        # Exact pair only; do not silently ignore any newly added punch on either date.
++        names=frappe.get_list("Employee Checkin",filters=[["employee","=","1047"],
++                             ["time",">=",day+" 00:00:00"],["time","<=",day+" 23:59:59"]],pluck="name",limit_page_length=0)
++        if set(names) != {x[0] for x in expected}:
++            frappe.throw("Additional punches exist for this date. Review them before recalculation.")
++        old.cancel()  # Native cancellation unlinks punches; entire request rolls back on failure.
++        for log in logs:
++            log.reload()
++            log.fetch_shift()
++            if log.offshift or log.shift != shift.name:
++                frappe.throw("A punch is still outside the corrected shift window.")
++            log.save()
++        status,hours,late,early,in_time,out_time=shift.get_attendance(
++            [frappe._dict(log.as_dict()) for log in logs],
++            shift.working_hours_threshold_for_absent,shift.working_hours_threshold_for_half_day)
++        if status != "Present" or not in_time or not out_time:
++            frappe.throw("Original punches do not meet the unchanged Present threshold.")
++        corrected=frappe.get_doc(dict(doctype="Attendance",employee=old.employee,company=old.company,
++            attendance_date=day,shift=shift.name,status=status,working_hours=hours,late_entry=late,
++            early_exit=early,in_time=in_time,out_time=out_time,amended_from=old.name))
++        corrected.insert()
++        corrected.submit()
++        from hrms.hr.doctype.employee_checkin.employee_checkin import update_attendance_in_checkins
++        update_attendance_in_checkins([log.name for log in logs],corrected.name)
++        note="Corrected premature absence after repairing the General - UAE checkout window. Recalculated from original punches {0}; no timestamps or working-hours thresholds changed. Replaces {1}.".format(
++            ", ".join(log.name for log in logs),old.name)
++        corrected.add_comment("Info",note)
++        old.add_comment("Info","Corrected by amendment {0}. {1}".format(corrected.name,note))
++        results.append(dict(date=day,name=corrected.name,status=status,working_hours=hours))
++    return results
+diff --git a/bsgroup/hr_monthly_review.py b/bsgroup/hr_monthly_review.py
+new file mode 100644
+index 0000000..d9d2268
+--- /dev/null
++++ b/bsgroup/hr_monthly_review.py
+@@ -0,0 +1,259 @@
++"""Read-only HR evidence for monthly attendance/leave review. Never issues warnings."""
++from datetime import date, datetime, time, timedelta
++from zoneinfo import ZoneInfo
++import frappe
++from frappe.utils import getdate, get_datetime, flt
++from bsgroup.hr_management import _guard
++from bsgroup.hr_attendance import month_bounds, _rows
++
++TZ = ZoneInfo('Asia/Dubai')
++ANNUAL = 'Annual Vacation'
++PROPOSED_RULES = [
++    dict(key='late', title='Late-arrival warning', trigger='3 completed late-arrival days in a calendar month',
++         delivery='Employee; once per month after the threshold is reached',
++         safeguard='Exclude holidays, approved leave/on-duty dates and incomplete or conflicting punches.'),
++    dict(key='absence', title='Absence review', trigger='1 submitted HR Absent day without approved leave or conflicting punches',
++         delivery='HR review first; employee warning only after HR confirms the absence',
++         safeguard='Missing check-in alone never triggers an absence warning.'),
++    dict(key='annual', title='Annual-leave planning reminder', trigger='10 or more available annual-leave days',
++         delivery='Employee; once per month',
++         safeguard='Use current HRMS balance after pending requests. Unknown/import-reference balances require HR review.'),
++    dict(key='after_hours', title='Manager after-hours review', trigger='30 or more recorded minutes after 6 PM on a day',
++         delivery='Recorded reporting manager; one daily digest for the previous day',
++         safeguard='Include the exact IN/OUT pairs. Request business reason/authorization; do not approve overtime or pay automatically.'),
++]
++
++
++def paired_intervals(logs, now):
++    """Only unambiguous completed pairs contribute hours; keep every raw punch."""
++    pairs, issues = [], set()
++    active = None
++    ambiguous = False
++    for log in sorted(logs, key=lambda x: x['stamp']):
++        stamp, kind = log['stamp'], log.get('log_type')
++        if stamp > now:
++            continue
++        if kind == 'IN':
++            if active is not None:
++                issues.update((active.date(), stamp.date()))
++                ambiguous = True
++            else:
++                active, ambiguous = stamp, False
++        elif kind == 'OUT':
++            if active is None:
++                issues.add(stamp.date())
++            elif not ambiguous and timedelta(0) < stamp-active <= timedelta(days=1):
++                pairs.append((active, stamp))
++            else:
++                issues.update((active.date(), stamp.date()))
++            active, ambiguous = None, False
++        else:
++            issues.add(stamp.date())
++            if active:
++                ambiguous = True
++    if active:
++        issues.add(active.date())
++    return pairs, issues
++
++
++def minutes_between(pairs, start, end):
++    return round(sum(max(0, (min(b, end)-max(a, start)).total_seconds()) for a,b in pairs)/60, 2)
++
++
++def effective_holiday(assignments, employee, company, day, fallback=None):
++    groups=[[a for a in assignments if a['assigned_to']==who] for who in (employee,company)]
++    for group in groups:
++        current=[a for a in group if getdate(a['from_date'])<=day]
++        if current:return max(current,key=lambda a:getdate(a['from_date']))['holiday_list']
++    for group in groups:
++        if group:return min(group,key=lambda a:getdate(a['from_date']))['holiday_list']
++    return fallback
++
++
++def day_metrics(day, now, pairs, punches, issues, schedule=None, holiday=False, leave=0, duty=0, attendance=None):
++    attendance = attendance or []
++    start, end = schedule if schedule else (None, None)
++    lower = datetime.combine(day, time(), TZ)
++    after_start = datetime.combine(day, time(18), TZ)
++    after = minutes_between(pairs, after_start, min(lower+timedelta(days=1), now)) if day <= now.date() else 0
++    raw = [r for r in punches if r['stamp'].date()==day and r['stamp']<=now]
++    first = next((r['stamp'] for r in sorted(raw,key=lambda x:x['stamp']) if r.get('log_type')=='IN'),None)
++    last = next((r['stamp'] for r in sorted(raw,key=lambda x:x['stamp'],reverse=True) if r.get('log_type')=='OUT'),None)
++    scheduled = round((end-start).total_seconds()/60,2) if start and not holiday else 0 if holiday else None
++    due = round(max(0,(min(now,end)-start).total_seconds())/60*(1-leave),2) if start and not holiday else 0 if holiday else None
++    office = minutes_between(pairs,start,end) if start else None
++    flags = []
++    if not schedule: flags.append('Shift or holiday calendar unavailable')
++    if day in issues: flags.append('Incomplete or ambiguous punches')
++    hr_absent = any(r.get('status')=='Absent' and r.get('docstatus')==1 for r in attendance)
++    if hr_absent and (raw or leave or duty or holiday): flags.append('HR absence conflicts with other records')
++    if any(r.get('docstatus')==0 for r in attendance): flags.append('Draft HR attendance')
++    eligible = bool(start and day<=now.date() and not holiday and not leave and not duty)
++    # Overnight shifts need their own arrival window; don't label daytime punches late.
++    if start and end.date()!=start.date():
++        eligible=False
++        flags.append('Overnight shift: review arrival separately')
++    complete = bool(first and any(a==first for a,b in pairs) and day not in issues)
++    late_minutes = round(max(0,(first-start).total_seconds())/60,2) if eligible and complete else 0
++    missing = bool(eligible and now>=end and not first)
++    return dict(date=str(day), first_in=first.strftime('%H:%M:%S') if first else None,
++                last_out=last.strftime('%H:%M:%S') if last else None, scheduled_minutes=scheduled,
++                expected_due_minutes=due, office_minutes=office, after_minutes=after,
++                after_day=int(after>0), late_minutes=late_minutes if start else None, late_day=int(late_minutes>0) if start else None,
++                leave_days=leave if day<=now.date() else 0, on_duty=duty, holiday=holiday,
++                hr_absent=int(hr_absent and day<=now.date()), missing_checkin=int(missing) if start else None,
++                flags=flags, punches=[{k:v for k,v in r.items() if k!='stamp'} for r in raw],
++                completed_pairs=[dict(check_in=a.isoformat(),check_out=b.isoformat()) for a,b in pairs
++                    if a<lower+timedelta(days=1) and b>lower],
++                attendance=attendance, future=day>now.date(),
++                shift_start=start.strftime('%H:%M') if start else None,
++                shift_end=end.strftime('%H:%M') if end else None)
++
++
++def _annual(employee, at, restricted):
++    needed=('Leave Allocation','Leave Application','Leave Ledger Entry')
++    if any(not frappe.has_permission(dt,'read') for dt in needed):
++        return dict(source='restricted',note='Annual-leave records are restricted by existing access.')
++    from hrms.hr.doctype.leave_application.leave_application import get_leave_details
++    try:
++        details=get_leave_details(employee.name,str(at))
++    except frappe.PermissionError:
++        return dict(source='restricted',note='Annual-leave details are restricted by HRMS.')
++    allocation=details.get('leave_allocation',{}).get(ANNUAL)
++    if allocation is not None:
++        balance=flt(allocation.get('remaining_leaves')); pending=flt(allocation.get('leaves_pending_approval'))
++        return dict(source='hrms',allocated=flt(allocation.get('total_leaves')),balance=balance,
++                    available=max(0,balance-pending),pending=pending,
++                    used_in_allocation=flt(allocation.get('leaves_taken')),as_of=str(at))
++    # Oman's balances come only from its native HRMS; UAE imports are not a source.
++    from bsgroup.hr_oman import is_oman
++    if is_oman():
++        return dict(source='unavailable',note='No annual-leave allocation for this date.')
++    # Imported negative/unknown values remain visible only with access to the private source.
++    from bsgroup.dashboard_leave_balance import SOURCE_FILE_ID, imported_reference
++    if employee.user_id and frappe.has_permission('File','read',doc=SOURCE_FILE_ID):
++        ref=imported_reference(employee.user_id,str(at))
++        if ref is not None:
++            return dict(source='reference',balance=ref,as_of=str(at),note='Excel reference; no live allocation. Not an available balance.')
++    return dict(source='unavailable',note='No annual-leave allocation for this date.')
++
++
++@frappe.whitelist()
++def report(month, employee=None):
++    _guard()
++    start,end=month_bounds(month)
++    now=datetime.now(TZ)
++    if not frappe.has_permission('Employee','read'):
++        frappe.throw('Employee records are restricted.',frappe.PermissionError)
++    employees=frappe.get_list('Employee',fields=['name','employee_name','company','department','reports_to',
++        'user_id','company_email','status','date_of_joining','relieving_date','default_shift','holiday_list'],
++        order_by='employee_name asc',limit_page_length=0)
++    employees=[e for e in employees if (not e.date_of_joining or getdate(e.date_of_joining)<end)
++        and (not e.relieving_date or getdate(e.relieving_date)>=start)
++        and (e.status=='Active' or e.relieving_date)]
++    if employee:
++        if employee not in {e.name for e in employees}:
++            frappe.throw('Employee is outside your permitted HR view.',frappe.PermissionError)
++        employees=[e for e in employees if e.name==employee]
++    restricted=[]
++    if not employees:return dict(month=month,employees=[],restricted=[],rules=PROPOSED_RULES,automation_enabled=False)
++    names=[e.name for e in employees]
++    site=ZoneInfo(frappe.utils.get_system_timezone())
++    lower=datetime.combine(start-timedelta(days=1),time(),TZ).astimezone(site).replace(tzinfo=None)
++    upper=datetime.combine(end+timedelta(days=1),time(),TZ).astimezone(site).replace(tzinfo=None)
++    logs=_rows('Employee Checkin',['name','employee','time','log_type'],
++        [['employee','in',names],['time','>=',lower],['time','<',upper]],restricted)
++    overlap=[['employee','in',names],['docstatus','!=',2],['from_date','<',str(end)],['to_date','>=',str(start)]]
++    leaves=_rows('Leave Application',['name','employee','from_date','to_date','leave_type','status','docstatus','half_day','half_day_date'],overlap,restricted)
++    duty=_rows('Attendance Request',['name','employee','from_date','to_date','reason','docstatus','half_day','half_day_date'],
++        overlap+[['reason','in',['On Duty','Work From Home']]],restricted)
++    attendance=_rows('Attendance',['name','employee','attendance_date','status','docstatus'],
++        [['employee','in',names],['attendance_date','>=',str(start)],['attendance_date','<',str(end)],['docstatus','!=',2]],restricted)
++    assignments=_rows('Shift Assignment',['employee','shift_type','start_date','end_date'],
++        [['employee','in',names],['docstatus','=',1],['status','=','Active'],['start_date','<',str(end)]],restricted)
++    assignments.sort(key=lambda a:str(a.start_date),reverse=True)
++    shift_names={e.default_shift for e in employees}|{a.shift_type for a in assignments}
++    shifts={}
++    for name in shift_names-{None,''}:
++        if frappe.has_permission('Shift Type','read',doc=name):shifts[name]=frappe.get_doc('Shift Type',name)
++        elif 'Shift Type' not in restricted:restricted.append('Shift Type')
++    company_holidays={}
++    for company in {e.company for e in employees}:
++        if frappe.has_permission('Company','read',doc=company):
++            company_holidays[company]=frappe.get_doc('Company',company).get('default_holiday_list')
++    holiday_assignments=[]
++    if frappe.db.exists('DocType','Holiday List Assignment'):
++        holiday_assignments=_rows('Holiday List Assignment',['assigned_to','holiday_list','from_date'],
++            [['assigned_to','in',names+list({e.company for e in employees})],['docstatus','=',1]],restricted)
++    list_names={e.holiday_list for e in employees}|{s.holiday_list for s in shifts.values()}|set(company_holidays.values())
++    list_names|={a.holiday_list for a in holiday_assignments}
++    holidays={};holiday_coverage={}
++    for name in list_names-{None,''}:
++        if frappe.has_permission('Holiday List','read',doc=name):
++            holiday_doc=frappe.get_doc('Holiday List',name)
++            holidays[name]={getdate(h.holiday_date):h.description for h in holiday_doc.holidays}
++            holiday_coverage[name]=(getdate(holiday_doc.from_date),getdate(holiday_doc.to_date))
++        elif 'Holiday List' not in restricted:restricted.append('Holiday List')
++    from bsgroup.attendance_widget import shift_bounds
++    from hrms.hr.doctype.leave_application.leave_application import get_number_of_leave_days
++    results=[]
++    for emp in employees:
++        elog=[dict(r, time=str(r.time),stamp=get_datetime(r.time).replace(tzinfo=site).astimezone(TZ)) for r in logs if r.employee==emp.name]
++        pairs,issues=paired_intervals(elog,now)
++        eleaves=[r for r in leaves if r.employee==emp.name]
++        eduty=[r for r in duty if r.employee==emp.name and r.docstatus==1]
++        eassign=[r for r in assignments if r.employee==emp.name]
++        daily=[]; day=start; annual_taken=0; leave_total=0
++        while day<end:
++            if (emp.date_of_joining and day<getdate(emp.date_of_joining)) or (emp.relieving_date and day>getdate(emp.relieving_date)):
++                day+=timedelta(days=1);continue
++            assigned=next((a.shift_type for a in eassign if getdate(a.start_date)<=day and (not a.end_date or getdate(a.end_date)>=day)),emp.default_shift)
++            shift=shifts.get(assigned)
++            fallback=emp.holiday_list or company_holidays.get(emp.company)
++            holiday_name=(shift.holiday_list if shift else None) or effective_holiday(holiday_assignments,emp.name,emp.company,day,fallback)
++            covered=holiday_name in holiday_coverage and holiday_coverage[holiday_name][0]<=day<=holiday_coverage[holiday_name][1]
++            schedule=shift_bounds(day,shift) if shift and covered and not {'Shift Assignment','Holiday List Assignment'}&set(restricted) else None
++            off=day in holidays.get(holiday_name,{})
++            approved=[r for r in eleaves if r.docstatus==1 and r.status=='Approved' and getdate(r.from_date)<=day<=getdate(r.to_date)]
++            portion=0; annual_portion=0
++            for leave in approved:
++                half=bool(leave.half_day and (not leave.half_day_date or getdate(leave.half_day_date)==day))
++                amount=max(0,flt(get_number_of_leave_days(emp.name,leave.leave_type,day,day,
++                    half_day=int(half),half_day_date=day if half else None,leave_application=leave.name)))
++                portion=max(portion,min(1,amount))
++                if leave.leave_type==ANNUAL:annual_portion=max(annual_portion,min(1,amount))
++            duty_portion=max([.5 if r.half_day and (not r.half_day_date or getdate(r.half_day_date)==day) else 1
++                for r in eduty if getdate(r.from_date)<=day<=getdate(r.to_date)]+[0])
++            d=day_metrics(day,now,pairs,elog,issues,schedule,off,portion,duty_portion,
++                [dict(r) for r in attendance if r.employee==emp.name and getdate(r.attendance_date)==day])
++            d['shift']=assigned;d['leave_records']=[dict(r) for r in eleaves if getdate(r.from_date)<=day<=getdate(r.to_date)]
++            if 'Employee Checkin' in restricted:
++                for k in ('office_minutes','after_minutes','after_day','late_minutes','late_day','missing_checkin'):d[k]=None
++            if 'Attendance' in restricted:d['hr_absent']=None
++            if 'Leave Application' in restricted:
++                d['leave_days']=None;d['expected_due_minutes']=None;d['late_day']=None;d['late_minutes']=None;d['missing_checkin']=None
++            if 'Attendance Request' in restricted:
++                d['late_day']=None;d['late_minutes']=None;d['missing_checkin']=None
++            daily.append(d)
++            if day<=now.date():annual_taken+=annual_portion;leave_total+=portion
++            day+=timedelta(days=1)
++        def total(key):
++            values=[d[key] for d in daily]
++            return None if any(v is None for v in values) else round(sum(values),2)
++        balance_at=min(end-timedelta(days=1),now.date())
++        annual=_annual(emp,balance_at,restricted)
++        manager=None
++        if emp.reports_to and frappe.has_permission('Employee','read',doc=emp.reports_to):
++            m=frappe.get_doc('Employee',emp.reports_to)
++            manager=dict(name=m.name,employee_name=m.employee_name,email=m.company_email or m.user_id)
++        results.append(dict(employee=emp.name,employee_name=emp.employee_name,company=emp.company,department=emp.department,
++            email=emp.company_email or emp.user_id,manager=manager,annual=annual,
++            annual_taken=round(annual_taken,2) if 'Leave Application' not in restricted else None,
++            leave_taken=round(leave_total,2) if 'Leave Application' not in restricted else None,
++            totals={k:total(k) for k in ('scheduled_minutes','expected_due_minutes','office_minutes','after_minutes','after_day','late_minutes','late_day','hr_absent','missing_checkin')},
++            review_days=sum(bool(d['flags']) for d in daily if not d['future']),days=daily))
++    return dict(month=month,as_of=now.isoformat(),employees=results,restricted=sorted(set(restricted)),
++                rules=PROPOSED_RULES,automation_enabled=False,
++                can_warning=frappe.has_permission('HR Warning','create'),
++                can_request=frappe.has_permission('HR Service Request','create'),
++                can_email=frappe.has_permission('Communication','create'))
+diff --git a/bsgroup/hr_annual_allocation.py b/bsgroup/hr_annual_allocation.py
+new file mode 100644
+index 0000000..8f7aca8
+--- /dev/null
++++ b/bsgroup/hr_annual_allocation.py
+@@ -0,0 +1,93 @@
++"""Capped annual allocations using native HRMS saves, ledger and permissions."""
++from decimal import Decimal, InvalidOperation
++import frappe
++from frappe.utils import flt, getdate
++from bsgroup.dashboard_leave import dubai_today
++from bsgroup.hr_management import _guard
++
++ANNUAL = 'Annual Vacation'
++LIMIT = 26
++
++
++def allocation_limit():
++    # The UAE-specific 26-day decision must not replace Oman's HR policy.
++    from urllib.parse import urlparse
++    host = urlparse((getattr(frappe, 'conf', None) or {}).get('host_name') or '').hostname
++    site = getattr(getattr(frappe, 'local', None), 'site', None)
++    if host in {'erp-om.bitssecureit.com', 'erp-om.k.frappe.cloud'} or site == 'erp-om.k.frappe.cloud':
++        native = flt(frappe.get_cached_value('Leave Type', ANNUAL, 'max_leaves_allowed'))
++        return native if native > 0 else None
++    return LIMIT
++
++
++def allocation_days(value):
++    try:
++        days = Decimal(str(value))
++    except (InvalidOperation, ValueError):
++        frappe.throw('Enter a valid number of annual-leave days.')
++    limit = allocation_limit()
++    if not days.is_finite() or days < 0 or (limit is not None and days > Decimal(str(limit))):
++        message = f'between 0 and {limit:g} days' if limit is not None else 'a non-negative number of days'
++        frappe.throw(f'Annual-leave allocation must be {message}, including carried-forward days.')
++    return float(days)
++
++
++def validate_allocation(doc, method=None):
++    if doc.leave_type != ANNUAL or doc.docstatus == 2:
++        return
++    total = allocation_days(flt(doc.new_leaves_allocated) + flt(doc.unused_leaves))
++    # Never permit direct edits of the derived total without corresponding ledger entries.
++    doc.total_leaves_allocated = total
++    previous = doc.get_doc_before_save()
++    if previous and previous.docstatus == 1 and total < flt(previous.total_leaves_allocated):
++        from hrms.hr.doctype.leave_application.leave_application import get_leave_details
++        at = max(getdate(doc.from_date), min(getdate(dubai_today()), getdate(doc.to_date)))
++        current = get_leave_details(doc.employee, str(at)).get('leave_allocation', {}).get(ANNUAL)
++        if current is None:
++            frappe.throw('The current HRMS balance could not be verified. Review the allocation in HRMS.')
++        available_after = flt(current.get('remaining_leaves')) + total - flt(previous.total_leaves_allocated)
++        if available_after < flt(current.get('leaves_pending_approval')) - 0.00001:
++            frappe.throw('This allocation would be below leave already used, approved or reserved by pending requests. Review those requests first.')
++
++
++@frappe.whitelist()
++def context(employee, date=None):
++    _guard()
++    emp = frappe.get_doc('Employee', employee)
++    emp.check_permission('read')
++    at = str(getdate(date or dubai_today()))
++    rows = frappe.get_list('Leave Allocation', filters={'employee': employee, 'leave_type': ANNUAL,
++        'docstatus': ['<', 2], 'from_date': ['<=', at], 'to_date': ['>=', at]},
++        fields=['name', 'modified', 'docstatus', 'from_date', 'to_date', 'new_leaves_allocated',
++                'unused_leaves', 'total_leaves_allocated', 'expired'], limit_page_length=0)
++    for row in rows:
++        row['can_edit'] = not row.expired and frappe.has_permission('Leave Allocation', 'write', doc=row.name)
++    draft = frappe.new_doc('Leave Allocation')
++    draft.employee, draft.company, draft.leave_type = emp.name, emp.company, ANNUAL
++    return dict(employee=emp.name, employee_name=emp.employee_name, company=emp.company,
++                allocations=rows, limit=allocation_limit(), can_create=frappe.has_permission('Leave Allocation', 'create', doc=draft), date=at)
++
++
++@frappe.whitelist(methods=['POST'])
++def save(allocation, total_days, modified, reason):
++    _guard()
++    target = allocation_days(total_days)
++    if not isinstance(reason, str) or not reason.strip() or len(reason) > 1000:
++        frappe.throw('Enter the reason for this annual-leave allocation change (up to 1,000 characters).')
++    doc = frappe.get_doc('Leave Allocation', allocation, for_update=True)
++    doc.check_permission('read')
++    doc.check_permission('write')
++    if doc.leave_type != ANNUAL or doc.docstatus != 1 or doc.expired:
++        frappe.throw('Open the active submitted annual-leave allocation to edit it.')
++    if str(doc.modified) != str(modified):
++        frappe.throw('This allocation was updated by someone else. Reopen it before saving.')
++    old = flt(doc.total_leaves_allocated)
++    if target < flt(doc.unused_leaves):
++        frappe.throw('The target is below carried-forward days. HR must review the previous allocation first.')
++    doc.new_leaves_allocated = target - flt(doc.unused_leaves)
++    doc.total_leaves_allocated = target
++    # Native save creates a balancing Leave Ledger Entry and retains Version history.
++    doc.save()
++    from frappe.utils import escape_html
++    doc.add_comment('Info', f'Annual allocation changed from {old:g} to {target:g} days through BS HR. Reason: {escape_html(reason.strip())}')
++    return dict(name=doc.name, allocated=doc.total_leaves_allocated)
+diff --git a/bsgroup/hr_oman.py b/bsgroup/hr_oman.py
+new file mode 100644
+index 0000000..8dcb244
+--- /dev/null
++++ b/bsgroup/hr_oman.py
+@@ -0,0 +1,44 @@
++"""Oman BS HR rollout: existing HR workflows, local policies and native access."""
++from pathlib import Path
++from urllib.parse import urlparse
++
++import frappe
++
++OMAN_HOSTS = {'erp-om.bitssecureit.com', 'erp-om.k.frappe.cloud'}
++
++
++def is_oman():
++    host = urlparse((getattr(frappe, 'conf', None) or {}).get('host_name') or '').hostname
++    return host in OMAN_HOSTS or getattr(getattr(frappe, 'local', None), 'site', None) in OMAN_HOSTS
++
++
++@frappe.whitelist()
++def navigation_script():
++    from bsgroup.hr_management import can_manage
++    content = ''
++    if is_oman() and can_manage():
++        for name in ('hr_management', 'hr_organization', 'hr_monthly_review', 'hr_attendance', 'hr_sidebar'):
++            content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', name + '.js')).read_text()
++    frappe.local.response.update(type='download', filename='oman_hr.js', filecontent=content,
++        content_type='application/javascript', display_content_as='inline')
++
++
++def boot_session(bootinfo):
++    if not is_oman():
++        return
++    from bsgroup.hr_management import can_manage
++    bootinfo.bs_hr_management = can_manage()
++
++
++def configure_hooks(hooks):
++    def append(mapping, key, value):
++        prior = mapping.get(key, [])
++        prior = [prior] if isinstance(prior, str) else list(prior)
++        if value not in prior:
++            prior.append(value)
++        mapping[key] = prior
++    append(hooks, 'app_include_js', '/api/method/bsgroup.hr_oman.navigation_script?v=20261111-hr-parity')
++    append(hooks, 'boot_session', 'bsgroup.hr_oman.boot_session')
++    events = hooks.setdefault('doc_events', {}).setdefault('Leave Allocation', {})
++    for event in ('validate', 'before_update_after_submit'):
++        append(events, event, 'bsgroup.hr_annual_allocation.validate_allocation')
+diff --git a/bsgroup/public/js/hr_management.js b/bsgroup/public/js/hr_management.js
+new file mode 100644
+index 0000000..4dd7315
+--- /dev/null
++++ b/bsgroup/public/js/hr_management.js
+@@ -0,0 +1,123 @@
++/* HR Management: navigation and review, with all actions in native HRMS forms. */
++window.bsHRManagement = async function (parent) {
++    const root = $(parent).empty().addClass('hrm-host');
++    const esc = value => frappe.utils.escape_html(String(value ?? ''));
++    const descriptions = {
++        organization: 'Reporting relationships recorded in HRMS',
++        review: 'Monthly leave balances, attendance evidence and HR follow-up',
++        employees: 'Employee records and employment details', onboarding: 'Joining tasks and onboarding checklists',
++        attendance: 'Monthly employee calendar, recorded punches and leave decisions', leave: 'Open applications awaiting review',
++        policies: 'Organization documents, rules and policies', warnings: 'Confidential warning reviews and responses',
++        exit: 'Exit feedback and interview records', offboarding: 'Separation tasks and handover checklists',
++        requests: 'Letters, document updates and HR enquiries'
++    };
++    const symbols = {organization:'users',employees:'users',onboarding:'add',attendance:'clock',leave:'calendar',policies:'file',warnings:'shield',exit:'message',offboarding:'exit',requests:'inbox'};
++    const paths = {
++        users:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M16 3a4 4 0 0 1 0 8m6 10v-2a4 4 0 0 0-3-3.87M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
++        add:'M12 5v14M5 12h14',clock:'M12 8v4l3 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',
++        calendar:'M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2',
++        file:'M14 2H4v20h16V8l-6-6v6h6M8 12h8m-8 4h8',shield:'M12 2 3 6v6c0 5 9 10 9 10s9-5 9-10V6L12 2M12 7v6m0 3v1',
++        message:'M21 3H3v14h5l4 4 4-4h5V3M7 7h10M7 11h6',exit:'M9 3H3v18h6m6-14 5 5-5 5M7 12h13',inbox:'M4 3h16l2 12v6H2v-6L4 3M2 15h6l2 3h4l2-3h6'
++    };
++    const icon = key => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[key] || paths.file}"/></svg>`;
++    if (!document.getElementById('hrm-styles')) $('<style id="hrm-styles">').text(`
++      .hrm-host{color:#193047}.hrm-layout{display:block}
++      .hrm-org{padding:18px}.hrm-org ul{list-style:none;padding:0;margin:0}.hrm-org ul ul{margin:8px 0 12px 18px;padding-left:18px;border-left:1px solid #d9e5eb}.hrm-org li{margin:8px 0}.hrm-person{padding:12px 14px;border:1px solid #dfe7ed;border-radius:10px;background:#fafcfd;display:flex;align-items:center;gap:12px;flex-wrap:wrap}.hrm-person a{font-size:13px;font-weight:650;color:#215b79}.hrm-person .hrm-muted{margin-top:3px}.hrm-avatar{width:34px;height:34px;border-radius:10px;background:#e4f0ed;color:#24716b;display:grid;place-items:center;font-weight:650}.hrm-org summary{cursor:pointer;list-style:none}.hrm-org summary::-webkit-details-marker{display:none}.hrm-org summary .hrm-person:after{content:'−';margin-left:auto;color:#728295}.hrm-org details:not([open])>summary .hrm-person:after{content:'+'}.hrm-org-note{font-size:11px;color:#906519;margin-top:4px}
++      .hrm-nav{display:flex;flex-direction:column;gap:4px}.hrm-nav button{display:flex;align-items:center;gap:10px;text-align:left;background:transparent;border:0;border-radius:9px;padding:11px 12px;color:#526579;font-size:13px;cursor:pointer}
++      .hrm-nav button.active{background:#e5f2f0;color:#126d66;font-weight:650}.hrm-nav button:hover{background:#eef2f5}.hrm-host svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
++      .hrm-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:20px}.hrm-top h2{font-size:22px;letter-spacing:-.5px;margin:0 0 5px}.hrm-muted{font-size:12px;color:#728295}.hrm-actions{display:flex;gap:8px;flex-wrap:wrap}
++      .hrm-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:22px}.hrm-kpi{background:white;border:1px solid #dfe7ed;border-radius:13px;padding:18px;text-align:left;cursor:pointer;color:#193047}.hrm-kpi span{font-size:12px;color:#627587;display:block}.hrm-kpi strong{font-size:29px;display:block;line-height:1.4;font-weight:650}.hrm-kpi small{font-size:11px;color:#758697}
++      .hrm-panel{background:#fff;border:1px solid #dfe7ed;border-radius:13px;overflow:hidden;margin-bottom:16px}.hrm-panel-head{padding:18px 20px;border-bottom:1px solid #edf1f4;display:flex;justify-content:space-between;align-items:center;gap:12px}.hrm-panel-head h3{font-size:15px;margin:0}.hrm-table-wrap{overflow-x:auto}.hrm-table{width:100%;font-size:12px;border-collapse:collapse}.hrm-table th{text-align:left;font-size:11px;color:#748596;font-weight:600;background:#fafbfd}.hrm-table th,.hrm-table td{padding:12px 18px;border-bottom:1px solid #edf1f4}.hrm-table td:first-child{max-width:330px}.hrm-table a{font-weight:600;color:#215b79}.hrm-tag{display:inline-block;background:#edf3f7;padding:4px 8px;border-radius:6px;font-size:11px;white-space:nowrap}.hrm-empty{padding:30px 20px;color:#738496;font-size:13px}.hrm-modules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.hrm-module{background:#fff;border:1px solid #dfe7ed;border-radius:12px;padding:16px;text-align:left;cursor:pointer;color:#193047}.hrm-module strong{display:block;font-size:13px;margin:10px 0 5px}.hrm-module small{font-size:11px;color:#748596}.hrm-foot{margin-top:18px;font-size:11px;color:#748596}.hrm-host button:focus-visible{outline:3px solid #8cc9c0;outline-offset:2px}
++      @media(max-width:1050px){.hrm-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.hrm-modules{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:700px){.hrm-layout{grid-template-columns:1fr}.hrm-nav{flex-direction:row;overflow:auto}.hrm-nav button{white-space:nowrap}.hrm-top{align-items:flex-start}.hrm-modules{grid-template-columns:1fr}.hrm-kpi{padding:12px}}
++    `).appendTo(document.head);
++    root.html('<div class="hrd-loading">Loading HR Management…</div>');
++    let data, selected=new URLSearchParams(location.search).get('hr_section') || 'dashboard';
++    window.bsHRSelectSection = key => {
++        const valid=['dashboard','organization','review',...(data?.sections || []).map(s=>s.key)];
++        selected=valid.includes(key)?key:'dashboard';
++        if(data && root[0].isConnected)render();
++    };
++    const openList = section => {
++        frappe.route_options = section.filters || {};
++        frappe.set_route('List',section.doctype);
++    };
++    function table(section) {
++        const box=$('<section class="hrm-panel">');
++        const head=$('<div class="hrm-panel-head">').appendTo(box);
++        $('<h3>').text(section.label).appendTo(head);
++        if (!section.available) {
++            $('<div class="hrm-empty">').text(section.reason).appendTo(box);
++            return box;
++        }
++        const actions=$('<div class="hrm-actions">').appendTo(head);
++        $('<button class="btn btn-default btn-sm">').text(__('View all')).on('click',()=>openList(section)).appendTo(actions);
++        if(section.can_create && !['attendance','leave'].includes(section.key)) $('<button class="btn btn-primary btn-sm">').text(__('New')).on('click',()=>frappe.new_doc(section.doctype)).appendTo(actions);
++        if (!section.rows.length) { $('<div class="hrm-empty">').text(section.key==='leave'?'No open leave applications awaiting review.':'No matching records.').appendTo(box); return box; }
++        const body=section.rows.map(row=>{
++            const title=row[section.title_field] || row.name;
++            const status=row[section.status_field] || ['Draft','Submitted','Cancelled'][row.docstatus] || '—';
++            const detail=row.time || (row.from_date ? `${row.from_date} – ${row.to_date}` : row.company || row.employee || '');
++            const url='/desk/'+frappe.router.slug(section.doctype)+'/'+encodeURIComponent(row.name);
++            return `<tr><td><a href="${esc(url)}">${esc(title)}</a><div class="hrm-muted">${esc(row.name)}</div></td><td><span class="hrm-tag">${esc(status)}</span></td><td>${esc(detail)}</td><td>${esc(frappe.datetime.str_to_user(row.modified))}</td></tr>`;
++        }).join('');
++        box.append(`<div class="hrm-table-wrap"><table class="hrm-table"><thead><tr><th>Record</th><th>Status</th><th>${section.key==='attendance'?'Check-in / out time':section.key==='leave'?'Leave dates':'Details'}</th><th>Updated</th></tr></thead><tbody>${body}</tbody></table></div>`);
++        return box;
++    }
++    function render() {
++        root.empty();
++        const layout=$('<div class="hrm-layout">').appendTo(root);
++        const main=$('<div class="hrm-main">').appendTo(layout);
++        const section=selected==='organization'?{key:'organization',label:'Organization Structure'}:selected==='review'?{key:'review',label:'Attendance and Leave Management'}:data.sections.find(s=>s.key===selected);
++        const top=$('<div class="hrm-top">').appendTo(main);
++        $('<div>').html(`<h2>${esc(section?.label || 'People & operations')}</h2><div class="hrm-muted">${esc(section?descriptions[selected]:'Live HRMS records · '+data.date)}</div>`).appendTo(top);
++        $('<button class="btn btn-default btn-sm">').text('Refresh').on('click',load).appendTo(top);
++        if(selected==='organization') {
++            window.bsHROrganization(main);
++        } else if(selected==='review') {
++            window.bsHRMonthlyReview(main);
++        } else if(selected==='attendance') {
++            window.bsHRAttendance(main);
++        } else if(section) {
++            if(['warnings','requests'].includes(section.key)) $('<p class="hrm-muted">').text('Confidential administrator register. Saving a record does not issue a warning, notify an employee or change employment status.').appendTo(main);
++            main.append(table(section));
++        } else {
++            const cards=$('<div class="hrm-kpis">').appendTo(main);
++            const labels={employees:['Active employees','Active profiles'],leave:['Leave approvals','Open applications'],onboarding:['Onboarding','Non-cancelled records'],offboarding:['Offboarding','Non-cancelled records']};
++            Object.entries(labels).forEach(([key,[label,foot]])=>{
++                const s=data.sections.find(x=>x.key===key);
++                $('<button class="hrm-kpi">').html(`<span>${esc(label)}</span><strong>${s.available?esc(s.count):'—'}</strong><small>${esc(s.available?foot:s.reason)}</small>`).on('click',()=>frappe.set_route('hr-dashboard',{hr_section:key})).appendTo(cards);
++            });
++            main.append(table(data.sections.find(s=>s.key==='leave')));
++            const modules=$('<div class="hrm-modules">').appendTo(main);
++            data.sections.filter(s=>s.key!=='leave').forEach(s=>{
++                $('<button class="hrm-module">').html(`${icon(symbols[s.key])}<strong>${esc(s.label)}</strong><small>${esc(s.available?descriptions[s.key]:s.reason)}</small>`).on('click',()=>frappe.set_route('hr-dashboard',{hr_section:s.key})).appendTo(modules);
++            });
++        }
++        if(data.can_setup) {
++            const admin=$('<div class="hrm-actions">').appendTo(main);
++            $('<button class="btn btn-default btn-sm">').text('Review Muskan access').on('click',async()=>{
++                const r=await frappe.call({method:'bsgroup.hr_management.muskan_access_review'});
++                const a=r.message;
++                frappe.msgprint({title:'BS HR access review',message:`<p><b>${esc(a.full_name)}</b> · ${esc(a.user)}</p><p>Existing roles: ${esc(a.roles.join(', '))}</p><table class="hrm-table"><tr><th>Section</th><th>Read</th><th>Edit</th><th>Create</th></tr>${a.current.map(x=>`<tr><td>${esc(x.doctype)}</td><td>${x.read?'Yes':'No'}</td><td>${x.write?'Yes':'No'}</td><td>${x.create?'Yes':'No'}</td></tr>`).join('')}</table><p>Prepared addition: BS HR Management — read, create and edit Warnings, HR Requests and Organization Documents; read policy categories. No System Manager, deletion, sharing or approval bypass rights will be added.</p><p>Access changes await confirmation.</p>`,wide:true,primary_action:{label:'Apply access',action:()=>{
++                    frappe.confirm('Grant Muskan read, create and edit access to Organization Documents, HR Warnings and HR Service Requests, plus read access to policy categories? Existing company restrictions and approvals remain in force.',async()=>{
++                        await frappe.call({method:'bsgroup.hr_management.grant_muskan_access',type:'POST',freeze:true});
++                        frappe.msgprint('BS HR access has been added to Muskan. Her existing roles were preserved.');
++                    });
++                }}});
++            }).appendTo(admin);
++        }
++        if(data.setup_pending && data.can_setup) {
++            $('<button class="btn btn-default btn-sm">').text('Set up confidential registers').on('click',async function(){
++                $(this).prop('disabled',true);
++                try {await frappe.call({method:'bsgroup.hr_management.setup_registers',type:'POST',freeze:true});await load();}
++                finally {$(this).prop('disabled',false);}
++            }).appendTo(main);
++        }
++        $('<p class="hrm-foot">').text('Only records allowed by your existing HRMS access are shown. Open a record to use its existing approval process.').appendTo(main);
++    }
++    async function load() {
++        try {const r=await frappe.call({method:'bsgroup.hr_management.overview'});data=r.message;render();}
++        catch(e) {root.html('<div class="hrm-empty">HR Management could not load. Please refresh or contact your administrator.</div>');}
++    }
++    await load();
++};
+diff --git a/bsgroup/public/js/hr_organization.js b/bsgroup/public/js/hr_organization.js
+new file mode 100644
+index 0000000..d0fed43
+--- /dev/null
++++ b/bsgroup/public/js/hr_organization.js
+@@ -0,0 +1,107 @@
++/* Editable organization flow. All employee changes use the native HR permission boundary. */
++window.bsHROrganization = async function (main) {
++    const esc = value => frappe.utils.escape_html(String(value ?? ''));
++    const panel = $('<section class="hrm-panel org-flow-panel">').appendTo(main);
++    const styleId = 'bs-org-flow-style';
++    if (!document.getElementById(styleId)) $('<style>').attr('id', styleId).text(`
++      .org-tools{padding:16px 20px;display:flex;gap:9px;align-items:center;flex-wrap:wrap;border-bottom:1px solid #e5edf1}
++      .org-tools input{min-width:180px;max-width:240px}.org-tools select{max-width:260px}.org-summary{padding:14px 20px;display:flex;gap:18px;flex-wrap:wrap;color:#647789;font-size:12px}.org-summary b{color:#18384b;font-size:16px;margin-right:5px}
++      .org-canvas{overflow:auto;max-height:720px;padding:28px 22px;background-color:#f9fbfd;background-image:radial-gradient(#dce5eb .7px,transparent .7px);background-size:18px 18px;min-height:200px}
++      .org-forest,.org-branch{list-style:none!important;margin:0!important;padding:0!important;display:flex;flex-direction:row;align-items:flex-start;gap:0;width:max-content}
++      .org-forest{gap:32px}.org-node{display:flex;flex-direction:column;align-items:center;position:relative;padding:0 12px!important;margin:0!important}
++      .org-branch{padding-top:36px!important;position:relative}.org-branch:before{content:'';position:absolute;left:50%;top:0;height:18px;border-left:1.5px solid #99b5c6}
++      .org-branch>.org-node:before{content:'';position:absolute;left:0;right:0;top:-18px;border-top:1.5px solid #99b5c6}
++      .org-branch>.org-node:first-child:before{left:50%}.org-branch>.org-node:last-child:before{right:50%}.org-branch>.org-node:only-child:before{display:none}
++      .org-branch>.org-node:after{content:'';position:absolute;left:50%;top:-18px;height:18px;border-left:1.5px solid #99b5c6}
++      .org-card{width:224px;min-height:190px;flex:0 0 auto;background:#fff;border:1px solid #d9e5ec;border-top:3px solid #16887e;border-radius:12px;padding:14px;box-shadow:0 3px 12px #18384b08;position:relative;text-align:left}
++      .org-card.org-leader{border-top-color:#234a6c;background:#f2f7fc}.org-card.org-match{outline:3px solid #efc36c;outline-offset:2px}.org-card-header{display:flex;gap:10px;align-items:center}.org-initials{width:33px;height:33px;flex-shrink:0;display:grid;place-items:center;border-radius:10px;background:#e8f3f1;color:#186c65;font-size:12px;font-weight:700}
++      .org-card a{font-size:13px;font-weight:650;color:#173b56;line-height:1.35}.org-role{font-size:11px;color:#63788a;margin:9px 0 6px;line-height:1.5}.org-team{font-size:10px;display:inline-block;border-radius:5px;padding:3px 6px;background:#edf3f7;color:#4c667a}.org-controls{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:9px;border-top:1px solid #edf2f5;flex-wrap:wrap}.org-controls button{font-size:11px!important;padding:3px 7px!important}.org-note{font-size:11px;color:#8b691f;margin-top:7px}.org-footer{padding:14px 20px;border-top:1px solid #e5edf1;font-size:11px;color:#718493}.org-team-links{display:flex;flex-wrap:wrap;gap:7px;padding:0 20px 14px}.org-team-links a{font-size:11px;color:#476278;background:#eff4f7;padding:5px 9px;border-radius:6px}.org-empty{padding:24px;color:#6d8091}
++    `).appendTo(document.head);
++    let state, search='', focus='', collapsed=new Set(), firstLoad=true, zoom=100;
++    async function edit(person, remove=false) {
++        const r=await frappe.call({method:'bsgroup.hr_org.employee_details',args:{employee:person.name}});
++        const d=r.message;
++        if(remove) {
++            frappe.confirm(`Remove ${esc(d.employee_name)}’s reporting line? They will remain an active employee, with their team and attendance history preserved. Their own direct reports will remain attached.`, async()=>{
++                await frappe.call({method:'bsgroup.hr_org.save_employee',type:'POST',freeze:true,args:{employee:d.name,modified:d.modified,values:{reports_to:null}}});
++                frappe.show_alert({message:'Reporting line removed',indicator:'green'});await load();
++            });
++            return;
++        }
++        const dialog=new frappe.ui.Dialog({title:'Edit employee & team',fields:[
++            {fieldtype:'HTML',options:`<p class="text-muted">${esc(d.employee_name)} · ${esc(d.company)}<br>Saving updates the official HR employee profile.</p>`},
++            {fieldname:'first_name',label:'First name',fieldtype:'Data',reqd:1,default:d.first_name},
++            {fieldname:'middle_name',label:'Middle name',fieldtype:'Data',default:d.middle_name},
++            {fieldname:'last_name',label:'Last name',fieldtype:'Data',default:d.last_name},
++            {fieldname:'designation',label:'Role / designation',fieldtype:'Link',options:'Designation',default:d.designation},
++            {fieldname:'department',label:'Team / department',fieldtype:'Link',options:'Department',default:d.department,get_query:()=>({filters:{company:d.company,disabled:0}})},
++            {fieldname:'reports_to',label:'Reports to',fieldtype:'Link',options:'Employee',default:d.reports_to,get_query:()=>({filters:{status:'Active',name:['!=',d.name]}})}
++        ],primary_action_label:'Save HR profile',primary_action:async values=>{
++            const changed={};Object.keys(values).forEach(k=>{if((values[k]||'')!==(d[k]||''))changed[k]=values[k]||null;});
++            if(!Object.keys(changed).length){dialog.hide();return;}
++            dialog.get_primary_btn().prop('disabled',true);
++            try {await frappe.call({method:'bsgroup.hr_org.save_employee',type:'POST',freeze:true,args:{employee:d.name,values:changed,modified:d.modified}});dialog.hide();frappe.show_alert({message:'HR profile updated',indicator:'green'});await load();}
++            finally{dialog.get_primary_btn().prop('disabled',false);}
++        }});
++        dialog.show();
++    }
++    function draw() {
++        if(!panel[0].isConnected)return;
++        panel.empty();
++        const employees=state.employees||[], byId=new Map(employees.map(e=>[e.name,e])), children=new Map();
++        employees.forEach(e=>{if(e.reports_to&&byId.has(e.reports_to)){if(!children.has(e.reports_to))children.set(e.reports_to,[]);children.get(e.reports_to).push(e);}});
++        if(firstLoad){employees.filter(e=>e.reports_to&&children.has(e.name)).forEach(e=>collapsed.add(e.name));firstLoad=false;}
++        const tools=$('<div class="org-tools">').appendTo(panel);
++        const input=$('<input type="search" class="form-control input-sm" aria-label="Find employee or team" placeholder="Find employee or team">').val(search).appendTo(tools);
++        const select=$('<select class="form-control input-sm" aria-label="Focus on a manager">').append($('<option value="">').text('Whole organization')).appendTo(tools);
++        employees.filter(e=>children.has(e.name)).forEach(e=>$('<option>').val(e.name).text(e.employee_name).appendTo(select));select.val(focus);
++        select.on('change',()=>{focus=select.val();if(focus)collapsed.delete(focus);draw();});
++        $('<button class="btn btn-default btn-sm">').text('Expand all').on('click',()=>{collapsed.clear();draw();}).appendTo(tools);
++        $('<button class="btn btn-default btn-sm">').text('Collapse teams').on('click',()=>{employees.filter(e=>e.reports_to).forEach(e=>collapsed.add(e.name));draw();}).appendTo(tools);
++        if(state.can_create)$('<button class="btn btn-primary btn-sm">').text('Add employee').on('click',()=>frappe.new_doc('Employee',focus?{reports_to:focus}:{})).appendTo(tools);
++        if(state.can_create_team)$('<button class="btn btn-default btn-sm">').text('Add team').on('click',()=>frappe.new_doc('Department')).appendTo(tools);
++        const teams=[...new Set(employees.map(e=>e.department).filter(Boolean))].sort();
++        $('<div class="org-summary">').html(`<span><b>${employees.length}</b>Active employees</span><span><b>${teams.length}</b>Teams</span><span><b>${children.size}</b>Managers</span><span>Teams arranged horizontally · scroll across to explore</span>`).appendTo(panel);
++        if(state.can_read_teams){const links=$('<div class="org-team-links" aria-label="Team details">').appendTo(panel);teams.forEach(t=>$('<a>').attr('href','/desk/department/'+encodeURIComponent(t)).text(t).appendTo(links));}
++        const canvas=$('<div class="org-canvas" role="region" aria-label="Organization flow diagram" tabindex="0">').appendTo(panel);
++        const tree=$('<ul class="org-forest" aria-label="Employee reporting flow">').appendTo(canvas);
++        const shown=new Set();
++        function node(e,parent,review=false){
++            if(shown.has(e.name))return;shown.add(e.name);
++            const reports=children.get(e.name)||[], li=$('<li class="org-node">').appendTo(parent);
++            const card=$('<article class="org-card">').toggleClass('org-leader',reports.length>0).attr('aria-label',e.employee_name).appendTo(li);
++            const h=$('<div class="org-card-header">').appendTo(card);
++            $('<span class="org-initials" aria-hidden="true">').text((e.employee_name||e.name).split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase()).appendTo(h);
++            $('<a>').attr('href','/desk/employee/'+encodeURIComponent(e.name)).text(e.employee_name||e.name).appendTo(h);
++            $('<div class="org-role">').text(e.designation||'Role not recorded').appendTo(card);
++            $('<span class="org-team">').text(e.department||'Team not assigned').appendTo(card);
++            if(review||e.manager_outside_view)$('<div class="org-note">').text(review?'Reporting line needs HR review':'Manager outside this view').appendTo(card);
++            const controls=$('<div class="org-controls">').appendTo(card);
++            if(e.can_edit){$('<button class="btn btn-default btn-xs">').attr('aria-label','Edit '+e.employee_name).text('Edit').on('click',()=>edit(e)).appendTo(controls);
++                if(e.reports_to)$('<button class="btn btn-default btn-xs">').attr('aria-label','Remove reporting line for '+e.employee_name).text('Remove line').on('click',()=>edit(e,true)).appendTo(controls);}
++            if(reports.length){const shut=collapsed.has(e.name);$('<button class="btn btn-default btn-xs">').attr({'aria-label':`${shut?'Expand':'Collapse'} team of ${e.employee_name}`,'aria-expanded':!shut}).text(`${shut?'+':'−'} ${reports.length} reports`).on('click',()=>{shut?collapsed.delete(e.name):collapsed.add(e.name);draw();}).appendTo(controls);
++                if(!shut){const sub=$('<ul class="org-branch">').appendTo(li);reports.forEach(x=>node(x,sub));}
++                else{const mark=id=>{if(shown.has(id))return;shown.add(id);(children.get(id)||[]).forEach(x=>mark(x.name));};reports.forEach(x=>mark(x.name));}}
++        }
++        if(focus&&byId.has(focus))node(byId.get(focus),tree);
++        else {employees.filter(e=>!e.reports_to).sort((a,b)=>(children.get(b.name)?.length||0)-(children.get(a.name)?.length||0)).forEach(e=>node(e,tree));employees.filter(e=>!shown.has(e.name)).forEach(e=>node(e,tree,true));}
++        if(!employees.length)$('<p class="org-empty">').text('No active employees are available in your view.').appendTo(canvas);
++        function highlight(){const term=search.toLowerCase().trim();tree.find('.org-card').each(function(){$(this).toggleClass('org-match',!!term&&$(this).text().toLowerCase().includes(term));});}
++        input.on('input',()=>{search=input.val();if(search){collapsed.clear();focus='';const pos=input[0].selectionStart;draw();const replacement=panel.find('input[type="search"]');replacement.trigger('focus');replacement[0].setSelectionRange(pos,pos);}else highlight();});highlight();
++        const foot=$('<div class="org-footer">').text('Edit updates HR names, roles, teams and reporting lines. Remove line keeps the employee and their history. Select a team above to edit its details. ').appendTo(panel);
++        const zoomBox=$('<span class="hrm-actions" style="margin-top:10px">').appendTo(foot);
++        const applyZoom=()=>tree.css('zoom',zoom/100);applyZoom();
++        [['−',-10],['+',10]].forEach(([label,delta])=>$('<button class="btn btn-default btn-xs">').attr('aria-label',delta<0?'Zoom out':'Zoom in').text(label).on('click',()=>{zoom=Math.max(50,Math.min(130,zoom+delta));applyZoom();}).appendTo(zoomBox));
++        $('<button class="btn btn-default btn-xs">').text('Reset zoom').on('click',()=>{zoom=100;applyZoom();}).appendTo(zoomBox);
++        if(search)tree.find('.org-match').first()[0]?.scrollIntoView({block:'nearest',inline:'nearest'});
++        else requestAnimationFrame(()=>{
++            const leader=tree.find('.org-card')[0];
++            if(leader&&panel[0].isConnected){const c=canvas[0],r=leader.getBoundingClientRect();c.scrollLeft+=r.left+r.width/2-c.getBoundingClientRect().left-c.clientWidth/2;}
++        });
++    }
++    async function load(){
++        try{const r=await frappe.call({method:'bsgroup.hr_management.organization'});state=r.message;draw();}
++        catch(e){if(panel[0].isConnected)panel.html('<div class="org-empty">Could not load the organization flow. Refresh to try again.</div>');}
++    }
++    panel.html('<div class="org-empty">Loading organization flow…</div>');await load();
++};
+diff --git a/bsgroup/public/js/hr_attendance.js b/bsgroup/public/js/hr_attendance.js
+new file mode 100644
+index 0000000..c013fad
+--- /dev/null
++++ b/bsgroup/public/js/hr_attendance.js
+@@ -0,0 +1,97 @@
++/* HR monthly calendar: recorded punches, leave decisions and HR attendance. */
++window.bsHRAttendance = function(main) {
++    const esc = value => frappe.utils.escape_html(String(value ?? ''));
++    const host = $('<div class="hrcal">').appendTo(main);
++    const controls = $('<div class="hrcal-controls">').appendTo(host);
++    const employee = $('<select class="form-control" aria-label="Employee">').appendTo($('<label>Employee</label>').appendTo(controls));
++    const month = $('<input type="month" class="form-control" aria-label="Attendance month">').val(frappe.datetime.get_today().slice(0,7)).appendTo($('<label>Month</label>').appendTo(controls));
++    const body = $('<div>').appendTo(host);
++    let data, sequence=0;
++    if(!document.getElementById('hrcal-style')) $('<style id="hrcal-style">').text(`
++      .hrcal-controls{display:flex;gap:14px;flex-wrap:wrap;margin:0 0 18px}.hrcal-controls label{font-size:12px;color:#627587;min-width:180px}.hrcal-controls select{min-width:280px}.hrcal-controls .form-control{margin-top:6px}
++      .hrcal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin:14px 0}.hrcal-weekday{padding:8px;font-size:11px;color:#738496;text-align:center}.hrcal-day{border:1px solid #dfe7ed;border-radius:10px;background:#fff;min-height:106px;padding:10px;text-align:left;color:#193047;display:flex;flex-direction:column;gap:5px;cursor:pointer}.hrcal-day:hover{border-color:#27948e;box-shadow:0 2px 10px #16334612}.hrcal-day strong{font-size:14px}.hrcal-day small{font-size:10px;line-height:1.4;overflow-wrap:anywhere}.hrcal-day.has-punch{border-top:3px solid #268b7f}.hrcal-day.has-leave{background:#eff4fb;border-top:3px solid #6487b5}.hrcal-day.has-pending{border-bottom:3px solid #caa266}.hrcal-day.is-future{color:#718294;background:#fafbfd}.hrcal-day.is-today strong{color:#087c75}.hrcal-note{font-size:11px;color:#738496;margin:10px 0}.hrcal-summary{display:flex;gap:12px;flex-wrap:wrap}.hrcal-summary span{background:#edf3f7;border-radius:7px;padding:7px 10px;font-size:12px}.hrcal-detail h5{margin:18px 0 8px;font-size:13px}.hrcal-detail p{font-size:12px}.hrcal-detail a{color:#215b79}.hrcal-time{font-variant-numeric:tabular-nums}
++      @media(max-width:760px){.hrcal-day{padding:6px;min-height:90px}.hrcal-day small{font-size:9px}.hrcal-grid{gap:3px}.hrcal-controls select{min-width:200px}}
++    `).appendTo(document.head);
++    const link = (dt,name,label) => `<a href="/desk/${frappe.router.slug(dt)}/${encodeURIComponent(name)}">${esc(label || name)}</a>`;
++    const clock = row => String(row.time).slice(11,16);
++    const leaveLabel = row => `${row.leave_type} · ${row.approved?'Approved':row.status==='Approved'?'Approved · not submitted':row.status}${row.is_half_day?' · half day':''}`;
++    function detail(day) {
++        const d = new frappe.ui.Dialog({title: `${employee.find(':selected').text()} · ${frappe.datetime.str_to_user(day.date)}`,size:'large',fields:[{fieldname:'details',fieldtype:'HTML'}]});
++        let html='<div class="hrcal-detail"><h5>Recorded check-in / check-out</h5>';
++        html += day.punches.length ? `<table class="hrm-table"><tr><th>Type</th><th>Time</th><th>Location</th><th>Record</th></tr>${day.punches.map(p=>`<tr><td>${esc(p.log_type || 'Unspecified')}</td><td class="hrcal-time">${esc(clock(p))}</td><td>${esc(p.location || 'Location not recorded')}</td><td>${link('Employee Checkin',p.name)}</td></tr>`).join('')}</table>` : '<p>No check-in or check-out records for this date.</p>';
++        html += '<h5>Leave applications</h5>' + (day.leaves.length ? day.leaves.map(l=>`<p>${link('Leave Application',l.name,leaveLabel(l))}</p>`).join('') : '<p>No leave application for this date.</p>');
++        html += '<h5>HR attendance records</h5>' + (day.attendance.length ? day.attendance.map(a=>`<p>${link('Attendance',a.name,`${a.status} · ${a.docstatus===1?'Submitted':'Draft'} · ${a.name}`)}</p>`).join('') : '<p>No HR attendance record.</p>');
++        html += '<h5>Attendance requests</h5>' + (day.requests.length ? day.requests.map(r=>`<p>${link('Attendance Request',r.name,`${r.reason} · ${r.docstatus===1?'Submitted':'Draft'}${r.is_half_day?' · half day':''}`)}</p>`).join('') : '<p>No attendance request.</p>');
++        html += '<p class="hrcal-note">HR attendance is shown separately from recorded punches. Missing punches do not automatically mean absence. Use the existing record’s correction or amendment process when attendance has already been recorded.</p></div>';
++        d.fields_dict.details.$wrapper.html(html);
++        if(data.can_record && !day.future && !day.attendance.length) d.set_primary_action('Record HR attendance',()=>{d.hide();manual(day);});
++        d.show();
++    }
++    function manual(day) {
++        const d = new frappe.ui.Dialog({title:'Record attendance upon employee request',fields:[
++            {fieldname:'context',fieldtype:'HTML',options:`<p>${esc(employee.find(':selected').text())} · ${esc(frappe.datetime.str_to_user(day.date))}</p><p class="text-muted">This prepares an HR attendance draft. Review and submit it using the existing HRMS controls. It does not create or change check-in/out times.</p>`},
++            {fieldname:'employee_request',label:'Employee request',fieldtype:'Link',options:'HR Service Request',reqd:1,get_query:()=>({filters:{employee:data.employee}}),description:'Select the HR request documenting the employee’s correction request.'},
++            {fieldname:'status',label:'Attendance status',fieldtype:'Select',options:['Present','Absent','Half Day','Work From Home'],reqd:1},
++            {fieldname:'reason',label:'HR reason / verification',fieldtype:'Small Text',reqd:1}
++        ],primary_action_label:'Prepare attendance draft',primary_action:async values=>{
++            d.get_primary_btn().prop('disabled',true);
++            try {
++                const r=await frappe.call({method:'bsgroup.hr_attendance.record_manual',type:'POST',freeze:true,args:{...values,employee:data.employee,attendance_date:day.date}});
++                d.hide();frappe.set_route('Form','Attendance',r.message.name);
++            } finally {d.get_primary_btn().prop('disabled',false);}
++        }});
++        d.show();
++    }
++    function render() {
++        body.empty();
++        if(!data.employees.length){body.html('<div class="hrm-empty">No employee profiles are available in your permitted view.</div>');return;}
++        const days=data.days;
++        if(data.repair_mithun) $('<button class="btn btn-default btn-sm">').text('Correct reviewed absences: 6–7 November').on('click',async function(){
++            $(this).prop('disabled',true);
++            try {
++                const r=await frappe.call({method:'bsgroup.hr_attendance.repair_mithun_november',type:'POST',freeze:true});
++                frappe.msgprint({title:'Attendance corrected',message:r.message.map(x=>`${esc(x.date)}: ${link('Attendance',x.name,x.status+' · '+x.name)}`).join('<br>')});
++                await load();
++            } finally {$(this).prop('disabled',false);}
++        }).appendTo(body);
++        const summary=$('<div class="hrcal-summary">').appendTo(body);
++        const approved=days.filter(d=>d.leaves.some(l=>l.approved)).length;
++        const pending=days.filter(d=>d.leaves.some(l=>!l.approved && !['Rejected','Cancelled'].includes(l.status))).length;
++        [`${days.filter(d=>d.punches.some(p=>p.log_type==='IN')).length} days with check-in`,`${approved} dates with approved leave`,`${pending} dates with pending leave`].forEach(text=>$('<span>').text(text).appendTo(summary));
++        if(data.restricted.length)$('<p class="hrcal-note">').text(`Restricted by your access: ${data.restricted.join(', ')}. This calendar may be incomplete.`).appendTo(body);
++        const grid=$('<div class="hrcal-grid" aria-label="Monthly employee attendance calendar">').appendTo(body);
++        ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach(day=>$('<div class="hrcal-weekday">').text(day).appendTo(grid));
++        const offset=(new Date(month.val()+'-01T12:00:00').getDay()+6)%7;
++        for(let i=0;i<offset;i++)$('<div aria-hidden="true">').appendTo(grid);
++        days.forEach(day=>{
++            const ins=day.punches.filter(p=>p.log_type==='IN'), outs=day.punches.filter(p=>p.log_type==='OUT');
++            const approved=day.leaves.filter(l=>l.approved), pending=day.leaves.filter(l=>!l.approved && !['Rejected','Cancelled'].includes(l.status));
++            const labels=[];
++            if(ins.length)labels.push(`IN ${clock(ins[0])} · ${ins[0].location || 'Location not recorded'}`);
++            if(outs.length)labels.push(`OUT ${clock(outs[outs.length-1])} · ${outs[outs.length-1].location || 'Location not recorded'}`);
++            if(!day.punches.length) labels.push(day.future?'Upcoming':'No punches recorded');
++            if(day.punches.length>2)labels.push(`${day.punches.length} punch records`);
++            approved.forEach(l=>labels.push(`${l.is_half_day?'½ day ':''}${l.leave_type} · approved`));
++            if(pending.length)labels.push('Leave pending');
++            day.attendance.forEach(a=>labels.push(`HR: ${a.status}${a.docstatus===0?' · draft':''}`));
++            day.requests.forEach(r=>labels.push(`${r.reason}${r.docstatus===0?' · draft':''}`));
++            $('<button type="button" class="hrcal-day">').toggleClass('has-punch',!!day.punches.length).toggleClass('has-leave',!!approved.length).toggleClass('has-pending',!!pending.length).toggleClass('is-future',day.future).toggleClass('is-today',day.date===data.today)
++                .attr('aria-label',`${day.date}: ${labels.join('; ')}`).attr('title',labels.join('\n')).html(`<strong>${Number(day.date.slice(-2))}</strong>${labels.map(t=>`<small>${esc(t)}</small>`).join('')}`).on('click',()=>detail(day)).appendTo(grid);
++        });
++        $('<p class="hrcal-note">').text('Select a date for every recorded check-in/out, leave decision and HR attendance record. Times follow the ERP site timezone. No punches recorded is not an absence decision. Manual HR attendance does not replace original punches.').appendTo(body);
++    }
++    async function load() {
++        const token=++sequence;
++        body.html('<div class="hrm-empty">Loading monthly attendance…</div>');
++        try {
++            const r=await frappe.call({method:'bsgroup.hr_attendance.month_view',args:{month:month.val(),employee:employee.val() || undefined}});
++            if(token!==sequence || !host[0].isConnected)return;
++            data=r.message;
++            employee.empty();
++            data.employees.forEach(e=>$('<option>').val(e.name).text(`${e.employee_name} · ${e.name}${e.status==='Active'?'':' · '+e.status}`).appendTo(employee));
++            employee.val(data.employee);render();
++        }catch(e){if(token===sequence && host[0].isConnected)body.html('<div class="hrm-empty">Attendance could not load. Check your access or refresh.</div>');}
++    }
++    employee.on('change',load);month.on('change',()=>{if(month.val())load();});
++    load();
++};
+diff --git a/bsgroup/public/js/hr_monthly_review.js b/bsgroup/public/js/hr_monthly_review.js
+new file mode 100644
+index 0000000..a5ca95c
+--- /dev/null
++++ b/bsgroup/public/js/hr_monthly_review.js
+@@ -0,0 +1,126 @@
++/* HR monthly evidence and reviewed actions. Automatic sending awaits approved rules. */
++window.bsHRMonthlyReview=async function(main){
++    const root=$('<div class="hr-review">').appendTo(main), esc=v=>frappe.utils.escape_html(String(v??''));
++    const number=v=>v===null||v===undefined?'—':Number(v).toLocaleString(undefined,{maximumFractionDigits:2});
++    const hours=v=>v===null||v===undefined?'—':`${Math.floor(v/60)}h ${Math.floor(v)%60}m`;
++    const link=(dt,id,label)=>`<a href="/desk/${frappe.router.slug(dt)}/${encodeURIComponent(id)}">${esc(label||id)}</a>`;
++    let month=frappe.datetime.get_today().slice(0,7), data, search='',company='',department='',request=0;
++    if(!document.getElementById('hr-review-style'))$('<style id="hr-review-style">').text(`
++      .hr-review-controls{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin:14px 0}.hr-review-controls label{font-size:11px;color:#60778a;margin:0}.hr-review-controls .form-control{min-width:155px;max-width:250px}.hr-review-note{border:1px solid #d8e6ed;background:#f0f7fb;border-radius:10px;padding:14px 16px;font-size:12px;color:#42637a;margin-bottom:16px}.hr-review-table{min-width:1480px}.hr-review-table th{white-space:normal!important;max-width:130px}.hr-review-table td{vertical-align:top;white-space:nowrap}.hr-review-table th:first-child,.hr-review-table td:first-child{position:sticky;left:0;background:#fff;z-index:1;min-width:190px;max-width:230px;white-space:normal;box-shadow:2px 0 3px #15334b08}.hr-review-table button{font-size:12px;padding:0;border:0;background:none;text-align:left;color:#1a5674;font-weight:650}.hr-review-small{font-size:10px;display:block;color:#718394;margin-top:4px;white-space:normal}.hr-review-badge{font-size:10px;color:#90651c;background:#fff4da;padding:3px 6px;border-radius:5px;display:inline-block;margin-top:6px}.hr-review-details{margin-top:20px}.hr-review-details h3{font-size:17px}.hr-review-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.hr-review-days{min-width:1050px}.hr-review-days td{vertical-align:top}.hr-review-rules td{vertical-align:top;white-space:normal}.hr-review-bar{height:5px;background:#e9eff3;border-radius:9px;overflow:hidden;margin-top:8px}.hr-review-bar span{display:block;height:100%;background:#14867a}.hr-review-count{font-size:12px;color:#5c7486;margin:12px 0}.hr-review-warning{color:#966817}
++    `).appendTo(document.head);
++    function rules(){
++        const d=new frappe.ui.Dialog({title:'Automatic message rules — awaiting your approval',size:'extra-large',fields:[{fieldtype:'HTML',options:`<p>These are proposals only. No automatic warnings, reminders or manager emails are enabled.</p><table class="hrm-table hr-review-rules"><thead><tr><th>Message</th><th>Proposed trigger</th><th>Recipient / frequency</th><th>Safeguards</th></tr></thead><tbody>${data.rules.map(r=>`<tr><td>${esc(r.title)}</td><td>${esc(r.trigger)}</td><td>${esc(r.delivery)}</td><td>${esc(r.safeguard)}</td></tr>`).join('')}</tbody></table><p class="hrm-foot">All rules require your approval before activation. Existing attendance, leave approvals and payroll controls remain authoritative. Historical punch source labels are incomplete; uncertain records need HR review before disciplinary action.</p>`}],primary_action_label:'Close',primary_action:()=>d.hide()});d.show();
++    }
++    function evidence(e,kind){
++        const a=e.annual,t=e.totals;
++        let subject,opening,rows;
++        if(kind==='annual'){
++            subject=`Annual leave planning · ${e.employee_name}`;
++            opening=`Dear ${e.employee_name}, your HRMS annual-leave balance is ${number(a.balance)} days, with ${number(a.available)} days available after ${number(a.pending)} pending days, as of ${a.as_of}. Please discuss suitable leave dates with your manager and submit your application through Time Off. Leave remains subject to approval.`;
++            rows=[];
++        }else if(kind==='after'){
++            subject=`After-hours duty review · ${e.employee_name} · ${month}`;
++            opening=`Dear ${e.manager?.employee_name||'Manager'}, please review the recorded work after 6 PM for ${e.employee_name}: ${number(t.after_day)} days, ${hours(t.after_minutes)} during ${month}. Please confirm the business reason and whether the duty was authorized. These are recorded punch durations, not approved overtime or a payroll entitlement.`;
++            rows=e.days.filter(d=>d.after_minutes>0);
++        }else{
++            subject=`Attendance review · ${e.employee_name} · ${month}`;
++            opening=`Dear ${e.employee_name}, the ${month} attendance report records ${number(t.late_day)} completed late-arrival days (${hours(t.late_minutes)} after the scheduled start) and ${number(t.hr_absent)} submitted HR Absent days. Please review the dates below and provide any relevant explanation or correction request to HR. Missing or conflicting punches require HR review. This message does not change your attendance or pay.`;
++            rows=e.days.filter(d=>d.late_day||d.hr_absent);
++        }
++        const daily=rows.length?`<table border="1" cellpadding="6" cellspacing="0"><tr><td><b>Date</b></td><td><b>Completed IN → OUT pairs</b></td><td><b>Late</b></td><td><b>After 6 PM</b></td><td><b>HR status / review</b></td></tr>${rows.map(d=>`<tr><td>${esc(d.date)}</td><td>${d.completed_pairs.map(p=>esc(p.check_in.slice(0,19).replace('T',' ')+' → '+p.check_out.slice(0,19).replace('T',' '))).join('<br>')||'No completed pair'}</td><td>${esc(hours(d.late_minutes))}</td><td>${esc(hours(d.after_minutes))}</td><td>${esc([...d.attendance.map(x=>x.status),...d.flags].join('; '))}</td></tr>`).join('')}</table><p>Times are Dubai time. Durations are displayed in whole minutes. Data reviewed as of ${esc(data.as_of.slice(0,19).replace('T',' '))}.</p>`:'';
++        return{subject,message:`<p>${esc(opening)}</p>${daily}<p>Regards,<br>HR</p>`};
++    }
++    function actions(e,holder){
++        $('<button class="btn btn-default btn-sm">').text('Edit annual allocation').on('click',async()=>{
++            const result=(await frappe.call({method:'bsgroup.hr_annual_allocation.context',args:{employee:e.employee,date:e.annual.as_of||data.as_of.slice(0,10)}})).message;
++            const d=new frappe.ui.Dialog({title:`Annual allocation · ${e.employee_name}`,fields:[{fieldname:'allocations',fieldtype:'HTML'}]});
++            const box=d.fields_dict.allocations.$wrapper;
++            const limit=result.limit;
++            $('<p>').text((limit===null?'Allocation follows the configured HRMS leave policy.':`Maximum allocation: ${limit} days, including carried-forward days.`)+' Changes update HRMS and the employee’s available balance. Approved leave stays deducted; pending requests reserve days.').appendTo(box);
++            for(const a of result.allocations){
++                const row=$('<div style="border:1px solid #dce5ed;border-radius:8px;padding:12px;margin:10px 0">').appendTo(box);
++                $('<p>').text(`${a.name} · ${a.from_date} to ${a.to_date} · ${a.total_leaves_allocated} allocated days${a.docstatus===0?' · Draft':''}`).appendTo(row);
++                if(a.docstatus===1&&a.can_edit)$('<button class="btn btn-primary btn-sm">').text('Edit allocated days').on('click',()=>{
++                    d.hide();const edit=new frappe.ui.Dialog({title:`Edit annual allocation · ${e.employee_name}`,fields:[
++                        {fieldtype:'Float',fieldname:'total_days',label:limit===null?'Total allocated days':`Total allocated days (maximum ${limit})`,default:a.total_leaves_allocated,reqd:1},
++                        {fieldtype:'Small Text',fieldname:'reason',label:'Reason for change',reqd:1}],primary_action_label:'Save allocation',primary_action:async values=>{
++                            if(!Number.isFinite(Number(values.total_days))||values.total_days<0||(limit!==null&&values.total_days>limit)){frappe.msgprint(limit===null?'Enter a non-negative allocation.':`Annual-leave allocation must be between 0 and ${limit} days.`);return;}
++                            edit.get_primary_btn().prop('disabled',true);
++                            try{await frappe.call({method:'bsgroup.hr_annual_allocation.save',args:{allocation:a.name,modified:a.modified,...values}});edit.hide();frappe.show_alert({message:'HRMS annual allocation updated',indicator:'green'});await load();}
++                            finally{edit.get_primary_btn().prop('disabled',false);}
++                        }});edit.show();
++                }).appendTo(row);
++                $('<button class="btn btn-default btn-sm" style="margin-left:6px">').text('Open HRMS record').on('click',()=>{d.hide();frappe.set_route('Form','Leave Allocation',a.name);}).appendTo(row);
++            }
++            if(!result.allocations.length){
++                $('<p>').text('No allocation exists for this date. Imported reference balances do not grant leave.').appendTo(box);
++                if(result.can_create)$('<button class="btn btn-primary btn-sm">').text('Create annual allocation').on('click',()=>{d.hide();frappe.new_doc('Leave Allocation',{employee:e.employee,company:e.company,leave_type:'Annual Vacation',from_date:result.date,to_date:result.date.slice(0,4)+'-12-31'});}).appendTo(box);
++            }
++            d.show();
++        }).appendTo(holder);
++        if(data.can_warning)$('<button class="btn btn-default btn-sm">').text('Prepare attendance warning').on('click',()=>{
++            const draft=evidence(e,'warning');frappe.new_doc('HR Warning',{employee:e.employee,company:e.company,subject:draft.subject,status:'Draft',warning_type:'Attendance',details:draft.message});
++        }).appendTo(holder);
++        const compose=async kind=>{
++            if(kind==='annual'&&e.annual.source!=='hrms'){frappe.msgprint('A verified current HRMS annual-leave balance is required. Review the allocation first.');return;}
++            const recipient=kind==='after'?e.manager?.email:e.email;
++            if(!recipient||!recipient.includes('@')){frappe.msgprint(kind==='after'?'A reporting manager with a business email is not recorded or is outside your access.':'A business email or linked ERP login is not recorded.');return;}
++            const draft=evidence(e,kind);
++            await frappe.model.with_doctype('Employee');
++            new frappe.views.CommunicationComposer({doc:{doctype:'Employee',name:e.employee},recipients:recipient,subject:draft.subject,message:draft.message});
++        };
++        if(data.can_email){
++            $('<button class="btn btn-default btn-sm">').text('Compose attendance message').on('click',()=>compose('warning')).appendTo(holder);
++            $('<button class="btn btn-default btn-sm">').text('Compose annual-leave reminder').on('click',()=>compose('annual')).appendTo(holder);
++            $('<button class="btn btn-default btn-sm">').text('Compose manager after-hours review').on('click',()=>compose('after')).appendTo(holder);
++        }
++        if(data.can_request)$('<button class="btn btn-default btn-sm">').text('Record HR follow-up').on('click',()=>{
++            const draft=evidence(e,'after');frappe.new_doc('HR Service Request',{employee:e.employee,company:e.company,subject:`Attendance follow-up · ${e.employee_name} · ${month}`,status:'Draft',request_type:'Other',details:draft.message});
++        }).appendTo(holder);
++    }
++    function detail(e){
++        root.find('.hr-review-details').remove();const box=$('<section class="hrm-panel hr-review-details">').appendTo(root);
++        const head=$('<div class="hrm-panel-head">').appendTo(box);$('<h3>').text(`${e.employee_name} · ${month}`).appendTo(head);
++        $('<button class="btn btn-default btn-sm">').text('Close details').on('click',()=>box.remove()).appendTo(head);
++        const body=$('<div style="padding:16px 20px">').appendTo(box);
++        $('<p class="hrm-muted">').text(`${e.department||'No department'} · Manager: ${e.manager?.employee_name||'Not recorded / restricted'} · ${e.company}`).appendTo(body);
++        const a=e.annual;
++        $('<p>').html(`<b>Annual leave:</b> allocated ${number(a.allocated)} · balance ${esc(a.balance??'—')} · available ${number(a.available)} · pending ${number(a.pending)} · used/booked in allocation ${number(a.used_in_allocation)}<br><small>${esc(a.note||'Live HRMS balance as of '+a.as_of+'. Allocated includes the HRMS allocation/carry-forward balance; it may differ from annual contractual entitlement.')}</small>`).appendTo(body);
++        actions(e,$('<div class="hr-review-actions">').appendTo(body));
++        $('<p class="hrm-muted">').text('Actions prepare a draft or email composer for HR review. Automatic messages are not enabled. Review any data flags before sending.').appendTo(body);
++        box.append(`<div class="hrm-table-wrap"><table class="hrm-table hr-review-days"><thead><tr><th>Date / schedule</th><th>Check-in / out</th><th>Office hours</th><th>Late</th><th>After 6 PM</th><th>Leave</th><th>HR attendance</th><th>Review notes</th></tr></thead><tbody>${e.days.map(d=>`<tr><td>${esc(d.date)}<span class="hr-review-small">${esc(d.shift||'No shift')} ${esc(d.shift_start||'')}–${esc(d.shift_end||'')}${d.holiday?' · Holiday':''}${d.future?' · Upcoming':''}${d.on_duty?' · On duty / WFH':''}</span></td><td>${d.punches.map(p=>link('Employee Checkin',p.name,`${p.log_type||'?'} ${p.time.slice(11,19)}`)).join('<br>')||'—'}</td><td>${hours(d.office_minutes)}</td><td>${hours(d.late_minutes)}</td><td>${hours(d.after_minutes)}</td><td>${d.leave_records.map(l=>link('Leave Application',l.name,`${l.leave_type} · ${l.status}${l.docstatus===0?' (draft)':''}`)).join('<br>')||'—'}</td><td>${d.attendance.map(a=>link('Attendance',a.name,`${a.status}${a.docstatus===0?' (draft)':''}`)).join('<br>')||'—'}</td><td class="hr-review-warning">${esc(d.flags.join('; '))}${d.missing_checkin?'<br>No check-in after shift ended':''}</td></tr>`).join('')}</tbody></table></div>`);
++        box[0].scrollIntoView({block:'start',behavior:'smooth'});
++    }
++    function render(){
++        root.empty();
++        $('<div class="hr-review-note">').html('<b>Monthly HR review</b> · Full 9 AM–6 PM office window; no lunch deduction. Hours use completed recorded IN/OUT pairs. After-hours work is shown separately from approved overtime.').appendTo(root);
++        const controls=$('<div class="hr-review-controls">').appendTo(root);
++        $('<label>Month</label>').append($('<input class="form-control input-sm" type="month" aria-label="Review month">').val(month).on('change',function(){month=this.value;load();})).appendTo(controls);
++        const companyInput=$('<select class="form-control input-sm" aria-label="Review company">').append('<option value="">All permitted companies</option>');
++        [...new Set(data.employees.map(e=>e.company))].sort().forEach(x=>$('<option>').val(x).text(x).appendTo(companyInput));companyInput.val(company).on('change',()=>{company=companyInput.val();drawRows();});$('<label>Company</label>').append(companyInput).appendTo(controls);
++        const deptInput=$('<select class="form-control input-sm" aria-label="Review department">').append('<option value="">All teams</option>');
++        [...new Set(data.employees.map(e=>e.department).filter(Boolean))].sort().forEach(x=>$('<option>').val(x).text(x).appendTo(deptInput));deptInput.val(department).on('change',()=>{department=deptInput.val();drawRows();});$('<label>Team</label>').append(deptInput).appendTo(controls);
++        $('<label>Employee</label>').append($('<input class="form-control input-sm" type="search" aria-label="Find employee in monthly review" placeholder="Name or employee ID">').val(search).on('input',function(){search=this.value;drawRows();})).appendTo(controls);
++        $('<button class="btn btn-default btn-sm">').text('Refresh report').on('click',load).appendTo(controls);
++        $('<button class="btn btn-default btn-sm">').text('Review proposed automatic rules').on('click',rules).appendTo(controls);
++        $('<p class="hrm-muted">').text(`Automatic sending: awaiting approval · Data as of ${data.as_of?.slice(0,19).replace('T',' ')} Dubai time.`).appendTo(root);
++        if(data.restricted.length)$('<p class="hr-review-note">').text('Restricted sources: '+data.restricted.join(', ')+'. A dash means unavailable, not zero.').appendTo(root);
++        $('<div class="hr-review-count">').appendTo(root);
++        const panel=$('<section class="hrm-panel"><div class="hrm-table-wrap"><table class="hrm-table hr-review-table"><thead><tr><th>Employee / details</th><th>Annual allocated / available</th><th>Leave taken this month</th><th>HR absent days</th><th>Late days / time</th><th>Scheduled hours — full month</th><th>Expected hours due</th><th>Recorded office hours</th><th>After 6 PM days / hours</th><th>Missing check-in / review</th></tr></thead><tbody></tbody></table></div></section>').appendTo(root);
++        function drawRows(){
++            const rows=data.employees.filter(e=>(!company||e.company===company)&&(!department||e.department===department)&&(!search||`${e.employee_name} ${e.employee}`.toLowerCase().includes(search.toLowerCase())));
++            root.find('.hr-review-count').text(`${rows.length} employees · Select an employee for daily evidence and HR actions.`);
++            const tbody=panel.find('tbody').empty();
++            rows.forEach(e=>{const t=e.totals,a=e.annual;const tr=$('<tr>').appendTo(tbody),cell=$('<td>').appendTo(tr);
++                $('<button>').text(e.employee_name).on('click',()=>detail(e)).appendTo(cell);$('<span class="hr-review-small">').text(`${e.employee} · ${e.department||'No team'}`).appendTo(cell);
++                if(e.review_days)$('<span class="hr-review-badge">').text(`${e.review_days} dates need review`).appendTo(cell);
++                tr.append(`<td>${number(a.allocated)} / <b>${number(a.available)}</b><span class="hr-review-small">Balance: ${esc(a.balance??'—')} · ${esc(a.source==='hrms'?'HRMS':a.source==='reference'?'Excel reference':a.source)}</span></td><td>${number(e.leave_taken)}<span class="hr-review-small">Annual: ${number(e.annual_taken)}</span></td><td>${number(t.hr_absent)}</td><td>${number(t.late_day)} / ${hours(t.late_minutes)}</td><td>${hours(t.scheduled_minutes)}</td><td>${hours(t.expected_due_minutes)}<span class="hr-review-small">To date; approved leave deducted</span></td><td>${hours(t.office_minutes)}<span class="hr-review-small">Completed pairs only</span></td><td>${number(t.after_day)} / ${hours(t.after_minutes)}</td><td>${number(t.missing_checkin)} / ${e.review_days}<span class="hr-review-small">Missing punches ≠ confirmed absence</span></td>`);
++            });
++            if(!rows.length)tbody.append('<tr><td colspan="10">No matching employee records.</td></tr>');
++        }
++        drawRows();
++        $('<p class="hrm-foot">').text('Scheduled hours follow the assigned shift and holiday calendar, within joining/relieving dates. Late time is measured from the scheduled start, without a grace deduction, only on complete days without approved leave/on-duty. Older check-in records may not identify their source; the report does not assume they are genuine app punches or change them.').appendTo(root);
++    }
++    async function load(){const id=++request;root.html('<div class="hrm-empty">Loading employee attendance and leave…</div>');try{const r=await frappe.call({method:'bsgroup.hr_monthly_review.report',args:{month}});if(id!==request||!root[0].isConnected)return;data=r.message;render();}catch(e){if(id===request&&root[0].isConnected)root.html('<div class="hrm-empty">The monthly review could not load. Please use Refresh or check HR access.</div>');}}
++    await load();
++};
+diff --git a/bsgroup/public/js/hr_sidebar.js b/bsgroup/public/js/hr_sidebar.js
+new file mode 100644
+index 0000000..684b013
+--- /dev/null
++++ b/bsgroup/public/js/hr_sidebar.js
+@@ -0,0 +1,44 @@
++/* BS HR uses the main application sidebar, without changing native HR permissions. */
++(() => {
++    const sections=[['dashboard','Dashboard','layout-dashboard'],['organization','Organization Structure','network'],['employees','Employee Profiles','users'],['onboarding','Onboarding','user-plus'],['attendance','Attendance','clock'],['leave','Leave Approvals','calendar-check'],['review','Attendance and Leave Management','calendar'],['policies','Policies','file-text'],['warnings','Warnings','shield-alert'],['exit','Exit Interviews','message-circle'],['offboarding','Offboarding','log-out'],['requests','HR Requests','inbox']];
++    function update() {
++        // Existing sessions may retain boot data from before this menu was installed.
++        // Server endpoints independently enforce the same audience and document permissions.
++        if(!(frappe.boot.bs_hr_management || ['Administrator','muskan@bitssecureit.com'].includes(frappe.session.user) || frappe.user.has_role('System Manager')))return;
++        const hosts=document.querySelectorAll('.body-sidebar .sidebar-items, .desk-sidebar .sidebar-items');
++        for(const host of hosts) {
++            let group=host.querySelector('.sidebar-item-container[data-id="BS HR"]');
++            if(!group && !location.pathname.includes('hr-dashboard'))continue;
++            if(!group) {
++                group=document.createElement('div');group.className='sidebar-item-container section-item';group.dataset.id='BS HR';
++                group.innerHTML='<div class="standard-sidebar-item"><button class="item-anchor section-break btn-reset" type="button" aria-expanded="true"><span class="sidebar-item-label">BS HR</span></button></div><div class="sidebar-child-item nested-container"></div>';
++                const toggle=group.querySelector('button');toggle.onclick=()=>{const child=group.querySelector('.sidebar-child-item');child.hidden=!child.hidden;toggle.setAttribute('aria-expanded',String(!child.hidden));};
++                host.append(group);
++            }
++            const children=group.querySelector(':scope > .sidebar-child-item');
++            if(!children)continue;
++            if(!children.querySelector('.bs-hr-sidebar-link[data-hr-section="review"]')) {
++                children.replaceChildren();
++                for(const [key,label,icon] of sections) {
++                    const row=document.createElement('div');row.className='sidebar-item-container';
++                    const item=document.createElement('div');item.className='standard-sidebar-item';row.append(item);
++                    const a=document.createElement('a');a.className='item-anchor bs-hr-sidebar-link';a.dataset.hrSection=key;
++                    a.href='/desk/bs-group/hr-dashboard?hr_section='+key;
++                    a.innerHTML=`<span class="sidebar-item-icon"><svg class="icon current-color icon-sm" aria-hidden="true"><use href="#icon-${icon}"></use></svg></span><span class="sidebar-item-label"></span>`;
++                    a.querySelector('.sidebar-item-label').textContent=label;
++                    a.onclick=event=>{if(event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;event.preventDefault();Promise.resolve(frappe.set_route('hr-dashboard',{hr_section:key})).then(()=>window.bsHRSelectSection?.(key));};
++                    item.append(a);children.append(row);
++                }
++            }
++            const active=location.pathname.includes('hr-dashboard')?(new URLSearchParams(location.search).get('hr_section')||'dashboard'):null;
++            children.querySelectorAll('.bs-hr-sidebar-link').forEach(a=>{
++                const selected=a.dataset.hrSection===active;
++                a.parentElement.classList.toggle('selected',selected);
++                if(selected)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');
++            });
++        }
++    }
++    frappe.router.on('change',()=>setTimeout(update,50));
++    new MutationObserver(update).observe(document.body,{childList:true,subtree:true});
++    update();
++})();
+diff --git a/bsgroup/bs_group/doctype/hr_warning/__init__.py b/bsgroup/bs_group/doctype/hr_warning/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/bsgroup/bs_group/doctype/hr_warning/hr_warning.py b/bsgroup/bs_group/doctype/hr_warning/hr_warning.py
+new file mode 100644
+index 0000000..47db6d4
+--- /dev/null
++++ b/bsgroup/bs_group/doctype/hr_warning/hr_warning.py
+@@ -0,0 +1,6 @@
++from frappe.model.document import Document
++
++
++class HRWarning(Document):
++    """Confidential administrative register; no automatic HR actions."""
++    pass
+diff --git a/bsgroup/bs_group/doctype/hr_warning/hr_warning.json b/bsgroup/bs_group/doctype/hr_warning/hr_warning.json
+new file mode 100644
+index 0000000..0539659
+--- /dev/null
++++ b/bsgroup/bs_group/doctype/hr_warning/hr_warning.json
+@@ -0,0 +1,112 @@
++{
++ "doctype": "DocType",
++ "name": "HR Warning",
++ "module": "BS Group",
++ "custom": 0,
++ "autoname": "format:HR-WARN-{YYYY}-{#####}",
++ "field_order": [
++  "subject",
++  "employee",
++  "employee_name",
++  "company",
++  "record_date",
++  "status",
++  "warning_type",
++  "details",
++  "employee_response",
++  "review_date",
++  "resolution"
++ ],
++ "fields": [
++  {
++   "fieldname": "subject",
++   "label": "Subject",
++   "fieldtype": "Data",
++   "reqd": 1,
++   "in_list_view": 1
++  },
++  {
++   "fieldname": "employee",
++   "label": "Employee",
++   "fieldtype": "Link",
++   "options": "Employee",
++   "reqd": 1,
++   "in_list_view": 1
++  },
++  {
++   "fieldname": "employee_name",
++   "label": "Employee Name",
++   "fieldtype": "Data",
++   "fetch_from": "employee.employee_name",
++   "read_only": 1
++  },
++  {
++   "fieldname": "company",
++   "label": "Company",
++   "fieldtype": "Link",
++   "options": "Company",
++   "fetch_from": "employee.company",
++   "read_only": 1,
++   "reqd": 1
++  },
++  {
++   "fieldname": "record_date",
++   "label": "Record Date",
++   "fieldtype": "Date",
++   "default": "Today",
++   "reqd": 1
++  },
++  {
++   "fieldname": "status",
++   "label": "Status",
++   "fieldtype": "Select",
++   "options": "Draft\nUnder Review\nClosed",
++   "default": "Draft",
++   "reqd": 1,
++   "in_list_view": 1
++  },
++  {
++   "fieldname": "warning_type",
++   "label": "Warning Type",
++   "fieldtype": "Select",
++   "options": "Attendance\nConduct\nPerformance\nOther",
++   "reqd": 1
++  },
++  {
++   "fieldname": "details",
++   "label": "Details",
++   "fieldtype": "Text Editor",
++   "reqd": 1
++  },
++  {
++   "fieldname": "employee_response",
++   "label": "Employee Response",
++   "fieldtype": "Text Editor"
++  },
++  {
++   "fieldname": "review_date",
++   "label": "Review Date",
++   "fieldtype": "Date"
++  },
++  {
++   "fieldname": "resolution",
++   "label": "Review Outcome",
++   "fieldtype": "Text Editor"
++  }
++ ],
++ "track_changes": 1,
++ "sort_field": "modified",
++ "sort_order": "DESC",
++ "title_field": "subject",
++ "permissions": [
++  {
++   "role": "System Manager",
++   "read": 1,
++   "write": 1,
++   "create": 1,
++   "report": 1
++  }
++ ],
++ "allow_rename": 0,
++ "engine": "InnoDB"
++}
+diff --git a/bsgroup/bs_group/doctype/hr_service_request/__init__.py b/bsgroup/bs_group/doctype/hr_service_request/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/bsgroup/bs_group/doctype/hr_service_request/hr_service_request.py b/bsgroup/bs_group/doctype/hr_service_request/hr_service_request.py
+new file mode 100644
+index 0000000..7b55b92
+--- /dev/null
++++ b/bsgroup/bs_group/doctype/hr_service_request/hr_service_request.py
+@@ -0,0 +1,6 @@
++from frappe.model.document import Document
++
++
++class HRServiceRequest(Document):
++    """Confidential administrative register; no automatic HR actions."""
++    pass
+diff --git a/bsgroup/bs_group/doctype/hr_service_request/hr_service_request.json b/bsgroup/bs_group/doctype/hr_service_request/hr_service_request.json
+new file mode 100644
+index 0000000..5d33a71
+--- /dev/null
++++ b/bsgroup/bs_group/doctype/hr_service_request/hr_service_request.json
+@@ -0,0 +1,100 @@
++{
++ "doctype": "DocType",
++ "name": "HR Service Request",
++ "module": "BS Group",
++ "custom": 0,
++ "autoname": "format:HR-REQ-{YYYY}-{#####}",
++ "field_order": [
++  "subject",
++  "employee",
++  "employee_name",
++  "company",
++  "record_date",
++  "status",
++  "request_type",
++  "details",
++  "resolution"
++ ],
++ "fields": [
++  {
++   "fieldname": "subject",
++   "label": "Subject",
++   "fieldtype": "Data",
++   "reqd": 1,
++   "in_list_view": 1
++  },
++  {
++   "fieldname": "employee",
++   "label": "Employee",
++   "fieldtype": "Link",
++   "options": "Employee",
++   "reqd": 1,
++   "in_list_view": 1
++  },
++  {
++   "fieldname": "employee_name",
++   "label": "Employee Name",
++   "fieldtype": "Data",
++   "fetch_from": "employee.employee_name",
++   "read_only": 1
++  },
++  {
++   "fieldname": "company",
++   "label": "Company",
++   "fieldtype": "Link",
++   "options": "Company",
++   "fetch_from": "employee.company",
++   "read_only": 1,
++   "reqd": 1
++  },
++  {
++   "fieldname": "record_date",
++   "label": "Record Date",
++   "fieldtype": "Date",
++   "default": "Today",
++   "reqd": 1
++  },
++  {
++   "fieldname": "status",
++   "label": "Status",
++   "fieldtype": "Select",
++   "options": "Draft\nUnder Review\nClosed",
++   "default": "Draft",
++   "reqd": 1,
++   "in_list_view": 1
++  },
++  {
++   "fieldname": "request_type",
++   "label": "Request Type",
++   "fieldtype": "Select",
++   "options": "Employment Letter\nDocument Update\nHR Enquiry\nOther",
++   "reqd": 1
++  },
++  {
++   "fieldname": "details",
++   "label": "Request Details",
++   "fieldtype": "Text Editor",
++   "reqd": 1
++  },
++  {
++   "fieldname": "resolution",
++   "label": "Response / Resolution",
++   "fieldtype": "Text Editor"
++  }
++ ],
++ "track_changes": 1,
++ "sort_field": "modified",
++ "sort_order": "DESC",
++ "title_field": "subject",
++ "permissions": [
++  {
++   "role": "System Manager",
++   "read": 1,
++   "write": 1,
++   "create": 1,
++   "report": 1
++  }
++ ],
++ "allow_rename": 0,
++ "engine": "InnoDB"
++}
