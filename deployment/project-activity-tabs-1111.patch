@@ -1,0 +1,102 @@
+Project activity tabs 20261111
+
+diff --git a/bsgroup/public/js/project_workspace.js b/bsgroup/public/js/project_workspace.js
+index 9ee869f..b4949c1 100644
+--- a/bsgroup/public/js/project_workspace.js
++++ b/bsgroup/public/js/project_workspace.js
+@@ -4,6 +4,7 @@
+     frappe.ui.form.on('Project', {
+         refresh(frm) {
+             groupAdditionalDetails(frm);
++            groupActivityTabs(frm);
+             for (const tab of frm.layout.tabs || []) {
+                 if (['connections_tab', 'costing_tab'].includes(tab.df.fieldname)) tab.df.hidden = 1;
+             }
+@@ -17,12 +18,49 @@
+                 });
+                 return;
+             }
+-            if (frm.is_new()) {field.$wrapper.text(__('Save this project to use its activities.')); return;}
+             for (const title of ['Expenses','Advance','Labour Approval']) frm.remove_custom_button(__(title),__('Project Requests'));
+-            frm.add_custom_button(__('Project Activities'), () => frm.scroll_to_field('custom_bs_project_workspace'));
+-            render(frm, frm.__bs_activity || 'tasks');
++            frm.remove_custom_button(__('Project Activities'));
+         }
+     });
++    function groupActivityTabs(frm) {
++        const layout = frm.layout;
++        const original = layout.tabs.find(tab=>tab.df.fieldname==='custom_bs_project_activities');
++        const plan = layout.tabs.find(tab=>tab.df.fieldname==='custom_bs_project_plan_tab');
++        if (!original || !plan) return;
++        const wasActive = original.is_active();
++        frm.__bs_activity_tabs ||= {};
++        let previous = plan;
++        for (const [id, title] of Object.entries(sections)) {
++            let tab = frm.__bs_activity_tabs[id];
++            if (!tab || !layout.tabs.includes(tab)) {
++                // Reuse native form tabs so routing, keyboard focus and active
++                // state behave exactly like Details and Project Plan.
++                tab = new original.constructor(layout, {
++                    fieldname:'custom_bs_activity_'+id, fieldtype:'Tab Break',
++                    label:title, permlevel:original.df.permlevel || 0
++                }, frm, layout.tab_link_container, layout.tabs_content);
++                layout.tabs.push(tab);
++                tab.activity_host = $('<div class="form-section" style="padding:20px">').appendTo(tab.wrapper);
++                const activate = tab.set_active.bind(tab);
++                tab.set_active = () => {
++                    activate();
++                    if (tab.activity_project !== frm.doc.name) render(frm,id);
++                };
++                frm.__bs_activity_tabs[id] = tab;
++            }
++            tab.activity_project = null;
++            tab.tab_link.insertAfter(previous.tab_link);
++            tab.wrapper.insertAfter(previous.wrapper);
++            previous = tab;
++        }
++        // Keep the stored legacy fields for compatibility; their wrapper is
++        // replaced by the six project-scoped tabs without changing records.
++        original.df.hidden = 1;
++        layout.tab_link_container.css('flex-wrap','wrap');
++        if (wasActive || window.location.hash==='#custom_bs_project_activities') {
++            frm.__bs_activity_tabs[frm.__bs_activity || 'tasks'].set_active();
++        }
++    }
+     function groupAdditionalDetails(frm) {
+         const tabs = frm.layout.tabs || [];
+         const additional = tabs.find(tab=>tab.df.fieldname==='monitor_progress_tab');
+@@ -141,25 +179,25 @@
+     }
+     async function render(frm, section) {
+         frm.__bs_activity = section;
+-        const version = frm.__bs_activity_version = (frm.__bs_activity_version || 0) + 1;
++        const tab = frm.__bs_activity_tabs?.[section];
++        if (!tab) return;
++        const version = tab.activity_version = (tab.activity_version || 0) + 1;
+         const project = frm.doc.name;
+-        const host = frm.fields_dict.custom_bs_project_workspace.$wrapper;
++        tab.activity_project = project;
++        const host = tab.activity_host;
+         host.empty();
+-        $('<h4>').text(frm.doc.project_name || project).appendTo(host);
++        if (frm.is_new()) {host.text(__('Save this project to use its activities.')); return;}
++        $('<h4>').text(__(sections[section])+' · '+(frm.doc.project_name || project)).appendTo(host);
+         $('<p class="text-muted">').text(__('Activities for this project only') + ' · ' + project).appendTo(host);
+-        const nav = $('<nav aria-label="Project activities" style="display:flex;gap:8px;flex-wrap:wrap;margin:16px 0">').appendTo(host);
+-        for (const [id,title] of Object.entries(sections)) $('<button type="button" class="btn btn-sm">')
+-            .addClass(id===section ? 'btn-primary' : 'btn-default').attr('aria-pressed',String(id===section))
+-            .text(__(title)).on('click',()=>render(frm,id)).appendTo(nav);
+         const panel = $('<section aria-live="polite">').text(__('Loading…')).appendTo(host);
+         let data;
+         try {
+             ({message:data} = await frappe.call({method:'bsgroup.project_workspace.context',args:{project,section}}));
+         } catch (error) {
+-            if (version===frm.__bs_activity_version) panel.text(__('Could not load this project activity. Check your access and try again.'));
++            if (version===tab.activity_version) panel.text(__('Could not load this project activity. Check your access and try again.'));
+             return;
+         }
+-        if (version!==frm.__bs_activity_version || frm.doc.name!==project) return;
++        if (version!==tab.activity_version || frm.doc.name!==project) return;
+         panel.empty();
+         if (data.problem) $('<p class="text-muted">').text(data.problem).appendTo(panel);
+         const actions = $('<div style="display:flex;gap:8px;margin-bottom:12px">').appendTo(panel);
