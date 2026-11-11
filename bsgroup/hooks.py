@@ -470,6 +470,7 @@ override_whitelisted_methods = {
 }
 
 extend_doctype_class = {
+    "Task": ["bsgroup.project_plan.ProjectPlanTaskMixin"],
     "Holiday List": [
         "bsgroup.utils.api.HolidayListEnglishDescriptionMixin"
     ]
@@ -752,4 +753,3 @@ for _event, _handler in (("before_validate", "before_validate"), ("before_print"
 # Keep project activities inside each project; no role or workflow changes.
 after_migrate.append("bsgroup.project_workspace.install")
 after_migrate.append("bsgroup.project_plan.install")
-extend_doctype_class.setdefault("Task", []).append("bsgroup.project_plan.ProjectPlanTaskMixin")
