@@ -466,7 +466,10 @@ frappe.pages['my-work-dashboard'].on_page_load = function(wrapper) {
     page.clear_primary_action();
     wrapper.refresh_dashboard = refresh;
 };
-frappe.pages['my-work-dashboard'].on_page_show = wrapper => wrapper.refresh_dashboard();
+frappe.pages['my-work-dashboard'].on_page_show = wrapper => {
+    wrapper.refresh_dashboard();
+    frappe.require('/assets/bsgroup/js/dashboard_early_checkout.js', () => window.bsEarlyCheckout.mount(wrapper));
+};
 
 function bsChairmanDashboard(wrapper) {
     const page=frappe.ui.make_app_page({parent:wrapper,title:'Executive Overview',single_column:true});
