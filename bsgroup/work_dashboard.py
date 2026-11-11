@@ -8,7 +8,6 @@ def navigation_script():
     """Serve navigation from the app when patched static assets are unavailable."""
     from pathlib import Path
     content = Path(frappe.get_app_path('bsgroup', 'public', 'js', 'scoped_sales_access.js')).read_text()
-    content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'navigation_recovery.js')).read_text()
     content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'personal_column_widths.js')).read_text()
     content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'sales_list_search.js')).read_text()
     content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'user_first_names.js')).read_text()
@@ -27,6 +26,7 @@ def navigation_script():
     style += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'css', 'attendance_widget.css')).read_text()
     style += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'css', 'bs_sales_theme.css')).read_text()
     style += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'css', 'project_layout.css')).read_text()
+    content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'navigation_recovery.js')).read_text()
     content += '\n(() => { const s=document.createElement("style"); s.id="bs-portal-theme"; s.textContent=' + json.dumps(style) + '; document.getElementById(s.id)?.remove(); document.head.append(s); document.body.classList.add("bs-premium"); })();'
     frappe.local.response.update(type='download', filename='scoped_sales_access.js',
                                  filecontent=content, content_type='application/javascript',

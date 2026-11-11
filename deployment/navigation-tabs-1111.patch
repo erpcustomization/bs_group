@@ -99,10 +99,14 @@ index 0000000..0af67ae
 +    if (document.body) start();else document.addEventListener('DOMContentLoaded', start, {once:true});
 +})();
 diff --git a/bsgroup/work_dashboard.py b/bsgroup/work_dashboard.py
-index 0b44bf7..0be924c 100644
+index 0b44bf7..3c110c1 100644
 --- a/bsgroup/work_dashboard.py
 +++ b/bsgroup/work_dashboard.py
-@@ -9,2 +9,3 @@ def navigation_script():
-     from pathlib import Path
-     content = Path(frappe.get_app_path('bsgroup', 'public', 'js', 'scoped_sales_access.js')).read_text()
+@@ -26,6 +26,7 @@ def navigation_script():
+     style += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'css', 'attendance_widget.css')).read_text()
+     style += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'css', 'bs_sales_theme.css')).read_text()
+     style += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'css', 'project_layout.css')).read_text()
 +    content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'navigation_recovery.js')).read_text()
+     content += '\n(() => { const s=document.createElement("style"); s.id="bs-portal-theme"; s.textContent=' + json.dumps(style) + '; document.getElementById(s.id)?.remove(); document.head.append(s); document.body.classList.add("bs-premium"); })();'
+     frappe.local.response.update(type='download', filename='scoped_sales_access.js',
+                                  filecontent=content, content_type='application/javascript',
