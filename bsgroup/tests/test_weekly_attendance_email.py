@@ -21,6 +21,8 @@ class WeeklyTests(unittest.TestCase):
         self.f.DuplicateEntryError = type('DuplicateEntryError', (Exception,), {})
         self.f.throw = lambda text: (_ for _ in ()).throw(ValueError(text))
         self.f.log_error = Mock()
+        self.f.conf = Doc(host_name='https://erp.bitssecureit.com')
+        self.f.local = Doc(site='local-test')
         self.u = types.ModuleType('frappe.utils')
         self.u.getdate = lambda v: v if isinstance(v, date) else date.fromisoformat(v)
         self.u.get_datetime = lambda v: v if isinstance(v, datetime) else datetime.fromisoformat(v)
@@ -60,6 +62,13 @@ class WeeklyTests(unittest.TestCase):
         self.assertTrue(row['late'])
         self.assertTrue(row['missing'])
         self.assertEqual(int(row['affected']), 1)
+
+    def test_regional_identity_without_newer_hr_helper(self):
+        self.assertEqual(self.m.site_profile()['region'], 'UAE')
+        self.f.conf.host_name = 'https://erp-om.bitssecureit.com'
+        self.assertEqual(self.m.site_profile()['region'], 'Oman')
+        self.f.conf.host_name = 'https://unrelated.example.test'
+        self.assertIsNone(self.m.site_profile())
 
     def test_midday_out_then_in_requires_final_checkout(self):
         row = self.classify([(self.start, 'IN'), (self.start+timedelta(hours=3), 'OUT'),

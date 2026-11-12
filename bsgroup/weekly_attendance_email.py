@@ -8,10 +8,11 @@ from email.utils import formataddr
 from hashlib import sha256
 from html import escape
 from zoneinfo import ZoneInfo
+from urllib.parse import urlparse
 
 import frappe
 from frappe.utils import get_datetime, getdate
-from bsgroup.hr_email import configured_account, site_profile
+from bsgroup.hr_email import configured_account
 
 TZ = ZoneInfo('Asia/Dubai')
 METHOD = 'bsgroup.weekly_attendance_email.send_summaries'
@@ -20,6 +21,18 @@ HR_CC = 'muskan@bitssecureit.com'
 CRON = '2 9 * * 5'
 START_DATE = date(2026, 11, 13)
 THRESHOLD = 3
+
+
+def site_profile():
+    # Older Oman installations have the dedicated HR sender but predate the
+    # shared regional helper. Do not replace their working mail configuration.
+    identities = {urlparse(frappe.conf.get('host_name') or '').hostname,
+                  getattr(frappe.local, 'site', None)}
+    if identities & {'erp-om.bitssecureit.com', 'erp-om.k.frappe.cloud'}:
+        return dict(region='Oman', email='hr-notifications-om@bitssecureit.com', sender_name='HR Oman')
+    if identities & {'erp.bitssecureit.com', 'erp-bitssecureit.u.frappe.cloud'}:
+        return dict(region='UAE', email='hr-notifications-ae@bitssecureit.com', sender_name='HR UAE')
+    return None
 
 
 def configure_hooks(hooks):
