@@ -401,4 +401,4 @@ diff --git a/bsgroup/hooks.py b/bsgroup/hooks.py
  _hr_email_hooks(globals())
 +# Friday weekly attendance summaries; enabled separately in HR Settings.
 +scheduler_events.setdefault("cron", {}).setdefault("2 9 * * 5", []).append("bsgroup.weekly_attendance_email.send_summaries")
- override_whitelisted_methods["frappe.desk.form.assign_to.add"] = "bsgroup.lead_assignment.assign"
+ 
