@@ -168,6 +168,8 @@ def configure_hooks(hooks):
         if value not in values:
             values.append(value)
         mapping[key] = values
+    append(hooks.setdefault('scheduler_events', {}).setdefault('cron', {}),
+           '2 9 * * 5', 'bsgroup.weekly_attendance_email.send_summaries')
     append(hooks, "after_migrate", "bsgroup.hr_email.install")
     for doctype, event, method in (("Email Queue", "before_insert", "route_queue"),
                                    ("HR Settings", "validate", "validate_settings")):
