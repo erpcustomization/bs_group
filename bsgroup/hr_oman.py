@@ -44,3 +44,4 @@ def configure_hooks(hooks):
         append(events, event, 'bsgroup.hr_annual_allocation.validate_allocation')
     cron = hooks.setdefault('scheduler_events', {}).setdefault('cron', {})
     append(cron, '* * * * *', 'bsgroup.oman_attendance_email.send_reminders')
+    append(cron, '2 9 * * 5', 'bsgroup.weekly_attendance_email.send_summaries')

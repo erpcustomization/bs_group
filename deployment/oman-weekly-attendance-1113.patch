@@ -393,12 +393,11 @@ index 0000000..77ffc89
 +    job.save()
 +    frappe.clear_cache(doctype='HR Settings')
 +    frappe.local.response.update(type='redirect', location='/api/method/bsgroup.weekly_attendance_email.page')
-diff --git a/bsgroup/hooks.py b/bsgroup/hooks.py
---- a/bsgroup/hooks.py
-+++ b/bsgroup/hooks.py
-@@ -713,3 +713,5 @@
- from bsgroup.hr_email import configure_hooks as _hr_email_hooks
- _hr_email_hooks(globals())
-+# Friday weekly attendance summaries; enabled separately in HR Settings.
-+scheduler_events.setdefault("cron", {}).setdefault("2 9 * * 5", []).append("bsgroup.weekly_attendance_email.send_summaries")
- 
+diff --git a/bsgroup/hr_oman.py b/bsgroup/hr_oman.py
+--- a/bsgroup/hr_oman.py
++++ b/bsgroup/hr_oman.py
+@@ -44,3 +44,4 @@
+         append(events, event, 'bsgroup.hr_annual_allocation.validate_allocation')
+     cron = hooks.setdefault('scheduler_events', {}).setdefault('cron', {})
+     append(cron, '* * * * *', 'bsgroup.oman_attendance_email.send_reminders')
++    append(cron, '2 9 * * 5', 'bsgroup.weekly_attendance_email.send_summaries')
