@@ -21,7 +21,11 @@ HR_CC = 'muskan@bitssecureit.com'
 CRON = '2 9 * * 5'
 START_DATE = date(2026, 11, 13)
 THRESHOLD = 3
-EXCLUDED_USERS = {'mohan@bitssecureit.com'}
+EXCLUDED_USERS = {'mohan@bitssecureit.com', 'raj@bitssecureit.com'}
+# Explicit weekly-email routing only; Employee.reports_to is not changed.
+MANAGER_CC_OVERRIDES = {
+    'UAE': {'mithun@bitssecureit.com': 'manikandan@bitssecureit.com'},
+}
 
 
 def site_profile():
@@ -176,6 +180,13 @@ def recipients(employee):
         return [], 'No enabled employee email'
     if not frappe.db.get_value('User', HR_CC, 'enabled'):
         return [], 'Muskan HR user is not enabled'
+    region = (site_profile() or {}).get('region')
+    override = MANAGER_CC_OVERRIDES.get(region, {}).get(user)
+    if override:
+        if (override == user or not frappe.db.get_value('User', override, 'enabled')
+                or not frappe.db.exists('Employee', {'user_id': override, 'status': 'Active'})):
+            return [], 'Designated weekly CC recipient is not an active employee with an enabled email'
+        return sorted({override, HR_CC} - {user}), ''
     manager_id = frappe.db.get_value('Employee', employee.name, 'reports_to')
     if not manager_id:
         return [], 'Reporting manager is not assigned'
@@ -343,7 +354,8 @@ def page():
     <p>Threshold: 3 or more distinct affected days (late check-in or missing final check-out).
     Assigned shift times, no grace period. Holidays, approved leave and approved arrangements excluded.
     No recorded check-in alone is not classified as late. Missing managers hold the email for HR review.
-    Mohan is excluded from these weekly emails.</p>
+    Mohan and Raj Kamal are excluded from these weekly emails.
+    {'Mithun’s weekly summary copies Manikandan and Muskan instead of his recorded reporting manager.' if profile['region'] == 'UAE' else ''}</p>
     <p>Scheduler: {'Active' if active else 'Not active'} · Last run: {escape(str(job.last_execution or 'Not yet') if job else 'Not yet')}.</p>
     <form method="post" action="/api/method/bsgroup.weekly_attendance_email.configure">
     <input type="hidden" name="csrf_token" value="{token}">

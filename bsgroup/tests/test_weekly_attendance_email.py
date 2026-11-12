@@ -142,6 +142,40 @@ class WeeklyTests(unittest.TestCase):
         self.f.db.get_value.side_effect = lambda dt, *a, **k: 1 if dt=='User' else None
         self.assertIn('not assigned', self.m.recipients(self.employee)[1])
 
+    def test_mithun_weekly_cc_uses_manikandan_and_muskan_without_changing_manager(self):
+        self.employee.user_id = 'mithun@bitssecureit.com'
+        self.f.db.get_value.return_value = 1
+        self.f.db.exists.return_value = True
+        cc, hold = self.m.recipients(self.employee)
+        self.assertEqual(cc, ['manikandan@bitssecureit.com', self.m.HR_CC])
+        self.assertFalse(hold)
+        self.f.db.exists.assert_called_once_with('Employee',
+            {'user_id': 'manikandan@bitssecureit.com', 'status': 'Active'})
+        self.f.db.set_value.assert_not_called()
+        self.assertTrue(all(call.args[0] == 'User' for call in self.f.db.get_value.call_args_list))
+
+    def test_mithun_override_is_uae_only(self):
+        self.employee.user_id = 'mithun@bitssecureit.com'
+        self.f.conf.host_name = 'https://erp-om.bitssecureit.com'
+        def lookup(dt, name, fields, **kw):
+            if dt == 'User': return 1
+            if fields == 'reports_to': return 'EMP-RECORDED-MANAGER'
+            return Doc(user_id='recorded@example.test', status='Active')
+        self.f.db.get_value.side_effect = lookup
+        self.assertEqual(self.m.recipients(self.employee),
+            ([self.m.HR_CC, 'recorded@example.test'], ''))
+
+    def test_unavailable_override_holds_email_without_falling_back_to_other_manager(self):
+        self.employee.user_id = 'mithun@bitssecureit.com'
+        for enabled, active in ((False, True), (True, False)):
+            with self.subTest(enabled=enabled, active=active):
+                self.f.db.get_value.side_effect = lambda dt, name, *a, **k: (
+                    enabled if name == 'manikandan@bitssecureit.com' else 1)
+                self.f.db.exists.return_value = active
+                cc, hold = self.m.recipients(self.employee)
+                self.assertEqual(cc, [])
+                self.assertIn('Designated weekly CC recipient', hold)
+
     def sample(self):
         row = self.classify([(self.start+timedelta(minutes=15), 'IN')])
         row.update(day=self.start.date(), excluded=False)
@@ -166,12 +200,27 @@ class WeeklyTests(unittest.TestCase):
         self.assertFalse(kwargs['now'])
         self.assertIn(self.account.email_id, kwargs['sender'])
 
-    def test_mohan_is_excluded_before_any_email_is_built(self):
-        self.setup_queue()
-        self.employee.user_id = 'mohan@bitssecureit.com'
-        self.assertFalse(self.m.queue_one(self.employee, self.now.date(), self.now, self.account))
-        self.m.report.assert_not_called()
-        self.f.sendmail.assert_not_called()
+    def test_mohan_and_raj_are_excluded_before_any_email_is_built(self):
+        for user in ('mohan@bitssecureit.com', 'raj@bitssecureit.com'):
+            with self.subTest(user=user):
+                self.setup_queue()
+                self.employee.user_id = user
+                self.assertFalse(self.m.queue_one(self.employee, self.now.date(), self.now, self.account))
+                self.m.report.assert_not_called()
+                self.f.sendmail.assert_not_called()
+
+    def test_raj_preview_is_excluded_without_attendance_or_recipient_lookup(self):
+        self.employee.user_id = 'raj@bitssecureit.com'
+        self.m.region_module = Mock(return_value=self.module)
+        self.m.read_day = Mock()
+        self.m.recipients = Mock()
+        result = self.m.report(self.employee, self.now.date(), self.now)
+        self.assertTrue(result['excluded'])
+        self.assertFalse(result['eligible'])
+        self.assertEqual(result['rows'], [])
+        self.assertEqual(result['cc'], [])
+        self.m.read_day.assert_not_called()
+        self.m.recipients.assert_not_called()
 
     def test_weekly_duplicate_concurrency_and_failure_rollback(self):
         self.setup_queue()
