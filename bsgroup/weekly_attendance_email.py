@@ -21,6 +21,7 @@ HR_CC = 'muskan@bitssecureit.com'
 CRON = '2 9 * * 5'
 START_DATE = date(2026, 11, 13)
 THRESHOLD = 3
+EXCLUDED_USERS = {'mohan@bitssecureit.com'}
 
 
 def site_profile():
@@ -192,11 +193,12 @@ def report(employee, friday, now=None):
     start, end = reporting_period(friday)
     observed = now or datetime.now(TZ)
     module = region_module()
-    rows = [read_day(employee, start + timedelta(days=i), observed, module) for i in range(7)]
-    cc, hold = recipients(employee)
+    excluded = employee.user_id in EXCLUDED_USERS
+    rows = [] if excluded else [read_day(employee, start + timedelta(days=i), observed, module) for i in range(7)]
+    cc, hold = ([], '') if excluded else recipients(employee)
     count = sum(int(row['affected']) for row in rows)
     return dict(employee=employee.name, name=employee.employee_name, to=employee.user_id,
-        cc=cc, hold=hold, friday=friday, start=start, end=end, rows=rows, affected=count,
+        cc=cc, hold=hold, excluded=excluded, friday=friday, start=start, end=end, rows=rows, affected=count,
         late=sum(int(r['late']) for r in rows), missing=sum(int(r['missing']) for r in rows),
         qualifies=count >= THRESHOLD, eligible=count >= THRESHOLD and not hold)
 
@@ -245,6 +247,8 @@ def email_body(summary, profile):
 
 
 def queue_one(employee, friday, now, account):
+    if employee.user_id in EXCLUDED_USERS:
+        return False
     key = weekly_key(employee.name, friday)
     if frappe.db.exists('Notification Log', key):
         return False
@@ -320,11 +324,12 @@ def page():
     rows = []
     for employee in region_module().employees():
         item = report(employee, friday, now)
-        status = ('Ready to send' if item['eligible'] else
+        status = ('Excluded by request' if item['excluded'] else 'Ready to send' if item['eligible'] else
                   ('Held: ' + item['hold'] if item['qualifies'] else 'Below 3 affected days'))
         cells = [item['name'], item['to'] or '—', ', '.join(item['cc']) or item['hold'],
                  item['late'], item['missing'], item['affected'], status]
-        detail = f'<details><summary>View individual email</summary>{email_body(item, profile)}</details>'
+        detail = ('—' if item['excluded'] else
+                  f'<details><summary>View individual email</summary>{email_body(item, profile)}</details>')
         rows.append('<tr>' + ''.join('<td>' + escape(str(c)) + '</td>' for c in cells)
                     + '<td>' + detail + '</td></tr>')
     token = escape(get_csrf_token(), quote=True)
@@ -337,7 +342,8 @@ def page():
     To: each qualifying employee separately. CC: their reporting manager and {HR_CC}.</p>
     <p>Threshold: 3 or more distinct affected days (late check-in or missing final check-out).
     Assigned shift times, no grace period. Holidays, approved leave and approved arrangements excluded.
-    No recorded check-in alone is not classified as late. Missing managers hold the email for HR review.</p>
+    No recorded check-in alone is not classified as late. Missing managers hold the email for HR review.
+    Mohan is excluded from these weekly emails.</p>
     <p>Scheduler: {'Active' if active else 'Not active'} · Last run: {escape(str(job.last_execution or 'Not yet') if job else 'Not yet')}.</p>
     <form method="post" action="/api/method/bsgroup.weekly_attendance_email.configure">
     <input type="hidden" name="csrf_token" value="{token}">

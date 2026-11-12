@@ -166,6 +166,13 @@ class WeeklyTests(unittest.TestCase):
         self.assertFalse(kwargs['now'])
         self.assertIn(self.account.email_id, kwargs['sender'])
 
+    def test_mohan_is_excluded_before_any_email_is_built(self):
+        self.setup_queue()
+        self.employee.user_id = 'mohan@bitssecureit.com'
+        self.assertFalse(self.m.queue_one(self.employee, self.now.date(), self.now, self.account))
+        self.m.report.assert_not_called()
+        self.f.sendmail.assert_not_called()
+
     def test_weekly_duplicate_concurrency_and_failure_rollback(self):
         self.setup_queue()
         self.f.db.exists.return_value = True
