@@ -41,7 +41,7 @@ class WeeklyTests(unittest.TestCase):
             Path(__file__).resolve().parents[1] / 'weekly_attendance_email.py')
         self.m = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.m)
-        self.now = datetime(2026, 11, 13, 9, 2, tzinfo=self.m.TZ)
+        self.now = datetime(2026, 11, 13, 9, 5, tzinfo=self.m.TZ)
         self.start = self.now.replace(day=12, hour=9, minute=0)
         self.end = self.start + timedelta(hours=9)
         self.employee = Doc(name='EMP-TEST', employee_name='Test & Employee', user_id='person@example.test')
@@ -98,8 +98,10 @@ class WeeklyTests(unittest.TestCase):
     def test_friday_period_and_exact_scheduled_time(self):
         self.assertEqual(self.m.reporting_period(self.now.date()), (date(2026,11,6), date(2026,11,12)))
         self.assertTrue(self.m.is_due(self.now))
-        for now in (self.now-timedelta(minutes=1), self.now-timedelta(days=1), self.now.replace(hour=12)):
+        for now in (self.now-timedelta(minutes=1), self.now.replace(minute=2),
+                    self.now-timedelta(days=1), self.now.replace(hour=12)):
             self.assertFalse(self.m.is_due(now))
+        self.assertEqual(self.m.next_run(self.now.replace(minute=2)), self.now.date())
         self.assertEqual(self.m.next_run(self.now-timedelta(minutes=1)), self.now.date())
         self.assertEqual(self.m.next_run(self.now), date(2026,11,20))
 
@@ -253,6 +255,18 @@ class WeeklyTests(unittest.TestCase):
         self.assertIn('requires immediate improvement', body)
         self.assertIn('9:00 AM', body)
         self.assertIn('6:00 PM', body)
+        self.assertIn('Staying beyond your assigned working hours to compensate for late arrival is not an acceptable practice.', body)
+        self.assertIn('<li>Report to work on time as per your assigned shift.</li>', body)
+        self.assertIn('<li>Maintain productivity throughout your working hours.</li>', body)
+        self.assertIn('<li>Record both check-in and check-out accurately.</li>', body)
+        self.assertIn('<li>Follow your assigned start and end time.</li>', body)
+        self.assertIn('<b>Daily Attendance Details:</b>', body)
+        self.assertIn('<b>Weekly Summary:</b>', body)
+        self.assertIn('<li>Late check-ins: 3 days</li>', body)
+        self.assertIn('<li>Missing check-outs: 3 days</li>', body)
+        self.assertIn('<li>Total affected days: 3</li>', body)
+        self.assertIn('Immediate and consistent improvement is expected. Any repeated violations will be addressed accordingly.', body)
+        self.assertIn('<b>Human Resources – UAE</b><br><b>BITS Secure IT</b>', body)
         self.assertNotIn('salary', body)
         self.assertNotIn('disciplinary', body)
 

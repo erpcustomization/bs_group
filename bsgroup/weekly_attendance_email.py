@@ -18,7 +18,7 @@ TZ = ZoneInfo('Asia/Dubai')
 METHOD = 'bsgroup.weekly_attendance_email.send_summaries'
 ENABLED = 'custom_bs_weekly_attendance_email'
 HR_CC = 'muskan@bitssecureit.com'
-CRON = '2 9 * * 5'
+CRON = '5 9 * * 5'
 START_DATE = date(2026, 11, 13)
 THRESHOLD = 3
 EXCLUDED_USERS = {'mohan@bitssecureit.com', 'raj@bitssecureit.com'}
@@ -69,14 +69,14 @@ def reporting_period(friday):
 
 def next_run(now):
     day = now.date() + timedelta(days=(4 - now.weekday()) % 7)
-    if day == now.date() and now.time().replace(tzinfo=None) >= time(9, 2):
+    if day == now.date() and now.time().replace(tzinfo=None) >= time(9, 5):
         day += timedelta(days=7)
     return max(START_DATE, day)
 
 
 def is_due(now):
     return (now.date() >= START_DATE and now.weekday() == 4
-            and time(9, 2) <= now.time().replace(tzinfo=None) < time(12))
+            and time(9, 5) <= now.time().replace(tzinfo=None) < time(12))
 
 
 def weekly_key(employee, friday):
@@ -235,26 +235,30 @@ def email_body(summary, profile):
         rows.append('<tr>' + ''.join('<td style="border:1px solid #ddd;padding:8px">'
                     + escape(str(cell)) + '</td>' for cell in cells) + '</tr>')
     return (f'<p>Dear {escape(summary["name"])},</p>'
-        f'<p>Your attendance records for <b>{summary["start"]:%d %B %Y} to '
-        f'{summary["end"]:%d %B %Y}</b> show <b>{summary["affected"]} days with late check-ins '
-        'and/or missing check-outs.</b></p>'
-        '<p><b>This requires immediate improvement.</b> Repeated late arrivals and incomplete '
-        'attendance records are not acceptable. You are expected to start work on time, '
-        'work productively, and record your check-out at the end of your assigned shift.</p>'
-        '<p>Your assigned shift and recorded attendance for each working day are shown below. '
-        f'All times are in {escape(profile["region"])} local time (UTC+4).</p>'
+        f'<p>Your attendance records for {summary["start"]:%d %B %Y} to '
+        f'{summary["end"]:%d %B %Y} show {summary["affected"]} days with late check-ins '
+        'and/or missing check-outs.</p>'
+        '<p><b>This requires immediate improvement. Repeated late arrivals and incomplete '
+        'attendance records are not acceptable.</b> Staying beyond your assigned working hours '
+        'to compensate for late arrival is not an acceptable practice.</p>'
+        '<p>You are expected to:</p><ul>'
+        '<li>Report to work on time as per your assigned shift.</li>'
+        '<li>Maintain productivity throughout your working hours.</li>'
+        '<li>Record both check-in and check-out accurately.</li>'
+        '<li>Follow your assigned start and end time.</li></ul>'
+        '<p><b>Daily Attendance Details:</b></p>'
         '<table style="border-collapse:collapse;width:100%"><thead><tr>'
         + ''.join('<th style="border:1px solid #ddd;padding:8px;text-align:left">' + name + '</th>'
-                  for name in ('Date', 'Assigned shift', 'Check-in', 'Check-out', 'Attendance remark'))
+                  for name in ('Date', 'Assigned Shift', 'Check-in', 'Check-out', 'Attendance Remark'))
         + '</tr></thead><tbody>' + ''.join(rows) + '</tbody></table>'
-        f'<p><b>Weekly summary:</b> Late check-in: {summary["late"]} days; '
-        f'missing check-out: {summary["missing"]} days; total affected days: {summary["affected"]}. '
-        'A day with both issues is counted once.</p>'
-        '<p><b>Please come on time, be productive, and leave on time.</b> Follow the start and end '
-        'times of your assigned shift and record both check-in and check-out every working day.</p>'
-        '<p>If any entry is incorrect or requires clarification, contact your reporting manager '
-        'and HR promptly so the record can be reviewed.</p>'
-        f'<p>Regards,<br>Human Resources — {escape(profile["region"])}<br>BITS Secure IT</p>')
+        '<p><b>Weekly Summary:</b></p><ul>'
+        f'<li>Late check-ins: {summary["late"]} days</li>'
+        f'<li>Missing check-outs: {summary["missing"]} days</li>'
+        f'<li>Total affected days: {summary["affected"]}</li></ul>'
+        '<p><b>Please come on time, work productively, and leave on time.</b> '
+        'Immediate and consistent improvement is expected. Any repeated violations will be addressed accordingly.</p>'
+        '<p>If any attendance entry is incorrect, please contact your reporting manager and HR promptly for review.</p>'
+        f'<p>Regards,<br><b>Human Resources – {escape(profile["region"])}</b><br><b>BITS Secure IT</b></p>')
 
 
 def queue_one(employee, friday, now, account):
@@ -348,7 +352,7 @@ def page():
     .error-page>div{{max-width:1400px;margin:auto}}.error-page .details{{text-align:left}}
     td,th{{padding:8px;border:1px solid #ddd}}table{{border-collapse:collapse;width:100%}}</style>
     <h2>Weekly attendance summaries — {escape(profile['region'])}</h2>
-    <p><b>Status: {'Enabled' if enabled else 'Disabled'}</b> · Every Friday at 9:02 AM (UTC+4) · Starts 13 November 2026</p>
+    <p><b>Status: {'Enabled' if enabled else 'Disabled'}</b> · Every Friday at 9:05 AM (UTC+4) · Starts 13 November 2026</p>
     <p>Sender: {escape(account.email_id) if account else 'HR sender unavailable'}<br>
     To: each qualifying employee separately. CC: their reporting manager and {HR_CC}.</p>
     <p>Threshold: 3 or more distinct affected days (late check-in or missing final check-out).
@@ -361,6 +365,7 @@ def page():
     <input type="hidden" name="csrf_token" value="{token}">
     <input type="hidden" name="enabled" value="{'0' if enabled else '1'}">
     <button class="btn btn-primary" type="submit">{'Pause weekly emails' if enabled else 'Enable weekly emails'}</button></form>
+    {'<form method="post" action="/api/method/bsgroup.weekly_attendance_email.configure"><input type="hidden" name="csrf_token" value="' + token + '"><input type="hidden" name="enabled" value="1"><button class="btn btn-default" type="submit">Apply current schedule</button></form>' if enabled else ''}
     <h3>Preview for Friday {friday:%d %B %Y}: {start:%d %B}–{end:%d %B %Y}</h3>
     <p>Read-only preview using records available now. This sends no emails. The finished week is recalculated at sending time.</p>
     <table><thead><tr><th>Employee</th><th>To</th><th>CC / hold</th><th>Late days</th>
@@ -381,20 +386,26 @@ def configure(enabled):
             frappe.throw('The regional HR sender and Muskan HR user must be enabled first.')
         system = ZoneInfo(frappe.utils.get_system_timezone())
         if datetime.now(system).utcoffset() != timedelta(hours=4):
-            frappe.throw('The site scheduler timezone must be UTC+4 for Friday 9:02 AM.')
+            frappe.throw('The site scheduler timezone must be UTC+4 for Friday 9:05 AM.')
     from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+    description = ('Friday 09:05; 3+ affected days; individual employee, CC manager and Muskan. '
+        '<a href="/api/method/bsgroup.weekly_attendance_email.page">View weekly schedule and previews</a>')
     if not frappe.get_meta('HR Settings').has_field(ENABLED):
         create_custom_fields({'HR Settings': [dict(fieldname=ENABLED,
             label='Weekly attendance summary emails', fieldtype='Check', default='0',
             insert_after='custom_bs_hr_email_enabled',
-            description='Friday 09:02; 3+ affected days; individual employee, CC manager and Muskan. '
-            '<a href="/api/method/bsgroup.weekly_attendance_email.page">View weekly schedule and previews</a>')]}, update=False)
+            description=description)]}, update=False)
+    else:
+        field = frappe.db.get_value('Custom Field', {'dt': 'HR Settings', 'fieldname': ENABLED}, 'name')
+        if field:
+            frappe.db.set_value('Custom Field', field, 'description', description)
     settings = frappe.get_doc('HR Settings')
     settings.set(ENABLED, value)
     settings.save()
     from frappe.core.doctype.scheduled_job_type.scheduled_job_type import insert_single_event
     insert_single_event('Cron', METHOD, CRON)
     job = frappe.get_doc('Scheduled Job Type', {'method': METHOD})
+    job.cron_format = CRON
     job.stopped = 0
     job.save()
     frappe.clear_cache(doctype='HR Settings')
