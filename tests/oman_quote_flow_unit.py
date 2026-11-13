@@ -16,6 +16,7 @@ class Doc(dict):
         return super().__getattribute__(key)
     def __getattr__(self, key): return self.get(key)
     def __setattr__(self, key, value): self[key] = value
+    def __deepcopy__(self, memo): return Doc({k:copy.deepcopy(v,memo) for k,v in dict.items(self)})
     def get_doc_before_save(self): return self.get('_before')
     def check_permission(self, p): self.setdefault('_permissions', []).append(p)
     def as_dict(self): return {k:v for k,v in dict.items(self) if not k.startswith('_')}
@@ -48,7 +49,7 @@ class FlowTests(unittest.TestCase):
         frappe.defaults.get_global_default.side_effect=lambda key: frappe.defaults.get_global_default.return_value if key==flow.FLAG else 0
         frappe.session.user='sales@example.com';frappe.get_roles.return_value=['BS Scoped Sales']
         frappe.get_doc.reset_mock();frappe.get_doc.side_effect=None
-        frappe.get_all.reset_mock();frappe.get_all.return_value=[];frappe.db.reset_mock()
+        frappe.get_all.reset_mock();frappe.get_all.return_value=[];frappe.db.reset_mock();frappe.db.get_value.side_effect=None
         self.q=Doc(name='Q-1',docstatus=0,custom_deal_cost_sheet='DCS-1',custom_pipeline_stage='Draft',
             custom_oman_revision_no=0,custom_oman_flow=1,modified='M1',currency='OMR',flags=Doc(),total=125)
         self.s=Doc(name='DCS-1',custom_quotation='Q-1',docstatus=1,currency='OMR',company='OM',total_selling=125,
@@ -218,7 +219,8 @@ class FlowTests(unittest.TestCase):
                 frappe.get_roles.return_value=[role];self.assertIn('Won',flow.context('Q-1')['statuses'])
 
     def test_pdf_uses_approved_format_and_letterhead(self):
-        frappe.db.exists.return_value=True;frappe.db.get_value.return_value='Oman Letterhead'
+        frappe.db.exists.return_value=True
+        frappe.db.get_value.side_effect=lambda dt,*a,**kw:Doc(doc_type='Quotation',disabled=0) if dt=='Print Format' else 'Oman Letterhead'
         with patch.object(frappe,'get_print',create=True,return_value=b'pdf') as printer:
             self.assertEqual(flow.render_pdf(self.q),b'pdf')
         self.assertEqual(printer.call_args.args,('Quotation','Q-1',flow.PILOT_PRINT_FORMAT))
@@ -226,11 +228,68 @@ class FlowTests(unittest.TestCase):
         self.assertFalse(printer.call_args.kwargs['no_letterhead'])
         self.assertNotIn('pdf_generator',printer.call_args.kwargs)
 
+    def test_template_choices_require_quote_print_permission_and_are_oman_only(self):
+        frappe.get_doc.return_value=self.q
+        frappe.get_all.return_value=['Template A','Template B',flow.PILOT_PRINT_FORMAT]
+        self.q[flow.PDF_TEMPLATE_FIELD]='Template B'
+        result=flow.pdf_templates('Q-1')
+        self.assertEqual(result['selected'],'Template B')
+        self.assertEqual(result['templates'],['Standard','Template A','Template B',flow.PILOT_PRINT_FORMAT])
+        self.assertIn('print',self.q._permissions)
+        self.assertEqual(frappe.get_all.call_args.kwargs['filters'],{'doc_type':'Quotation','disabled':0})
+        frappe.local.site='erp-bitssecureit.u.frappe.cloud'
+        self.assertFalse(flow.template_selection_enabled())
+
+    def test_invalid_pdf_templates_rejected(self):
+        frappe.db.get_value.side_effect=None
+        for value in (None,Doc(doc_type='Sales Invoice',disabled=0),Doc(doc_type='Quotation',disabled=1)):
+            frappe.db.get_value.return_value=value
+            with self.assertRaisesRegex(ValidationError,'enabled Quotation'):flow.validate_pdf_template('Wrong')
+        with self.assertRaisesRegex(ValidationError,'enabled Quotation'):flow.validate_pdf_template('')
+        self.assertEqual(flow.validate_pdf_template('Standard'),'Standard')
+
+    def test_selected_pdf_template_and_co_wording_use_print_copy_only(self):
+        self.q.items=[Doc(description='INTERNAL PART-123',item_code='PART-123',item_name='Internal name',
+            custom_oman_use_costing_description=0,custom_oman_client_description='Customer package',qty=2,rate=100),
+            Doc(description='Costing text',item_code='PART-456',custom_oman_use_costing_description=1,qty=1,rate=50)]
+        self.q[flow.PDF_TEMPLATE_FIELD]='Template B'
+        frappe.db.get_value.side_effect=lambda dt,*a,**kw:Doc(doc_type='Quotation',disabled=0) if dt=='Print Format' else 'Oman Letterhead'
+        with self.mod('bsgroup.oman_item_description',require_client_wording=lambda q:None,managed=lambda q:True,
+            PARENT='custom_oman_client_descriptions',FIELD='custom_oman_client_description',COSTING='custom_oman_use_costing_description',visible_text=str),patch.object(frappe,'get_print',create=True,return_value=b'pdf') as printer:
+            flow.render_pdf(self.q,template='Template A')
+            self.assertEqual(printer.call_args.args[2],'Template A')
+            printed=printer.call_args.kwargs['doc']
+            self.assertEqual(printed.items[0].description,'Customer package')
+            self.assertEqual(printed.items[0].item_name,'Customer package')
+            self.assertEqual(printed.items[0].item_code,'')
+            self.assertEqual(printed.items[1].description,'Costing text')
+            self.assertEqual(printed.items[1].item_code,'PART-456')
+            self.assertEqual(self.q.items[0].item_code,'PART-123')
+            self.assertEqual(self.q.items[0].description,'INTERNAL PART-123')
+            flow.render_pdf(self.q,no_letterhead=1)
+            self.assertEqual(printer.call_args.args[2],'Template B','Procurement reuses the issued template')
+            self.assertEqual(printer.call_args.kwargs['no_letterhead'],1)
+
     def test_pdf_requires_current_saved_revision(self):
         frappe.get_doc.return_value=self.q
         with patch.object(flow,'render_pdf') as printer:
             with self.assertRaisesRegex(ValidationError,'changed'):flow.convert_pdf('Q-1','old')
         printer.assert_not_called();self.assertIn('print',self.q._permissions)
+
+    def test_pdf_remembers_template_only_after_successful_generation(self):
+        file=Doc(name='FILE-1',file_url='/private/files/q.pdf')
+        frappe.get_doc.side_effect=lambda dt,*a,**kw:file if isinstance(dt,dict) else self.q if dt=='Quotation' else self.s
+        frappe.db.get_value.return_value=Doc(doc_type='Quotation',disabled=0)
+        with self.mod('bsgroup.dcs.quotation_control',validate_position=lambda s,q:None),patch.object(flow,'render_pdf',return_value=b'pdf') as printer,patch.object(flow,'snapshot') as audit:
+            result=flow.convert_pdf('Q-1','M1',template='Template B')
+            self.assertEqual(result['template'],'Template B')
+            self.assertEqual(printer.call_args.kwargs['template'],'Template B')
+            frappe.db.set_value.assert_called_once_with('Quotation','Q-1',flow.PDF_TEMPLATE_FIELD,'Template B',update_modified=False)
+            self.assertIn('template: Template B',audit.call_args.args[1])
+            self.assertEqual(self.q.modified,'M1')
+            frappe.db.set_value.reset_mock();printer.side_effect=ValidationError('Invalid layout')
+            with self.assertRaisesRegex(ValidationError,'Invalid layout'):flow.convert_pdf('Q-1','M1',template='Template A')
+            frappe.db.set_value.assert_not_called()
 
     def test_status_operation_context_cannot_leak_after_error(self):
         with self.assertRaises(RuntimeError):

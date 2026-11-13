@@ -49,8 +49,24 @@
             const data=await call('context',{quotation:frm.doc.name});
             if(data.pdf_issues?.length) { showPdfIssues(data); return; }
         }
-        const result = await call('convert_pdf',{quotation:frm.doc.name,expected_modified:String(frm.doc.modified)});
-        if (result?.file_url) window.open(result.file_url,'_blank','noopener');
+        const generate=async(template)=>{
+            const result=await call('convert_pdf',{quotation:frm.doc.name,expected_modified:String(frm.doc.modified),template});
+            if(result?.template) frm.doc.custom_oman_pdf_template=result.template;
+            if(result?.file_url) window.open(result.file_url,'_blank','noopener');
+        };
+        if(!frm.__bs_choose_pdf_template) { await generate(); return; }
+        const choices=await call('pdf_templates',{quotation:frm.doc.name});
+        const dialog=new frappe.ui.Dialog({title:__('Choose Quotation Template'),fields:[
+            {fieldtype:'Select',fieldname:'template',label:__('Quotation Template'),reqd:1,
+                options:['',...choices.templates],default:choices.selected,
+                description:__('The quotation PDF will use the template you select here.')}
+        ],primary_action_label:__('Create PDF'),async primary_action(values){
+            if(frm.is_dirty()) {frappe.msgprint(__('Save the quotation before converting to PDF.'));return;}
+            dialog.disable_primary_action();
+            try {await generate(values.template);dialog.hide();}
+            finally {dialog.enable_primary_action();}
+        }});
+        dialog.show();
     }
     function showPdfIssues(data) {
         frappe.msgprint({title:__('Complete quotation for PDF'),indicator:'orange',
@@ -154,6 +170,7 @@
             frm.__oman_quotation_pilot=!!data.enabled;
             frm.__oman_client_descriptions=!!data.client_descriptions;
             frm.__bs_save_feedback=!!data.save_feedback;
+            frm.__bs_choose_pdf_template=!!data.choose_pdf_template;
             await defaultUnselectedDescriptions(frm,data);
             clientGrid(frm,frm.__oman_client_descriptions);
             if(frm.fields_dict?.custom_oman_revision_no) frm.toggle_display('custom_oman_revision_no',!!data.enabled);
@@ -213,7 +230,15 @@
             frm.refresh_field('items');
             // The complementary choice changes asynchronously. Re-evaluate the
             // row dependencies after both flags settle so CO unlocks immediately.
-            frm.fields_dict?.items?.grid?.grid_rows_by_docname?.[cdn]?.refresh_dependency?.();
+            const gridRow=frm.fields_dict?.items?.grid?.grid_rows_by_docname?.[cdn];
+            gridRow?.refresh_dependency?.();
+            gridRow?.toggle_editable?.('custom_oman_client_description',!costing);
+            // Text Editor sets Quill's readOnly only when it is constructed.
+            // Refreshing its field does not update an existing editor instance.
+            for(const control of [gridRow?.on_grid_fields_dict?.custom_oman_client_description,
+                gridRow?.grid_form?.fields_dict?.custom_oman_client_description]) {
+                control?.quill?.enable(!costing && control.get_status()==='Write');
+            }
             frm.remove_custom_button(__('Convert to PDF'));
             setSaveAction(frm);
             if(typeof window.eqa_readiness==='function') window.eqa_readiness(frm);

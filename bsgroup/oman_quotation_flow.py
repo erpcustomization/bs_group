@@ -5,6 +5,7 @@ All writes use existing document permissions and governed DCS/procurement servic
 """
 from contextlib import contextmanager
 from contextvars import ContextVar
+from copy import deepcopy
 import inspect
 import json
 
@@ -17,6 +18,7 @@ UAE_FLAG = "bs_uae_quotation_flow"
 FLAG = "bs_oman_quotation_flow"
 SOURCE_PRINT_FORMAT = "Enterprise Quotation - Class A - OM"
 PILOT_PRINT_FORMAT = "Enterprise Quotation - Oman Pilot"
+PDF_TEMPLATE_FIELD = "custom_oman_pdf_template"
 TERMINAL = {"Won", "Lost"}
 STAGES = {"Draft", "Sent", "Follow-up", "Delayed", "Cancelled", "Expired", "Won", "Lost"}
 _operation = ContextVar("oman_quote_operation", default=None)
@@ -40,6 +42,31 @@ def setup_authorised():
 
 def print_formats():
     return ("EnterPrise Quotation 3", "Enterprise Quotation - UAE Workflow") if uae() else (SOURCE_PRINT_FORMAT, PILOT_PRINT_FORMAT)
+
+
+def template_selection_enabled():
+    return getattr(frappe.local, "site", None) in OMAN_SITES and enabled()
+
+
+def validate_pdf_template(template):
+    if template == "Standard":
+        return template
+    settings = frappe.db.get_value("Print Format", template, ["doc_type", "disabled"], as_dict=True) if template else None
+    if not settings or settings.doc_type != "Quotation" or cint(settings.disabled):
+        frappe.throw("Choose an enabled Quotation template before creating the PDF.")
+    return template
+
+
+@frappe.whitelist()
+def pdf_templates(quotation):
+    q = _quotation(quotation)
+    q.check_permission("print")
+    if not template_selection_enabled():
+        frappe.throw("Quotation template selection is not enabled on this site.")
+    templates = ["Standard"] + frappe.get_all("Print Format", filters={"doc_type": "Quotation", "disabled": 0},
+        pluck="name", order_by="name asc")
+    selected = q.get(PDF_TEMPLATE_FIELD) or print_formats()[1]
+    return dict(templates=templates, selected=selected if selected in templates else "")
 
 
 def active_quotes(sheet):
@@ -340,6 +367,7 @@ def context(quotation):
         discount_before_vat=True,
         show_standard_terms=uae(),
         save_feedback=True, pdf_issues=pdf_issues,
+        choose_pdf_template=template_selection_enabled(),
         client_descriptions=client_descriptions,
         can_install_descriptions=setup_authorised() and (not descriptions.enabled()
             or not frappe.db.exists("Custom Field", "Quotation Item-" + descriptions.COSTING)),
@@ -438,7 +466,7 @@ def _change_status(quotation, stage, expected_modified, reason=None, schedule_da
 
 
 @frappe.whitelist(methods=["POST"])
-def convert_pdf(quotation, expected_modified):
+def convert_pdf(quotation, expected_modified, template=None):
     q = _quotation(quotation, lock=True)
     q.check_permission("print")
     if str(q.modified) != str(expected_modified):
@@ -448,22 +476,43 @@ def convert_pdf(quotation, expected_modified):
         q._validate_mandatory()
     from bsgroup.dcs.quotation_control import validate_position
     validate_position(frappe.get_doc("Deal Cost Sheet", q.custom_deal_cost_sheet), q)
-    pdf = render_pdf(q)
+    if template_selection_enabled():
+        validate_pdf_template(template)
+    elif template:
+        frappe.throw("Quotation template selection is not enabled on this site.")
+    pdf = render_pdf(q, template=template)
     name = f"{q.name}-R{cint(q.get('custom_oman_revision_no'))}-{now_datetime().strftime('%Y%m%d%H%M%S%f')}.pdf"
     file = frappe.get_doc(dict(doctype="File", file_name=name, content=pdf, is_private=1,
         attached_to_doctype="Quotation", attached_to_name=q.name)).insert(ignore_permissions=True)
-    snapshot(q, "PDF issued: " + file.name)
-    return dict(file_url=file.file_url, revision=cint(q.get("custom_oman_revision_no")))
+    if template_selection_enabled():
+        # This is PDF output metadata, not a change to the commercial position.
+        # Preserve the saved revision/timestamp and reuse it for procurement's PDF.
+        frappe.db.set_value("Quotation", q.name, PDF_TEMPLATE_FIELD, template, update_modified=False)
+        q.set(PDF_TEMPLATE_FIELD, template)
+    snapshot(q, "PDF issued: " + file.name + ("; template: " + template if template else ""))
+    return dict(file_url=file.file_url, revision=cint(q.get("custom_oman_revision_no")), template=template)
 
 
-def render_pdf(q, no_letterhead=None):
-    """Use Oman's approved customer format and its configured PDF generator."""
-    from bsgroup.oman_item_description import require_client_wording, managed, PARENT
+def render_pdf(q, no_letterhead=None, template=None):
+    """Render the selected format without changing stored costing descriptions."""
+    from bsgroup.oman_item_description import require_client_wording, managed, PARENT, FIELD, COSTING, visible_text
     require_client_wording(q)
     if managed(q):
         q.set(PARENT, 1)
     target_format = print_formats()[1]
-    if not frappe.db.exists("Print Format", target_format):
+    if template_selection_enabled():
+        target_format = validate_pdf_template(template or q.get(PDF_TEMPLATE_FIELD) or target_format)
+        if managed(q):
+            q = deepcopy(q)
+            for row in q.items:
+                wording = row.description if cint(row.get(COSTING)) else row.get(FIELD)
+                row.description = wording
+                if not cint(row.get(COSTING)):
+                    # Older formats use item_name/item_code directly. Only this
+                    # print copy is changed, so CO never exposes the costing code.
+                    row.item_name = visible_text(wording)
+                    row.item_code = ""
+    elif not frappe.db.exists("Print Format", target_format):
         frappe.throw("The quotation workflow print format is not installed. Complete workflow setup.")
     letterhead = q.get("letter_head") or frappe.db.get_value("Letter Head", {"is_default": 1, "disabled": 0}, "name")
     return frappe.get_print("Quotation", q.name, target_format, as_pdf=True, doc=q,

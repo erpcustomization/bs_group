@@ -48,12 +48,20 @@ async function form(data,{dirty=false,doctype='Quotation',fresh=false,withGrid=f
  const handlers={},row={custom_oman_use_costing_description:1,custom_oman_use_co_description:1},actions=[];
  const frappe={ui:{form:{on(dt,h){handlers[dt]=h}}},get_doc:()=>row,model:{async set_value(dt,dn,values){Object.assign(row,values);}},utils:{},call:async()=>({})};
  vm.runInNewContext(fs.readFileSync(path.join(root,'bsgroup/public/js/oman_quotation_flow.js'),'utf8'),{frappe,__:s=>s,window:{}});
- let coEditable=false;
- const gridRow={refresh_dependency(){coEditable=!row.custom_oman_use_costing_description;}};
+ let coEditable=false,fieldReadOnly=true,canWrite=true;
+ // Regression: Frappe refreshes the field dependency but leaves an existing
+ // Quill instance in its construction-time readOnly state.
+ const gridRow={refresh_dependency(){fieldReadOnly=!!row.custom_oman_use_costing_description;},
+  toggle_editable(name,editable){fieldReadOnly=!editable;},
+  on_grid_fields_dict:{custom_oman_client_description:{get_status:()=>canWrite&&!fieldReadOnly?'Write':'Read',quill:{enable:value=>coEditable=value}}}};
  const frm={__oman_client_descriptions:true,fields_dict:{items:{grid:{grid_rows_by_docname:{ROW1:gridRow}}}},refresh_field:()=>{},remove_custom_button:x=>actions.push(x),page:{set_primary_action:x=>actions.push(x)}};
  await handlers['Quotation Item'].custom_oman_use_costing_description(frm,'Quotation Item','ROW1');
  assert.equal(row.custom_oman_use_co_description,0);assert.equal(row.custom_oman_use_costing_description,1);
  assert.equal(coEditable,false);
+ canWrite=false;row.custom_oman_use_co_description=1;
+ await handlers['Quotation Item'].custom_oman_use_co_description(frm,'Quotation Item','ROW1');
+ assert.equal(coEditable,false,'Read-only permissions must still keep the editor locked');
+ canWrite=true;
  row.custom_oman_use_co_description=1;
  await handlers['Quotation Item'].custom_oman_use_co_description(frm,'Quotation Item','ROW1');
  assert.equal(row.custom_oman_use_costing_description,0);assert.equal(row.custom_oman_use_co_description,1);
