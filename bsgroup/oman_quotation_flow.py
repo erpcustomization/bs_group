@@ -354,8 +354,6 @@ def context(quotation):
     if missing_descriptions:
         pdf_issues.append("Choose Item Description (Costing), or enter CO wording only if you choose CO Item Description, for line(s): "
             + ", ".join(map(str, missing_descriptions)) + ". CO Description is optional.")
-    if uae() and (not q.get("tc_name") or not descriptions.visible_text(q.get("terms"))):
-        pdf_issues.append("Select the approved Terms and Conditions and review the Term Details on the Terms tab.")
     if not discount_basis_ready(q):
         pdf_issues.append("Save the quotation so the discount is applied before VAT.")
     return dict(enabled=True, revision=cint(q.get("custom_oman_revision_no")),

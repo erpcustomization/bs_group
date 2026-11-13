@@ -738,6 +738,7 @@ doc_events["Project"]["before_validate"] = ([_prior] if isinstance(_prior, str) 
 # Shared quotation workflow remains opt-in separately on each site.
 from bsgroup.quotation_workflow_hooks import configure as _quotation_workflow_hooks
 _quotation_workflow_hooks(globals())
+after_migrate.append("bsgroup.quotation_optional_terms.install")
 
 # Keep project activities inside each project; no role or workflow changes.
 after_migrate.append("bsgroup.project_workspace.install")

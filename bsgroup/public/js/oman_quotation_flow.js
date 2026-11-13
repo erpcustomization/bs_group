@@ -175,11 +175,14 @@
             clientGrid(frm,frm.__oman_client_descriptions);
             if(frm.fields_dict?.custom_oman_revision_no) frm.toggle_display('custom_oman_revision_no',!!data.enabled);
             if(!data.enabled) return;
-            // The approved UAE PDF requires a terms template. Keep its native
-            // selector and wording available even when legacy customisation hid them.
+            // Terms remain available for users who want to include them.
             if(data.show_standard_terms) {
                 for(const field of ['tc_name','terms']) {
-                    if(frm.fields_dict?.[field]) frm.toggle_display(field,true);
+                    if(frm.fields_dict?.[field]) {
+                        frm.toggle_display(field,true);
+                        frm.set_df_property(field,'reqd',0);
+                        frm.set_df_property(field,'description',__('Optional. Included in the quotation PDF when entered.'));
+                    }
                 }
             }
             if(data.conflict){

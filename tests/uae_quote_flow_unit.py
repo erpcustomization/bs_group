@@ -81,7 +81,7 @@ class UAEFlowTests(unittest.TestCase):
         desc.prepare(self.q);desc.require_client_wording(self.q)
         self.assertEqual(row.get(desc.FIELD),'Client wording')
 
-    def test_uae_pdf_context_distinguishes_optional_co_and_required_terms(self):
+    def test_uae_pdf_context_allows_blank_terms_without_changing_entered_terms(self):
         self.q.items=[Doc(idx=1,description='Costing wording',custom_oman_use_costing_description=1,
                          custom_oman_client_description='')]
         frappe.get_doc.side_effect=lambda dt,*args,**kwargs:self.q if dt=='Quotation' else self.s
@@ -89,10 +89,10 @@ class UAEFlowTests(unittest.TestCase):
             data=flow.context('Q-1')
             self.assertTrue(data['save_feedback'])
             self.assertTrue(data['ready_to_convert'])
-            self.assertEqual(len(data['pdf_issues']),1)
-            self.assertIn('Terms and Conditions',data['pdf_issues'][0])
+            self.assertEqual(data['pdf_issues'],[])
             self.q.tc_name='Approved';self.q.terms='<p>Approved terms</p>'
             self.assertEqual(flow.context('Q-1')['pdf_issues'],[])
+            self.assertEqual(self.q.terms,'<p>Approved terms</p>')
 
     def test_terminal_status_reloads_persisted_values_only_in_uae(self):
         for site, reloads in [('erp-bitssecureit.u.frappe.cloud', 1), ('erp-om.k.frappe.cloud', 0)]:

@@ -28,10 +28,10 @@ async function setup({dirty=false,rows=[],issues=[],canWrite=true}={}) {
  assert.equal(r.primary.fn(),undefined);assert.equal(r.saves,1);
  r=await setup({dirty:true});const save=r.primary.fn;r.setDirty(false);save();
  assert.equal(r.saves,0);assert.equal(r.primary.label,'Convert to PDF');assert.equal(r.alerts.length,1);
- r=await setup({issues:['Select approved Terms and Conditions.']});
+ r=await setup({issues:['Complete the required quotation fields.']});
  assert.equal(r.primary.label,'Convert to PDF');assert(r.buttons.has('Convert to PDF'));
- await r.primary.fn();assert.equal(r.messages.length,1);assert.match(r.messages[0].message,/Terms and Conditions/);
- assert(!r.calls.some(c=>c.method.endsWith('.convert_pdf')),'Incomplete terms cannot issue a customer PDF');
+ await r.primary.fn();assert.equal(r.messages.length,1);assert.match(r.messages[0].message,/required quotation fields/);
+ assert(!r.calls.some(c=>c.method.endsWith('.convert_pdf')),'Other required fields still block a customer PDF');
  r=await setup({canWrite:false,rows:[{name:'read-only'}]});assert(!r.frm.is_dirty());
  console.log('PASS UAE saved-state actions, optional CO defaults, explicit CO preservation, read-only isolation, PDF blockers, and nonsettling native-save regression');
 })().catch(e=>{console.error(e);process.exitCode=1;});
