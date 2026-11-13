@@ -13,6 +13,7 @@ frappe.listview_settings['Presales Request'] = {
             'Costing in Progress': 'orange',
             'Ready for Quotation': 'cyan',
             'Submitted to Sales': 'green',
+            'Rework': 'orange',
             'Completed': 'green',
             'On Hold': 'grey',
             'Won': 'green',
@@ -33,7 +34,7 @@ frappe.listview_settings['Presales Request'] = {
     {label:'In Progress',color:'#fd7e14'},{label:'Awaiting Sales Input',color:'#ffc107'},
     {label:'Awaiting Customer Input',color:'#e83e8c'},{label:'Costing in Progress',color:'#20c997'},
     {label:'Awaiting Site Survey Results',color:'#a35b00'},{label:'Site Survey Results Received',color:'#087f5b'},
-    {label:'Ready for Quotation',color:'#6610f2'},{label:'Submitted to Sales',color:'#28a745'},
+    {label:'Ready for Quotation',color:'#6610f2'},{label:'Submitted to Sales',color:'#28a745'},{label:'Rework',color:'#fd7e14'},
     {label:'Completed',color:'#155724'},{label:'On Hold',color:'#856404'},{label:'Won',color:'#1a7a4a'},
     {label:'Lost',color:'#dc3545'},{label:'Cancelled',color:'#343a40'}
   ];

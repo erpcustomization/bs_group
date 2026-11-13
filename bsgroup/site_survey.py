@@ -28,7 +28,7 @@ def presales_handoff(name):
     label = pre.status
     if pre.status == "Costing in Progress":
         label = "Deal Cost Sheet in Progress"
-    elif pre.status not in ("Cancelled", "Completed", "Won", "Lost", "Submitted to Sales", "Ready for Quotation", "On Hold"):
+    elif pre.status not in ("Cancelled", "Completed", "Won", "Lost", "Submitted to Sales", "Ready for Quotation", "On Hold", "Rework"):
         label = "Awaiting Site Survey" if survey and survey.status not in ("Completed", "Cancelled") else "Open with Presales"
     return {"label": label, "results": survey.results if survey and survey.status == "Completed" else None}
 

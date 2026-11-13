@@ -2,6 +2,31 @@
 (() => {
     const base = 'bsgroup.oman_quotation_flow.';
     const call = async (method, args) => (await frappe.call({method:base+method,args,freeze:true})).message;
+    function reviseQuotation(frm) {
+        if (frm.is_dirty()) { frappe.msgprint(__('Save the quotation before requesting a revision.')); return; }
+        const dialog = new frappe.ui.Dialog({
+            title: __('Revise Quotation'),
+            fields: [{fieldname:'presales',fieldtype:'Select',label:__('Do you want Presales to work on this?'),
+                options:'\nYes\nNo',reqd:1,
+                description:__('Yes sends the linked costing sheet to Presales for rework. No lets Sales revise it. Both update the same quotation.')}],
+            primary_action_label: __('Continue'),
+            async primary_action(values) {
+                if (dialog.__saving) return;
+                dialog.__saving = true;
+                try {
+                    const result = (await frappe.call({method:'bsgroup.quotation_revision.begin',
+                        args:{quotation:frm.doc.name,presales:values.presales,expected_modified:frm.doc.modified},freeze:true})).message;
+                    if (!result?.dcs) return;
+                    dialog.hide();
+                    await frappe.set_route('Form','Deal Cost Sheet',result.dcs);
+                    frappe.show_alert({message: values.presales === 'Yes'
+                        ? __('Costing sheet: To be revised. Presales Request: Rework.')
+                        : __('Use Revise BOQ to update the costing sheet and this same quotation.'), indicator:'blue'},10);
+                } finally { dialog.__saving = false; }
+            }
+        });
+        dialog.show();
+    }
     async function install(frm) {
         const result = await call('install', {});
         if (result?.enabled) { frappe.msgprint(__('Quotation workflow enabled. Reloading…')); window.location.reload(); }
@@ -207,7 +232,8 @@
             workflowInstructions(frm,data);
             frm.dashboard.set_headline(__('Quotation Status: {0} · R{1}',[frappe.utils.escape_html(frm.doc.custom_pipeline_stage || 'Draft'),data.revision]));
             if(data.editable && data.can_write){
-                frm.add_custom_button(__('Revise Costing Sheet'),()=>frappe.set_route('Form','Deal Cost Sheet',frm.doc.custom_deal_cost_sheet));
+                frm.remove_custom_button(__('Revise Costing Sheet'));
+                frm.add_custom_button(__('Revise Quotation'),()=>reviseQuotation(frm));
                 frm.add_custom_button(__('Change Status'),()=>{
                     if(frm.is_dirty()){frappe.msgprint(__('Save the quotation before changing status.'));return;}
                     frappe.prompt([{fieldtype:'Select',fieldname:'stage',label:__('Status'),options:data.statuses,reqd:1}],
@@ -279,6 +305,10 @@
             if(data.terminal) frm.remove_custom_button(__('Revise BOQ'));
             if(data.quotation) frm.add_custom_button(__('View Linked Quotation'),()=>frappe.set_route('Form','Quotation',data.quotation));
             if(frm.doc.docstatus===1 && data.auto_sync) frm.set_intro(data.terminal ? __('The linked quotation is Won or Lost. Costing and quotation revisions are locked.') : __('Use Revise BOQ to edit costing. The linked Draft Quotation updates automatically with revision history; no new quotation is created.'),'blue');
+            if(frm.doc.custom_deal_status === 'To be revised') {
+                frm.page.set_indicator(__('To be revised'),'orange');
+                frm.set_intro(__('Presales rework requested. Use Revise BOQ to save the revised costing and update the existing quotation. The linked Presales Request returns to Submitted to Sales after a successful revision.'),'orange');
+            }
         }
     });
 })();

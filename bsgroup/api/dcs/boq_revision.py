@@ -321,6 +321,8 @@ def _apply(args):
     from bsgroup.dcs.quotation_control import supersede_submitted
     supersession_changes = supersede_submitted(proposed)
     quotation_note = _sync_quotation(proposed, truthy_flag(args.get("update_quotation")), previous_sheet=sheet)
+    from bsgroup.quotation_revision import finish
+    finish(proposed)
     changes = diff_changes(D2A_FIELDS, before, snapshot("Deal Cost Sheet", sheet.name, D2A_FIELDS), "Deal Cost Sheet", sheet.name)
     changes += supersession_changes
     if quote_changed and sheet.custom_quotation and not truthy_flag(args.get("update_quotation")):

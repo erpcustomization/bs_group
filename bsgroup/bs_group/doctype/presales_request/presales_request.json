@@ -247,7 +247,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "Draft\nOpen\nAssigned\nIn Progress\nAwaiting Sales Input\nAwaiting Customer Input\nCosting in Progress\nReady for Quotation\nSubmitted to Sales\nCompleted\nOn Hold\nWon\nLost\nCancelled",
+   "options": "Draft\nOpen\nAssigned\nIn Progress\nAwaiting Sales Input\nAwaiting Customer Input\nCosting in Progress\nReady for Quotation\nSubmitted to Sales\nRework\nCompleted\nOn Hold\nWon\nLost\nCancelled",
    "reqd": 1
   },
   {

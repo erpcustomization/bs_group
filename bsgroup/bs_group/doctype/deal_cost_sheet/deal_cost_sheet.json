@@ -503,7 +503,7 @@
    "fieldname": "custom_deal_stage",
    "fieldtype": "Select",
    "label": "Deal Stage",
-   "options": "Draft\nCosting in Progress\nSubmitted to Sales\nQuoted\nWon\nLost",
+   "options": "Draft\nCosting in Progress\nSubmitted to Sales\nTo be revised\nQuoted\nWon\nLost",
    "hidden": 1
   },
   {
