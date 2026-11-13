@@ -323,6 +323,7 @@ def context(quotation):
         can_print=frappe.has_permission("Quotation", "print", doc=q),
         ready_to_convert=complete and discount_basis_ready(q) and not conflict,
         discount_before_vat=True,
+        show_standard_terms=uae(),
         client_descriptions=client_descriptions,
         can_install_descriptions=setup_authorised() and (not descriptions.enabled()
             or not frappe.db.exists("Custom Field", "Quotation Item-" + descriptions.COSTING)),
@@ -400,6 +401,10 @@ def _change_status(quotation, stage, expected_modified, reason=None, schedule_da
         if stage in TERMINAL:
             q.check_permission("submit")
             q.submit()  # Includes DCS approval, mandatory fields and stale-position checks.
+            if uae():
+                # Native valuation can exceed the database's decimal precision.
+                # Start the status-only save from what submit actually persisted.
+                q.reload()
         q.custom_pipeline_stage = stage
         q.custom_lost_reason = reason
         q.save()

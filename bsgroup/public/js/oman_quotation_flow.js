@@ -114,6 +114,13 @@
             clientGrid(frm,frm.__oman_client_descriptions);
             if(frm.fields_dict?.custom_oman_revision_no) frm.toggle_display('custom_oman_revision_no',!!data.enabled);
             if(!data.enabled) return;
+            // The approved UAE PDF requires a terms template. Keep its native
+            // selector and wording available even when legacy customisation hid them.
+            if(data.show_standard_terms) {
+                for(const field of ['tc_name','terms']) {
+                    if(frm.fields_dict?.[field]) frm.toggle_display(field,true);
+                }
+            }
             if(data.conflict){
                 frm.set_intro(__('This DCS has multiple active quotations. Review the existing quotations before saving, revising or finalising. No quotation has been merged or deleted.'),'red');
                 frm.page.clear_primary_action();

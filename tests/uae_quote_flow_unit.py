@@ -1,5 +1,5 @@
 import json, pathlib, unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 import oman_quote_flow_unit as fixture
 frappe, Doc, flow, ValidationError = fixture.frappe, fixture.Doc, fixture.flow, fixture.ValidationError
 
@@ -16,6 +16,25 @@ class UAEFlowTests(unittest.TestCase):
         self.assertTrue(flow.enabled())
         frappe.defaults.get_global_default.side_effect=lambda key:int(key==flow.FLAG)
         self.assertFalse(flow.enabled())
+
+    def test_terminal_status_reloads_persisted_values_only_in_uae(self):
+        for site, reloads in [('erp-bitssecureit.u.frappe.cloud', 1), ('erp-om.k.frappe.cloud', 0)]:
+            with self.subTest(site=site):
+                frappe.local.site=site
+                self.q.docstatus=0; self.q.custom_pipeline_stage='Draft'
+                self.q.reload=Mock()
+                with patch.object(flow,'_quotation',return_value=self.q), patch.object(flow,'snapshot'):
+                    flow._change_status('Q-1','Lost','M1',reason='Customer declined')
+                self.assertEqual(self.q.reload.call_count,reloads)
+                self.assertEqual(self.q.custom_pipeline_stage,'Lost')
+                self.assertEqual(self.q.docstatus,1)
+
+    def test_editable_status_does_not_reload_or_submit(self):
+        self.q.reload=Mock()
+        with patch.object(flow,'_quotation',return_value=self.q), patch.object(flow,'snapshot'):
+            flow._change_status('Q-1','Delayed','M1',reason='Awaiting customer')
+        self.q.reload.assert_not_called()
+        self.assertEqual(self.q.docstatus,0)
 
     def test_duplicate_insert_checks_all_quotes_under_dcs_lock(self):
         frappe.get_all.return_value=['Q-EXISTING']
