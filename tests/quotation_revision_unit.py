@@ -60,7 +60,7 @@ class RevisionTests(unittest.TestCase):
         self.assertEqual(frappe.db.set_value.call_count,2)
         self.assertEqual(self.event.call_count,1)
         self.assertIn('write',self.d._permissions)
-        self.assertIn('read',self.p._permissions)
+        self.assertFalse(self.p.get('_permissions'))
 
     def test_no_returns_same_sheet_without_status_writes(self):
         self.assertEqual(self.begin('No')['dcs'],'D-1')

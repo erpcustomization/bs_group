@@ -87,7 +87,9 @@ def _begin(quotation, presales, expected_modified):
             frappe.throw("This revision is already with Presales. Complete the existing rework before starting another revision.")
         return result
     request = linked_presales(sheet)
-    request.check_permission("read")
+    # Scoped Sales cannot open Presales documents. Their write access to this
+    # quotation AND DCS authorises this one identity-checked handoff, not general
+    # Presales read/write access. No request content is returned to the caller.
     record(sheet, request, "QUOTATION_PRESALES_REWORK_REQUESTED", [
         (sheet, dict(custom_deal_status=REVISION, custom_presales_status=REWORK)),
         (request, dict(status=REWORK)),
