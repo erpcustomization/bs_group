@@ -201,12 +201,14 @@ def sync_draft(sheet, previous_sheet=None):
         description = row.description or (row.item_name if row.exclude_item_name_and_brand else
             " - ".join(str(v) for v in (row.brand, row.item_code, row.item_name) if v)) or item.item_name
         customer_text = wording.get(row.name)
+        use_costing = customer_text[2] if customer_text and customer_text[0] == row.item_code else int(uae())
         rows.append(dict(item_code=row.item_code, item_name=row.item_name or item.item_name,
             brand=row.brand, uom=item.stock_uom, stock_uom=item.stock_uom, conversion_factor=1,
             description=description, custom_header=row.header,
             custom_oman_dcs_row=row.name,
             custom_oman_client_description=customer_text[1] if customer_text and customer_text[0] == row.item_code else "",
-            custom_oman_use_costing_description=customer_text[2] if customer_text and customer_text[0] == row.item_code else 0,
+            custom_oman_use_costing_description=use_costing,
+            custom_oman_use_co_description=0 if use_costing else 1,
             custom_exclude_item_name_and_brand=row.exclude_item_name_and_brand,
             qty=row.qty, custom_cost_rate=row.cost_rate, custom_selling_rate=row.selling_rate,
             price_list_rate=row.selling_rate, discount_percentage=0, rate=row.selling_rate))
@@ -217,10 +219,12 @@ def sync_draft(sheet, previous_sheet=None):
             frappe.throw("Configure the existing DCS Additional Item before synchronising charges.")
         item = frappe.db.get_value("Item", code, ["item_name", "stock_uom"], as_dict=True)
         customer_text = wording.get(descriptions.ADDITIONAL)
+        use_costing = customer_text[2] if customer_text and customer_text[0] == code else int(uae())
         rows.append(dict(item_code=code, item_name=item.item_name, description=item.item_name,
             custom_oman_dcs_row=descriptions.ADDITIONAL,
             custom_oman_client_description=customer_text[1] if customer_text and customer_text[0] == code else "",
-            custom_oman_use_costing_description=customer_text[2] if customer_text and customer_text[0] == code else 0,
+            custom_oman_use_costing_description=use_costing,
+            custom_oman_use_co_description=0 if use_costing else 1,
             qty=1, uom=item.stock_uom, stock_uom=item.stock_uom, conversion_factor=1,
             rate=charges, price_list_rate=charges, discount_percentage=0))
     q.set("items", rows)
@@ -315,7 +319,19 @@ def context(quotation):
     complete = not any(d._get_missing_mandatory_fields() for d in [q] + q.get_all_children())
     from bsgroup import oman_item_description as descriptions
     client_descriptions = descriptions.managed(q)
-    complete = complete and not descriptions.missing_rows(q)
+    missing_descriptions = descriptions.missing_rows(q)
+    complete = complete and not missing_descriptions
+    pdf_issues = []
+    if uae():
+        if any(d._get_missing_mandatory_fields() for d in [q] + q.get_all_children()):
+            pdf_issues.append("Complete the required quotation fields before preparing the PDF.")
+        if missing_descriptions:
+            pdf_issues.append("Choose Item Description (Costing), or enter CO wording only if you choose CO Item Description, for line(s): "
+                + ", ".join(map(str, missing_descriptions)) + ". CO Description is optional.")
+        if not q.get("tc_name") or not descriptions.visible_text(q.get("terms")):
+            pdf_issues.append("Select the approved Terms and Conditions and review the Term Details on the Terms tab.")
+        if not discount_basis_ready(q):
+            pdf_issues.append("Save the quotation so the discount is applied before VAT.")
     return dict(enabled=True, revision=cint(q.get("custom_oman_revision_no")),
         editable=q.docstatus == 0 and q.custom_pipeline_stage not in TERMINAL and not conflict,
         conflict=conflict,
@@ -324,6 +340,7 @@ def context(quotation):
         ready_to_convert=complete and discount_basis_ready(q) and not conflict,
         discount_before_vat=True,
         show_standard_terms=uae(),
+        save_feedback=uae(), pdf_issues=pdf_issues,
         client_descriptions=client_descriptions,
         can_install_descriptions=setup_authorised() and (not descriptions.enabled()
             or not frappe.db.exists("Custom Field", "Quotation Item-" + descriptions.COSTING)),

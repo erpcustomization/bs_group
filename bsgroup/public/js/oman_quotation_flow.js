@@ -45,8 +45,50 @@
     }
     async function pdf(frm) {
         if (frm.is_dirty()) { frappe.msgprint(__('Save the quotation before converting to PDF.')); return; }
+        if(frm.__bs_save_feedback) {
+            const data=await call('context',{quotation:frm.doc.name});
+            if(data.pdf_issues?.length) { showPdfIssues(data); return; }
+        }
         const result = await call('convert_pdf',{quotation:frm.doc.name,expected_modified:String(frm.doc.modified)});
         if (result?.file_url) window.open(result.file_url,'_blank','noopener');
+    }
+    function showPdfIssues(data) {
+        frappe.msgprint({title:__('Complete quotation for PDF'),indicator:'orange',
+            message:'<p>'+__('The quotation is saved. Complete the following before preparing its PDF:')+'</p><ul>'+
+                (data.pdf_issues || []).map(issue=>'<li>'+frappe.utils.escape_html(__(issue))+'</li>').join('')+'</ul>'});
+    }
+    function setSaveAction(frm) {
+        if(!frm.__bs_save_feedback) { frm.page.set_primary_action(__('Save'),()=>frm.save()); return; }
+        // Native save promises do not settle on every no-change/validation path.
+        // Let the native button cleanup handle saving, without a second promise spinner.
+        frm.page.set_primary_action(__('Save'),()=>{
+            if(!frm.is_dirty()) {
+                frm.page.set_primary_action(__('Convert to PDF'),()=>pdf(frm));
+                frappe.show_alert({message:__('Quotation is already saved. Use Convert to PDF.'),indicator:'green'});
+                return;
+            }
+            frm.save('Save',null,frm.page.btn_primary);
+        });
+    }
+    async function defaultUnselectedDescriptions(frm,data) {
+        if(!data.save_feedback || !data.editable || !data.can_write || !data.client_descriptions) return;
+        const rows=(frm.doc.items || []).filter(row=>!Number(row.custom_oman_use_costing_description) &&
+            !Number(row.custom_oman_use_co_description) && !String(row.custom_oman_client_description || '').replace(/<[^>]*>/g,'').trim());
+        if(!rows.length) return;
+        frm.__oman_description_selecting=true;
+        try {
+            for(const row of rows) await frappe.model.set_value(row.doctype,row.name,{
+                custom_oman_use_costing_description:1,custom_oman_use_co_description:0
+            });
+            frm.dirty();
+        } finally {frm.__oman_description_selecting=false;}
+    }
+    function workflowInstructions(frm,data) {
+        if(!data.save_feedback) return;
+        frm.$wrapper?.find('.form-message').filter(function(){
+            return this.textContent.trim()===__('Submit this document to confirm');
+        }).remove();
+        frm.set_intro(__('Save changes, then use Convert to PDF. CO Description is optional; costing wording is the default. After customer acceptance, Change Status → Won submits the quotation and sends it to Procurement.'),'blue');
     }
     function projectFields(data) {
         if (!data.project_required) return [];
@@ -111,6 +153,8 @@
             installationButton(frm,data);
             frm.__oman_quotation_pilot=!!data.enabled;
             frm.__oman_client_descriptions=!!data.client_descriptions;
+            frm.__bs_save_feedback=!!data.save_feedback;
+            await defaultUnselectedDescriptions(frm,data);
             clientGrid(frm,frm.__oman_client_descriptions);
             if(frm.fields_dict?.custom_oman_revision_no) frm.toggle_display('custom_oman_revision_no',!!data.enabled);
             if(!data.enabled) return;
@@ -140,6 +184,7 @@
             frm.remove_custom_button(__('Set as Lost'));
             frm.set_intro(__('Quotation revision R{0}. DCS revisions update this same quotation. Won and Lost are locked.',[data.revision]),'blue');
             if(data.client_descriptions) frm.set_intro(__('Choose one description per line: Use Item Description (Costing) prints the original costing wording, including any part numbers. Use CO Item Description prints your editable client wording. Choices and CO wording are retained during costing revisions.'),'blue');
+            workflowInstructions(frm,data);
             frm.dashboard.set_headline(__('Quotation Status: {0} · R{1}',[frappe.utils.escape_html(frm.doc.custom_pipeline_stage || 'Draft'),data.revision]));
             if(data.editable && data.can_write){
                 frm.add_custom_button(__('Revise Costing Sheet'),()=>frappe.set_route('Form','Deal Cost Sheet',frm.doc.custom_deal_cost_sheet));
@@ -149,9 +194,9 @@
                         values=>statusDetails(frm,values.stage),__('Change quotation status'),__('Continue'));
                 });
             }
-            if(!frm.is_dirty() && data.can_print && data.ready_to_convert) frm.add_custom_button(__('Convert to PDF'),()=>pdf(frm));
+            if(!frm.is_dirty() && data.can_print && (data.ready_to_convert || data.save_feedback)) frm.add_custom_button(__('Convert to PDF'),()=>pdf(frm));
             if(data.editable && data.can_write){
-                if(frm.is_dirty() || !data.ready_to_convert) frm.page.set_primary_action(__('Save'),()=>frm.save());
+                if(frm.is_dirty() || (!data.ready_to_convert && !data.save_feedback)) setSaveAction(frm);
                 else if(data.can_print) frm.page.set_primary_action(__('Convert to PDF'),()=>pdf(frm));
                 else frm.page.clear_primary_action();
             }
@@ -167,7 +212,7 @@
             });
             frm.refresh_field('items');
             frm.remove_custom_button(__('Convert to PDF'));
-            frm.page.set_primary_action(__('Save'),()=>frm.save());
+            setSaveAction(frm);
             if(typeof window.eqa_readiness==='function') window.eqa_readiness(frm);
         } finally {frm.__oman_description_selecting=false;}
     }

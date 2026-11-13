@@ -120,7 +120,7 @@ def prepare(q):
     if not managed(q):
         return
     before = q.get_doc_before_save()
-    from bsgroup.oman_quotation_flow import _operation
+    from bsgroup.oman_quotation_flow import _operation, uae
     revising = _operation.get() == (q.name, "revise")
     prior = {r.name: r for r in before.items} if before else {}
     if not revising:
@@ -131,6 +131,10 @@ def prepare(q):
     sheet = frappe.get_doc("Deal Cost Sheet", q.custom_deal_cost_sheet)
     bind(q, sheet)
     for row in q.items:
+        # Older UAE rows can predate both checkboxes. Do not turn an unset
+        # choice into mandatory CO wording; preserve every explicit CO choice.
+        if uae() and not cint(row.get(COSTING)) and not cint(row.get(CO)) and not visible_text(row.get(FIELD)):
+            row.set(COSTING, 1)
         row.set(COSTING, 1 if cint(row.get(COSTING)) else 0)
         row.set(CO, 0 if cint(row.get(COSTING)) else 1)
     q.set(PARENT, 1)
@@ -233,10 +237,10 @@ def install():
         fieldtype="Check", hidden=1, read_only=1, print_hide=1, no_copy=1)],
         "Quotation Item": [
             dict(fieldname=COSTING, label="Use Item Description (Costing)", fieldtype="Check",
-                insert_after="item_name", default="0", print_hide=1,
+                insert_after="item_name", default="1" if uae() else "0", print_hide=1,
                 description="Print the original costing description on this line, including any part numbers it contains."),
             dict(fieldname=CO, label="Use CO Item Description", fieldtype="Check",
-                insert_after=COSTING, default="1", print_hide=1,
+                insert_after=COSTING, default="0" if uae() else "1", print_hide=1,
                 description="Print the editable CO wording instead. Select one description per line."),
             dict(fieldname=FIELD, label="CO Item Description", fieldtype="Text Editor",
                 insert_after="description", in_list_view=1, columns=3,

@@ -17,6 +17,37 @@ class UAEFlowTests(unittest.TestCase):
         frappe.defaults.get_global_default.side_effect=lambda key:int(key==flow.FLAG)
         self.assertFalse(flow.enabled())
 
+    def test_optional_co_for_legacy_uae_rows_and_explicit_co_preserved(self):
+        from bsgroup import oman_item_description as desc
+        self.s.items[0].name='SOURCE-1'
+        row=Doc(name='ROW-1',idx=1,item_code='ITEM',description='Scope',qty=1,rate=125,
+                custom_oman_use_costing_description=0,custom_oman_use_co_description=0,
+                custom_oman_client_description='')
+        self.q.items=[row]
+        desc.prepare(self.q)
+        self.assertEqual(row.get(desc.COSTING),1)
+        self.assertEqual(desc.missing_rows(self.q),[])
+        row.set(desc.COSTING,0);row.set(desc.CO,1)
+        desc.prepare(self.q)
+        self.assertEqual(row.get(desc.COSTING),0)
+        with self.assertRaises(ValidationError):desc.require_client_wording(self.q)
+        row.set(desc.FIELD,'Client wording')
+        desc.prepare(self.q);desc.require_client_wording(self.q)
+        self.assertEqual(row.get(desc.FIELD),'Client wording')
+
+    def test_uae_pdf_context_distinguishes_optional_co_and_required_terms(self):
+        self.q.items=[Doc(idx=1,description='Costing wording',custom_oman_use_costing_description=1,
+                         custom_oman_client_description='')]
+        frappe.get_doc.side_effect=lambda dt,*args,**kwargs:self.q if dt=='Quotation' else self.s
+        with self.base.mod('bsgroup.dcs.procurement',SEND_ROLES={'Sales Manager'}):
+            data=flow.context('Q-1')
+            self.assertTrue(data['save_feedback'])
+            self.assertTrue(data['ready_to_convert'])
+            self.assertEqual(len(data['pdf_issues']),1)
+            self.assertIn('Terms and Conditions',data['pdf_issues'][0])
+            self.q.tc_name='Approved';self.q.terms='<p>Approved terms</p>'
+            self.assertEqual(flow.context('Q-1')['pdf_issues'],[])
+
     def test_terminal_status_reloads_persisted_values_only_in_uae(self):
         for site, reloads in [('erp-bitssecureit.u.frappe.cloud', 1), ('erp-om.k.frappe.cloud', 0)]:
             with self.subTest(site=site):
