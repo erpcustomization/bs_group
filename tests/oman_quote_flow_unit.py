@@ -228,7 +228,7 @@ class FlowTests(unittest.TestCase):
         self.assertFalse(printer.call_args.kwargs['no_letterhead'])
         self.assertNotIn('pdf_generator',printer.call_args.kwargs)
 
-    def test_template_choices_require_quote_print_permission_and_are_oman_only(self):
+    def test_template_choices_require_quote_print_permission_and_site_opt_in(self):
         frappe.get_doc.return_value=self.q
         frappe.get_all.return_value=['Template A','Template B',flow.PILOT_PRINT_FORMAT]
         self.q[flow.PDF_TEMPLATE_FIELD]='Template B'

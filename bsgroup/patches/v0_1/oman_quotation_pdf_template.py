@@ -3,8 +3,8 @@ import frappe
 
 
 def execute():
-    from bsgroup.oman_quotation_flow import template_selection_enabled, PDF_TEMPLATE_FIELD
-    if not template_selection_enabled():
+    from bsgroup.oman_quotation_flow import OMAN_SITES, template_selection_enabled, PDF_TEMPLATE_FIELD
+    if getattr(frappe.local, "site", None) not in OMAN_SITES or not template_selection_enabled():
         return
     from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
     create_custom_fields({"Quotation": [dict(fieldname=PDF_TEMPLATE_FIELD,

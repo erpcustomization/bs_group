@@ -14,8 +14,54 @@ class UAEFlowTests(unittest.TestCase):
 
     def test_uae_requires_its_own_opt_in(self):
         self.assertTrue(flow.enabled())
+        self.assertTrue(flow.template_selection_enabled())
         frappe.defaults.get_global_default.side_effect=lambda key:int(key==flow.FLAG)
         self.assertFalse(flow.enabled())
+        self.assertFalse(flow.template_selection_enabled())
+
+    def test_uae_template_chooser_uses_saved_choice_and_local_default(self):
+        frappe.get_doc.return_value=self.q
+        default=flow.print_formats()[1]
+        frappe.get_all.return_value=[default,'Quotation Classic']
+        self.assertEqual(flow.pdf_templates('Q-1')['selected'],default)
+        self.q[flow.PDF_TEMPLATE_FIELD]='Quotation Classic'
+        self.assertEqual(flow.pdf_templates('Q-1')['selected'],'Quotation Classic')
+        self.assertIn('print',self.q._permissions)
+        with self.base.mod('bsgroup.dcs.procurement',SEND_ROLES={'Sales Manager'}):
+            with patch('bsgroup.oman_item_description.managed',return_value=False):
+                self.assertTrue(flow.context('Q-1')['choose_pdf_template'])
+
+    def test_uae_selected_template_preserves_co_and_costing_in_pdf_only(self):
+        self.q.items=[Doc(description='Internal PART-101',item_code='PART-101',item_name='Internal name',
+            custom_oman_use_costing_description=0,custom_oman_client_description='Customer equipment',qty=2,rate=100),
+            Doc(description='Costing item',item_code='PART-102',custom_oman_use_costing_description=1,qty=1,rate=50)]
+        self.q[flow.PDF_TEMPLATE_FIELD]='Quotation Classic'
+        frappe.db.get_value.side_effect=lambda dt,*a,**kw:Doc(doc_type='Quotation',disabled=0) if dt=='Print Format' else 'UAE Letterhead'
+        with patch.object(frappe,'get_print',create=True,return_value=b'pdf') as printer:
+            flow.render_pdf(self.q,template='Quotation Modern')
+            self.assertEqual(printer.call_args.args[2],'Quotation Modern')
+            printed=printer.call_args.kwargs['doc']
+            self.assertEqual(printed.items[0].description,'Customer equipment')
+            self.assertEqual(printed.items[0].item_code,'')
+            self.assertEqual(printed.items[1].description,'Costing item')
+            self.assertEqual(self.q.items[0].description,'Internal PART-101')
+            self.assertEqual(self.q.items[0].item_code,'PART-101')
+            self.assertEqual(printer.call_args.kwargs['letterhead'],'UAE Letterhead')
+            flow.render_pdf(self.q,no_letterhead=1)
+            self.assertEqual(printer.call_args.args[2],'Quotation Classic')
+
+    def test_uae_template_field_migration_is_site_scoped(self):
+        from bsgroup.patches.v0_1.uae_quotation_pdf_template import execute
+        from bsgroup.patches.v0_1.oman_quotation_pdf_template import execute as oman_execute
+        create=Mock()
+        with self.base.mod('frappe.custom.doctype.custom_field.custom_field',create_custom_fields=create):
+            oman_execute();create.assert_not_called()
+            execute();create.assert_called_once()
+            field=create.call_args.args[0]['Quotation'][0]
+            self.assertEqual(field['fieldname'],flow.PDF_TEMPLATE_FIELD)
+            self.assertTrue(field['read_only']);self.assertTrue(field['no_copy'])
+            create.reset_mock();frappe.local.site='erp-om.k.frappe.cloud'
+            execute();create.assert_not_called()
 
     def test_optional_co_for_legacy_uae_rows_and_explicit_co_preserved(self):
         from bsgroup import oman_item_description as desc

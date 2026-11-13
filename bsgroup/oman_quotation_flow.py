@@ -45,7 +45,7 @@ def print_formats():
 
 
 def template_selection_enabled():
-    return getattr(frappe.local, "site", None) in OMAN_SITES and enabled()
+    return enabled()
 
 
 def validate_pdf_template(template):
