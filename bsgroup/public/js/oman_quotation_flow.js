@@ -211,6 +211,9 @@
                 custom_oman_use_co_description:costing?0:1
             });
             frm.refresh_field('items');
+            // The complementary choice changes asynchronously. Re-evaluate the
+            // row dependencies after both flags settle so CO unlocks immediately.
+            frm.fields_dict?.items?.grid?.grid_rows_by_docname?.[cdn]?.refresh_dependency?.();
             frm.remove_custom_button(__('Convert to PDF'));
             setSaveAction(frm);
             if(typeof window.eqa_readiness==='function') window.eqa_readiness(frm);
