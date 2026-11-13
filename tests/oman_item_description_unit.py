@@ -1,5 +1,5 @@
 import copy, importlib, pathlib, unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 import oman_quote_flow_unit as fixture
 frappe,Doc,flow,ValidationError=fixture.frappe,fixture.Doc,fixture.flow,fixture.ValidationError
 desc=importlib.import_module('bsgroup.oman_item_description')
@@ -37,7 +37,7 @@ class DescriptionTests(unittest.TestCase):
   row=self.q.items[0];row.set(desc.FIELD,'');row.set(desc.COSTING,1)
   desc.prepare(self.q);desc.require_client_wording(self.q)
   self.assertEqual(row.get(desc.CO),0)
-  row.set(desc.COSTING,0);desc.prepare(self.q)
+  row.set(desc.COSTING,0);row.set(desc.CO,1);desc.prepare(self.q)
   self.assertEqual(row.get(desc.CO),1)
   with self.assertRaises(ValidationError):desc.require_client_wording(self.q)
  def test_switching_keeps_co_wording(self):
@@ -58,12 +58,46 @@ class DescriptionTests(unittest.TestCase):
   self.assertEqual(self.q.items[0][desc.COSTING],1)
   self.assertEqual(self.q.items[1][desc.COSTING],0)
   self.assertEqual(self.q.items[1][desc.FIELD],'Office network equipment');self.assertEqual(self.q.name,'Q-1')
- def test_new_or_replaced_item_needs_its_own_client_text(self):
+ def test_new_or_replaced_item_defaults_costing_and_does_not_reuse_co(self):
   desc.prepare(self.q);revised=clone(self.s);revised.items[0].item_code='NEW-ITEM'
   frappe.get_doc.side_effect=None;frappe.get_doc.return_value=self.q;frappe.db.get_value.return_value=Doc(item_name='New Item',stock_uom='Nos')
   with self.base.mod('bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet',quotation_deal_identity=lambda s,q:''),self.base.mod('bsgroup.dcs.currency',money_tolerance=lambda c:.001),patch.object(flow,'snapshot'):
    flow.sync_draft(revised,previous_sheet=self.s)
   self.assertEqual(self.q.items[0][desc.FIELD],'')
+  self.assertEqual(self.q.items[0][desc.COSTING],1)
+  self.assertEqual(self.q.items[0][desc.CO],0)
+ def test_unset_oman_choice_defaults_to_costing_without_co(self):
+  row=self.q.items[0];row.set(desc.FIELD,'');row.set(desc.COSTING,0);row.set(desc.CO,0)
+  desc.prepare(self.q)
+  self.assertEqual(row.get(desc.COSTING),1);self.assertEqual(row.get(desc.CO),0)
+  desc.require_client_wording(self.q)
+ def test_explicit_empty_co_choice_is_preserved(self):
+  row=self.q.items[0];row.set(desc.FIELD,'');row.set(desc.COSTING,0);row.set(desc.CO,1)
+  desc.prepare(self.q)
+  self.assertEqual(row.get(desc.COSTING),0);self.assertEqual(row.get(desc.CO),1)
+  with self.assertRaises(ValidationError):desc.require_client_wording(self.q)
+ def test_oman_saved_pdf_context_keeps_its_existing_terms_policy(self):
+  row=self.q.items[0];row.set(desc.FIELD,'');row.set(desc.COSTING,1)
+  with self.base.mod('bsgroup.dcs.procurement',SEND_ROLES={'Sales Manager'}):
+   data=flow.context('Q-1')
+   self.assertTrue(data['save_feedback']);self.assertTrue(data['ready_to_convert'])
+   self.assertEqual(data['pdf_issues'],[])
+   row.set(desc.COSTING,0);row.set(desc.CO,1)
+   data=flow.context('Q-1')
+   self.assertFalse(data['ready_to_convert']);self.assertEqual(len(data['pdf_issues']),1)
+   self.assertIn('CO Description is optional',data['pdf_issues'][0])
+ def test_oman_default_migration_is_scoped_and_idempotent(self):
+  migration=importlib.import_module('bsgroup.patches.v0_1.oman_quotation_description_defaults')
+  fields={'Quotation Item-'+desc.COSTING:Mock(default='0'),'Quotation Item-'+desc.CO:Mock(default='1')}
+  with patch.object(frappe.db,'exists',return_value=True),patch.object(frappe,'get_doc',side_effect=lambda dt,name:fields[name]) as get_doc,patch.object(frappe,'clear_cache',create=True):
+   migration.execute();migration.execute()
+   self.assertEqual(fields['Quotation Item-'+desc.COSTING].default,'1')
+   self.assertEqual(fields['Quotation Item-'+desc.CO].default,'0')
+   for field in fields.values():field.save.assert_called_once_with(ignore_permissions=True)
+   get_doc.reset_mock()
+   for site in ('erp-bitssecureit.u.frappe.cloud','unrelated.example.com'):
+    frappe.local.site=site;migration.execute()
+   get_doc.assert_not_called()
  def test_source_reference_cannot_be_reassigned_by_client(self):
   desc.prepare(self.q);self.q._before=clone(self.q);self.q.items[0].set(desc.SOURCE,'OTHER-LINE')
   with self.assertRaisesRegex(ValidationError,'source references'):desc.prepare(self.q)

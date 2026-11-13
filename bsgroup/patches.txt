@@ -33,3 +33,4 @@ bsgroup.patches.v0_1.dcs_procurement
 bsgroup.patches.v0_1.quotation_won_requirements
 bsgroup.patches.v0_1.dcs_supplier_evidence
 bsgroup.patches.v0_1.uae_quotation_description_defaults
+bsgroup.patches.v0_1.oman_quotation_description_defaults
