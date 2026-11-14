@@ -331,6 +331,7 @@
         }
         if (version!==tab.activity_version || frm.doc.name!==project) return;
         panel.empty();
+        if (data.inline_timesheets) {renderTimesheetLines(frm, panel, data);return;}
         if (data.problem) $('<p class="text-muted">').text(data.problem).appendTo(panel);
         const actions = $('<div style="display:flex;gap:8px;margin-bottom:12px">').appendTo(panel);
         if (data.can_create) $('<button type="button" class="btn btn-primary btn-sm">').text(__('New')+' '+__(data.doctype)).on('click',()=>{
@@ -344,6 +345,58 @@
         ).join('') || '<tr><td colspan="3">No records for this project.</td></tr>'}</tbody></table>`).appendTo(panel);
         records.on('click','button[data-record]',e=>openProjectRecord(frm,data,e.currentTarget.dataset.record,()=>render(frm,section)));
         $('<p class="text-muted">').text(__('Showing up to 100 accessible records linked to this project.')).appendTo(panel);
+    }
+    function renderTimesheetLines(frm, panel, data) {
+        const pending = new Set();
+        const refresh=$('<button type="button" class="btn btn-default btn-sm" style="margin-bottom:12px">').text(__('Refresh')).appendTo(panel);
+        refresh.on('click',()=>{
+            if(pending.size)return frappe.msgprint(__('Wait for saving to finish, or retry the unsaved entry.'));
+            render(frm,'timesheets');
+        });
+        if(!data.available){$('<p>').text(__('This activity is restricted by your existing access.')).appendTo(panel);return;}
+        const table=$('<div class="table-responsive"><table class="table table-bordered"><thead><tr><th>Date</th><th>Employee</th><th>Task</th><th style="min-width:300px">Work Done</th><th>Status</th></tr></thead><tbody></tbody></table></div>').appendTo(panel);
+        const body=table.find('tbody');
+        for(const entry of data.entries || []) {
+            const tr=$('<tr>').attr('data-timesheet-row',entry.name).appendTo(body);
+            $('<td>').text(entry.date?frappe.datetime.str_to_user(entry.date):'—').appendTo(tr);
+            $('<td>').text(entry.employee).appendTo(tr);
+            const task=$('<td>').appendTo(tr);
+            $('<div>').text(entry.task_title || entry.task || '—').appendTo(task);
+            $('<small class="text-muted">').text(entry.task).appendTo(task);
+            const cell=$('<td>').appendTo(tr);
+            if(!entry.editable) $('<div style="white-space:pre-wrap">').text(entry.work).appendTo(cell);
+            else {
+                const input=$('<textarea class="form-control" rows="3" maxlength="20000">').attr('aria-label',__('Work Done')+' '+entry.task+' '+entry.name).val(entry.work).appendTo(cell);
+                const state=$('<small role="status" class="text-muted">').text(__('Saved')).appendTo(cell);
+                const retry=$('<button type="button" class="btn btn-default btn-xs" style="margin-left:8px">').text(__('Retry')).hide().appendTo(cell);
+                let saved=entry.work,busy=false,timer;
+                const token={};
+                const clean=()=>{pending.delete(token);pendingSaves.delete(token);};
+                async function save() {
+                    clearTimeout(timer);
+                    if(busy)return;
+                    if(input.val().trim()===saved){clean();state.text(__('Saved'));retry.hide();return;}
+                    busy=true;retry.hide();state.text(__('Saving…'));
+                    try {
+                        while(input.val().trim()!==saved) {
+                            const value=input.val();
+                            const {message}=await frappe.call({method:'bsgroup.project_timesheets.save_work',type:'POST',args:{project:data.project,timesheet:entry.timesheet,row_name:entry.name,work:value,expected_work:saved}});
+                            saved=message.work;
+                            if(input.val()===value)input.val(saved);
+                        }
+                        clean();state.text(__('Saved automatically'));
+                    } catch(error){state.text(__('Not saved — retry or refresh after copying your work'));retry.show();}
+                    finally {busy=false;}
+                }
+                input.on('input',()=>{pending.add(token);pendingSaves.add(token);state.text(__('Unsaved'));clearTimeout(timer);timer=setTimeout(save,700);});
+                input.on('blur',save);retry.on('click',save);
+            }
+            const status=$('<td>').appendTo(tr);
+            $('<div>').text(entry.status).appendTo(status);
+            $('<small class="text-muted">').text(entry.timesheet).appendTo(status);
+        }
+        if(!(data.entries || []).length)$('<tr><td colspan="5">').find('td').text(__('No work entries for this project yet.')).end().appendTo(body);
+        $('<p class="text-muted">').text(__('Draft work descriptions save automatically. Dates, employees and task links retain the original work record.')).appendTo(panel);
     }
     function openProjectRecord(frm,data,name,afterClose) {
         if(frm.__bs_plan_dirty?.size) return frappe.msgprint(__('Wait for automatic saving to finish or resolve the row save error before opening another form.'));
