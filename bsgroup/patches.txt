@@ -37,3 +37,4 @@ bsgroup.patches.v0_1.oman_quotation_description_defaults
 bsgroup.patches.v0_1.oman_quotation_pdf_template
 bsgroup.patches.v0_1.uae_quotation_pdf_template
 bsgroup.patches.v0_1.uae_optional_quotation_terms
+bsgroup.patches.v0_1.uae_supply_daily_work_20261114
