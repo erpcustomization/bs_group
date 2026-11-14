@@ -262,7 +262,7 @@ app_include_css = [
     "/assets/bsgroup/css/sidebar.css",
     "/assets/bsgroup/css/labor_preapproval.css",
     "/assets/bsgroup/css/bs_sales_theme.css?v=20261111-project-visuals",
-    "/assets/bsgroup/css/commercial_studio.css?v=20261114-studio-blue",
+    "/assets/bsgroup/css/commercial_studio.css?v=20261114-studio-compact",
     # "/assets/bsgroup/css/bs_welcome_banner.css",
 ]
 

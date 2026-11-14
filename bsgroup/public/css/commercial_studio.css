@@ -45,7 +45,7 @@
     }
     .bs-commercial-studio .bs-commercial-hero {
         display: flex; align-items: center; justify-content: space-between; gap: 24px;
-        padding: 27px 32px; margin: 16px 0 18px; border-radius: 16px;
+        padding: 14px 24px; margin: 12px 0 12px; border-radius: 12px;
         background: linear-gradient(115deg, #102b57, #194578);
         border: 1px solid #28518a; box-shadow: 0 8px 24px #14334212; color: #fff;
         position: relative; overflow: hidden;
@@ -56,7 +56,7 @@
     .bs-commercial-studio .bs-commercial-heading { min-width: 0; }
     .bs-commercial-studio .bs-commercial-eyebrow { color: #bad4ff; font-size: 10px; letter-spacing: 1.8px; font-weight: 700; }
     .bs-commercial-studio .bs-commercial-hero h2 {
-        color: #fff; font-size: 28px; font-weight: 700; letter-spacing: -.7px; line-height: 1.25; margin: 8px 0 7px;
+        color: #fff; font-size: 24px; font-weight: 700; letter-spacing: -.5px; line-height: 1.2; margin: 4px 0;
     }
     .bs-commercial-studio .bs-commercial-hero p { color: #cfddf3; margin: 0; font-size: 12px; overflow-wrap: anywhere; }
     .bs-commercial-studio .bs-commercial-document { padding-left: 28px; border-left: 1px solid #ffffff26; flex: 0 0 auto; }
@@ -142,8 +142,8 @@
         font-size: 22px; color: #235dcc; background: #eaf1ff; font-weight: 700; padding: 12px;
     }
     @media (max-width: 767px) {
-        .bs-commercial-studio .bs-commercial-hero { padding: 22px 20px; gap: 16px; }
-        .bs-commercial-studio .bs-commercial-hero h2 { font-size: 23px; }
+        .bs-commercial-studio .bs-commercial-hero { padding: 12px 18px; gap: 12px; }
+        .bs-commercial-studio .bs-commercial-hero h2 { font-size: 22px; }
         .bs-commercial-studio .bs-commercial-document { padding-left: 16px; }
         .bs-commercial-studio .bs-commercial-document small { display: none; }
         .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-layout .form-section { padding: 18px 16px; }
