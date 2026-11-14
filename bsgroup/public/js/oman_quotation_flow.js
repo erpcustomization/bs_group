@@ -212,8 +212,6 @@
                         on_success(file){dialog.set_value('customer_po',file.file_url);}});
                 }},
                 {fieldtype:'Date',fieldname:'schedule_date',label:__('Required By'),reqd:1,default:data.required_by},
-                {fieldtype:'Select',fieldname:'warehouse',label:__('Target Warehouse'),options:['',...data.warehouses],reqd:data.stock_items?1:0,
-                    default:data.warehouses.length===1?data.warehouses[0]:''},
                 ...projectFields(data),
             ] : []),
             {fieldtype:'Small Text',fieldname:'reason',label:__('Reason'),reqd:['Lost','Cancelled','Delayed'].includes(stage)?1:0},
@@ -227,7 +225,7 @@
                     if(won && data.project_required && !projectModules.length) {frappe.msgprint(__('Choose at least one project module.'));return;}
                     const result=await call('change_status',{quotation:frm.doc.name,stage,expected_modified:String(frm.doc.modified),
                         reason:values.reason,customer_po:values.customer_po,customer_po_reference:values.customer_po_reference,
-                        schedule_date:values.schedule_date,warehouse:values.warehouse,
+                        schedule_date:values.schedule_date,
                         project_modules:JSON.stringify(projectModules),project_details:JSON.stringify(Object.fromEntries(
                             ['expected_end_date','customer','custom_project_description'].map(key=>[key,values[key]])))});
                     dialog.hide();await frm.reload_doc();

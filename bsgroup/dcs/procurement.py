@@ -286,8 +286,8 @@ def send_to_procurement(quotation, schedule_date=None, warehouse=None, project_m
     if warehouse:
         if warehouse not in handover_warehouses(sheet.company):
             frappe.throw(_("Select an enabled warehouse belonging to the DCS company."))
-    elif any(r["is_stock_item"] for r in rows):
-        frappe.throw(_("Select a target warehouse for the stock items."))
+    # Sales can hand over stock items without selecting a receiving warehouse.
+    # Procurement supplies it later; explicitly supplied values still validate.
     source = po_file(q)
     data = costing_snapshot(sheet)
     # Render before inserting: a rendering failure cannot leave a half-created PR.

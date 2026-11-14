@@ -61,7 +61,7 @@ def run():
     q.submit()
     def send():
         with patch.object(frappe,"get_print",return_value=sample_pdf("Quotation")),patch.object(h,"costing_pdf",return_value=sample_pdf("Costing")):
-            return h.send_to_procurement(q.name,add_days(nowdate(),7),"Stores - AE")
+            return h.send_to_procurement(q.name,add_days(nowdate(),7))
     blocked("Unwon quotation cannot create a requisition",send)
     q.custom_pipeline_stage="Won"
     blocked("Won requires a customer PO",q.save)
@@ -80,11 +80,7 @@ def run():
           [(r["qty"],r["rate"]) for r in context["items"]]==[(3,100),(2,200)])
     blocked("Required-by date is required",lambda:h.send_to_procurement(q.name,warehouse="Stores - AE"))
     blocked("Past required-by date rejected",lambda:h.send_to_procurement(q.name,add_days(nowdate(),-1),"Stores - AE"))
-    frappe.db.savepoint("stock_requirement")
     frappe.db.set_value("Item","ZZTEST-CLAUDE-DCS-ITEM-A","is_stock_item",1)
-    blocked("Stock item handover requires a warehouse",
-            lambda:h.send_to_procurement(q.name,add_days(nowdate(),7)), "warehouse")
-    frappe.db.rollback(save_point="stock_requirement")
     wrong=frappe.db.get_value("Warehouse",{"company":["!=",COMPANY],"is_group":0,"disabled":0},"name")
     if wrong:
         blocked("Another company's warehouse is rejected",lambda:h.send_to_procurement(q.name,add_days(nowdate(),7),wrong))
@@ -98,6 +94,8 @@ def run():
     check("Print failure leaves no requisition",not frappe.db.exists(p.MR,{"custom_bsp_key":h.handover_key(dcs)}))
     sent=send()
     mr=frappe.get_doc(p.MR,sent["name"])
+    check("Stock item handover allows warehouse to be chosen by Procurement later",
+          all(not row.warehouse for row in mr.items))
     check("Sales sender creates a real draft standard Material Request",
           mr.material_request_type=="Purchase" and mr.docstatus==0 and mr.workflow_state=="Draft"
           and mr.owner==SALES and mr.custom_bsp_managed)

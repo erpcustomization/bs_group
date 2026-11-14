@@ -1,5 +1,8 @@
 frappe.ui.form.on('Quotation', {
     refresh: function(frm) {
+        for (const field of ['zoho_estimate_id', 'shipping_rule', 'incoterm']) {
+            if (frm.fields_dict?.[field]) frm.set_df_property(field, 'hidden', 1);
+        }
         reduce_subject_height(frm)
         set_lead_name(frm)
         frm.set_df_property('customer_name', 'hidden', 1);
@@ -367,9 +370,6 @@ frappe.ui.form.on("Quotation", {
                             <tbody>${rows}</tbody></table>${additional}
                             <p>The awarded quotation, customer PO and costing sheet are attached privately.</p>`},
                         {fieldname:"schedule_date",label:__("Required By"),fieldtype:"Date",reqd:1,default:data.required_by},
-                        {fieldname:"warehouse",label:__("Target Warehouse"),fieldtype:"Select",options:["",...data.warehouses],
-                         reqd:data.items.some(row=>row.is_stock_item)?1:0,
-                         default:data.warehouses.length===1?data.warehouses[0]:""},
                         {fieldname:'project_section',fieldtype:'Section Break',label:__('Select Project Category — choose one or more')},
                         ...modules.map(([key,label])=>({fieldname:'module_'+key,fieldtype:'Check',label:__(label),default:(data.project_modules||[]).includes(key)?1:0})),
                         ...projectFields
@@ -383,7 +383,7 @@ frappe.ui.form.on("Quotation", {
                         try {
                             const result = await frappe.call({
                                 method:"bsgroup.dcs.procurement.send_to_procurement",
-                                args:{quotation:frm.doc.name,schedule_date:values.schedule_date,warehouse:values.warehouse,
+                                args:{quotation:frm.doc.name,schedule_date:values.schedule_date,
                                     project_modules:JSON.stringify(selected),project_details:JSON.stringify(projectDetails)},freeze:true,
                                 freeze_message:__("Creating requisition and preserving sales documents…")
                             });
