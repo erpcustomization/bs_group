@@ -19,13 +19,14 @@ class UAEFlowTests(unittest.TestCase):
         self.assertFalse(flow.enabled())
         self.assertFalse(flow.template_selection_enabled())
 
-    def test_uae_template_chooser_uses_saved_choice_and_local_default(self):
+    def test_uae_template_chooser_defaults_to_regional_proposal(self):
         frappe.get_doc.return_value=self.q
-        default=flow.print_formats()[1]
+        default='Proposal - UAE'
         frappe.get_all.return_value=[default,'Quotation Classic']
         self.assertEqual(flow.pdf_templates('Q-1')['selected'],default)
         self.q[flow.PDF_TEMPLATE_FIELD]='Quotation Classic'
-        self.assertEqual(flow.pdf_templates('Q-1')['selected'],'Quotation Classic')
+        self.assertEqual(flow.pdf_templates('Q-1')['selected'],default)
+        self.assertEqual(self.q[flow.PDF_TEMPLATE_FIELD],'Quotation Classic')
         self.assertIn('print',self.q._permissions)
         with self.base.mod('bsgroup.dcs.procurement',SEND_ROLES={'Sales Manager'}):
             with patch('bsgroup.oman_item_description.managed',return_value=False):

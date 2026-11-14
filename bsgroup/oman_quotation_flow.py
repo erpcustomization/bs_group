@@ -65,7 +65,9 @@ def pdf_templates(quotation):
         frappe.throw("Quotation template selection is not enabled on this site.")
     templates = ["Standard"] + frappe.get_all("Print Format", filters={"doc_type": "Quotation", "disabled": 0},
         pluck="name", order_by="name asc")
-    selected = q.get(PDF_TEMPLATE_FIELD) or print_formats()[1]
+    # Each conversion starts with the regional customer proposal. A previous
+    # PDF choice is historical evidence, not the default for the next dialog.
+    selected = "Proposal - UAE" if uae() else "Proposal - Oman"
     return dict(templates=templates, selected=selected if selected in templates else "")
 
 

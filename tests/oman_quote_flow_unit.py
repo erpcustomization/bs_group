@@ -230,11 +230,14 @@ class FlowTests(unittest.TestCase):
 
     def test_template_choices_require_quote_print_permission_and_site_opt_in(self):
         frappe.get_doc.return_value=self.q
-        frappe.get_all.return_value=['Template A','Template B',flow.PILOT_PRINT_FORMAT]
+        frappe.get_all.return_value=['Template A','Template B','Proposal - Oman']
         self.q[flow.PDF_TEMPLATE_FIELD]='Template B'
         result=flow.pdf_templates('Q-1')
-        self.assertEqual(result['selected'],'Template B')
-        self.assertEqual(result['templates'],['Standard','Template A','Template B',flow.PILOT_PRINT_FORMAT])
+        self.assertEqual(result['selected'],'Proposal - Oman')
+        self.assertEqual(self.q[flow.PDF_TEMPLATE_FIELD],'Template B')
+        self.assertEqual(result['templates'],['Standard','Template A','Template B','Proposal - Oman'])
+        frappe.get_all.return_value=['Template A']
+        self.assertEqual(flow.pdf_templates('Q-1')['selected'],'')
         self.assertIn('print',self.q._permissions)
         self.assertEqual(frappe.get_all.call_args.kwargs['filters'],{'doc_type':'Quotation','disabled':0})
         frappe.local.site='erp-bitssecureit.u.frappe.cloud'
