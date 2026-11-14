@@ -1,0 +1,61 @@
+{
+ "doctype": "DocType",
+ "name": "BS Project Schedule Settings",
+ "module": "BS Group",
+ "custom": 0,
+ "issingle": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "start_date",
+  "send_on_holiday_eve",
+  "individual_webhook",
+  "private_delivery_verified",
+  "instructions"
+ ],
+ "fields": [
+  {
+   "fieldname": "enabled",
+   "label": "Enable automatic schedules and Teams messages",
+   "fieldtype": "Check",
+   "default": "0"
+  },
+  {
+   "fieldname": "start_date",
+   "label": "First evening send date",
+   "fieldtype": "Date"
+  },
+  {
+   "fieldname": "send_on_holiday_eve",
+   "label": "Send on a holiday evening when tomorrow is a working day",
+   "fieldtype": "Check",
+   "default": "0"
+  },
+  {
+   "fieldname": "individual_webhook",
+   "label": "Verified individual Teams flow endpoint",
+   "fieldtype": "Password"
+  },
+  {
+   "fieldname": "private_delivery_verified",
+   "label": "Individual recipient delivery verified in Power Automate",
+   "fieldtype": "Check",
+   "default": "0"
+  },
+  {
+   "fieldname": "instructions",
+   "label": "Schedule",
+   "fieldtype": "HTML",
+   "options": "<p>6:00 PM local time: tomorrow\u2019s Project Plan tasks through the existing Tech Task Scheduler. HR holiday calendars apply. Completed/Closed/Cancelled tasks are excluded. Delivery is attempted once per user/date/site.</p>"
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "track_changes": 1
+}

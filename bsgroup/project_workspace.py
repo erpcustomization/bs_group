@@ -116,6 +116,8 @@ def context(project, section="tasks"):
         result["child"] = dict(field="time_logs", values={"project": doc.name,
                               "custom_reference_type": "Project", "custom_reference": doc.name})
     elif section == "scheduler":
+        from bsgroup.project_schedule import project_entries
+        result['automatic_entries'] = project_entries(doc.name)
         filters = [["Tech Task Scheduler List", "project", "=", doc.name]]
         result["child"] = dict(field="tech_task_scheduler_list", values={"project": doc.name, "category": "Project",
                                   "category_doctype": "Project", "category_name": doc.name})

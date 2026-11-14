@@ -332,6 +332,13 @@
         if (version!==tab.activity_version || frm.doc.name!==project) return;
         panel.empty();
         if (data.inline_timesheets) {renderTimesheetLines(frm, panel, data);return;}
+        if (data.automatic_entries) {
+            $('<h5>').text(__('Automatic Project Plan schedules')).appendTo(panel);
+            $('<p class="text-muted">').text(__('Tomorrow’s tasks are prepared at 6:00 PM using HR working-day calendars. Edit task details in Project Plan.')).appendTo(panel);
+            $('<div class="table-responsive">').html(`<table class="table table-bordered"><thead><tr><th>Date</th><th>Employee</th><th>Task</th><th>Details</th><th>Status</th></tr></thead><tbody>${data.automatic_entries.map(row=>
+                `<tr><td>${esc(frappe.datetime.str_to_user(row.date))}</td><td>${esc(row.employee)}</td><td>${esc(row.title)}<br><small>${esc(row.task)}</small></td><td>${esc(row.work)}<br><small>${esc(row.scheduler)}</small></td><td>${esc(row.status)}</td></tr>`
+            ).join('') || '<tr><td colspan="5">No automatic schedules generated for this project yet.</td></tr>'}</tbody></table>`).appendTo(panel);
+        }
         if (data.problem) $('<p class="text-muted">').text(data.problem).appendTo(panel);
         const actions = $('<div style="display:flex;gap:8px;margin-bottom:12px">').appendTo(panel);
         if (data.can_create) $('<button type="button" class="btn btn-primary btn-sm">').text(__('New')+' '+__(data.doctype)).on('click',()=>{
@@ -354,7 +361,7 @@
             render(frm,'timesheets');
         });
         if(!data.available){$('<p>').text(__('This activity is restricted by your existing access.')).appendTo(panel);return;}
-        const table=$('<div class="table-responsive"><table class="table table-bordered"><thead><tr><th>Date</th><th>Employee</th><th>Task</th><th style="min-width:300px">Work Done</th><th>Status</th></tr></thead><tbody></tbody></table></div>').appendTo(panel);
+        const table=$('<div class="table-responsive"><table class="table table-bordered"><thead><tr><th>Date</th><th>Employee</th><th>Task</th><th style="min-width:300px">Work Done</th></tr></thead><tbody></tbody></table></div>').appendTo(panel);
         const body=table.find('tbody');
         for(const entry of data.entries || []) {
             const tr=$('<tr>').attr('data-timesheet-row',entry.name).appendTo(body);
@@ -391,11 +398,8 @@
                 input.on('input',()=>{pending.add(token);pendingSaves.add(token);state.text(__('Unsaved'));clearTimeout(timer);timer=setTimeout(save,700);});
                 input.on('blur',save);retry.on('click',save);
             }
-            const status=$('<td>').appendTo(tr);
-            $('<div>').text(entry.status).appendTo(status);
-            $('<small class="text-muted">').text(entry.timesheet).appendTo(status);
         }
-        if(!(data.entries || []).length)$('<tr><td colspan="5">').find('td').text(__('No work entries for this project yet.')).end().appendTo(body);
+        if(!(data.entries || []).length)$('<tr><td colspan="4">').find('td').text(__('No work entries for this project yet.')).end().appendTo(body);
         $('<p class="text-muted">').text(__('Draft work descriptions save automatically. Dates, employees and task links retain the original work record.')).appendTo(panel);
     }
     function openProjectRecord(frm,data,name,afterClose) {

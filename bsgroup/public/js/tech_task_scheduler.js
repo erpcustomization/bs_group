@@ -328,6 +328,7 @@ function render_tts_dashboard(frm) {
 
 frappe.ui.form.on('Tech Task Scheduler', {
     refresh: function(frm) {
+        if (frm.doc.custom_bs_auto_key) return;
         frm.add_custom_button('Send to Individuals (Teams)', function() {
             var rows = frm.doc.tech_task_scheduler_list || [];
 
@@ -495,7 +496,7 @@ frappe.ui.form.on('Tech Task Scheduler', {
 
 frappe.ui.form.on('Tech Task Scheduler', {
   refresh: function(frm) {
-
+    if (frm.doc.custom_bs_auto_key) return;
     frm.add_custom_button('Send to Projects Team Group', function() {
       var rows = frm.doc.tech_task_scheduler_list || [];
 

@@ -1,0 +1,58 @@
+{
+ "doctype": "DocType",
+ "name": "BS Project Schedule Delivery",
+ "module": "BS Group",
+ "custom": 0,
+ "issingle": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "recipient",
+  "schedule_date",
+  "task_count",
+  "status",
+  "detail"
+ ],
+ "fields": [
+  {
+   "fieldname": "recipient",
+   "label": "Recipient",
+   "fieldtype": "Link",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "schedule_date",
+   "label": "Task date",
+   "fieldtype": "Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "task_count",
+   "label": "Tasks",
+   "fieldtype": "Int",
+   "read_only": 1
+  },
+  {
+   "fieldname": "status",
+   "label": "Delivery status",
+   "fieldtype": "Select",
+   "options": "Reserved\nAccepted\nFailed\nUncertain",
+   "read_only": 1
+  },
+  {
+   "fieldname": "detail",
+   "label": "Delivery detail",
+   "fieldtype": "Small Text",
+   "read_only": 1
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 0,
+   "create": 0
+  }
+ ],
+ "track_changes": 1
+}

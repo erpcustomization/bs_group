@@ -762,3 +762,7 @@ _uae_attendance_hooks(globals())
 # Oman HR feature parity uses native local leave policy and existing access.
 from bsgroup.hr_oman import configure_hooks as _hr_oman_hooks
 _hr_oman_hooks(globals())
+
+# Disabled until the site's private Teams recipient route has been verified.
+from bsgroup.project_schedule import configure_hooks as _project_schedule_hooks
+_project_schedule_hooks(globals())
