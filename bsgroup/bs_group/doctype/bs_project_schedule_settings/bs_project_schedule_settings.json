@@ -15,7 +15,11 @@
   "oman_group_section",
   "oman_group_webhook",
   "oman_group_verified",
-  "oman_group_enabled"
+  "oman_group_enabled",
+  "uae_group_section",
+  "uae_group_webhook",
+  "uae_group_verified",
+  "uae_group_enabled"
  ],
  "fields": [
   {
@@ -71,6 +75,28 @@
   {
    "fieldname": "oman_group_enabled",
    "label": "Send Oman group summary daily at 6 PM",
+   "fieldtype": "Check",
+   "default": "0"
+  },
+  {
+   "fieldname": "uae_group_section",
+   "fieldtype": "Section Break",
+   "label": "Projects Team UAE group copy"
+  },
+  {
+   "fieldname": "uae_group_webhook",
+   "label": "Verified UAE group flow endpoint",
+   "fieldtype": "Password"
+  },
+  {
+   "fieldname": "uae_group_verified",
+   "label": "Projects Team UAE destination verified in Power Automate",
+   "fieldtype": "Check",
+   "default": "0"
+  },
+  {
+   "fieldname": "uae_group_enabled",
+   "label": "Send UAE group summary daily at 6 PM",
    "fieldtype": "Check",
    "default": "0"
   }

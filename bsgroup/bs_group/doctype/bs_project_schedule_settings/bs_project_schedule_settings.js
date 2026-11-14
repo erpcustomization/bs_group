@@ -1,9 +1,12 @@
 frappe.ui.form.on('BS Project Schedule Settings', {
     refresh(frm) {
-        if(frm.doc.oman_group_enabled && frm.doc.oman_group_verified) frm.add_custom_button(__('Send Oman Group Summary Now'), async () => {
+        for (const region of ['Oman','UAE']) {
+        const prefix=region.toLowerCase()+'_group';
+        if(frm.doc[prefix+'_enabled'] && frm.doc[prefix+'_verified']) frm.add_custom_button(__('Send {0} Group Summary Now',[region]), async () => {
             const {message:r}=await frappe.call({method:'bsgroup.project_schedule_group.send_now',type:'POST',freeze:true});
-            frappe.msgprint(__('Projects Team Oman: {0}. Task date: {1}. Check Power Automate for actual delivery.',[r.result,r.schedule_date]));
+            frappe.msgprint(__('{0}: {1}. Task date: {2}. Check Power Automate for actual delivery.',[r.destination,r.result,r.schedule_date]));
         });
+        }
         if(frappe.session.user==='mohan@bitssecureit.com') frm.add_custom_button(__('Send Private Test to Mohan'), async () => {
             const {message:r}=await frappe.call({method:'bsgroup.project_schedule.test_delivery',type:'POST',freeze:true});
             frappe.msgprint(__('First attempt: {0}. Repeated attempt: {1}. Check Power Automate run history for actual delivery.',[r.first,r.repeated]));

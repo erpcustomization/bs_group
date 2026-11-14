@@ -15,7 +15,7 @@ class GroupTests(unittest.TestCase):
         self.f.db=types.SimpleNamespace(exists=Mock(return_value=False),commit=Mock(),rollback=Mock(),set_value=Mock())
         self.f.DuplicateEntryError=type('DuplicateEntryError',(Exception,),{})
         self.log=Mock(); self.f.get_doc=Mock(return_value=self.log)
-        self.hr=types.ModuleType('bsgroup.hr_email');self.hr.is_oman=Mock(return_value=True)
+        self.hr=types.ModuleType('bsgroup.hr_email');self.hr.site_profile=Mock(return_value={'region':'Oman'})
         self.scheduler=types.ModuleType('bsgroup.project_schedule')
         self.scheduler.DELIVERY='Delivery';self.scheduler.identity=lambda site,user,day:f'{site}:{user}:{day}'
         self.scheduler.validate_endpoint=Mock()
@@ -62,13 +62,37 @@ class GroupTests(unittest.TestCase):
         self.assertEqual(self.f.get_doc.call_args.args[0]['task_count'],2)
         self.assertNotIn('recipient',self.f.get_doc.call_args.args[0])
 
-    def test_disabled_uae_and_empty_do_not_send(self):
-        self.hr.is_oman.return_value=False
+    def test_unknown_site_disabled_and_empty_do_not_send(self):
+        self.hr.site_profile.return_value=None
         self.m.dispatch(self.settings,self.day,self.people)
-        self.hr.is_oman.return_value=True;self.settings.get.return_value=0
+        self.hr.site_profile.return_value={'region':'Oman'};self.settings.get.return_value=0
         self.m.dispatch(self.settings,self.day,self.people)
         self.settings.get.return_value=1
         self.assertEqual(self.m.dispatch(self.settings,self.day,[]),'No eligible tasks')
+        self.requests.post.assert_not_called()
+
+    def test_uae_uses_only_uae_endpoint_and_identity(self):
+        self.hr.site_profile.return_value={'region':'UAE'}
+        self.f.local.site='uae'
+        self.assertEqual(self.m.dispatch(self.settings,self.day,self.people),'Accepted')
+        self.settings.get_password.assert_called_once_with('uae_group_webhook')
+        payload=self.requests.post.call_args.kwargs['json']
+        self.assertEqual(payload['allocated_to'],'Projects Team UAE')
+        self.assertTrue(payload['idempotency_key'].startswith('GROUP:uae:'))
+        self.assertIn('— UAE',payload['message'])
+
+    def test_holiday_for_everyone_never_reserves_or_posts_on_either_site(self):
+        for region in ('Oman','UAE'):
+            self.hr.site_profile.return_value={'region':region}
+            for person in self.people: person['reason']='Holiday / weekly day off'
+            self.assertEqual(self.m.dispatch(self.settings,self.day,self.people),'No eligible tasks')
+        self.requests.post.assert_not_called()
+        self.log.insert.assert_not_called()
+
+    def test_oman_switch_cannot_enable_uae_group(self):
+        self.hr.site_profile.return_value={'region':'UAE'}
+        self.settings.get.side_effect=lambda key: key.startswith('oman_')
+        self.assertEqual(self.m.dispatch(self.settings,self.day,self.people),'Group delivery disabled')
         self.requests.post.assert_not_called()
 
     def test_uncertain_not_blindly_retried(self):
