@@ -115,6 +115,10 @@ def _dated_value(original, value):
 
 
 def _eligible(user, project, task):
+    if project.company == 'Bits Secure IT Infrastructure LLC - OM':
+        from bsgroup.oman_assigned_project_access import applies, employee_users
+        if applies(project):
+            return user in employee_users()
     account = frappe.db.get_value("User", user, ["enabled", "user_type"], as_dict=True)
     return bool(account and account.enabled and account.user_type == "System User"
                 and frappe.has_permission("Project", "read", doc=project, user=user)
@@ -252,6 +256,11 @@ def assignment_choices(project, task):
     item.check_permission("write")
     if item.project != doc.name:
         frappe.throw(_("The task must belong to this project."), frappe.PermissionError)
+    if doc.company == 'Bits Secure IT Infrastructure LLC - OM':
+        from bsgroup.oman_assigned_project_access import applies, employee_users
+        if applies(doc):
+            return [dict(value=user, label=name, description=user)
+                    for user, name in sorted(employee_users().items(), key=lambda entry: entry[1].lower())]
     users = frappe.get_all("User", filters={"enabled": 1, "user_type": "System User"},
                            fields=["name", "full_name"], order_by="full_name asc")
     return [dict(value=u.name, label=u.full_name or u.name, description=u.name)
@@ -325,7 +334,7 @@ def save_task(project, task, subject, description, start_date, end_date, assigne
             frappe.throw(_("End Date cannot be before Start Date."))
         for user in set(selected) - set(current):
             if not _eligible(user, doc, item):
-                frappe.throw(_("Choose an active user who already has access to this project and task."), frappe.PermissionError)
+                frappe.throw(_("Choose an eligible active employee from the assignment list."), frappe.PermissionError)
         item.subject = title
         item.description = description or ""
         item.exp_start_date = _dated_value(item.exp_start_date, start)

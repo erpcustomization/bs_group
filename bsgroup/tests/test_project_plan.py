@@ -47,6 +47,22 @@ class ProjectPlanTests(unittest.TestCase):
 
     def tearDown(self):self.patch.stop()
 
+    def test_oman_picker_and_save_allow_employee_before_task_access(self):
+        access=types.ModuleType('bsgroup.oman_assigned_project_access')
+        access.applies=Mock(return_value=True)
+        access.employee_users=Mock(return_value={'employee@example.com':'Employee'})
+        self.project.company='Bits Secure IT Infrastructure LLC - OM'
+        self.f.has_permission.return_value=False
+        with patch.dict(sys.modules,{'bsgroup.oman_assigned_project_access':access}):
+            self.assertEqual(self.plan.assignment_choices('P-A','TASK-A'),[
+                dict(value='employee@example.com',label='Employee',description='employee@example.com')])
+            self.assertTrue(self.plan._eligible('employee@example.com',self.project,self.task))
+            self.assertFalse(self.plan._eligible('outsider@example.com',self.project,self.task))
+            self.save(assigned_to=['employee@example.com'])
+            self.assign.add.assert_called_once()
+            self.project.check_permission.assert_called_with('write')
+            self.task.check_permission.assert_called_with('write')
+
     def save(self,**kw):
         args=dict(project='P-A',task='TASK-A',subject='Updated',description='Revised',start_date='2026-11-11',end_date='2026-11-12',
                   assigned_to=[],expected_modified=self.task.modified,expected_assignees=[])

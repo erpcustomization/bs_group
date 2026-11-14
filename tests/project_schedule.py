@@ -111,7 +111,8 @@ class ScheduleTests(unittest.TestCase):
         self.f.get_meta=Mock(return_value=R(has_field=lambda f:True))
         self.f.clear_cache=Mock()
         self.f.db.get_value.return_value=1
-        self.f.get_all.return_value=[R(share_doctype='Project',share_name='OLD')]
+        self.f.get_all.side_effect=lambda *a,**kw: [] if kw.get('pluck') else [R(share_doctype='Project',share_name='OLD')]
+        module.employee_users=Mock(return_value={u:u for u in module.USERS})
         module.desired=Mock(return_value={('Task','T1'),('Project','P1')})
         with patch.dict(sys.modules,{'bsgroup.hr_email':hr,'frappe.share':share}):
             module.sync()
@@ -127,6 +128,14 @@ class ScheduleTests(unittest.TestCase):
             hr.is_oman.return_value=False
             module.sync()
             share.add_docshare.assert_not_called();share.remove.assert_not_called()
+
+    def test_oman_employee_choices_exclude_disabled_portal_and_unlinked_accounts(self):
+        spec=importlib.util.spec_from_file_location('assigned_access',Path(__file__).resolve().parents[1]/'bsgroup/oman_assigned_project_access.py')
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        self.f.get_all.return_value=[R(user_id=u,employee_name=u) for u in ('active','disabled','portal','')]
+        self.f.db.get_value.side_effect=lambda dt,user,*a,**kw:R(enabled=user!='disabled',user_type='Website User' if user=='portal' else 'System User')
+        self.assertEqual(module.employee_users(),{'active':'active'})
+        self.assertEqual(self.f.get_all.call_args.kwargs['filters'],{'company':module.COMPANY,'status':'Active'})
 
     def test_holiday_tomorrow_no_tasks_or_send(self):
         self.p.employees.return_value=[R(name='E1',employee_name='One',user_id='one@example.com')]

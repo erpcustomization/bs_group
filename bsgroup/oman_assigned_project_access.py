@@ -1,8 +1,28 @@
-"""Read-only document sharing for the two explicitly authorised Oman users."""
+"""Oman employee assignment eligibility and assignment-scoped read access."""
 import frappe
 
 USERS = ('amar@bitssecureit.com', 'nowfal@bitssecureit.com')
 FLAG = 'custom_bs_assigned_project_access'
+COMPANY = 'Bits Secure IT Infrastructure LLC - OM'
+
+
+def employee_users():
+    """Only active Oman employees with enabled desk accounts may be assigned."""
+    employees = frappe.get_all('Employee', filters={'company': COMPANY, 'status': 'Active'},
+        fields=['user_id', 'employee_name'])
+    result = {}
+    for employee in employees:
+        if not employee.user_id:
+            continue
+        account = frappe.db.get_value('User', employee.user_id, ['enabled', 'user_type'], as_dict=True)
+        if account and account.enabled and account.user_type == 'System User':
+            result[employee.user_id] = employee.employee_name or employee.user_id
+    return result
+
+
+def applies(project):
+    from bsgroup.hr_email import is_oman
+    return project.company == COMPANY and is_oman()
 
 
 def desired(user):
@@ -26,8 +46,10 @@ def sync(doc=None, method=None):
     if not is_oman() or not frappe.get_meta('DocShare').has_field(FLAG):
         return
     from frappe.share import add_docshare as add, remove
-    for user in USERS:
-        wanted = desired(user) if frappe.db.get_value('User', user, 'enabled') else set()
+    eligible = employee_users()
+    managed = frappe.get_all('DocShare', filters={FLAG: 1}, pluck='user')
+    for user in set(eligible) | set(managed) | set(USERS):
+        wanted = desired(user) if user in eligible else set()
         for share in frappe.get_all('DocShare', filters={'user': user, FLAG: 1},
                 fields=['share_doctype', 'share_name']):
             if (share.share_doctype, share.share_name) not in wanted:
