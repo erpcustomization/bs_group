@@ -3464,7 +3464,7 @@ function dcs_buttons(frm, s3, s4, s5) {
 			dcs_run(frm, 'dcs_record_award', { dcs: frm.doc.name, award_reference: v.award_reference, evidence_type: v.evidence_type, notes: v.notes }, d);
 		});
 	};
-	if (auth.can_record_award && lv.authorised_position === 1 && st.customer_award !== 'Awarded') { add('Record Award', function () { record_award(); }, W); }
+	// Customer awards are entered through Quotation; omit the DCS Record Award action.
 	if (st.customer_award === 'Awarded' && auth.can_override) {
 		add('Reverse Award', function () {
 			dcs_dialog(frm, 'Reverse Award', [

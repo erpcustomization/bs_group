@@ -1,6 +1,23 @@
 /* BS Commercial Studio — scoped to DCS and Quotation forms; never customer PDFs.
    Native grids, validation, tabs, actions and permission-driven visibility remain intact. */
 @media screen {
+    /* Consistent blue field surfaces, including submitted DCS read-only values. */
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-section .frappe-control :is(.form-control, .like-disabled-input) {
+        background-color: #f0f5ff !important; border: 1px solid #ccdaf1 !important;
+        border-radius: 8px !important; color: #1c3f70 !important;
+    }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-section .frappe-control .like-disabled-input {
+        background-color: #eaf0f9 !important; padding: 8px 11px; min-height: 38px;
+    }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-section .frappe-control .form-control:focus {
+        background-color: #fff !important; border-color: #3676dc !important;
+    }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-section .frappe-control .control-label {
+        color: #244e88 !important; font-weight: 600 !important;
+    }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-section .section-head {
+        background: #edf3fc; border-left: 3px solid #3676dc; padding: 9px 12px; border-radius: 6px;
+    }
     .bs-commercial-studio .bs-commercial-routine-banner { display: none !important; }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio :is(.section-head, .dcs-panel-title, .grid-heading-row, .form-tabs .nav-link) { font-weight: 700 !important; }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio {
