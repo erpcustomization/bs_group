@@ -142,6 +142,8 @@ def show_lead_intake_navigation():
 
 
 def boot_session(bootinfo):
+    from bsgroup.app_navigation import destinations
+    bootinfo.bs_app_destinations = destinations()
     from bsgroup.work_dashboard import screens
     from bsgroup.hr_management import can_manage
     bootinfo.bs_hr_management = can_manage()
@@ -150,7 +152,7 @@ def boot_session(bootinfo):
             for name, sidebar in (bootinfo.get(key) or {}).items():
                 if isinstance(sidebar, dict) and (name.lower().replace("-", " ") == "bs hr" or sidebar.get("title") == "BS HR"):
                     sidebar["items"] = []
-    bootinfo.bs_work_dashboard = bool(screens())
+    bootinfo.bs_work_dashboard = frappe.session.user != "Guest"
     mode = scope()
     if not mode:
         return

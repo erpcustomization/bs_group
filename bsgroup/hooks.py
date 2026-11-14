@@ -707,6 +707,7 @@ doc_events["Presales Request"]["validate"].append("bsgroup.presales_duration.val
 doc_events["Presales Request"]["before_submit"] = "bsgroup.presales_duration.validate"
 
 boot_session = "bsgroup.scoped_sales_access.boot_session"
+on_session_creation = "bsgroup.app_navigation.on_session_creation"
 for _dt, _query in {"Lead": "lead_query", "Opportunity": "opportunity_query",
                    "Presales Request": "presales_query", "Deal Cost Sheet": "dcs_query",
                    "Quotation": "quotation_query", "Site Survey Request": "survey_query"}.items():

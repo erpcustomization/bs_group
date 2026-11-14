@@ -29,6 +29,7 @@ def navigation_script():
     style += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'css', 'bs_sales_theme.css')).read_text()
     style += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'css', 'project_layout.css')).read_text()
     content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'navigation_recovery.js')).read_text()
+    content += '\n' + Path(frappe.get_app_path('bsgroup', 'public', 'js', 'app_navigation.js')).read_text()
     content += '\n(() => { const s=document.createElement("style"); s.id="bs-portal-theme"; s.textContent=' + json.dumps(style) + '; document.getElementById(s.id)?.remove(); document.head.append(s); document.body.classList.add("bs-premium"); })();'
     frappe.local.response.update(type='download', filename='scoped_sales_access.js',
                                  filecontent=content, content_type='application/javascript',

@@ -1,7 +1,8 @@
 // Intake coordinators hand over one Lead to one eligible salesperson.
 frappe.ui.form.on('Lead', {
     refresh(frm) {
-        const hideAssignment = ['erp-om.bitssecureit.com', 'erp-om.k.frappe.cloud']
+        const hideAssignment = ['erp-om.bitssecureit.com', 'erp-om.k.frappe.cloud',
+            'erp.bitssecureit.com', 'erp-bitssecureit.u.frappe.cloud']
             .includes(window.location.hostname);
         if (hideAssignment) frm.remove_custom_button(__('Assign salesperson'));
         // Realtime doc_update can arrive before the transfer response. Its delayed
