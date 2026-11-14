@@ -12,7 +12,7 @@ frappe.ui.form.on('BS Project Schedule Settings', {
             const {message: rows} = await frappe.call({method:'bsgroup.project_schedule.preview',freeze:true});
             const e = value => frappe.utils.escape_html(String(value || ''));
             const html = '<p>Read-only preview. No schedules or Teams messages are created.</p><div class="table-responsive"><table class="table table-bordered"><thead><tr><th>Employee</th><th>Shift</th><th>Tasks</th><th>Result</th></tr></thead><tbody>' + (rows || []).map(row=>
-                `<tr><td>${e(row.employee_name)}<br>${e(row.user)}</td><td>${e(row.shift)}</td><td>${row.rows.length}</td><td>${e(row.reason || (row.rows.length ? 'Eligible' : 'No active assigned tasks with a start date'))}</td></tr>`
+                `<tr><td>${e(row.employee_name)}<br>${e(row.user)}</td><td>${e(row.shift)}</td><td>${row.rows.length}</td><td>${e(row.reason || 'Eligible')}${row.rows.length ? '<ul>'+row.rows.map(t=>'<li>'+e(t.task)+' — '+e(t.task_title)+'</li>').join('')+'</ul>' : ''}${row.excluded?.length ? '<details><summary>Excluded tasks ('+row.excluded.length+')</summary><ul>'+row.excluded.map(t=>'<li>'+e(t.task)+' — '+e(t.title)+': '+e(t.reason)+'</li>').join('')+'</ul></details>' : ''}</td></tr>`
             ).join('') + '</tbody></table></div>';
             const dialog = new frappe.ui.Dialog({title:__('Tomorrow’s Project Schedule'),size:'extra-large',fields:[{fieldname:'preview',fieldtype:'HTML'}]});
             dialog.fields_dict.preview.$wrapper.html(html);dialog.show();

@@ -46,19 +46,28 @@ def calendar_plan(employee, day):
     return result
 
 
-def task_rows(user, day, company):
+def task_rows(user, day, company, excluded=None):
     assignments = frappe.get_all('ToDo', filters={'reference_type': 'Task',
         'allocated_to': user, 'status': 'Open'}, fields=['reference_name'])
     result = []
     for name in sorted({a.reference_name for a in assignments if a.reference_name}):
         task = frappe.get_doc('Task', name)
-        if not task.project or not eligible_task(task, day):
+        reason = ('No linked project' if not task.project else
+            'Task completed / closed / cancelled / template' if task.status in TERMINAL or task.get('is_template') else
+            'Missing start date' if not task.exp_start_date else
+            'Start date is after the schedule date' if getdate(task.exp_start_date) > day else '')
+        if reason:
+            if excluded is not None:
+                excluded.append(dict(task=name, title=task.subject, reason=reason))
             continue
         project = frappe.get_doc('Project', task.project)
-        if project.company != company or project.status in TERMINAL:
-            continue
-        if not (frappe.has_permission('Project', 'read', doc=project, user=user)
-                and frappe.has_permission('Task', 'read', doc=task, user=user)):
+        reason = ('Project company does not match employee company' if project.company != company else
+            'Project completed / closed / cancelled' if project.status in TERMINAL else
+            'Missing Project read access' if not frappe.has_permission('Project', 'read', doc=project, user=user) else
+            'Missing Task read access' if not frappe.has_permission('Task', 'read', doc=task, user=user) else '')
+        if reason:
+            if excluded is not None:
+                excluded.append(dict(task=name, title=task.subject, reason=reason))
             continue
         result.append(dict(date=str(day), category='Project', category_doctype='Project',
             category_name=project.name, project=project.name, task=task.name,
@@ -77,9 +86,13 @@ def candidates(day, settings, sent_day=None):
             today = calendar_plan(employee, sent_day)
             if today['reason']:
                 plan['reason'] = 'No evening send: ' + today['reason']
-        rows = task_rows(employee.user_id, day, employee.company) if not plan['reason'] else []
+        excluded = []
+        rows = task_rows(employee.user_id, day, employee.company, excluded) if not plan['reason'] else []
+        reason = plan['reason']
+        if not reason and not rows:
+            reason = '; '.join(sorted({r['reason'] for r in excluded})) or 'No open task assignments'
         result.append(dict(employee=employee.name, employee_name=employee.employee_name,
-            user=employee.user_id, shift=plan['shift'], reason=plan['reason'], rows=rows))
+            user=employee.user_id, shift=plan['shift'], reason=reason, rows=rows, excluded=excluded))
     return result
 
 

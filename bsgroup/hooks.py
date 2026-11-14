@@ -766,3 +766,5 @@ _hr_oman_hooks(globals())
 # Disabled until the site's private Teams recipient route has been verified.
 from bsgroup.project_schedule import configure_hooks as _project_schedule_hooks
 _project_schedule_hooks(globals())
+from bsgroup.oman_assigned_project_access import configure_hooks as _oman_assigned_access_hooks
+_oman_assigned_access_hooks(globals())

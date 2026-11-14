@@ -73,6 +73,61 @@ class ScheduleTests(unittest.TestCase):
         self.p.plan.return_value={'reason':'Approved on-duty / work-from-home arrangement'}
         self.assertEqual(self.m.calendar_plan(R(),self.day)['reason'],'')
 
+    def test_preview_distinguishes_access_from_dates(self):
+        self.f.get_all.return_value = [R(reference_name='T1')]
+        task=R(name='T1',project='P1',status='Open',exp_start_date='2026-11-01',subject='Work')
+        project=R(name='P1',project_name='Project',company='OM',status='Open')
+        self.f.get_doc.side_effect=lambda dt,name: task if dt=='Task' else project
+        for start, access, expected in [(None, True, 'Missing start date'),
+                ('2026-11-01', False, 'Missing Project read access'),
+                ('2026-11-20', True, 'Start date is after the schedule date')]:
+            task.exp_start_date=start
+            self.f.has_permission.return_value=access
+            excluded=[]
+            self.assertEqual(self.m.task_rows('one',self.day,'OM',excluded),[])
+            self.assertEqual(excluded[0]['reason'],expected)
+
+    def test_scoped_access_only_assigned_active_oman_documents(self):
+        spec=importlib.util.spec_from_file_location('assigned_access',Path(__file__).resolve().parents[1]/'bsgroup/oman_assigned_project_access.py')
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        self.assertEqual(module.USERS,('amar@bitssecureit.com','nowfal@bitssecureit.com'))
+        self.f.get_all.return_value=[R(reference_name=x) for x in ('T1','T2','T3','T4')]
+        tasks={'T1':R(name='T1',project='P1',status='Open'),
+            'T2':R(name='T2',project='P1',status='Completed'),
+            'T3':R(name='T3',project='P2',status='Open'),
+            'T4':R(name='T4',project='P3',status='Open')}
+        projects={'P1':R(company='Bits Secure IT Infrastructure LLC - OM',status='Open'),
+            'P2':R(company='Other',status='Open'),
+            'P3':R(company='Bits Secure IT Infrastructure LLC - OM',status='Completed')}
+        self.f.db.get_value.side_effect=lambda dt,name,*a,**kw:(tasks if dt=='Task' else projects)[name]
+        self.assertEqual(module.desired('amar@bitssecureit.com'),{('Task','T1'),('Project','P1')})
+        self.assertEqual(self.f.get_all.call_args.kwargs['filters']['allocated_to'],'amar@bitssecureit.com')
+
+    def test_scoped_shares_are_read_only_and_revoke_only_managed_records(self):
+        spec=importlib.util.spec_from_file_location('assigned_access',Path(__file__).resolve().parents[1]/'bsgroup/oman_assigned_project_access.py')
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        hr=types.ModuleType('bsgroup.hr_email');hr.is_oman=Mock(return_value=True)
+        share=types.ModuleType('frappe.share');share.add_docshare=Mock();share.remove=Mock()
+        self.f.get_meta=Mock(return_value=R(has_field=lambda f:True))
+        self.f.clear_cache=Mock()
+        self.f.db.get_value.return_value=1
+        self.f.get_all.return_value=[R(share_doctype='Project',share_name='OLD')]
+        module.desired=Mock(return_value={('Task','T1'),('Project','P1')})
+        with patch.dict(sys.modules,{'bsgroup.hr_email':hr,'frappe.share':share}):
+            module.sync()
+            self.assertEqual(share.add_docshare.call_count,4)
+            for call in share.add_docshare.call_args_list:
+                self.assertIn(call.kwargs['user'],module.USERS)
+                self.assertEqual((call.kwargs['read'],call.kwargs['write'],call.kwargs['share']),(1,0,0))
+                self.assertEqual(call.kwargs['notify'],0)
+            self.assertEqual(share.remove.call_count,2)
+            for call in self.f.get_all.call_args_list:
+                self.assertEqual(call.kwargs['filters'][module.FLAG],1)
+            share.add_docshare.reset_mock();share.remove.reset_mock()
+            hr.is_oman.return_value=False
+            module.sync()
+            share.add_docshare.assert_not_called();share.remove.assert_not_called()
+
     def test_holiday_tomorrow_no_tasks_or_send(self):
         self.p.employees.return_value=[R(name='E1',employee_name='One',user_id='one@example.com')]
         self.p.plan.return_value={'reason':'Holiday / weekly day off','shift':'General'}
