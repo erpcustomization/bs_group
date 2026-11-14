@@ -107,6 +107,16 @@
             };
             grid._bs_description_refresh=true;
         }
+        // Frappe can rebuild headings after its debounced refresh has returned.
+        // Restore only missing controls, avoiding an observer/render loop.
+        if(!grid._bs_description_observer && grid.wrapper?.[0] && typeof MutationObserver!=='undefined') {
+            grid._bs_description_observer=new MutationObserver(()=>{
+                if(frm.__oman_client_descriptions &&
+                    grid.wrapper.find('.grid-heading-row [data-fieldname="custom_oman_use_costing_description"]').length &&
+                    grid.wrapper.find('.bs-description-select-all').length!==2) descriptionHeaders(frm);
+            });
+            grid._bs_description_observer.observe(grid.wrapper[0],{childList:true,subtree:true});
+        }
         grid.reset_grid();
         descriptionHeaders(frm);
     }
