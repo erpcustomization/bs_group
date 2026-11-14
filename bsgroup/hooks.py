@@ -262,6 +262,7 @@ app_include_css = [
     "/assets/bsgroup/css/sidebar.css",
     "/assets/bsgroup/css/labor_preapproval.css",
     "/assets/bsgroup/css/bs_sales_theme.css?v=20261111-project-visuals",
+    "/assets/bsgroup/css/commercial_studio.css?v=20261114-studio",
     # "/assets/bsgroup/css/bs_welcome_banner.css",
 ]
 
@@ -768,3 +769,8 @@ from bsgroup.project_schedule import configure_hooks as _project_schedule_hooks
 _project_schedule_hooks(globals())
 from bsgroup.oman_assigned_project_access import configure_hooks as _oman_assigned_access_hooks
 _oman_assigned_access_hooks(globals())
+
+# Presentation layer only, shared by the two commercial document forms.
+for _commercial_dt in ("Quotation", "Deal Cost Sheet"):
+    _prior = doctype_js.get(_commercial_dt, [])
+    doctype_js[_commercial_dt] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["public/js/commercial_studio.js"]
