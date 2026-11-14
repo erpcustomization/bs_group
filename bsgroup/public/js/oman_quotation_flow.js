@@ -33,7 +33,7 @@
     }
     function installationButton(frm, data) {
         if (data.can_install) frm.add_custom_button(__('Enable {0}',[data.workflow_label || 'Oman Quotation Pilot']), () => install(frm), __('Workflow setup'));
-        if(data.can_install_descriptions) frm.add_custom_button(__('Enable CO Item Descriptions'),async()=>{
+        if(data.can_install_descriptions) frm.add_custom_button(__('Enable Custom Descriptions'),async()=>{
             const result=(await frappe.call({method:'bsgroup.oman_item_description.install',freeze:true})).message;
             if(result?.enabled) window.location.reload();
         },__('Pilot setup'));
@@ -46,7 +46,7 @@
         const rows=frm.doc.items || [];
         for(const [field,costing,label] of [
             ['custom_oman_use_costing_description',true,'Use costing descriptions for all items'],
-            ['custom_oman_use_co_description',false,'Use CO descriptions for all items']
+            ['custom_oman_use_co_description',false,'Use custom descriptions for all items']
         ]) {
             const cell=grid.wrapper.find('.grid-heading-row [data-fieldname="'+field+'"]');
             if(!cell.length) continue;
@@ -78,6 +78,8 @@
         if(active) for(const row of frm.doc.items || []) {
             row.custom_oman_use_co_description=Number(row.custom_oman_use_costing_description)?0:1;
         }
+        grid.update_docfield_property('custom_oman_client_description','label',__('Custom Description'));
+        grid.update_docfield_property('custom_oman_use_co_description','label',__('Use Custom Description'));
         const description=grid.fields_map.description;
         grid._oman_original_description ||= {label:description.label,read_only:description.read_only};
         grid.update_docfield_property('description','label',active?__('Item Description (Costing)'):grid._oman_original_description.label);
@@ -181,7 +183,7 @@
         frm.$wrapper?.find('.form-message').filter(function(){
             return this.textContent.trim()===__('Submit this document to confirm');
         }).remove();
-        frm.set_intro(__('Save changes, then use Convert to PDF. CO Description is optional; costing wording is the default. After customer acceptance, Change Status → Won submits the quotation and sends it to Procurement.'),'blue');
+        frm.set_intro(__('Save changes, then use Convert to PDF. Custom Description is optional; costing wording is the default. After customer acceptance, Change Status → Won submits the quotation and sends it to Procurement.'),'blue');
     }
     function projectFields(data) {
         if (!data.project_required) return [];
@@ -203,7 +205,7 @@
         const data=won ? await call('won_context',{quotation:frm.doc.name}) : {};
         let dialog;
         const fields=[
-            {fieldtype:'HTML',options:won ? '<p>'+__('Won will submit the quotation, record the approved award and create one draft Purchase Requisition with the DCS, quotation and customer PO. Existing purchasing approval remains required.')+'</p>' : ''},
+            ...(won ? [{fieldtype:'HTML',options: '<p>'+__('Won will submit the quotation, record the approved award and create one draft Purchase Requisition with the DCS, quotation and customer PO. Existing purchasing approval remains required.')+'</p>'}] : []),
             ...(won ? [
                 {fieldtype:'Data',fieldname:'customer_po_reference',label:__('Customer PO Reference'),reqd:1,default:frm.doc.custom_customer_po_reference},
                 {fieldtype:'Data',fieldname:'customer_po',label:__('Attached Customer PO'),read_only:1,reqd:1,default:frm.doc.custom_customer_po},
@@ -280,7 +282,7 @@
             frm.remove_custom_button(__('Send to Procurement'));
             frm.remove_custom_button(__('Set as Lost'));
             frm.set_intro(__('Quotation revision R{0}. DCS revisions update this same quotation. Won and Lost are locked.',[data.revision]),'blue');
-            if(data.client_descriptions) frm.set_intro(__('Choose one description per line: Use Item Description (Costing) prints the original costing wording, including any part numbers. Use CO Item Description prints your editable client wording. Choices and CO wording are retained during costing revisions.'),'blue');
+            if(data.client_descriptions) frm.set_intro(__('Choose one description per line: Use Item Description (Costing) prints the original costing wording, including any part numbers. Use Custom Description prints your editable client wording. Choices and custom wording are retained during costing revisions.'),'blue');
             workflowInstructions(frm,data);
             frm.dashboard.set_headline(__('Quotation Status: {0} · R{1}',[frappe.utils.escape_html(frm.doc.custom_pipeline_stage || 'Draft'),data.revision]));
             if(data.editable && data.can_write){
@@ -293,10 +295,12 @@
                         values=>statusDetails(frm,values.stage),__('Change quotation status'),__('Continue'));
                 });
                 statusButton?.addClass('bs-quotation-status');
+                statusButton?.attr('data-quotation-status',frm.doc.custom_pipeline_stage || 'Draft');
                 statusButton?.attr('title',__('Change quotation status'));
             } else if(data.can_write && ['Won','Lost'].includes(frm.doc.custom_pipeline_stage)) {
                 const statusButton=frm.add_custom_button(__(frm.doc.custom_pipeline_stage),()=>{});
                 statusButton?.addClass('bs-quotation-status');
+                statusButton?.attr('data-quotation-status',frm.doc.custom_pipeline_stage || 'Draft');
                 statusButton?.prop('disabled',true);
             }
             if(!frm.is_dirty() && data.can_print && (data.ready_to_convert || data.save_feedback)) frm.add_custom_button(__('Convert to PDF'),()=>pdf(frm));

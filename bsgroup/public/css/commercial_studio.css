@@ -179,3 +179,16 @@
     }
 }
 @media print { .bs-commercial-hero { display: none !important; } }
+
+@media screen {
+.bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .bs-quotation-status[data-quotation-status="Quote sent"] { background:#235dcc !important; border-color:#235dcc !important; color:#fff !important; }
+.bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .bs-quotation-status[data-quotation-status="Sent"] { background:#235dcc !important; border-color:#235dcc !important; color:#fff !important; }
+.bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .bs-quotation-status[data-quotation-status="Under negotiation"] { background:#a65412 !important; border-color:#a65412 !important; color:#fff !important; }
+.bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .bs-quotation-status[data-quotation-status="Under approval"] { background:#7550a5 !important; border-color:#7550a5 !important; color:#fff !important; }
+.bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .bs-quotation-status[data-quotation-status="Approved"] { background:#087e8b !important; border-color:#087e8b !important; color:#fff !important; }
+.bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .bs-quotation-status[data-quotation-status="Awaiting PO"] { background:#8c6b05 !important; border-color:#8c6b05 !important; color:#fff !important; }
+.bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .bs-quotation-status[data-quotation-status="Follow-up"] { background:#4757ad !important; border-color:#4757ad !important; color:#fff !important; }
+.bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .bs-quotation-status[data-quotation-status="Lost"] { background:#bb3747 !important; border-color:#bb3747 !important; color:#fff !important; }
+.bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .bs-quotation-status[data-quotation-status="Expired"] { background:#64748b !important; border-color:#64748b !important; color:#fff !important; }
+.bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .bs-quotation-status[data-quotation-status="Won"] { background:#19724e !important; border-color:#19724e !important; color:#fff !important; }
+}

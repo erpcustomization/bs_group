@@ -60,7 +60,7 @@ def missing_rows(q):
 def require_client_wording(q):
     missing = missing_rows(q)
     if missing:
-        frappe.throw("Enter the selected Item Description or CO Item Description for quotation line(s) "
+        frappe.throw("Enter the selected Item Description or Custom Description for quotation line(s) "
             + ", ".join(map(str, missing))
             + ". Only the selected wording is printed; CO wording never falls back to costing text.")
 
@@ -239,13 +239,13 @@ def install():
             dict(fieldname=COSTING, label="Use Item Description (Costing)", fieldtype="Check",
                 insert_after="item_name", default="1", print_hide=1,
                 description="Print the original costing description on this line, including any part numbers it contains."),
-            dict(fieldname=CO, label="Use CO Item Description", fieldtype="Check",
+            dict(fieldname=CO, label="Use Custom Description", fieldtype="Check",
                 insert_after=COSTING, default="0", print_hide=1,
-                description="Print the editable CO wording instead. Select one description per line."),
-            dict(fieldname=FIELD, label="CO Item Description", fieldtype="Text Editor",
+                description="Print the editable custom wording instead. Select one description per line."),
+            dict(fieldname=FIELD, label="Custom Description", fieldtype="Text Editor",
                 insert_after="description", in_list_view=1, columns=3,
                 read_only_depends_on="eval:doc.custom_oman_use_costing_description == 1",
-                description="Printed only when Use CO Item Description is selected. Your wording is retained when you switch choices."),
+                description="Printed only when Use Custom Description is selected. Your wording is retained when you switch choices."),
             dict(fieldname=SOURCE, label="Oman costing source row", fieldtype="Data",
                 hidden=1, read_only=1, print_hide=1, no_copy=1),
         ]})

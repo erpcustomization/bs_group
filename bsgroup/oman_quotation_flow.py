@@ -481,6 +481,12 @@ def sync_status_options():
     field = frappe.get_meta("Quotation").get_field("custom_pipeline_stage")
     if not field:
         return
+    from frappe.custom.doctype.property_setter.property_setter import make_property_setter
+    for fieldname, label in (("custom_oman_client_description", "Custom Description"),
+                             ("custom_oman_use_co_description", "Use Custom Description")):
+        if frappe.get_meta("Quotation Item").get_field(fieldname):
+            make_property_setter("Quotation Item", fieldname, "label", label, "Data")
+    frappe.clear_cache(doctype="Quotation Item")
     options = (field.options or "").splitlines()
     missing = [stage for stage in STATUS_CHOICES if stage not in options]
     if missing:
