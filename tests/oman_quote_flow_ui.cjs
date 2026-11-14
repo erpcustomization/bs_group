@@ -1,12 +1,12 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),path=require('path');
 const root=path.resolve(__dirname,'..');
-async function form(data,{dirty=false,doctype='Quotation',fresh=false,withGrid=false}={}){
+async function form(data,{dirty=false,doctype='Quotation',fresh=false,withGrid=false,stage='Draft'}={}){
  data={ready_to_convert:true,...data};
- const handlers={},calls=[],buttons=new Map(),primary=[];
- const frappe={ui:{form:{on(dt,h){handlers[dt]=h}}},call:async opts=>{calls.push(opts);return{message:data}},utils:{escape_html:s=>s},msgprint:()=>{},set_route:()=>{}};
+ const handlers={},calls=[],buttons=new Map(),primary=[],prompts=[],dialogs=[];
+ const frappe={ui:{form:{on(dt,h){handlers[dt]=h}},Dialog:class{constructor(config){dialogs.push(config)}show(){}}},prompt:(fields,callback)=>prompts.push({fields,callback}),call:async opts=>{calls.push(opts);return{message:data}},utils:{escape_html:s=>s},msgprint:()=>{},set_route:()=>{}};
  vm.runInNewContext(fs.readFileSync(path.join(root,'bsgroup/public/js/oman_quotation_flow.js'),'utf8'),{frappe,__:s=>s,window:{location:{reload(){}}}});
- const frm={doc:{name:'Q1',modified:'M1',custom_deal_cost_sheet:'DCS1',custom_pipeline_stage:'Delayed',items:[{}, {custom_oman_use_costing_description:1}],docstatus:doctype==='Quotation'?0:1},is_new:()=>fresh,is_dirty:()=>dirty,
-  add_custom_button:(label,fn)=>buttons.set(label,fn),remove_custom_button:label=>calls.push(['remove',label]),set_df_property:()=>{},set_intro:()=>{},dashboard:{set_headline:()=>{}},
+ const frm={doc:{name:'Q1',modified:'M1',custom_deal_cost_sheet:'DCS1',custom_pipeline_stage:stage,items:[{}, {custom_oman_use_costing_description:1}],docstatus:doctype==='Quotation'?0:1},is_new:()=>fresh,is_dirty:()=>dirty,
+  add_custom_button:(label,fn)=>{buttons.set(label,fn);},remove_custom_button:label=>calls.push(['remove',label]),set_df_property:()=>{},set_intro:()=>{},dashboard:{set_headline:()=>{}},
   page:{set_primary_action:(label,fn)=>primary.push(label),clear_primary_action:()=>primary.push('clear')}};
  let grid;
  if(withGrid){
@@ -14,7 +14,7 @@ async function form(data,{dirty=false,doctype='Quotation',fresh=false,withGrid=f
   grid={fields_map,update_docfield_property(name,key,value){fields_map[name][key]=value;},setup_user_defined_columns(){this.user_defined_columns=[fields_map.description];},reset_grid(){this.setup_user_defined_columns();}};
   frm.fields_dict={items:{grid}};
  }
- await handlers[doctype].refresh(frm);return{calls,buttons,primary,grid,frm};
+ await handlers[doctype].refresh(frm);return{calls,buttons,primary,grid,frm,prompts,dialogs};
 }
 (async()=>{
  let r=await form({enabled:false});assert.equal(r.buttons.size,0);assert.deepEqual(r.primary,[]);
@@ -33,6 +33,17 @@ async function form(data,{dirty=false,doctype='Quotation',fresh=false,withGrid=f
  assert.deepEqual(Array.from(r.grid.user_defined_columns,x=>x.fieldname),['custom_oman_use_costing_description','description','custom_oman_use_co_description','custom_oman_client_description','qty','rate','amount']);
  r=await form({enabled:false},{withGrid:true});assert.equal(r.grid.fields_map.custom_oman_client_description.hidden,1);assert.equal(r.grid.fields_map.description.read_only,0);
  r=await form({enabled:false},{fresh:true});assert.equal(r.calls.length,0);
+ for(const stage of ['Quote sent','Under negotiation','Under approval','Approved','Awaiting PO','Follow-up','Expired']){
+  r=await form({enabled:true,editable:true,can_write:true,statuses:[stage]},{stage});
+  assert(r.buttons.has(stage)); r.buttons.get(stage)();
+  await r.prompts[0].callback({stage});
+  assert.equal(r.dialogs[0].fields.find(f=>f.fieldname==='reason').reqd,1);
+ }
+ r=await form({enabled:true,editable:true,can_write:true,statuses:['Won']});
+ r.buttons.get('Change Status')(); await r.prompts[0].callback({stage:'Won'});
+ assert.equal(r.dialogs[0].fields.find(f=>f.fieldname==='reason').reqd,1);
+ assert.equal(r.dialogs[0].fields.find(f=>f.fieldname==='schedule_date').reqd,1);
+ console.log('PASS selected status labels and mandatory reasons including Won');
  let renders=0;class ListView{get_args(){return{fields:['name']}}before_render(){renders++;return'original'}}
  const frappe={meta:{has_field:()=>true},views:{ListView}},settings={get_indicator:row=>['legacy','blue']};
  const list=Object.assign(new ListView(),{doctype:'Quotation',settings});const code=fs.readFileSync(path.join(root,'bsgroup/public/js/oman_quotation_flow_list.js'),'utf8');

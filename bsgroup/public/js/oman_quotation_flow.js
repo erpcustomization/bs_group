@@ -214,13 +214,14 @@
                 {fieldtype:'Date',fieldname:'schedule_date',label:__('Required By'),reqd:1,default:data.required_by},
                 ...projectFields(data),
             ] : []),
-            {fieldtype:'Small Text',fieldname:'reason',label:__('Reason'),reqd:['Lost','Cancelled','Delayed'].includes(stage)?1:0},
+            {fieldtype:'Small Text',fieldname:'reason',label:__('Reason for status change'),reqd:1},
         ];
         dialog=new frappe.ui.Dialog({title:__('Mark quotation {0}',[stage]),fields,
             primary_action_label:won?__('Confirm Won, Create Project and Send'):__('Save Status'),
             async primary_action(values){
                 dialog.disable_primary_action();
                 try {
+                    if(!String(values.reason || '').trim()) {frappe.msgprint(__('Enter a reason for this status change.'));return;}
                     const projectModules=['supply','elv','3cx','infra'].filter(key=>values['module_'+key]);
                     if(won && data.project_required && !projectModules.length) {frappe.msgprint(__('Choose at least one project module.'));return;}
                     const result=await call('change_status',{quotation:frm.doc.name,stage,expected_modified:String(frm.doc.modified),
@@ -285,11 +286,18 @@
             if(data.editable && data.can_write){
                 frm.remove_custom_button(__('Revise Costing Sheet'));
                 frm.add_custom_button(__('Revise Quotation'),()=>reviseQuotation(frm));
-                frm.add_custom_button(__('Change Status'),()=>{
+                const stageLabel=frm.doc.custom_pipeline_stage;
+                const statusButton=frm.add_custom_button(__(!stageLabel || stageLabel==='Draft' ? 'Change Status' : stageLabel==='Sent' ? 'Quote sent' : stageLabel),()=>{
                     if(frm.is_dirty()){frappe.msgprint(__('Save the quotation before changing status.'));return;}
                     frappe.prompt([{fieldtype:'Select',fieldname:'stage',label:__('Status'),options:data.statuses,reqd:1}],
                         values=>statusDetails(frm,values.stage),__('Change quotation status'),__('Continue'));
                 });
+                statusButton?.addClass('bs-quotation-status');
+                statusButton?.attr('title',__('Change quotation status'));
+            } else if(data.can_write && ['Won','Lost'].includes(frm.doc.custom_pipeline_stage)) {
+                const statusButton=frm.add_custom_button(__(frm.doc.custom_pipeline_stage),()=>{});
+                statusButton?.addClass('bs-quotation-status');
+                statusButton?.prop('disabled',true);
             }
             if(!frm.is_dirty() && data.can_print && (data.ready_to_convert || data.save_feedback)) frm.add_custom_button(__('Convert to PDF'),()=>pdf(frm));
             if(data.editable && data.can_write){

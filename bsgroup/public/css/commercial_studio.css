@@ -1,6 +1,11 @@
 /* BS Commercial Studio — scoped to DCS and Quotation forms; never customer PDFs.
    Native grids, validation, tabs, actions and permission-driven visibility remain intact. */
 @media screen {
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .bs-quotation-status {
+        background: #235dcc !important; border-color: #235dcc !important; color: #fff !important;
+        font-weight: 700; padding: 8px 16px;
+    }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .bs-quotation-status:disabled { opacity: 1; }
     /* Consistent blue field surfaces, including submitted DCS read-only values. */
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-section .frappe-control :is(.form-control, .like-disabled-input) {
         background-color: #f0f5ff !important; border: 1px solid #ccdaf1 !important;

@@ -44,6 +44,31 @@ package=types.ModuleType('bsgroup');package.__path__=[str(ROOT/'bsgroup')];sys.m
 flow=importlib.import_module('bsgroup.oman_quotation_flow')
 
 class FlowTests(unittest.TestCase):
+    def test_each_status_requires_new_nonblank_reason(self):
+        self.q.custom_lost_reason = 'Old reason cannot be reused'
+        for stage in flow.STATUS_CHOICES:
+            with self.subTest(stage=stage), patch.object(flow, '_quotation', return_value=self.q):
+                with self.assertRaisesRegex(ValidationError, 'reason'):
+                    flow._change_status('Q-1', stage, 'M1', reason='  ')
+        self.assertEqual(self.q.docstatus, 0)
+        self.assertFalse(self.q.get('saved'))
+
+    def test_new_tracking_stages_preserve_draft_and_audit_reason(self):
+        for stage in flow.STATUS_CHOICES:
+            if stage in flow.TERMINAL:
+                continue
+            with self.subTest(stage=stage), patch.object(flow, '_quotation', return_value=self.q), patch.object(flow, 'snapshot') as audit:
+                flow._change_status('Q-1', stage, 'M1', reason='Customer <requested> review')
+                self.assertEqual(self.q.custom_pipeline_stage, stage)
+                self.assertEqual(self.q.docstatus, 0)
+                self.assertIn('Reason: Customer &lt;requested&gt; review', audit.call_args.args[1])
+
+    def test_retired_status_not_offered_for_new_changes(self):
+        with patch.object(flow, '_quotation', return_value=self.q):
+            for stage in ('Sent', 'Delayed', 'Cancelled', 'Draft'):
+                with self.assertRaisesRegex(ValidationError, 'valid quotation status'):
+                    flow._change_status('Q-1', stage, 'M1', reason='Test')
+
     def setUp(self):
         frappe.local.site='erp-om.k.frappe.cloud';frappe.defaults.get_global_default.return_value='1'
         frappe.defaults.get_global_default.side_effect=lambda key: frappe.defaults.get_global_default.return_value if key==flow.FLAG else 0

@@ -8,6 +8,7 @@ from contextvars import ContextVar
 from copy import deepcopy
 import inspect
 import json
+from html import escape
 
 import frappe
 from frappe.utils import cint, flt, now_datetime, today
@@ -20,7 +21,10 @@ SOURCE_PRINT_FORMAT = "Enterprise Quotation - Class A - OM"
 PILOT_PRINT_FORMAT = "Enterprise Quotation - Oman Pilot"
 PDF_TEMPLATE_FIELD = "custom_oman_pdf_template"
 TERMINAL = {"Won", "Lost"}
-STAGES = {"Draft", "Sent", "Follow-up", "Delayed", "Cancelled", "Expired", "Won", "Lost"}
+STATUS_CHOICES = ("Quote sent", "Under negotiation", "Under approval", "Approved",
+                  "Awaiting PO", "Follow-up", "Lost", "Expired", "Won")
+# Retain historical values without offering them for new transitions.
+STAGES = set(STATUS_CHOICES) | {"Draft", "Sent", "Delayed", "Cancelled"}
 _operation = ContextVar("oman_quote_operation", default=None)
 
 
@@ -371,7 +375,7 @@ def context(quotation):
         client_descriptions=client_descriptions,
         can_install_descriptions=setup_authorised() and (not descriptions.enabled()
             or not frappe.db.exists("Custom Field", "Quotation Item-" + descriptions.COSTING)),
-        can_win=can_win, statuses=[s for s in ("Sent", "Delayed", "Cancelled", "Lost", "Won") if s != "Won" or can_win])
+        can_win=can_win, statuses=[s for s in STATUS_CHOICES if s != "Won" or can_win])
 
 
 def can_install():
@@ -433,8 +437,12 @@ def _change_status(quotation, stage, expected_modified, reason=None, schedule_da
     check_editable(q)
     if str(q.modified) != str(expected_modified):
         frappe.throw("The quotation changed. Reload it before changing status.")
-    if stage not in {"Sent", "Delayed", "Cancelled", "Lost", "Won"}:
+    if stage not in STATUS_CHOICES:
         frappe.throw("Choose a valid quotation status.")
+    reason = str(reason or "").strip()
+    if not reason:
+        frappe.throw("A reason is required for every quotation status change.")
+    previous_stage = q.custom_pipeline_stage or "Draft"
     if stage == "Won":
         won_context(q.name)  # Keep the same role and source restrictions.
     q.custom_oman_flow = 1
@@ -461,8 +469,25 @@ def _change_status(quotation, stage, expected_modified, reason=None, schedule_da
         sent = send_to_procurement(**args)
         result["requisition"] = sent["name"]
         result["project"] = sent.get("project")
-    snapshot(q, "Status changed to " + stage)
+    snapshot(q, "Status changed from " + escape(previous_stage) + " to " + escape(stage)
+             + ". Reason: " + escape(reason))
     return result
+
+
+def sync_status_options():
+    """Add tracking choices on enabled sites; never rewrite historical quotations."""
+    if not enabled():
+        return
+    field = frappe.get_meta("Quotation").get_field("custom_pipeline_stage")
+    if not field:
+        return
+    options = (field.options or "").splitlines()
+    missing = [stage for stage in STATUS_CHOICES if stage not in options]
+    if missing:
+        from frappe.custom.doctype.property_setter.property_setter import make_property_setter
+        make_property_setter("Quotation", "custom_pipeline_stage", "options",
+                             "\n".join(options + missing), "Text")
+        frappe.clear_cache(doctype="Quotation")
 
 
 @frappe.whitelist(methods=["POST"])
@@ -578,6 +603,7 @@ def install():
     install_print_format()
     install_pdf_action()
     frappe.defaults.set_global_default(UAE_FLAG if uae() else FLAG, 1)
+    sync_status_options()
     if uae():
         from bsgroup.oman_item_description import install as install_descriptions
         install_descriptions()

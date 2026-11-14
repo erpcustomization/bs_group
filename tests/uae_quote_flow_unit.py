@@ -110,7 +110,7 @@ class UAEFlowTests(unittest.TestCase):
     def test_editable_status_does_not_reload_or_submit(self):
         self.q.reload=Mock()
         with patch.object(flow,'_quotation',return_value=self.q), patch.object(flow,'snapshot'):
-            flow._change_status('Q-1','Delayed','M1',reason='Awaiting customer')
+            flow._change_status('Q-1','Awaiting PO','M1',reason='Awaiting customer')
         self.q.reload.assert_not_called()
         self.assertEqual(self.q.docstatus,0)
 
