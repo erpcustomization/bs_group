@@ -1,6 +1,9 @@
 // Intake coordinators hand over one Lead to one eligible salesperson.
 frappe.ui.form.on('Lead', {
     refresh(frm) {
+        const hideAssignment = ['erp-om.bitssecureit.com', 'erp-om.k.frappe.cloud']
+            .includes(window.location.hostname);
+        if (hideAssignment) frm.remove_custom_button(__('Assign salesperson'));
         // Realtime doc_update can arrive before the transfer response. Its delayed
         // reload must not reopen a record after the sender loses permission.
         if (!frm._bsi_handover_reload_guard) {
@@ -54,7 +57,7 @@ frappe.ui.form.on('Lead', {
             ],primary_action_label:__('Assign'),primary_action:async v=>{if(await transfer(v.person)) d.hide();}});
             d.show();
         };
-        frm.add_custom_button(__('Assign salesperson'), open);
+        if (!hideAssignment) frm.add_custom_button(__('Assign salesperson'), open);
         if (frm.assign_to) frm.assign_to.add = open;
     }
 });
