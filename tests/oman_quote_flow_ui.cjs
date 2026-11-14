@@ -18,10 +18,10 @@ async function form(data,{dirty=false,doctype='Quotation',fresh=false,withGrid=f
 }
 (async()=>{
  let r=await form({enabled:false});assert.equal(r.buttons.size,0);assert.deepEqual(r.primary,[]);
- r=await form({enabled:true,editable:true,can_write:true,can_print:true,revision:1});assert(r.buttons.has('Convert to PDF'));assert(r.buttons.has('Change Status'));assert(r.buttons.has('Revise Costing Sheet'));assert.deepEqual(r.primary,['Convert to PDF']);
+ r=await form({enabled:true,editable:true,can_write:true,can_print:true,revision:1});assert(r.buttons.has('Convert to PDF'));assert(r.buttons.has('Change Status'));assert(r.buttons.has('Revise Quotation'));assert.deepEqual(r.primary,['Convert to PDF']);
  r=await form({enabled:true,editable:true,can_write:true,can_print:true},{dirty:true});assert(!r.buttons.has('Convert to PDF'));assert.deepEqual(r.primary,['Save']);
  r=await form({enabled:true,editable:true,can_write:true,can_print:true,ready_to_convert:false});assert(!r.buttons.has('Convert to PDF'));assert.deepEqual(r.primary,['Save']);
- r=await form({enabled:true,editable:false,can_write:true,can_print:true});assert(!r.buttons.has('Change Status'));assert(!r.buttons.has('Revise Costing Sheet'));
+ r=await form({enabled:true,editable:false,can_write:true,can_print:true});assert(!r.buttons.has('Change Status'));assert(!r.buttons.has('Revise Quotation'));
  r=await form({enabled:true,editable:true,can_write:false,can_print:false});assert.equal(r.buttons.size,0);assert.deepEqual(r.primary,[]);
  r=await form({enabled:true,quotation:'Q1'},{doctype:'Deal Cost Sheet'});assert(r.buttons.has('View Linked Quotation'));assert(r.calls.some(c=>Array.isArray(c)&&c[1]==='Create Quotation'));
  r=await form({enabled:true,conflict:true,editable:false,can_write:true,can_print:true});assert.equal(r.buttons.size,0);assert.deepEqual(r.primary,['clear']);

@@ -38,6 +38,38 @@
             if(result?.enabled) window.location.reload();
         },__('Pilot setup'));
     }
+    function descriptionHeaders(frm) {
+        const grid=frm.fields_dict?.items?.grid;
+        if(!grid?.wrapper?.find) return;
+        grid.wrapper.find('.bs-description-select-all').remove();
+        if(!frm.__oman_client_descriptions) return;
+        const rows=frm.doc.items || [];
+        for(const [field,costing,label] of [
+            ['custom_oman_use_costing_description',true,'Use costing descriptions for all items'],
+            ['custom_oman_use_co_description',false,'Use CO descriptions for all items']
+        ]) {
+            const cell=grid.wrapper.find('.grid-heading-row [data-fieldname="'+field+'"]');
+            if(!cell.length) continue;
+            const selected=rows.filter(row=>!!Number(row.custom_oman_use_costing_description)===costing).length;
+            const checkbox=$('<input type="checkbox" class="bs-description-select-all">')
+                .attr('aria-label',__(label)).attr('title',__(label))
+                .prop('checked',rows.length>0 && selected===rows.length)
+                .prop('indeterminate',selected>0 && selected<rows.length)
+                .prop('disabled',!frm.__bs_description_editable || !rows.length || !!frm.__oman_description_selecting)
+                .on('click',event=>event.stopPropagation())
+                .on('change',async function(){
+                    const useCosting=this.checked?costing:!costing;
+                    await selectAllDescriptions(frm,useCosting);
+                });
+            cell.prepend(checkbox);
+        }
+    }
+    async function selectAllDescriptions(frm,costing) {
+        if(!frm.__bs_description_editable || frm.__oman_description_selecting) return;
+        // Reuse the single-row handler so editor permissions and dirty state stay identical.
+        for(const row of frm.doc.items || []) await selectDescription(frm,row.doctype,row.name,costing);
+        descriptionHeaders(frm);
+    }
     function clientGrid(frm, active) {
         const grid=frm.fields_dict?.items?.grid;
         if(!grid?.fields_map?.custom_oman_client_description) return;
@@ -66,7 +98,17 @@
             };
             grid._oman_columns_wrapped=true;
         }
+        if(!grid._bs_description_refresh && typeof grid.refresh==='function') {
+            const refresh=grid.refresh;
+            grid.refresh=function(...args){
+                const result=refresh.apply(this,args);
+                descriptionHeaders(frm);
+                return result;
+            };
+            grid._bs_description_refresh=true;
+        }
         grid.reset_grid();
+        descriptionHeaders(frm);
     }
     async function pdf(frm) {
         if (frm.is_dirty()) { frappe.msgprint(__('Save the quotation before converting to PDF.')); return; }
@@ -114,7 +156,7 @@
     async function defaultUnselectedDescriptions(frm,data) {
         if(!data.save_feedback || !data.editable || !data.can_write || !data.client_descriptions) return;
         const rows=(frm.doc.items || []).filter(row=>!Number(row.custom_oman_use_costing_description) &&
-            !Number(row.custom_oman_use_co_description) && !String(row.custom_oman_client_description || '').replace(/<[^>]*>/g,'').trim());
+            !Number(row.custom_oman_use_co_description));
         if(!rows.length) return;
         frm.__oman_description_selecting=true;
         try {
@@ -194,6 +236,7 @@
             installationButton(frm,data);
             frm.__oman_quotation_pilot=!!data.enabled;
             frm.__oman_client_descriptions=!!data.client_descriptions;
+            frm.__bs_description_editable=!!(data.editable && data.can_write && data.client_descriptions);
             frm.__bs_save_feedback=!!data.save_feedback;
             frm.__bs_choose_pdf_template=!!data.choose_pdf_template;
             await defaultUnselectedDescriptions(frm,data);
@@ -271,9 +314,12 @@
             frm.remove_custom_button(__('Convert to PDF'));
             setSaveAction(frm);
             if(typeof window.eqa_readiness==='function') window.eqa_readiness(frm);
-        } finally {frm.__oman_description_selecting=false;}
+        } finally {frm.__oman_description_selecting=false;descriptionHeaders(frm);}
     }
     frappe.ui.form.on('Quotation Item',{
+        items_add(frm,cdt,cdn){
+            if(frm.__bs_description_editable) return selectDescription(frm,cdt,cdn,true);
+        },
         custom_oman_use_costing_description(frm,cdt,cdn){
             return selectDescription(frm,cdt,cdn,!!frappe.get_doc(cdt,cdn).custom_oman_use_costing_description);
         },
