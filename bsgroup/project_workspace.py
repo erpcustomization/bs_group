@@ -101,8 +101,8 @@ def context(project, section="tasks"):
     if meta.has_field("company"):
         result["defaults"]["company"] = doc.company
     filters = {field: doc.name} if field else []
-    from bsgroup.project_daily_work import enabled, TERMINAL
-    if enabled() and section == "timesheets":
+    from bsgroup.project_daily_work import enabled, timesheets_enabled, TERMINAL
+    if timesheets_enabled() and section == "timesheets":
         from bsgroup.project_timesheets import lines
         result.update(inline_timesheets=True, entries=lines(doc.name) if result["available"] else [])
         return result

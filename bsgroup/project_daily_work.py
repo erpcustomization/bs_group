@@ -1,4 +1,4 @@
-"""UAE Project Plan work capture and completion rollup."""
+"""Oman/UAE daily work capture; UAE project completion rollup."""
 import hashlib
 from html import escape
 from urllib.parse import urlparse
@@ -17,13 +17,21 @@ class ProjectDailyWorkMixin:
 
 
 def enabled():
+    """Existing UAE completion behaviour, kept separate from timesheet rollout."""
     hosts = {"erp.bitssecureit.com", "erp-bitssecureit.u.frappe.cloud"}
     return (urlparse((getattr(frappe, "conf", None) or {}).get("host_name") or "").hostname in hosts
             or getattr(getattr(frappe, "local", None), "site", None) in hosts)
 
 
+def timesheets_enabled():
+    hosts = {"erp-om.bitssecureit.com", "erp-om.k.frappe.cloud"}
+    return (enabled() or
+            urlparse((getattr(frappe, "conf", None) or {}).get("host_name") or "").hostname in hosts or
+            getattr(getattr(frappe, "local", None), "site", None) in hosts)
+
+
 def install():
-    if not enabled():
+    if not timesheets_enabled():
         return
     from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
     create_custom_fields({"Timesheet Detail": [

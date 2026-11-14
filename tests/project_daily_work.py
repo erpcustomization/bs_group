@@ -32,6 +32,19 @@ class DailyWorkTests(unittest.TestCase):
     def tearDown(self):self.patch.stop()
     def test_uae_only(self):
         self.assertTrue(self.m.enabled());self.f.local.site='erp-om.k.frappe.cloud';self.assertFalse(self.m.enabled())
+    def test_timesheets_enabled_for_both_production_sites_only(self):
+        for site in ('erp-bitssecureit.u.frappe.cloud','erp.bitssecureit.com','erp-om.k.frappe.cloud','erp-om.bitssecureit.com'):
+            self.f.local.site=site;self.assertTrue(self.m.timesheets_enabled())
+        self.f.local.site='unrelated.example.com';self.assertFalse(self.m.timesheets_enabled())
+        self.f.conf={'host_name':'https://erp-om.bitssecureit.com'};self.assertTrue(self.m.timesheets_enabled())
+    def test_oman_capture_uses_same_dated_atomic_flow(self):
+        self.f.local.site='erp-om.k.frappe.cloud'
+        self.assertTrue(self.m.timesheets_enabled())
+        self.m.capture(self.project,self.task,'Oman daily work','om-request')
+        row=self.sheet.append.call_args.args[1]
+        self.assertEqual(row['custom_bs_work_date'],'2026-11-14')
+        self.assertEqual(row['description'],'Oman daily work')
+        self.sheet.save.assert_called_once()
     def test_dated_own_draft_and_no_invented_hours(self):
         result=self.m.capture(self.project,self.task,'Installed <camera>','request-1')
         self.assertEqual(result['timesheet'],'TS-1');self.assertEqual(self.sheet.user,'assigned@example.com')

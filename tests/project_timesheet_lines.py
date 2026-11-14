@@ -12,7 +12,7 @@ class InlineTimesheetTests(unittest.TestCase):
         self.f.whitelist=lambda **kw:lambda fn:fn
         self.f.throw=lambda s:(_ for _ in ()).throw(ValueError(s))
         self.enabled=Mock(return_value=True)
-        daily=types.ModuleType('bsgroup.project_daily_work');daily.enabled=self.enabled
+        daily=types.ModuleType('bsgroup.project_daily_work');daily.timesheets_enabled=self.enabled
         self.modules=patch.dict(sys.modules,{'frappe':self.f,'bsgroup.project_daily_work':daily});self.modules.start()
         spec=importlib.util.spec_from_file_location('inline',Path(__file__).resolve().parents[1]/'bsgroup/project_timesheets.py')
         self.m=importlib.util.module_from_spec(spec);spec.loader.exec_module(self.m)
@@ -55,7 +55,7 @@ class InlineTimesheetTests(unittest.TestCase):
         self.sheet.check_permission.side_effect=PermissionError('Denied')
         with self.assertRaises(PermissionError):self.m.save_work('P-1','TS-1','ROW-1','New','Original')
         self.sheet.save.assert_not_called()
-    def test_oman_not_enabled_and_blank_rejected(self):
+    def test_disabled_site_and_blank_rejected(self):
         self.enabled.return_value=False
         with self.assertRaises(ValueError):self.m.lines('P-1')
         self.enabled.return_value=True

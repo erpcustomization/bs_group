@@ -142,8 +142,8 @@ def get_plan(project):
         item = frappe.get_doc("Task", row.name)
         row["can_edit"] = row["can_edit"] and frappe.has_permission("Task", "write", doc=item)
         row["can_log_work"] = doc.status != "Cancelled" and row.status not in {"Cancelled", "Template"} and _is_assigned(item, closed=True)
-        from bsgroup.project_daily_work import enabled, TERMINAL
-        if enabled() and (row.status in TERMINAL or doc.status == "Completed"):
+        from bsgroup.project_daily_work import timesheets_enabled, TERMINAL
+        if timesheets_enabled() and (row.status in TERMINAL or doc.status == "Completed"):
             row["can_log_work"] = False
         project_status_editable = doc.status != "Cancelled" and (doc.status != "Completed" or frappe.has_permission("Project", "write", doc=doc))
         row["can_change_status"] = project_status_editable and row.status not in {"Cancelled", "Template"} and (
@@ -197,8 +197,8 @@ def save_work(project, task, work, request_id=None):
     text = (work or "").strip()
     if not text or len(text) > 20000:
         frappe.throw(_("Enter the work completed today (up to 20,000 characters)."))
-    from bsgroup.project_daily_work import enabled, capture
-    if enabled():
+    from bsgroup.project_daily_work import timesheets_enabled, capture
+    if timesheets_enabled():
         return capture(doc, item, text, request_id)
     author = frappe.db.get_value("User", frappe.session.user, "full_name") or frappe.session.user
     content = "<p><strong>Today's work — " + str(getdate()) + "</strong></p><p>" + escape(text).replace("\n", "<br>") + "</p>"

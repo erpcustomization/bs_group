@@ -1,12 +1,12 @@
 """Project-scoped timesheet lines, using the parent document's permissions."""
 import frappe
 from frappe import _
-from bsgroup.project_daily_work import enabled
+from bsgroup.project_daily_work import timesheets_enabled
 
 
 def project_access(project):
-    if not enabled():
-        frappe.throw(_("Inline project timesheets are enabled for UAE only."))
+    if not timesheets_enabled():
+        frappe.throw(_("Inline project timesheets are not enabled on this site."))
     doc = frappe.get_doc("Project", project)
     doc.check_permission("read")
     return doc
