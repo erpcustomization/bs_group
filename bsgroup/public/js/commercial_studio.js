@@ -3,9 +3,28 @@
     if (window.bsCommercialStudioInstalled) return;
     window.bsCommercialStudioInstalled = true;
 
+    function hideRoutineBanners(root) {
+        root.find('.form-message').each(function () {
+            const text = this.textContent.replace(/\s+/g, ' ').trim();
+            const routine = /^Quotation Status:/.test(text)
+                || text.startsWith('Save changes, then use Convert to PDF.')
+                || text.startsWith('Use Revise BOQ to edit costing. The linked Draft Quotation updates automatically')
+                || (!!this.querySelector('.dcs-compact') && /Next:\s/.test(text));
+            this.classList.toggle('bs-commercial-routine-banner', routine);
+        });
+    }
+
     function render(frm) {
         const root = $(frm.page.wrapper);
         root.addClass('bs-commercial-studio');
+        // Async workflow callbacks can recreate these messages after refresh.
+        // Keep validation, duplicate-link and approval-routing error banners visible.
+        hideRoutineBanners(root);
+        if (!root[0].bsCommercialBannerObserver) {
+            const observer = new MutationObserver(() => hideRoutineBanners(root));
+            observer.observe(root[0], { childList: true, subtree: true, characterData: true });
+            root[0].bsCommercialBannerObserver = observer;
+        }
         const form = root.find('.form-page').first();
         if (!form.length) return;
         let hero = form.children('.bs-commercial-hero');

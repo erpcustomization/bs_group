@@ -1,16 +1,18 @@
 /* BS Commercial Studio — scoped to DCS and Quotation forms; never customer PDFs.
    Native grids, validation, tabs, actions and permission-driven visibility remain intact. */
 @media screen {
+    .bs-commercial-studio .bs-commercial-routine-banner { display: none !important; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio :is(.section-head, .dcs-panel-title, .grid-heading-row, .form-tabs .nav-link) { font-weight: 700 !important; }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio {
         --bs-navy: #142f3f;
-        --bs-blue: #087f82;
+        --bs-blue: #235dcc;
         --bs-ink: #233a47;
         --bs-muted: #687b86;
         --bs-line: #dce5e9;
         --bs-canvas: #f3f6f7;
-        --dcs-accent: #087f82;
+        --dcs-accent: #235dcc;
         --dcs-header-ink: #233a47;
-        --dcs-header-tint: #eef4f5;
+        --dcs-header-tint: #edf3fc;
         color: #233a47;
         background: #f3f6f7;
         font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
@@ -35,32 +37,32 @@
         background: #fff; border-color: #d7e2e6; color: #304d5c;
     }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio :is(.btn-primary, .es-button.primary-action) {
-        background: #087f82 !important; border-color: #087f82 !important; color: #fff !important;
-        box-shadow: 0 3px 8px #087f821a;
+        background: #235dcc !important; border-color: #235dcc !important; color: #fff !important;
+        box-shadow: 0 3px 8px #235dcc1a;
     }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio :is(.btn-primary, .es-button.primary-action):hover:not(:disabled) {
-        background: #06686b !important; border-color: #06686b !important;
+        background: #19499f !important; border-color: #19499f !important;
     }
     .bs-commercial-studio .bs-commercial-hero {
         display: flex; align-items: center; justify-content: space-between; gap: 24px;
         padding: 27px 32px; margin: 16px 0 18px; border-radius: 16px;
-        background: linear-gradient(115deg, #132e40, #1c4551);
-        border: 1px solid #244957; box-shadow: 0 8px 24px #14334212; color: #fff;
+        background: linear-gradient(115deg, #102b57, #194578);
+        border: 1px solid #28518a; box-shadow: 0 8px 24px #14334212; color: #fff;
         position: relative; overflow: hidden;
     }
     .bs-commercial-studio .bs-commercial-hero::before {
-        content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: #69c3ba;
+        content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: #70a8ff;
     }
     .bs-commercial-studio .bs-commercial-heading { min-width: 0; }
-    .bs-commercial-studio .bs-commercial-eyebrow { color: #a4d4d4; font-size: 10px; letter-spacing: 1.8px; font-weight: 650; }
+    .bs-commercial-studio .bs-commercial-eyebrow { color: #bad4ff; font-size: 10px; letter-spacing: 1.8px; font-weight: 700; }
     .bs-commercial-studio .bs-commercial-hero h2 {
-        color: #fff; font-size: 28px; font-weight: 600; letter-spacing: -.7px; line-height: 1.25; margin: 8px 0 7px;
+        color: #fff; font-size: 28px; font-weight: 700; letter-spacing: -.7px; line-height: 1.25; margin: 8px 0 7px;
     }
-    .bs-commercial-studio .bs-commercial-hero p { color: #c6d9df; margin: 0; font-size: 12px; overflow-wrap: anywhere; }
+    .bs-commercial-studio .bs-commercial-hero p { color: #cfddf3; margin: 0; font-size: 12px; overflow-wrap: anywhere; }
     .bs-commercial-studio .bs-commercial-document { padding-left: 28px; border-left: 1px solid #ffffff26; flex: 0 0 auto; }
-    .bs-commercial-studio .bs-commercial-document span { display: block; font-size: 9px; letter-spacing: 1.4px; color: #b1c8d1; }
+    .bs-commercial-studio .bs-commercial-document span { display: block; font-size: 9px; letter-spacing: 1.4px; color: #b9cee9; }
     .bs-commercial-studio .bs-commercial-document strong { display: block; font-weight: 550; font-size: 19px; margin: 6px 0; color: #fff; }
-    .bs-commercial-studio .bs-commercial-document small { font-size: 11px; color: #a9c7ce; }
+    .bs-commercial-studio .bs-commercial-document small { font-size: 11px; color: #b8cdea; }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-tabs-list {
         background: #fff; border: 1px solid #dce5e9; border-radius: 12px;
         box-shadow: 0 3px 10px #14334204; margin: 12px 0 18px; padding: 5px 8px;
@@ -72,8 +74,8 @@
         border: 0 !important; border-radius: 7px; padding: 10px 16px !important; margin: 0;
         color: #607681; font-size: 12px; font-weight: 550; white-space: nowrap;
     }
-    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-tabs .nav-link:hover { background: #f3f7f7; color: #176d70; }
-    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-tabs .nav-link.active { background: #e8f4f2; color: #066b6b; font-weight: 650; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-tabs .nav-link:hover { background: #f0f5fc; color: #235dcc; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-tabs .nav-link.active { background: #eaf1ff; color: #1c4fae; font-weight: 700; }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-layout { padding: 0; background: transparent; }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-layout .form-section {
         padding: 24px 28px; margin: 0 0 16px; border: 1px solid #dce5e9;
@@ -81,7 +83,7 @@
     }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-section .section-body { max-width: none; margin-top: 10px; }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-section .section-head {
-        color: #233e4c; font-size: 15px; letter-spacing: -.2px; font-weight: 650; margin-bottom: 12px;
+        color: #233e4c; font-size: 15px; letter-spacing: -.2px; font-weight: 700; margin-bottom: 12px;
     }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-column { min-width: 0; }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .frappe-control { margin-bottom: 17px; }
@@ -100,7 +102,7 @@
     }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .section-head { color: #233e4c !important; }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-tabs .nav-link.active {
-        color: #066b6b !important;
+        color: #1c4fae !important;
     }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio :is(.form-control, .like-disabled-input) {
         border: 1px solid #dbe4e8; border-radius: 8px; background-color: #fbfcfc;
@@ -109,35 +111,35 @@
     }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .like-disabled-input { background: #f4f7f8; border-color: transparent; }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-control:focus {
-        background: #fff; border-color: #198f8b; box-shadow: 0 0 0 3px #198f8b16;
+        background: #fff; border-color: #3676dc; box-shadow: 0 0 0 3px #3676dc16;
     }
-    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio :is(button, a, input, select, textarea):focus-visible { outline: 2px solid #087f82; outline-offset: 3px; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio :is(button, a, input, select, textarea):focus-visible { outline: 2px solid #235dcc; outline-offset: 3px; }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .help-box { font-size: 11px; line-height: 1.5; color: #6b7d86; }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-grid { border: 1px solid #dce5e9; border-radius: 10px; box-shadow: none; }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-grid .grid-heading-row,
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-grid .grid-heading-row :is(.col, .static-area) {
-        background: #eef4f5 !important; color: #345361 !important;
-        border-color: #dce5e9; font-size: 11px; font-weight: 650; letter-spacing: normal;
+        background: #edf3fc !important; color: #345361 !important;
+        border-color: #dce5e9; font-size: 11px; font-weight: 700; letter-spacing: normal;
     }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-grid .grid-heading-row :is(div, span, .reqd) {
-        background: #eef4f5 !important; color: #345361 !important;
+        background: #edf3fc !important; color: #345361 !important;
         -webkit-text-fill-color: #345361 !important; border-color: #dce5e9 !important;
     }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-grid .grid-heading-row input { filter: none !important; }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-grid .grid-row { border-color: #e4ebee; }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-grid .grid-body .static-area { font-size: 13px; color: #263e4b; font-variant-numeric: tabular-nums; }
-    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-grid .grid-row:hover { background: #f7fbfa; }
-    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio input[type="checkbox"] { accent-color: #087f82; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-grid .grid-row:hover { background: #f6f9ff; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio input[type="checkbox"] { accent-color: #235dcc; }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-message {
-        background: #eef6f6; border: 1px solid #d9e9e8; border-radius: 9px; color: #355f69;
+        background: #eef4ff; border: 1px solid #dbe5f5; border-radius: 9px; color: #375a8b;
         font-size: 12px; line-height: 1.6; margin-bottom: 8px; padding: 10px 14px;
     }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .dcs-overview {
         border-radius: 12px; border-color: #dce5e9; background: #f7fafb; padding: 24px;
     }
-    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .dcs-metrics strong { color: #096d72; font-size: 27px; letter-spacing: -.5px; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .dcs-metrics strong { color: #235dcc; font-size: 27px; letter-spacing: -.5px; }
     .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio [data-fieldname="grand_total"] .like-disabled-input {
-        font-size: 22px; color: #086e70; background: #eaf5f3; font-weight: 650; padding: 12px;
+        font-size: 22px; color: #235dcc; background: #eaf1ff; font-weight: 700; padding: 12px;
     }
     @media (max-width: 767px) {
         .bs-commercial-studio .bs-commercial-hero { padding: 22px 20px; gap: 16px; }
