@@ -102,6 +102,11 @@ REFERENCE_DOCTYPE_TO_CATEGORY = {
 
 
 def sync_row_status(row, is_system_manager, resources):
+	# Project Plan notes are a dated work record, not a scheduler status command.
+	# The child DocType defaults to Open; replaying that default on save would
+	# reopen a task that is already in progress or completed.
+	if row.get("custom_bs_work_entry"):
+		return
 	status = row.custom_status
 	ref_type = row.custom_reference_type
 	ref_name = row.custom_reference
