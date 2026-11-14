@@ -1,7 +1,7 @@
 /* BS Commercial Studio — scoped to DCS and Quotation forms; never customer PDFs.
    Native grids, validation, tabs, actions and permission-driven visibility remain intact. */
 @media screen {
-    .bs-commercial-studio.bs-commercial-studio {
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio {
         --bs-navy: #142f3f;
         --bs-blue: #087f82;
         --bs-ink: #233a47;
@@ -17,29 +17,29 @@
         letter-spacing: normal;
         font-size: 13px;
     }
-    .bs-commercial-studio.bs-commercial-studio .layout-main-section {
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .layout-main-section {
         background: transparent; border: 0; box-shadow: none; overflow: visible;
     }
-    .bs-commercial-studio.bs-commercial-studio .page-head {
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .page-head {
         background: #fff; border-bottom: 1px solid #dce5e9;
     }
-    .bs-commercial-studio.bs-commercial-studio .page-head-content {
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .page-head-content {
         min-height: 68px; height: auto; padding-top: 10px; padding-bottom: 10px; gap: 12px;
     }
-    .bs-commercial-studio.bs-commercial-studio .page-actions { flex-wrap: wrap; gap: 7px; }
-    .bs-commercial-studio.bs-commercial-studio :is(.btn, .es-button) {
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .page-actions { flex-wrap: wrap; gap: 7px; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio :is(.btn, .es-button) {
         border-radius: 8px; font-family: inherit; font-size: 12px; font-weight: 600;
         letter-spacing: normal; min-height: 34px; box-shadow: none;
     }
-    .bs-commercial-studio.bs-commercial-studio :is(.btn-default, .es-button:not(.primary-action)) {
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio :is(.btn-default, .es-button:not(.primary-action)) {
         background: #fff; border-color: #d7e2e6; color: #304d5c;
     }
-    .bs-commercial-studio.bs-commercial-studio :is(.btn-primary, .es-button.primary-action) {
-        background: #087f82; border-color: #087f82; color: #fff;
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio :is(.btn-primary, .es-button.primary-action) {
+        background: #087f82 !important; border-color: #087f82 !important; color: #fff !important;
         box-shadow: 0 3px 8px #087f821a;
     }
-    .bs-commercial-studio.bs-commercial-studio :is(.btn-primary, .es-button.primary-action):hover:not(:disabled) {
-        background: #06686b; border-color: #06686b;
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio :is(.btn-primary, .es-button.primary-action):hover:not(:disabled) {
+        background: #06686b !important; border-color: #06686b !important;
     }
     .bs-commercial-studio .bs-commercial-hero {
         display: flex; align-items: center; justify-content: space-between; gap: 24px;
@@ -61,63 +61,82 @@
     .bs-commercial-studio .bs-commercial-document span { display: block; font-size: 9px; letter-spacing: 1.4px; color: #b1c8d1; }
     .bs-commercial-studio .bs-commercial-document strong { display: block; font-weight: 550; font-size: 19px; margin: 6px 0; color: #fff; }
     .bs-commercial-studio .bs-commercial-document small { font-size: 11px; color: #a9c7ce; }
-    .bs-commercial-studio.bs-commercial-studio .form-tabs-list {
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-tabs-list {
         background: #fff; border: 1px solid #dce5e9; border-radius: 12px;
         box-shadow: 0 3px 10px #14334204; margin: 12px 0 18px; padding: 5px 8px;
     }
-    .bs-commercial-studio.bs-commercial-studio .form-tabs {
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-tabs {
         gap: 4px; padding: 0; flex-wrap: wrap; border: 0;
     }
-    .bs-commercial-studio.bs-commercial-studio .form-tabs .nav-link {
-        border: 0; border-radius: 7px; padding: 10px 16px; margin: 0;
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-tabs .nav-link {
+        border: 0 !important; border-radius: 7px; padding: 10px 16px !important; margin: 0;
         color: #607681; font-size: 12px; font-weight: 550; white-space: nowrap;
     }
-    .bs-commercial-studio.bs-commercial-studio .form-tabs .nav-link:hover { background: #f3f7f7; color: #176d70; }
-    .bs-commercial-studio.bs-commercial-studio .form-tabs .nav-link.active { background: #e8f4f2; color: #066b6b; font-weight: 650; }
-    .bs-commercial-studio.bs-commercial-studio .form-layout { padding: 0; background: transparent; }
-    .bs-commercial-studio.bs-commercial-studio .form-layout .form-section {
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-tabs .nav-link:hover { background: #f3f7f7; color: #176d70; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-tabs .nav-link.active { background: #e8f4f2; color: #066b6b; font-weight: 650; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-layout { padding: 0; background: transparent; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-layout .form-section {
         padding: 24px 28px; margin: 0 0 16px; border: 1px solid #dce5e9;
         border-radius: 13px; background: #fff; box-shadow: 0 3px 12px #14334204;
     }
-    .bs-commercial-studio.bs-commercial-studio .form-section .section-body { max-width: none; margin-top: 10px; }
-    .bs-commercial-studio.bs-commercial-studio .form-section .section-head {
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-section .section-body { max-width: none; margin-top: 10px; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-section .section-head {
         color: #233e4c; font-size: 15px; letter-spacing: -.2px; font-weight: 650; margin-bottom: 12px;
     }
-    .bs-commercial-studio.bs-commercial-studio .form-column { min-width: 0; }
-    .bs-commercial-studio.bs-commercial-studio .frappe-control { margin-bottom: 17px; }
-    .bs-commercial-studio.bs-commercial-studio .control-label {
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-column { min-width: 0; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .frappe-control { margin-bottom: 17px; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .control-label {
         font-family: inherit; color: #5c707c; font-size: 12px; font-weight: 550; letter-spacing: normal; margin-bottom: 6px;
     }
-    .bs-commercial-studio.bs-commercial-studio :is(.form-control, .like-disabled-input) {
+    /* The older optional Color Theme uses !important rules. Neutralize its
+       field highlights only within these two forms, without altering preference. */
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .frappe-control[data-fieldname] {
+        background: transparent !important; border-left: 0 !important;
+        padding: 0 !important; box-shadow: none !important; margin-bottom: 17px !important;
+    }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .frappe-control .control-label {
+        color: #5c707c !important; font-weight: 550 !important; font-size: 12px !important;
+        text-transform: none; letter-spacing: normal;
+    }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .section-head { color: #233e4c !important; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-tabs .nav-link.active {
+        color: #066b6b !important;
+    }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio :is(.form-control, .like-disabled-input) {
         border: 1px solid #dbe4e8; border-radius: 8px; background-color: #fbfcfc;
         color: #233a47; min-height: 38px; padding: 8px 11px; font-size: 13px; font-family: inherit;
         font-variant-numeric: tabular-nums; letter-spacing: normal;
     }
-    .bs-commercial-studio.bs-commercial-studio .like-disabled-input { background: #f4f7f8; border-color: transparent; }
-    .bs-commercial-studio.bs-commercial-studio .form-control:focus {
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .like-disabled-input { background: #f4f7f8; border-color: transparent; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-control:focus {
         background: #fff; border-color: #198f8b; box-shadow: 0 0 0 3px #198f8b16;
     }
-    .bs-commercial-studio.bs-commercial-studio :is(button, a, input, select, textarea):focus-visible { outline: 2px solid #087f82; outline-offset: 3px; }
-    .bs-commercial-studio.bs-commercial-studio .help-box { font-size: 11px; line-height: 1.5; color: #6b7d86; }
-    .bs-commercial-studio.bs-commercial-studio .form-grid { border: 1px solid #dce5e9; border-radius: 10px; box-shadow: none; }
-    .bs-commercial-studio.bs-commercial-studio .form-grid .grid-heading-row,
-    .bs-commercial-studio.bs-commercial-studio .form-grid .grid-heading-row :is(.col, .static-area) {
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio :is(button, a, input, select, textarea):focus-visible { outline: 2px solid #087f82; outline-offset: 3px; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .help-box { font-size: 11px; line-height: 1.5; color: #6b7d86; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-grid { border: 1px solid #dce5e9; border-radius: 10px; box-shadow: none; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-grid .grid-heading-row,
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-grid .grid-heading-row :is(.col, .static-area) {
         background: #eef4f5 !important; color: #345361 !important;
         border-color: #dce5e9; font-size: 11px; font-weight: 650; letter-spacing: normal;
     }
-    .bs-commercial-studio.bs-commercial-studio .form-grid .grid-row { border-color: #e4ebee; }
-    .bs-commercial-studio.bs-commercial-studio .form-grid .grid-body .static-area { font-size: 13px; color: #263e4b; font-variant-numeric: tabular-nums; }
-    .bs-commercial-studio.bs-commercial-studio .form-grid .grid-row:hover { background: #f7fbfa; }
-    .bs-commercial-studio.bs-commercial-studio input[type="checkbox"] { accent-color: #087f82; }
-    .bs-commercial-studio.bs-commercial-studio .form-message {
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-grid .grid-heading-row :is(div, span, .reqd) {
+        background: #eef4f5 !important; color: #345361 !important;
+        -webkit-text-fill-color: #345361 !important; border-color: #dce5e9 !important;
+    }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-grid .grid-heading-row input { filter: none !important; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-grid .grid-row { border-color: #e4ebee; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-grid .grid-body .static-area { font-size: 13px; color: #263e4b; font-variant-numeric: tabular-nums; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-grid .grid-row:hover { background: #f7fbfa; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio input[type="checkbox"] { accent-color: #087f82; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-message {
         background: #eef6f6; border: 1px solid #d9e9e8; border-radius: 9px; color: #355f69;
         font-size: 12px; line-height: 1.6; margin-bottom: 8px; padding: 10px 14px;
     }
-    .bs-commercial-studio.bs-commercial-studio .dcs-overview {
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .dcs-overview {
         border-radius: 12px; border-color: #dce5e9; background: #f7fafb; padding: 24px;
     }
-    .bs-commercial-studio.bs-commercial-studio .dcs-metrics strong { color: #096d72; font-size: 27px; letter-spacing: -.5px; }
-    .bs-commercial-studio.bs-commercial-studio [data-fieldname="grand_total"] .like-disabled-input {
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .dcs-metrics strong { color: #096d72; font-size: 27px; letter-spacing: -.5px; }
+    .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio [data-fieldname="grand_total"] .like-disabled-input {
         font-size: 22px; color: #086e70; background: #eaf5f3; font-weight: 650; padding: 12px;
     }
     @media (max-width: 767px) {
@@ -125,8 +144,8 @@
         .bs-commercial-studio .bs-commercial-hero h2 { font-size: 23px; }
         .bs-commercial-studio .bs-commercial-document { padding-left: 16px; }
         .bs-commercial-studio .bs-commercial-document small { display: none; }
-        .bs-commercial-studio.bs-commercial-studio .form-layout .form-section { padding: 18px 16px; }
-        .bs-commercial-studio.bs-commercial-studio .form-tabs .nav-link { padding: 9px 12px; }
+        .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-layout .form-section { padding: 18px 16px; }
+        .bs-commercial-studio.bs-commercial-studio.bs-commercial-studio .form-tabs .nav-link { padding: 9px 12px; }
     }
     @media (max-width: 480px) {
         .bs-commercial-studio .bs-commercial-hero { align-items: flex-start; flex-direction: column; }
