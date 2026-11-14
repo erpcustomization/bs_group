@@ -101,6 +101,9 @@ def context(project, section="tasks"):
     if meta.has_field("company"):
         result["defaults"]["company"] = doc.company
     filters = {field: doc.name} if field else []
+    from bsgroup.project_daily_work import enabled, TERMINAL
+    if enabled() and section == "tasks":
+        filters["status"] = ["not in", list(TERMINAL)]
     if section == "labor":
         filters["source"] = "Project"
         result["defaults"].update(source="Project", cost_center=doc.get("cost_center") or frappe.db.get_value("Company", doc.company, "cost_center"))
@@ -136,7 +139,7 @@ def context(project, section="tasks"):
             result["rows"] = controlled["records"]
     elif result["available"]:
         fields = ["name", "modified", "docstatus"] + [name for name in
-                  ("subject", "employee_name", "status", "workflow_state", "task") if meta.has_field(name)]
+                  ("subject", "employee_name", "status", "workflow_state", "task", "custom_date", "user") if meta.has_field(name)]
         result["rows"] = frappe.get_list(doctype, filters=filters, fields=fields, distinct=True,
                                         order_by="creation desc", limit_page_length=100)
     return result

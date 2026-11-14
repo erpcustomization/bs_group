@@ -85,10 +85,12 @@ def data(month=None):
         status = 'status' if meta.has_field('status') else 'docstatus'
         # get_list applies role, user and custom record permission filters.
         fields = ['name', status, 'creation', 'modified']
+        from bsgroup.project_daily_work import enabled, TERMINAL
+        active = [['status', 'not in', list(TERMINAL)]] if dt == 'Task' and enabled() else []
         created = frappe.get_list(dt, fields=fields,
-            filters=[['creation', '>=', str(start)], ['creation', '<', str(end)]], limit_page_length=0)
+            filters=[['creation', '>=', str(start)], ['creation', '<', str(end)]] + active, limit_page_length=0)
         updated = frappe.get_list(dt, fields=fields,
-            filters=[['modified', '>=', str(start)], ['modified', '<', str(end)]], limit_page_length=0)
+            filters=[['modified', '>=', str(start)], ['modified', '<', str(end)]] + active, limit_page_length=0)
         rows = list({row.name: row for row in created + updated}.values())
         for row in created:
             daily[frappe.utils.getdate(row.creation).day - 1] += 1

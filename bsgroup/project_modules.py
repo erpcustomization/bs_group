@@ -104,6 +104,9 @@ def records(section, projects):
         "labor": ("Labor Preapproval", {"source": "Project", "reference": ["in", names]}, ["workflow_state", "reference", "task"]),
     }
     doctype, filters, extra = definitions[section]
+    from bsgroup.project_daily_work import enabled, TERMINAL
+    if enabled() and section == "tasks":
+        filters["status"] = ["not in", list(TERMINAL)]
     result = {"doctype": doctype, "rows": [], "available": bool(frappe.has_permission(doctype, "read"))}
     if not result["available"] or not names:
         return result

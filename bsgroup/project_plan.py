@@ -142,6 +142,9 @@ def get_plan(project):
         item = frappe.get_doc("Task", row.name)
         row["can_edit"] = row["can_edit"] and frappe.has_permission("Task", "write", doc=item)
         row["can_log_work"] = doc.status != "Cancelled" and row.status not in {"Cancelled", "Template"} and _is_assigned(item, closed=True)
+        from bsgroup.project_daily_work import enabled, TERMINAL
+        if enabled() and (row.status in TERMINAL or doc.status == "Completed"):
+            row["can_log_work"] = False
         project_status_editable = doc.status != "Cancelled" and (doc.status != "Completed" or frappe.has_permission("Project", "write", doc=doc))
         row["can_change_status"] = project_status_editable and row.status not in {"Cancelled", "Template"} and (
             frappe.has_permission("Task", "write", doc=item) or (row.status != "Completed" and _is_assigned(item)))
@@ -187,13 +190,16 @@ def work_history(project, task):
 
 
 @frappe.whitelist(methods=["POST"])
-def save_work(project, task, work):
+def save_work(project, task, work, request_id=None):
     doc, item = _read_task(project, task, lock=True)
     if doc.status == "Cancelled" or item.status in {"Cancelled", "Template"} or not _is_assigned(item, closed=True):
         frappe.throw(_("Only users assigned to this task can enter today's work."), frappe.PermissionError)
     text = (work or "").strip()
     if not text or len(text) > 20000:
         frappe.throw(_("Enter the work completed today (up to 20,000 characters)."))
+    from bsgroup.project_daily_work import enabled, capture
+    if enabled():
+        return capture(doc, item, text, request_id)
     author = frappe.db.get_value("User", frappe.session.user, "full_name") or frappe.session.user
     content = "<p><strong>Today's work — " + str(getdate()) + "</strong></p><p>" + escape(text).replace("\n", "<br>") + "</p>"
     # Comments are the native Task activity history. The caller and task are
@@ -206,6 +212,9 @@ def save_work(project, task, work):
 
 @frappe.whitelist(methods=["POST"])
 def set_task_status(project, task, status, expected_modified):
+    from bsgroup.project_daily_work import enabled
+    if enabled() and status == "Closed":
+        status = "Completed"
     savepoint = "plan_status_" + frappe.generate_hash(length=10)
     frappe.db.savepoint(savepoint)
     try:

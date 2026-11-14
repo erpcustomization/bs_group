@@ -471,6 +471,7 @@ override_whitelisted_methods = {
 
 extend_doctype_class = {
     "Task": ["bsgroup.project_plan.ProjectPlanTaskMixin"],
+    "Project": ["bsgroup.project_daily_work.ProjectDailyWorkMixin"],
     "Holiday List": [
         "bsgroup.utils.api.HolidayListEnglishDescriptionMixin"
     ]
@@ -746,6 +747,9 @@ after_migrate.append("bsgroup.quotation_revision.install")
 after_migrate.append("bsgroup.project_workspace.install")
 after_migrate.append("bsgroup.project_plan.install")
 after_migrate.append("bsgroup.project_ai_plan.install")
+after_migrate.append("bsgroup.project_daily_work.install")
+doc_events["Task"]["before_validate"].insert(0, "bsgroup.project_daily_work.normalize_closed")
+doc_events["Task"]["on_update"].append("bsgroup.project_daily_work.task_updated")
 
 # Regional, explicitly enabled HR sending; no change to other mail routes.
 from bsgroup.hr_email import configure_hooks as _hr_email_hooks

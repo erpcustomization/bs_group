@@ -291,6 +291,7 @@
         }).appendTo(recovery);
     }
     async function showWork(frm,project,row,entry) {
+        const request_id=crypto.randomUUID();
         const d=new frappe.ui.Dialog({title:entry?__('Enter today’s task'):__('Task Work History'),size:'large',fields:[
             {fieldname:'activity',fieldtype:'HTML',options:'<p><strong>'+esc(row.subject)+'</strong><br>'+esc(row.name)+'</p>'},
             ...(entry?[{fieldname:'work',fieldtype:'Small Text',label:__('Work completed today'),reqd:1}]:[]),
@@ -298,7 +299,7 @@
             primary_action_label:entry?__('Save work'):__('Close'),async primary_action(values){
                 if(!entry) {d.hide();return;}
                 if(d.__saving)return;d.__saving=true;d.get_primary_btn().prop('disabled',true);
-                try {await frappe.call({method:'bsgroup.project_plan.save_work',type:'POST',args:{project,task:row.name,work:values.work}});d.hide();frappe.show_alert({message:__('Today’s work saved'),indicator:'green'});}
+                try {const {message:receipt}=await frappe.call({method:'bsgroup.project_plan.save_work',type:'POST',args:{project,task:row.name,work:values.work,request_id}});d.hide();frappe.show_alert({message:receipt.timesheet?__('Work saved to your task and today’s draft timesheet'):__('Today’s work saved'),indicator:'green'});if(frm.__bs_activity_tabs?.timesheets)frm.__bs_activity_tabs.timesheets.activity_project=null;}
                 finally {d.__saving=false;d.get_primary_btn().prop('disabled',false);}
             }});
         d.show();d.fields_dict.history.$wrapper.text(__('Loading work history…'));
@@ -339,7 +340,7 @@
         if (!data.available) {$('<p>').text(__('This activity is restricted by your existing access.')).appendTo(panel); return;}
 
         const records=$('<div class="table-responsive">').html(`<table class="table table-bordered"><thead><tr><th>Record</th><th>Details</th><th>Status</th></tr></thead><tbody>${data.rows.map(row=>
-            `<tr><td><button type="button" class="btn btn-link btn-xs" data-record="${esc(row.name)}">${esc(row.name)}</button></td><td>${esc(row.subject||row.employee_name||row.task||'—')}</td><td>${esc(row.workflow_state||row.status||['Draft','Submitted','Cancelled'][row.docstatus])}</td></tr>`
+            `<tr><td><button type="button" class="btn btn-link btn-xs" data-record="${esc(row.name)}">${esc(row.name)}</button></td><td>${esc(row.subject||row.employee_name||row.user||row.task||'—')}${row.custom_date?'<br>'+esc(frappe.datetime.str_to_user(row.custom_date)):''}</td><td>${esc(row.workflow_state||row.status||['Draft','Submitted','Cancelled'][row.docstatus])}</td></tr>`
         ).join('') || '<tr><td colspan="3">No records for this project.</td></tr>'}</tbody></table>`).appendTo(panel);
         records.on('click','button[data-record]',e=>openProjectRecord(frm,data,e.currentTarget.dataset.record,()=>render(frm,section)));
         $('<p class="text-muted">').text(__('Showing up to 100 accessible records linked to this project.')).appendTo(panel);
