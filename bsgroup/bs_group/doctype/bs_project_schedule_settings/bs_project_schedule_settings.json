@@ -11,7 +11,11 @@
   "send_on_holiday_eve",
   "individual_webhook",
   "private_delivery_verified",
-  "instructions"
+  "instructions",
+  "oman_group_section",
+  "oman_group_webhook",
+  "oman_group_verified",
+  "oman_group_enabled"
  ],
  "fields": [
   {
@@ -47,6 +51,28 @@
    "label": "Schedule",
    "fieldtype": "HTML",
    "options": "<p>6:00 PM local time: tomorrow\u2019s Project Plan tasks through the existing Tech Task Scheduler. HR holiday calendars apply. Completed/Closed/Cancelled tasks are excluded. Delivery is attempted once per user/date/site.</p>"
+  },
+  {
+   "fieldname": "oman_group_section",
+   "fieldtype": "Section Break",
+   "label": "Projects Team Oman group copy"
+  },
+  {
+   "fieldname": "oman_group_webhook",
+   "label": "Verified Oman group flow endpoint",
+   "fieldtype": "Password"
+  },
+  {
+   "fieldname": "oman_group_verified",
+   "label": "Projects Team Oman destination verified in Power Automate",
+   "fieldtype": "Check",
+   "default": "0"
+  },
+  {
+   "fieldname": "oman_group_enabled",
+   "label": "Send Oman group summary daily at 6 PM",
+   "fieldtype": "Check",
+   "default": "0"
   }
  ],
  "permissions": [

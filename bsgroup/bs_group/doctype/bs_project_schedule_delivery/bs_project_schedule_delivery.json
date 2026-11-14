@@ -7,6 +7,7 @@
  "engine": "InnoDB",
  "field_order": [
   "recipient",
+  "delivery_target",
   "schedule_date",
   "task_count",
   "status",
@@ -43,6 +44,12 @@
    "fieldname": "detail",
    "label": "Delivery detail",
    "fieldtype": "Small Text",
+   "read_only": 1
+  },
+  {
+   "fieldname": "delivery_target",
+   "label": "Group destination",
+   "fieldtype": "Data",
    "read_only": 1
   }
  ],

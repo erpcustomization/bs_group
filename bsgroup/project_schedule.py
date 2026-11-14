@@ -204,7 +204,8 @@ def run():
     if not lock.acquire(blocking=False):
         return
     try:
-        for candidate in candidates(day, settings, sent_day=now.date()):
+        planned = candidates(day, settings, sent_day=now.date())
+        for candidate in planned:
             key = identity(frappe.local.site, candidate['user'], day)
             if candidate['reason'] or not candidate['rows'] or frappe.db.exists(DELIVERY, key):
                 continue
@@ -220,6 +221,8 @@ def run():
                 # Never include the HTTP URL, response body or credentials.
                 frappe.log_error(title='Automatic project schedule needs review',
                     message=f'Employee {candidate["employee"]}; task date {day}; error type {type(exc).__name__}. Check schedule settings and delivery history.')
+        from bsgroup.project_schedule_group import dispatch as dispatch_group
+        dispatch_group(settings, day, planned)
     finally:
         lock.release()
 
