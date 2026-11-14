@@ -143,11 +143,13 @@ def validate_endpoint(url):
         frappe.throw('Use the HTTPS endpoint of the verified Microsoft individual Teams flow.')
 
 
-def dispatch(settings, candidate, day, rows):
-    key = identity(frappe.local.site, candidate['user'], day)
+def dispatch(settings, candidate, day, rows, test=False):
+    key = identity(('TEST:' if test else '') + frappe.local.site, candidate['user'], day)
     if frappe.db.exists(DELIVERY, key):
         return 'Already reserved'
     body = message(candidate['employee_name'], day, rows, profile().COMPANY.rsplit(' - ', 1)[-1])
+    if test:
+        body = '<p><b>TEST ONLY — private project schedule delivery and duplicate protection.</b></p>' + body
     if len(body.encode('utf-8')) > 24000:
         frappe.throw('Teams summary exceeds 24 KB; review the flow before sending.')
     url = settings.get_password('individual_webhook')
@@ -297,6 +299,28 @@ def selftest():
             rows_after_two_runs=count, persisted=False, teams_messages_sent=0)
     finally:
         frappe.db.rollback(save_point='bs_schedule_selftest')
+
+
+@frappe.whitelist(methods=['POST'])
+def test_delivery():
+    """A labelled, sample-only test to Mohan; repeated requests cannot resend.
+
+    Separate reservation namespace never consumes his real daily notification.
+    This explicitly sends once, unlike the rollback-only scheduler self-test.
+    """
+    frappe.only_for('System Manager')
+    if frappe.session.user != 'mohan@bitssecureit.com' or not profile():
+        frappe.throw('The delivery test must be run by Mohan on Oman or UAE.')
+    day = datetime.now(profile().TZ).date() + timedelta(days=1)
+    candidate = dict(user=frappe.session.user, employee_name='Mohan')
+    rows = [dict(project_title='TEST ONLY — ' + profile().COMPANY, task='TEST-DELIVERY',
+        task_title='Verify one private Teams message; no real work assigned',
+        due_date=str(day), status='Scheduled')]
+    settings = frappe.get_single(SETTINGS)
+    first = dispatch(settings, candidate, day, rows, test=True)
+    second = dispatch(settings, candidate, day, rows, test=True)
+    return dict(first=first, repeated=second, recipient=frappe.session.user,
+        delivery=identity('TEST:' + frappe.local.site, frappe.session.user, day))
 
 
 def configure_hooks(hooks):

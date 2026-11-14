@@ -1,5 +1,9 @@
 frappe.ui.form.on('BS Project Schedule Settings', {
     refresh(frm) {
+        if(frappe.session.user==='mohan@bitssecureit.com') frm.add_custom_button(__('Send Private Test to Mohan'), async () => {
+            const {message:r}=await frappe.call({method:'bsgroup.project_schedule.test_delivery',type:'POST',freeze:true});
+            frappe.msgprint(__('First attempt: {0}. Repeated attempt: {1}. Check Power Automate run history for actual delivery.',[r.first,r.repeated]));
+        });
         frm.add_custom_button(__('Test Duplicate Protection'), async () => {
             const {message:r}=await frappe.call({method:'bsgroup.project_schedule.selftest',type:'POST',freeze:true});
             if(r?.success) frappe.msgprint(__('Passed: two runs reused one scheduler and left one task row. Test changes were rolled back. No Teams messages sent.')+'<br>'+frappe.utils.escape_html(r.project));

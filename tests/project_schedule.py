@@ -90,6 +90,12 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual(self.m.dispatch(self.settings,self.candidate,self.day,[self.row]),'Already reserved')
         self.requests.post.assert_not_called()
 
+    def test_delivery_test_does_not_consume_real_day_reservation(self):
+        self.m.dispatch(self.settings,self.candidate,self.day,[self.row],test=True)
+        test_key=self.log.insert.call_args.kwargs['set_name']
+        self.assertNotEqual(test_key,self.m.identity(self.f.local.site,self.candidate['user'],self.day))
+        self.assertIn('TEST ONLY',self.requests.post.call_args.kwargs['json']['message'])
+
     def test_concurrent_reservation_never_posts(self):
         self.log.insert.side_effect=self.f.DuplicateEntryError
         self.assertEqual(self.m.dispatch(self.settings,self.candidate,self.day,[self.row]),'Already reserved')
