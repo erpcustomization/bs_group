@@ -14,6 +14,8 @@ class LaborPreapproval(Document):
 		self.validate_labor_lines()
 		self.calculate_totals()
 		self.validate_self_approval()
+		from bsgroup.labour_approvals import guard_decision
+		guard_decision(self)
 
 	def before_insert(self):
 		if self.amended_from:
@@ -462,10 +464,10 @@ def get_summary_html(lpre_name):
 		<div class="lpre-stats">
 			<div class="lpre-stat"><div class="lpre-stat-label">Project</div><div class="lpre-stat-value">{esc(project_title) or esc(lpre.reference) or "-"}</div></div>
 			<div class="lpre-stat"><div class="lpre-stat-label">Task</div><div class="lpre-stat-value">{esc(task_title) or esc(lpre.task) or "-"}</div></div>
-			<div class="lpre-stat lpre-stat-blue"><div class="lpre-stat-label">Approved</div><div class="lpre-stat-value">{approved}</div></div>
+			<div class="lpre-stat lpre-stat-blue"><div class="lpre-stat-label">{"Approved person-days" if lpre.docstatus == 1 else "Requested person-days"}</div><div class="lpre-stat-value">{approved}</div></div>
 			<div class="lpre-stat lpre-stat-blue"><div class="lpre-stat-label">Scheduled</div><div class="lpre-stat-value">{scheduled_total}</div></div>
 			<div class="lpre-stat lpre-stat-green"><div class="lpre-stat-label">Used</div><div class="lpre-stat-value">{consumed}</div></div>
-			<div class="lpre-stat {remaining_color}"><div class="lpre-stat-label">Remaining</div><div class="lpre-stat-value">{remaining}</div></div>
+			<div class="lpre-stat {remaining_color}"><div class="lpre-stat-label">{"Remaining" if lpre.docstatus == 1 else "Available now"}</div><div class="lpre-stat-value">{remaining if lpre.docstatus == 1 else 0}</div></div>
 		</div>
 
 		<h6>Tech Task Scheduler Allocation</h6>

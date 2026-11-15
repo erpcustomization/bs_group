@@ -6,6 +6,7 @@ frappe.ui.form.on("Labor Preapproval", {
 		set_reference_label(frm);
 	},
 	refresh(frm) {
+		frm.set_df_property("approved_person_days", "label", frm.doc.docstatus === 1 ? __("Approved Person-Days") : __("Requested Person-Days"));
 		set_reference_label(frm);
 		render_summary_html(frm);
 		render_line_items_summary(frm);

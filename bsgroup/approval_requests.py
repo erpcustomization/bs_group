@@ -59,9 +59,19 @@ def pending():
             requested_by=row.owner, amount=sum(flt(i.qty) * flt(i.rate) for i in doc.items),
             currency=frappe.get_cached_value("Company", row.company, "default_currency"),
             state="Pending Approval", quotation=row.custom_bsp_quotation or ""))
+    labour = visible_rows("Labor Preapproval", {"docstatus": 0, "workflow_state": "Pending Approval"},
+        ["name", "modified", "owner", "company", "source", "reference", "task", "total_labor_cost"])
+    for row in labour:
+        title = (frappe.db.get_value("Project", row.reference, "project_name")
+                 if row.source == "Project" else row.reference)
+        result.append(dict(kind="labour", name=row.name, modified=str(row.modified),
+            subject=title or row.reference, customer=row.task or row.source,
+            requested_by=row.owner, company=row.company, amount=row.total_labor_cost,
+            currency=frappe.get_cached_value("Company", row.company, "default_currency"),
+            state="Pending Approval", quotation=""))
     result.sort(key=lambda row: (row["modified"], row["kind"], row["name"]))
     return dict(requests=result, counts={kind: sum(r["kind"] == kind for r in result)
-                                        for kind in ("sales", "purchase")})
+                                        for kind in ("sales", "purchase", "labour")})
 
 
 def load_sales(name, lock=False):
@@ -76,6 +86,9 @@ def load_sales(name, lock=False):
 @frappe.whitelist()
 def review(kind, name):
     require_mohan()
+    if kind == "labour":
+        from bsgroup.labour_approvals import review as review_labour
+        return review_labour(name)
     if kind == "sales":
         doc = load_sales(name)
         from bsgroup.api.dcs.approval import dcs_screen4
@@ -109,6 +122,9 @@ def decide(kind, name, modified, action, reason="", revision=None):
         frappe.throw("Enter a reason for this decision.")
     if not modified:
         frappe.throw("Refresh and review the request before deciding.")
+    if kind == "labour":
+        from bsgroup.labour_approvals import decide as decide_labour
+        return decide_labour(name, modified, action, reason)
     if kind == "sales":
         doc = load_sales(name, lock=True)
         if (not revision or revision != doc.custom_revision_reference
