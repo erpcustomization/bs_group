@@ -15,6 +15,9 @@ ROOT = Path(__file__).parents[1]
 
 
 class Doc(dict):
+    def set(self, key, value):
+        self[key] = value
+
     def __getattr__(self, key):
         return self.get(key)
 
@@ -35,14 +38,14 @@ class DeliveryTests(unittest.TestCase):
         for fn in functions:
             if fn.name!='writing': fn.decorator_list=[]
         exec(compile(ast.Module(body=functions,type_ignores=[]),'<delivery>','exec'),self.env)
-        self.task=Doc(name='T1',project='P1',company='OM',status='Open',custom_bs_delivery_pr='PR1',save=MagicMock(),reload=MagicMock())
+        self.task=Doc(name='T1',project='P1',company='OM',status='Open',custom_bs_delivery_pr='PR1',custom_bs_delivery_coordinator='assignee@example.com',custom_bs_delivery_person='driver@example.com',save=MagicMock(),reload=MagicMock())
         self.pr=Doc(name='PR1',custom_project='P1',company='OM',docstatus=1,workflow_state='Approved',status='Pending')
         self.project=Doc(name='P1',company='OM',status='Open',reload=MagicMock(),save=MagicMock(),add_comment=MagicMock())
-        self.delivery=Doc(name='DEL1',project='P1',company='OM',task='T1',purchase_request='PR1',status='Open',notes='Delivered to site',proof='/private/files/proof.pdf',save=MagicMock(),completed_by=None)
+        self.delivery=Doc(name='DEL1',project='P1',company='OM',task='T1',purchase_request='PR1',status='Open',coordinator='assignee@example.com',delivery_person='driver@example.com',coordinator_notes='Arranged delivery',coordinator_proof='/private/files/arrangement.pdf',delivery_notes='Delivered to site',delivery_proof='/private/files/proof.pdf',save=MagicMock(),completed_by=None)
         self.docs={'Task':self.task,'Project':self.project,'Material Request':self.pr,'Delivery Request':self.delivery}
         self.f.get_doc.side_effect=lambda dt,*a,**k:self.docs[dt]
         self.f.db.get_value.return_value='T1'
-        self.env['assignees']=lambda task:{'assignee@example.com'}
+        self.env['assignees']=lambda task:{'assignee@example.com','driver@example.com'}
         self.capture=MagicMock(return_value={'timesheet':'TS1'})
         sys.modules['bsgroup.project_daily_work']=SimpleNamespace(capture=self.capture)
 
@@ -64,24 +67,44 @@ class DeliveryTests(unittest.TestCase):
         self.pr.docstatus=0
         with self.assertRaisesRegex(ValueError,'approved purchase'):self.env['complete']('DEL1')
         self.pr.docstatus=1
-        self.delivery.notes=' '
+        self.delivery.coordinator_notes=' '
         with self.assertRaisesRegex(ValueError,'Attach delivery proof'):self.env['complete']('DEL1')
-        self.delivery.notes='Delivered'
+        self.delivery.coordinator_notes='Arranged delivery'
         self.f.db.exists.return_value=False
         with self.assertRaisesRegex(ValueError,'private document'):self.env['complete']('DEL1')
         self.capture.assert_not_called()
 
-    def test_complete_updates_all_records_and_repeat_is_idempotent(self):
+    def test_both_people_required_and_each_submission_is_idempotent(self):
         self.f.db.exists.return_value=True
         self.f.get_all.return_value=['Completed']
         result=self.env['complete']('DEL1')
         self.assertEqual(result['timesheet'],'TS1')
-        self.assertEqual(self.task.status,'Completed')
-        self.assertEqual(self.project.status,'Completed')
-        self.assertEqual(self.delivery.completed_by,'assignee@example.com')
+        self.assertEqual(self.task.status,'Open')
+        self.assertEqual(self.project.status,'Open')
+        self.assertEqual(self.delivery.status,'Awaiting delivery person')
         self.env['complete']('DEL1')
         self.capture.assert_called_once()
-        self.assertEqual(self.capture.call_args.args[3],'delivery-DEL1')
+        self.f.session.user='driver@example.com'
+        self.env['complete']('DEL1')
+        self.assertEqual(self.task.status,'Completed')
+        self.assertEqual(self.project.status,'Completed')
+        self.assertEqual(self.delivery.completed_by,'driver@example.com')
+        self.env['complete']('DEL1')
+        self.assertEqual(self.capture.call_count,2)
+        self.assertEqual(self.capture.call_args_list[0].args[3],'delivery-DEL1-coordinator')
+        self.assertEqual(self.capture.call_args_list[1].args[3],'delivery-DEL1-delivery')
+
+    def test_participant_cannot_edit_other_person_or_submitted_work(self):
+        old=Doc(self.delivery)
+        self.delivery.is_new=lambda:False
+        self.delivery.get_doc_before_save=lambda:old
+        self.delivery.delivery_notes='Changed by coordinator'
+        with self.assertRaisesRegex(ValueError,'own delivery work'):self.env['validate'](self.delivery)
+        self.delivery.delivery_notes=old.delivery_notes
+        old.coordinator_completed_on='EARLIER'
+        self.delivery.coordinator_completed_on='EARLIER'
+        self.delivery.coordinator_notes='Edited after submission'
+        with self.assertRaisesRegex(ValueError,'Submitted evidence'):self.env['validate'](self.delivery)
 
     def test_reconciliation_reuses_request_and_retains_completed_evidence(self):
         self.f.db.exists.return_value=True

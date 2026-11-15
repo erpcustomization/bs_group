@@ -253,8 +253,20 @@
         const assigned=cell();
         const label=$('<div>').text(selected.map(u=>names[u] || u).join(', ') || __('Unassigned')).appendTo(assigned);
         $('<button type="button" class="btn btn-default btn-xs bs-plan-edit">').text(__('Choose users')).prop('disabled',!row.can_edit).on('click',async()=>{
+            if(frm.__bs_plan_dirty?.size) return frappe.msgprint(__('Wait for automatic saving to finish before changing assignments.'));
             const {message:choices}=await frappe.call({method:'bsgroup.project_plan.assignment_choices',args:{project,task:row.name}});
             for(const u of selected) if(!choices.some(o=>o.value===u)) choices.push({value:u,label:names[u] || u,description:u});
+            if(row.delivery_managed) {
+                const options=[{label:'',value:''},...choices.map(o=>({label:o.label+' ('+o.value+')',value:o.value}))];
+                const d=new frappe.ui.Dialog({title:__('Assign Delivery Participants'),fields:[
+                    {fieldname:'coordinator',fieldtype:'Select',label:__('Coordinator / Person Arranging Delivery'),options,reqd:1,default:row.delivery_coordinator || ''},
+                    {fieldname:'delivery_person',fieldtype:'Select',label:__('Delivery Person'),options,reqd:1,default:row.delivery_person || ''}
+                ],primary_action_label:__('Assign Both'),async primary_action(v){
+                    if(v.coordinator===v.delivery_person) return frappe.msgprint(__('Choose two different people.'));
+                    await frappe.call({method:'bsgroup.supply_delivery.assign',args:{project,task:row.name,...v,expected_modified:row.modified},freeze:true});
+                    d.hide();await frm.reload_doc();
+                }});d.show();return;
+            }
             for(const o of choices) {names[o.value]=o.label;o.label=esc(o.label);o.description=esc(o.description);}
             const d=new frappe.ui.Dialog({title:__('Assign Activity'),fields:[{fieldname:'users',fieldtype:'MultiSelectList',label:__('Assigned To'),get_data:txt=>choices.filter(o=>(o.label+' '+o.value).toLowerCase().includes((txt||'').toLowerCase()))}],primary_action_label:__('Done'),primary_action(v){selected=[...(v.users || [])];label.text(selected.map(u=>names[u] || u).join(', ') || __('Unassigned'));controller.edit('assigned_to',selected);d.hide();}});
             d.show();await d.fields_dict.users.set_options();d.fields_dict.users.set_value(selected);
