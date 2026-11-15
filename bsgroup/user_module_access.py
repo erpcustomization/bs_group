@@ -156,6 +156,8 @@ def summarize(doc, context, roles=None):
                 if doc.name == 'Administrator':
                     inherited_full = True
                     status = 'Available'
+                elif row['note'] and status == 'Available':
+                    status = 'Limited'
                 note = 'Applies only to accessible records. Company, ownership and assignment restrictions remain.'
             else:
                 enabled,note=approval(module,doc.name,roles,context)
@@ -165,11 +167,11 @@ def summarize(doc, context, roles=None):
             reason = row['note']
             if action=='approve' and module in ('Sales','Procurement'):
                 reason=note
-            elif inherited_full:
+            elif not reason and inherited_full:
                 reason='Included in existing access; protected from removal here.'
-            elif status in ('Available','Eligible requests') and not managed:
+            elif not reason and status in ('Available','Eligible requests') and not managed:
                 reason='Included in another new grant. Remove that grant first to change this option.'
-            elif not grant_roles(module,action,context):
+            elif not reason and not grant_roles(module,action,context):
                 reason='No compatible permission is configured for this option.'
             if not records:
                 reason='This module is not installed.'
