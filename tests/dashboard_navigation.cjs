@@ -9,7 +9,7 @@ class Element {
 for(const scoped of [false,true]) {
  const host=new Element(),native=new Element();host.append(native);
  const document={body:{},head:new Element(),createElement:()=>new Element(),querySelectorAll:s=>s.includes('data-title')?[]:[host]};
- const location={href:'https://erp.bitssecureit.com/desk/my-work-dashboard',pathname:'/desk/my-work-dashboard'};
+ const location={href:'https://erp.bitssecureit.com/desk/private/my-work-dashboard',pathname:'/desk/private/my-work-dashboard'};
  const window={};window.top=window;window.self=window;
  const observers=[],changes=[],timers=[];
  const context={document,location,window,URL,__:s=>s,sessionStorage:{getItem:()=>null,setItem(){}},

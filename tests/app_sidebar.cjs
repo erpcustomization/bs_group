@@ -29,6 +29,7 @@ assert.equal(appForSection(null),'BS Sales');
 console.log('PASS app-scoped routes, direct records, app switching, project categories, shared routes and invalid context');
 assert(isDashboard('/desk/my-work-dashboard'));
 assert(isDashboard('/desk/bs-group/my-work-dashboard/'));
+assert(isDashboard('/desk/private/my-work-dashboard'));
 assert(!isDashboard('/desk/project'));
 const permitted={'BS Project':'/desk/bs-group/project','BS Sales':null,'BS HR':null};
 const before=JSON.stringify(permitted);

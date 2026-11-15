@@ -33,7 +33,7 @@
         return groups[previous] ? previous : 'BS Sales';
     }
     function isDashboard(path) {
-        return /^\/desk\/(?:bs-group\/)?my-work-dashboard\/?$/.test(path);
+        return /^\/desk\/(?:[^/]+\/)?my-work-dashboard\/?$/.test(path);
     }
     function dashboardLinks(destinations) {
         return [
