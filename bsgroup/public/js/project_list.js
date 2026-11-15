@@ -1,3 +1,7 @@
+// Default applies to every project user, independently of Command Centre roles.
+frappe.listview_settings = frappe.listview_settings || {};
+frappe.listview_settings['Project'] = frappe.listview_settings['Project'] || {};
+frappe.listview_settings['Project'].filters = [['status','!=','Completed']];
 // Project Command Centre - persistent auto-loader
 // Artifact version : 2026-08-08-frozen.11
 // Artifact SHA-256 : 363d044c…e6a6e628  (full hash recorded in change log)
@@ -675,7 +679,6 @@ function addLauncher(listview) {
 }
 frappe.listview_settings = frappe.listview_settings || {};
 frappe.listview_settings['Project'] = frappe.listview_settings['Project'] || {};
-frappe.listview_settings['Project'].filters = [['status','!=','Completed']];
 var prevOnload = frappe.listview_settings['Project'].__pcc_wrapped ? null : frappe.listview_settings['Project'].onload;
 frappe.listview_settings['Project'].onload = function (listview) {
   if (prevOnload) { try { prevOnload(listview); } catch (e) {} }
