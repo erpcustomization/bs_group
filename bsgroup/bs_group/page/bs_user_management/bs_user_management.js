@@ -28,7 +28,7 @@ frappe.pages['bs-user-management'].on_page_load = function(wrapper) {
             for(const user of rows) {
                 const row=$('<button class="person">').toggleClass('selected',user.name===selected).appendTo(list);
                 const identity=$('<span class="identity">').appendTo(row);
-                $('<strong>').text(user.full_name||user.first_name||'Name missing').appendTo(identity);
+                $('<strong>').text(user.first_name||user.full_name||'Name missing').appendTo(identity);
                 $('<small>').text(user.name).appendTo(identity);
                 row.on('click',()=>show(user.name));
             }
