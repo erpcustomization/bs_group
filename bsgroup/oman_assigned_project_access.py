@@ -4,6 +4,64 @@ import frappe
 USERS = ('amar@bitssecureit.com', 'nowfal@bitssecureit.com')
 FLAG = 'custom_bs_assigned_project_access'
 COMPANY = 'Bits Secure IT Infrastructure LLC - OM'
+READER_ROLE = 'BS Assigned Project Reader'
+
+
+def restricted(user=None):
+    from bsgroup.hr_email import is_oman
+    return is_oman() and (user or frappe.session.user) == 'amar@bitssecureit.com'
+
+
+def assigned_condition(doctype, user=None):
+    user = user or frappe.session.user
+    if not restricted(user):
+        return ''
+    names = sorted(name for dt, name in desired(user) if dt == doctype)
+    if not names:
+        return '1=0'
+    return f'`tab{doctype}`.name in (' + ','.join(frappe.db.escape(name) for name in names) + ')'
+
+
+def project_query(user=None):
+    return assigned_condition('Project', user)
+
+
+def task_query(user=None):
+    return assigned_condition('Task', user)
+
+
+def assigned_permission(doc, user=None, permission_type=None, ptype=None):
+    user = user or frappe.session.user
+    if not restricted(user):
+        return True
+    return ((permission_type or ptype or 'read') in ('read', 'select')
+            and not doc.is_new() and (doc.doctype, doc.name) in desired(user))
+
+
+def install_amar_reader():
+    """Open native navigation without granting general access to other records."""
+    if not restricted('amar@bitssecureit.com') or not frappe.db.exists('User', 'amar@bitssecureit.com'):
+        return
+    if not frappe.db.exists('Role', READER_ROLE):
+        frappe.get_doc(dict(doctype='Role', role_name=READER_ROLE, desk_access=1)).insert(ignore_permissions=True)
+    from frappe.permissions import setup_custom_perms
+    for dt in ('Project', 'Task'):
+        setup_custom_perms(dt)
+        filters = dict(parent=dt, role=READER_ROLE, permlevel=0, if_owner=1)
+        name = frappe.db.get_value('Custom DocPerm', filters, 'name')
+        rule = frappe.get_doc('Custom DocPerm', name) if name else frappe.get_doc(dict(
+            doctype='Custom DocPerm', parenttype='DocType', parentfield='permissions', **filters))
+        # Owner-only grants expose the app/list. Exact assigned records remain
+        # readable through the existing assignment shares and query restrictions.
+        rule.update(dict(read=1, select=1, write=0, create=0, delete=0, submit=0,
+                         cancel=0, amend=0, report=0, export=0, share=0, print=0, email=0))
+        rule.save(ignore_permissions=True)
+        frappe.clear_cache(doctype=dt)
+    user = frappe.get_doc('User', 'amar@bitssecureit.com')
+    if READER_ROLE not in [row.role for row in user.roles]:
+        user.append('roles', dict(role=READER_ROLE))
+        user.save(ignore_permissions=True)
+    frappe.clear_cache(user=user.name)
 
 
 def employee_users():
@@ -73,9 +131,13 @@ def install():
     create_custom_fields({'DocShare': [dict(fieldname=FLAG, label='Managed assigned project access',
         fieldtype='Check', read_only=1, hidden=1, no_copy=1)]}, update=True)
     sync()
+    install_amar_reader()
 
 
 def configure_hooks(hooks):
+    for dt, query in (('Project', 'project_query'), ('Task', 'task_query')):
+        hooks.setdefault('permission_query_conditions', {})[dt] = 'bsgroup.oman_assigned_project_access.' + query
+        hooks.setdefault('has_permission', {})[dt] = 'bsgroup.oman_assigned_project_access.assigned_permission'
     hooks.setdefault('after_migrate', []).append('bsgroup.oman_assigned_project_access.install')
     for doctype, events in {'ToDo': ('on_update', 'after_delete'), 'Task': ('on_update',),
                             'Project': ('on_update',)}.items():
