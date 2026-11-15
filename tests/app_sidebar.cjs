@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-const {appForSection,chooseApp,routeMatches,groups}=require('../bsgroup/public/js/app_sidebar.js');
+const {appForSection,chooseApp,routeMatches,groups,isDashboard,dashboardLinks}=require('../bsgroup/public/js/app_sidebar.js');
 const url=p=>new URL(p,'https://erp.bitssecureit.com');
 const candidates=[
  {app:'BS Sales',href:'/desk/bs-group/quotation'},
@@ -27,3 +27,19 @@ for(const section of groups['BS Project']) assert.equal(appForSection(section),'
 for(const app of ['BS HR','BS Support','BS AMC','BS PPM','BS Procurement','BS Approvals','BS Helpdesk']) assert.equal(appForSection(app),app);
 assert.equal(appForSection(null),'BS Sales');
 console.log('PASS app-scoped routes, direct records, app switching, project categories, shared routes and invalid context');
+assert(isDashboard('/desk/my-work-dashboard'));
+assert(isDashboard('/desk/bs-group/my-work-dashboard/'));
+assert(!isDashboard('/desk/project'));
+const permitted={'BS Project':'/desk/bs-group/project','BS Sales':null,'BS HR':null};
+const before=JSON.stringify(permitted);
+assert.deepEqual(dashboardLinks(permitted),[
+ {label:'Dashboard',href:'/desk/my-work-dashboard'},
+ {label:'All apps',href:'/desk'},
+ {label:'BS Project Support',href:'/desk/bs-group/project?bs_app=BS%20Project'},
+]);
+assert.equal(JSON.stringify(permitted),before);
+assert.equal(dashboardLinks(undefined).length,2);
+assert.equal(dashboardLinks({'BS HR':'https://invalid.example','Unknown':'/desk/project'}).length,2);
+assert.equal(dashboardLinks({'BS Procurement':'/desk/bs-group/material-request?view=list'})[2].href,
+ '/desk/bs-group/material-request?view=list&bs_app=BS%20Procurement');
+console.log('PASS dashboard aliases, permitted modules only, All apps fallback, safe links and unchanged permission map');

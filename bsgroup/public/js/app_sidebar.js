@@ -32,18 +32,54 @@
         }
         return groups[previous] ? previous : 'BS Sales';
     }
-    if(typeof module!=='undefined' && module.exports) {module.exports={groups,appForSection,routeMatches,chooseApp};return;}
+    function isDashboard(path) {
+        return /^\/desk\/(?:bs-group\/)?my-work-dashboard\/?$/.test(path);
+    }
+    function dashboardLinks(destinations) {
+        return [
+            {label:'Dashboard',href:'/desk/my-work-dashboard'},
+            {label:'All apps',href:'/desk'},
+            ...Object.entries(destinations || {}).filter(([app,path])=>groups[app] && typeof path==='string' && path.startsWith('/desk/'))
+                .map(([app,path])=>({label:app==='BS Project'?'BS Project Support':app,
+                    href:path+(path.includes('?')?'&':'?')+'bs_app='+encodeURIComponent(app)})),
+        ];
+    }
+    if(typeof module!=='undefined' && module.exports) {module.exports={groups,appForSection,routeMatches,chooseApp,isDashboard,dashboardLinks};return;}
     if(window.top!==window.self || window.bsAppSidebarInstalled) return;
     window.bsAppSidebarInstalled=true;
     const key='bs-sidebar-app:'+frappe.session.user;
     let previous, scheduled=false;
     try { previous=sessionStorage.getItem(key); } catch (_) {}
     const style=document.createElement('style');
-    style.textContent='.bs-app-unrelated{display:none!important}';
+    style.textContent='.bs-app-unrelated,.bs-dashboard-hidden{display:none!important}';
     document.head.append(style);
     function update() {
         scheduled=false;
         const current=new URL(location.href);
+        const dashboard=isDashboard(current.pathname);
+        for(const host of document.querySelectorAll('.body-sidebar .sidebar-items, .desk-sidebar .sidebar-items')) {
+            let nav=host.querySelector('.bs-dashboard-modules');
+            if(dashboard && frappe.boot.bs_work_dashboard) {
+                if(!nav) {
+                    nav=document.createElement('div');
+                    nav.className='bs-dashboard-modules';
+                    for(const item of dashboardLinks(frappe.boot.bs_app_destinations)) {
+                        const row=document.createElement('div'), link=document.createElement('a');
+                        row.className='standard-sidebar-item';
+                        link.className='item-anchor';
+                        link.href=item.href;
+                        link.textContent=__(item.label);
+                        row.append(link);nav.append(row);
+                    }
+                    host.prepend(nav);
+                }
+                for(const row of host.children) row.classList.toggle('bs-dashboard-hidden',row!==nav);
+            } else {
+                if(nav) nav.remove();
+                for(const row of host.children) row.classList.remove('bs-dashboard-hidden');
+            }
+        }
+        if(dashboard) return;
         for(const sidebar of document.querySelectorAll('.body-sidebar[data-title="BS Group"]')) {
             const host=sidebar.querySelector('.sidebar-items');
             if(!host) continue;

@@ -1,5 +1,8 @@
 (() => {
     function restrictNavigation() {
+        // The dashboard menu is built from the server's permission-checked app
+        // destinations by app_sidebar.js, including native Private sidebars.
+        if (/^\/desk\/(?:bs-group\/)?my-work-dashboard\/?$/.test(location.pathname)) return;
         const screens = frappe.boot.bs_scoped_screens;
         if (!screens) {
             if (frappe.boot.bs_work_dashboard) {
