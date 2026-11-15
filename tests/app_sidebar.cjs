@@ -33,12 +33,20 @@ assert(isDashboard('/desk/private/my-work-dashboard'));
 assert(!isDashboard('/desk/project'));
 const permitted={'BS Project':'/desk/bs-group/project','BS Sales':null,'BS HR':null};
 const before=JSON.stringify(permitted);
-assert.deepEqual(dashboardLinks(permitted),[
+assert.deepEqual(dashboardLinks(permitted).filter(x=>!x.children),[
  {label:'Dashboard',href:'/desk/my-work-dashboard'},
  {label:'All apps',href:'/desk'},
  {label:'BS Project Support',href:'/desk/bs-group/project?bs_app=BS%20Project'},
 ]);
 assert.equal(JSON.stringify(permitted),before);
+const categories=dashboardLinks(permitted).filter(x=>x.children);
+assert.deepEqual(categories.map(x=>x.label),['Supply Projects','3CX Projects','Infra Projects','ELV Projects']);
+for(const [i,key] of ['supply','3cx','infra','elv'].entries()) {
+ assert.deepEqual(categories[i].children.map(x=>x.label),['Projects','AMC']);
+ for(const child of categories[i].children){const route=url(child.href);assert.equal(route.searchParams.get('bs_module'),key);assert.equal(route.searchParams.get('bs_section'),child.label.toLowerCase());}
+}
+assert(!dashboardLinks({'BS Project':'/desk/bs-group/task'}).some(x=>x.children));
+assert(!dashboardLinks({'BS Project':null}).some(x=>x.children));
 assert.equal(dashboardLinks(undefined).length,2);
 assert.equal(dashboardLinks({'BS HR':'https://invalid.example','Unknown':'/desk/project'}).length,2);
 assert.equal(dashboardLinks({'BS Procurement':'/desk/bs-group/material-request?view=list'})[2].href,

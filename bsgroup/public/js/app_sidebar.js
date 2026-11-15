@@ -40,8 +40,19 @@
             {label:'Dashboard',href:'/desk/my-work-dashboard'},
             {label:'All apps',href:'/desk'},
             ...Object.entries(destinations || {}).filter(([app,path])=>groups[app] && typeof path==='string' && path.startsWith('/desk/'))
-                .map(([app,path])=>({label:app==='BS Project'?'BS Project Support':app,
-                    href:path+(path.includes('?')?'&':'?')+'bs_app='+encodeURIComponent(app)})),
+                .flatMap(([app,path])=>[
+                    {label:app==='BS Project'?'BS Project Support':app,
+                        href:path+(path.includes('?')?'&':'?')+'bs_app='+encodeURIComponent(app)},
+                    // Project is the first server destination only when Project read
+                    // is allowed. A Task/Timesheet-only fallback must not add these.
+                    ...(app==='BS Project' && path==='/desk/bs-group/project'
+                        ? [['supply','Supply'],['3cx','3CX'],['infra','Infra'],['elv','ELV']].map(([key,label])=>({
+                            label:label+' Projects',children:['Projects','AMC'].map(section=>({
+                                label:section,href:'/desk/bs-group/bs-project-modules?bs_module='+key+
+                                    '&bs_section='+section.toLowerCase()+'&bs_app=BS%20Project',
+                            })),
+                        })) : []),
+                ]),
         ];
     }
     if(typeof module!=='undefined' && module.exports) {module.exports={groups,appForSection,routeMatches,chooseApp,isDashboard,dashboardLinks};return;}
@@ -51,7 +62,9 @@
     let previous, scheduled=false;
     try { previous=sessionStorage.getItem(key); } catch (_) {}
     const style=document.createElement('style');
-    style.textContent='.bs-app-unrelated,.bs-dashboard-hidden{display:none!important}';
+    style.textContent='.bs-app-unrelated,.bs-dashboard-hidden{display:none!important}'+
+        '.bs-dashboard-category{margin:10px 0 5px}.bs-dashboard-category-title{font-weight:600;padding:5px 12px}'+
+        '.bs-dashboard-category .standard-sidebar-item{margin-left:12px}';
     document.head.append(style);
     function update() {
         scheduled=false;
@@ -64,6 +77,21 @@
                     nav=document.createElement('div');
                     nav.className='bs-dashboard-modules';
                     for(const item of dashboardLinks(frappe.boot.bs_app_destinations)) {
+                        if(item.children) {
+                            const section=document.createElement('div'), heading=document.createElement('div');
+                            section.className='bs-dashboard-category';
+                            heading.className='bs-dashboard-category-title';
+                            heading.textContent=__(item.label);
+                            section.append(heading);
+                            for(const child of item.children) {
+                                const row=document.createElement('div'), link=document.createElement('a');
+                                row.className='standard-sidebar-item';link.className='item-anchor';
+                                link.href=child.href;link.textContent=__(child.label);
+                                row.append(link);section.append(row);
+                            }
+                            nav.append(section);
+                            continue;
+                        }
                         const row=document.createElement('div'), link=document.createElement('a');
                         row.className='standard-sidebar-item';
                         link.className='item-anchor';

@@ -18,7 +18,9 @@ for(const scoped of [false,true]) {
  const run=()=>{for(const fn of changes)fn();while(timers.length)timers.shift()();};
  for(const name of ['scoped_sales_access','app_sidebar'])vm.runInNewContext(fs.readFileSync('bsgroup/public/js/'+name+'.js','utf8'),context);
  const menu=host.querySelector('.bs-dashboard-modules');
- assert(menu);assert.equal(menu.children.length,3);assert(native.classList.contains('bs-dashboard-hidden'));
+ assert(menu);assert.equal(menu.children.length,7);assert(native.classList.contains('bs-dashboard-hidden'));
+ assert.equal(menu.children.filter(x=>x.className==='bs-dashboard-category').length,4);
+ for(const section of menu.children.filter(x=>x.className==='bs-dashboard-category'))assert.equal(section.children.length,3);
  assert.equal(menu.children[1].children[0].textContent,'All apps');
  for(let i=0;i<5;i++){observers.forEach(fn=>fn());while(timers.length)timers.shift()();}
  assert.equal(host.children.filter(x=>x.classList.contains('bs-dashboard-modules')).length,1);
