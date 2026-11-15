@@ -27,12 +27,9 @@ frappe.pages['bs-user-management'].on_page_load = function(wrapper) {
             rows=r.message.rows;create.toggle(!!r.message.can_create);list.empty();
             for(const user of rows) {
                 const row=$('<button class="person">').toggleClass('selected',user.name===selected).appendTo(list);
-                $('<span class="avatar" aria-hidden="true">').text((user.first_name||user.full_name||'?').slice(0,2).toUpperCase()).appendTo(row);
                 const identity=$('<span class="identity">').appendTo(row);
-                $('<strong>').text(user.first_name||'First name missing').appendTo(identity);
-                $('<small>').text(user.full_name||user.name).appendTo(identity);
+                $('<strong>').text(user.full_name||user.first_name||'Name missing').appendTo(identity);
                 $('<small>').text(user.name).appendTo(identity);
-                $('<span class="badge">').toggleClass('disabled',!user.enabled).text(user.enabled?'Active':'Disabled').appendTo(row);
                 row.on('click',()=>show(user.name));
             }
             if(!rows.length)list.append('<div class="empty">No matching users. Try another name or clear the filters.</div>');
