@@ -777,6 +777,7 @@ _supply_delivery_hooks(globals())
 # Administration UI only: native User forms retain all permission writes.
 after_migrate.append("bsgroup.user_management.install")
 after_migrate.append("bsgroup.uae_project_access.install")
+after_migrate.append("bsgroup.uae_expense_access.install")
 doc_events["Project"]["on_update"].append("bsgroup.uae_project_access.project_updated")
 for _user_registry in (doctype_js, doctype_list_js):
     _prior = _user_registry.get("User", [])
