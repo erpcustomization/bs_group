@@ -8,7 +8,9 @@ from unittest.mock import Mock, patch
 
 
 class Record(dict):
-    def __getattr__(self,key):return self.get(key)
+    def __getattr__(self,key):
+        if key.startswith('__'):raise AttributeError(key)
+        return self.get(key)
     def as_dict(self):return dict(self)
 
 
@@ -35,7 +37,8 @@ class ProjectModuleTests(unittest.TestCase):
         self.f.clear_cache=Mock();self.f.reload_doc=Mock(side_effect=self.reload)
         custom=types.ModuleType('frappe.custom.doctype.custom_field.custom_field')
         custom.create_custom_fields=self.create_fields=Mock(side_effect=self.add_fields)
-        self.p=patch.dict(sys.modules,{'frappe':self.f,'frappe.custom.doctype.custom_field.custom_field':custom});self.p.start()
+        daily=types.ModuleType('bsgroup.project_daily_work');daily.enabled=lambda:False;daily.TERMINAL=[]
+        self.p=patch.dict(sys.modules,{'frappe':self.f,'frappe.custom.doctype.custom_field.custom_field':custom,'bsgroup.project_daily_work':daily});self.p.start()
         spec=importlib.util.spec_from_file_location('pm_test',Path(__file__).resolve().parents[1]/'project_modules.py')
         self.m=importlib.util.module_from_spec(spec);spec.loader.exec_module(self.m)
 
@@ -87,15 +90,17 @@ class ProjectModuleTests(unittest.TestCase):
         self.m.install()
         shared=Record(name='P1',project_name='Shared',status='Open')
         self.f.get_list.return_value=[shared]
-        self.assertEqual(self.m.overview('elv')['projects'],[shared])
+        self.assertEqual(self.m.visible_projects('elv'),[shared])
         self.assertEqual(self.f.get_list.call_args.kwargs['filters'],{'custom_bs_elv_projects':1})
-        self.assertEqual(self.m.overview('infra')['projects'],[shared])
+        self.assertEqual(self.m.visible_projects('infra'),[shared])
         self.assertEqual(self.f.get_list.call_args.kwargs['filters'],{'custom_bs_infra_projects':1})
         self.assertNotIn('ignore_permissions',self.f.get_list.call_args.kwargs)
 
     def test_related_records_limited_to_visible_module_projects(self):
         self.m.install()
         projects=[Record(name='P1')]
+        daily=types.ModuleType('bsgroup.project_daily_work');daily.enabled=lambda:False;daily.TERMINAL=[]
+        sys.modules['bsgroup.project_daily_work']=daily
         self.m.records('tasks',projects)
         self.assertEqual(self.f.get_list.call_args.kwargs['filters'],{'project':['in',['P1']]})
         self.m.records('labor',projects)
@@ -120,5 +125,43 @@ class ProjectModuleTests(unittest.TestCase):
         self.assertNotIn('rows',result)
         self.f.get_list.assert_called_once()
 
+
+class ClassificationTests(ProjectModuleTests):
+    def test_explicit_membership_wins_over_name_and_no_mutation(self):
+        row=Record(name='P1',project_name='3CX server',custom_bs_supply_projects=1)
+        before=copy.deepcopy(row)
+        result=self.m.classify(row)
+        self.assertEqual(result['categories'],['supply'])
+        self.assertFalse(result['review_required'])
+        self.assertEqual(row,before)
+
+    def test_legacy_categories_are_reviewable_and_ambiguous_supply_is_not_guessed(self):
+        for title,categories in [('AMC - 3CX',['3cx']),('CCTV maintenance',['elv']),('WiFi network',['infra']),('Supply only - CCTV',['supply']),('Supply & Installation of equipment',[]),('Nurse call & network',['elv','infra'])]:
+            result=self.m.classify({'project_name':title})
+            self.assertEqual(result['categories'],categories)
+            self.assertTrue(result['review_required'])
+        self.assertFalse(self.m.classify({'project_name':'Non-AMC network'})['is_amc'])
+        self.assertTrue(self.m.classify({'project_type':'PPM AMC','project_name':'Network'})['is_amc'])
+
+    def test_overview_partitions_amc_and_projects_and_flags_unknown(self):
+        self.m.install()
+        self.f.get_list.return_value=[Record(name='P1',project_name='3CX implementation'),Record(name='A1',project_name='3CX AMC'),Record(name='U1',project_name='General work')]
+        result=self.m.overview('3cx','amc')
+        self.assertEqual([p['name'] for p in result['projects']],['P1'])
+        self.assertEqual([p['name'] for p in result['amcs']],['A1'])
+        self.assertEqual([p['name'] for p in result['unclassified']],['U1'])
+        self.f.get_list.assert_called_once()
+        self.assertEqual(self.f.get_list.call_args.args,('Project',))
+        self.assertNotIn('ignore_permissions',self.f.get_list.call_args.kwargs)
+
+    def test_amc_navigation_upgrades_existing_groups_once(self):
+        self.m.install()
+        self.sidebar.items=[r for r in self.sidebar.items if self.m.route_options(r).get('bs_section')!='amc']
+        self.m.install(); self.m.install()
+        amcs=[r for r in self.sidebar.items if self.m.route_options(r).get('bs_section')=='amc']
+        self.assertEqual(len(amcs),4)
+        for row in amcs:
+            prev=self.sidebar.items[self.sidebar.items.index(row)-1]
+            self.assertEqual(self.m.route_options(prev)['bs_section'],'projects')
 
 if __name__=='__main__':unittest.main()

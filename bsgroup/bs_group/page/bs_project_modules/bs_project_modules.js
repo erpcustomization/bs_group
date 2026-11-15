@@ -2,7 +2,7 @@ frappe.pages['bs-project-modules'].on_page_load = function(wrapper) {
     const page = frappe.ui.make_app_page({parent:wrapper,title:__('Project Modules'),single_column:true});
     const host = $('<div class="bspm">').appendTo(page.main);
     const modules = {supply:'BS Supply Projects',elv:'BS ELV Projects',infra:'BS Infra Projects','3cx':'BS 3CX Projects'};
-    const sections = {dashboard:'Dashboard',projects:'Projects'};
+    const sections = {dashboard:'Dashboard',projects:'Projects',amc:'AMC'};
     const esc = value => frappe.utils.escape_html(String(value ?? ''));
     let key='supply', section='dashboard', version=0;
     if (!document.getElementById('bspm-style')) $('<style id="bspm-style">').text(`
@@ -43,21 +43,23 @@ frappe.pages['bs-project-modules'].on_page_load = function(wrapper) {
         for(const [id,title] of Object.entries(sections)) $('<button type="button">').text(title).toggleClass('active',id===section).on('click',()=>navigate(key,id)).appendTo(nav);
         if(section==='dashboard') {
             const stats=$('<div class="bspm-stats">').appendTo(host);
-            const counts=[['Projects',data.projects.length],['Open',data.projects.filter(p=>p.status==='Open').length],['On hold',data.projects.filter(p=>p.status==='On hold').length],['Completed',data.projects.filter(p=>p.status==='Completed').length]];
+            const counts=[['Projects',data.projects.length],['AMC',data.amcs.length],['Open projects',data.projects.filter(p=>p.status==='Open').length],['Needs classification',data.unclassified.length]];
             for(const [label,value] of counts) $('<div class="bspm-stat">').html(`<span>${esc(label)}</span><strong>${value}</strong>`).appendTo(stats);
         }
-        const table=$('<div class="bspm-table">').appendTo(host);
-        if(!data.projects.length) {
-            table.html('<div class="bspm-empty"><strong>No projects assigned to this module yet.</strong><p class="bspm-note">Open an existing project, choose Project Modules, select the relevant modules and save. A single project can be selected in several modules.</p></div>');
-        } else if(section==='dashboard'||section==='projects') {
-            table.html(`<table><thead><tr><th>Project</th><th>Status</th><th>Project Type</th><th>Progress</th></tr></thead><tbody>${data.projects.map(p=>`<tr><td><a href="/desk/project/${encodeURIComponent(p.name)}">${esc(p.project_name)}</a><div class="bspm-note">${esc(p.name)} · ${esc(p.company)}</div></td><td>${esc(p.status)}</td><td>${esc(p.project_type)}</td><td>${Number(p.percent_complete||0).toFixed(0)}%</td></tr>`).join('')}</tbody></table>`);
-        } else if(!data.available) {
-            table.html('<div class="bspm-empty">This section is restricted by your existing access.</div>');
-        } else {
-            const route=data.doctype.toLowerCase().replaceAll(' ','-');
-            table.html(data.rows.length ? `<table><thead><tr><th>Record</th><th>Details</th><th>Status</th><th>Updated</th></tr></thead><tbody>${data.rows.map(row=>`<tr><td><a href="/desk/${route}/${encodeURIComponent(row.name)}">${esc(row.name)}</a></td><td>${esc(row.subject||row.employee_name||row.task||row.project||row.custom_project||row.reference||'—')}</td><td>${esc(row.workflow_state||row.status||['Draft','Submitted','Cancelled'][row.docstatus])}</td><td>${esc(frappe.datetime.str_to_user(row.modified))}</td></tr>`).join('')}</tbody></table>` : '<div class="bspm-empty">No matching records to show.</div>');
-            $('<p class="bspm-note">').text('Latest 100 accessible records linked to projects in this module. Open a project to create requests using its existing controls.').appendTo(host);
+        function draw(rows, amc=false) {
+            const table=$('<div class="bspm-table">').appendTo(host);
+            if(!rows.length) {table.html('<div class="bspm-empty">No matching accessible records.</div>');return;}
+            table.html(`<table><thead><tr><th>${amc?'AMC / Maintenance':'Project'}</th><th>Customer</th><th>Status</th><th>${amc?'Contract start':'Start'}</th><th>${amc?'Renewal / End':'Expected end'}</th><th>Category</th></tr></thead><tbody>${rows.map(p=>`<tr><td><a href="/desk/project/${encodeURIComponent(p.name)}">${esc(p.project_name)}</a><div class="bspm-note">${esc(p.name)} · ${esc(p.company)}</div></td><td>${esc(p.customer||'—')}</td><td>${esc(p.status)}</td><td>${esc(p.expected_start_date||'—')}</td><td>${esc(p.expected_end_date||'—')}</td><td>${esc(p.categories.map(k=>modules[k]).join(', ')||'Unclassified')}<div class="bspm-note" style="${p.review_required?'color:#916000':''}">${esc(p.classification)}</div></td></tr>`).join('')}</tbody></table>`);
         }
+        $('<p class="bspm-note">').text('Saved category selections take priority. Older records grouped from their title or type are marked for confirmation. No project, assignment or work history is changed.').appendTo(host);
+        draw(section==='amc'?data.amcs:data.projects,section==='amc');
+        if(data.unclassified.length) {
+            const review=$('<details class="bspm-hero" style="margin-top:18px">').appendTo(host);
+            $('<summary>').text(`Needs classification — ${data.unclassified.length} accessible records across all categories`).appendTo(review);
+            $('<p class="bspm-note">').text('These records have no saved category and no clear category in their title/type. An authorized project editor can open each record and select its categories in Details.').appendTo(review);
+            $('<div>').html(data.unclassified.map(p=>`<p><a href="/desk/project/${encodeURIComponent(p.name)}">${esc(p.project_name)}</a> · ${esc(p.name)} · ${p.is_amc?'AMC':'Project'} · ${esc(p.status)}</p>`).join('')).appendTo(review);
+        }
+
     }
     wrapper.bs_project_module_refresh=render;
 };
