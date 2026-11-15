@@ -77,9 +77,10 @@
     Opportunity:['name','customer_name','party_name','custom_subject'],
     'Presales Request':['name','organisation_name','customer','subject','opportunity'],
     'Deal Cost Sheet':['name','organisation_name','customer','subject','opportunity'],
-    Quotation:['name','customer_name','party_name','custom_subject','opportunity']
+    Quotation:['name','customer_name','party_name','custom_subject','opportunity'],
+    Project:['name','project_name','customer']
   };
-  const extraLists = ['Presales Request','Deal Cost Sheet','Quotation'];
+  const extraLists = ['Presales Request','Deal Cost Sheet','Quotation','Project'];
   const style = document.createElement('style');
   style.textContent = '.bs-search-header .list-page-form{display:none!important}.bs-search-header .bs-search-filter{display:inline-flex!important;align-items:center;justify-content:center;width:34px;height:34px;padding:0!important;border-radius:8px!important;margin-right:8px}.bs-search-header .bs-search-filter .button-label{display:none!important}.bs-search-header .bs-search-filter .filter-icon{margin:0!important}';
   document.head.append(style);
@@ -171,7 +172,7 @@
     const input = document.createElement('input');
     input.type = 'search';
     input.className = 'form-control input-sm bs-sales-search';
-    input.placeholder = 'Search ID, name or subject';
+    input.placeholder = view.doctype==='Project' ? 'Search ID, project or customer' : 'Search ID, name or subject';
     input.setAttribute('aria-label', `Search ${view.doctype}`);
     input.style.cssText = 'width:230px;min-width:160px;max-width:100%;margin-right:8px;';
     input.value = view._bs_search || '';

@@ -127,6 +127,22 @@ class ProjectModuleTests(unittest.TestCase):
 
 
 class ClassificationTests(ProjectModuleTests):
+    def test_status_and_search_apply_to_projects_amcs_and_unclassified(self):
+        self.f.get_list.return_value=[
+            Record(name='P1',project_name='3CX install',status='Open',customer='Acme'),
+            Record(name='P2',project_name='3CX install done',status='Completed'),
+            Record(name='A1',project_name='3CX AMC',status='Completed'),
+            Record(name='A2',project_name='3CX AMC ongoing',status='On hold',customer='Acme'),
+            Record(name='U1',project_name='General work',status='Completed')]
+        result=self.m.overview('3cx','projects')
+        self.assertEqual([r['name'] for r in result['projects']],['P1'])
+        self.assertEqual([r['name'] for r in result['amcs']],['A2'])
+        self.assertEqual(result['unclassified'],[])
+        self.assertEqual(len(self.m.overview('3cx',status='All')['projects']),2)
+        self.assertEqual([r['name'] for r in self.m.overview('3cx','amc',status='Completed')['amcs']],['A1'])
+        self.assertEqual([r['name'] for r in self.m.overview('3cx',search='acME')['projects']],['P1'])
+        self.assertEqual(self.m.overview('3cx',search='absent')['projects'],[])
+
     def test_explicit_membership_wins_over_name_and_no_mutation(self):
         row=Record(name='P1',project_name='3CX server',custom_bs_supply_projects=1)
         before=copy.deepcopy(row)

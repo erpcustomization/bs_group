@@ -3,7 +3,7 @@
     const groups = {
         'BS Sales': [],
         'BS User Management': [],
-        'BS Project': ['BS Project','BS Supply Projects','BS ELV Projects','BS Infra Projects','BS 3CX Projects'],
+        'BS Project': ['BS Project','BS Project Support','BS Supply Projects','BS ELV Projects','BS Infra Projects','BS 3CX Projects'],
         ...Object.fromEntries(['BS HR','BS Helpdesk','BS Approvals','BS Procurement','BS AMC','BS PPM','BS Support'].map(x=>[x,[x]])),
     };
     function appForSection(section) {
@@ -64,7 +64,8 @@
                 row.classList.toggle('bs-app-unrelated',!row.classList.contains('bs-personal-dashboard') && !row.classList.contains('bs-all-apps') && app!==active);
             }
             const title=sidebar.querySelector('.sidebar-header .header-title');
-            if(title && title.textContent!==active) title.textContent=active;
+            const displayTitle=active==='BS Project'?'BS Project Support':active;
+            if(title && title.textContent!==displayTitle) title.textContent=displayTitle;
         }
     }
     function schedule() {if(!scheduled){scheduled=true;setTimeout(update,50);}}

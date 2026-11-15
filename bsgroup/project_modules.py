@@ -37,7 +37,7 @@ def install():
         return {"installed": False, "reason": "The existing BS Group sidebar is not available on this site."}
     sidebar = frappe.get_doc("Sidebar", "BS Group")
     sections = [row.label for row in sidebar.items if row.type == "Section Break"]
-    if "BS Project" not in sections:
+    if not {"BS Project", "BS Project Support"}.intersection(sections):
         return {"installed": False, "reason": "The existing BS Project sidebar section is missing."}
     from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
     after = "project_type"
@@ -54,7 +54,7 @@ def install():
         create_custom_fields({"Project": fields}, update=False)
     if not frappe.db.exists("Page", "bs-project-modules"):
         frappe.reload_doc("bs_group", "page", "bs_project_modules", force=True)
-    source = next(row for row in sidebar.items if row.type == "Section Break" and row.label == "BS Project")
+    source = next(row for row in sidebar.items if row.type == "Section Break" and row.label in {"BS Project", "BS Project Support"})
     changed = False
     for key, (title, field) in MODULES.items():
         if title in sections:
@@ -155,12 +155,18 @@ def records(section, projects):
 
 
 @frappe.whitelist()
-def overview(module, section="dashboard"):
+def overview(module, section="dashboard", status="Not completed", search=""):
     if module not in MODULES:
         frappe.throw(_("Choose a valid project module."))
     if section not in {key for key, label, icon in SECTIONS}:
         frappe.throw(_("Choose a valid module section."))
-    rows = portfolio()
+    if status not in ("Not completed", "All", "Open", "On hold", "Completed", "Cancelled"):
+        frappe.throw(_("Choose a valid project status."))
+    query = str(search or "").strip().casefold()
+    rows = [row for row in portfolio()
+            if (status == "All" or (row.get("status") != "Completed" if status == "Not completed" else row.get("status") == status))
+            and (not query or any(query in str(row.get(field) or "").casefold()
+                                 for field in ("name", "project_name", "customer")))]
     matching = [row for row in rows if module in row["categories"]]
     projects = [row for row in matching if not row["is_amc"]]
     amcs = [row for row in matching if row["is_amc"]]

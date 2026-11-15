@@ -5,6 +5,14 @@ frappe.pages['bs-project-modules'].on_page_load = function(wrapper) {
     const sections = {dashboard:'Dashboard',projects:'Projects',amc:'AMC'};
     const esc = value => frappe.utils.escape_html(String(value ?? ''));
     let key='supply', section='dashboard', version=0;
+    let selectedStatus='Not completed', searchText='', searchTimer;
+    const filters=$('<div class="bspm-nav" style="align-items:center">').insertBefore(host);
+    const search=$('<input type="search" class="form-control input-sm" aria-label="Search projects and AMC" placeholder="Search ID, project or customer" style="width:280px;max-width:100%">').appendTo(filters);
+    const status=$('<select class="form-control input-sm" aria-label="Project status filter" style="width:200px">').appendTo(filters);
+    for(const value of ['Not completed','All','Open','On hold','Completed','Cancelled']) $('<option>').val(value).text(value==='Not completed'?'Status: Not completed':value==='All'?'Status: All':value).appendTo(status);
+    status.on('change',()=>{selectedStatus=status.val();render();});
+    search.on('input search',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{searchText=search.val().trim();render();},350);});
+    search.on('keydown',e=>{if(e.key==='Enter'){e.preventDefault();clearTimeout(searchTimer);searchText=search.val().trim();render();}});
     if (!document.getElementById('bspm-style')) $('<style id="bspm-style">').text(`
       .bspm{padding:16px 4px;color:var(--text-color,#193047)}.bspm-nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
       .bspm-nav button{border:1px solid #dce5ec;border-radius:8px;padding:8px 12px;background:var(--card-bg,#fff);font-size:12px}
@@ -28,7 +36,7 @@ frappe.pages['bs-project-modules'].on_page_load = function(wrapper) {
         const current=++version;
         page.set_title(modules[key]);
         host.html('<p class="text-muted">Loading project module…</p>');
-        const {message:data}=await frappe.call({method:'bsgroup.project_modules.overview',args:{module:key,section}});
+        const {message:data}=await frappe.call({method:'bsgroup.project_modules.overview',args:{module:key,section,status:selectedStatus,search:searchText}});
         if(current!==version)return;
         host.empty();
         const moduleNav=$('<nav class="bspm-nav" aria-label="Project modules">').appendTo(host);

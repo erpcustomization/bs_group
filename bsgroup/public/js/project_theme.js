@@ -18,7 +18,7 @@
         const selected = ((view === 'List' || view === 'Form') && doctypes.has(name))
             || view === 'bs-project-modules'
             || (view === 'query-report' && reports.has(name))
-            || (view === 'Workspaces' && ['BS Project', 'Projects', 'Projects, AMC & PPM Management'].includes(name));
+            || (view === 'Workspaces' && ['BS Project', 'BS Project Support', 'Projects', 'Projects, AMC & PPM Management'].includes(name));
         document.body.classList.toggle('bs-project-ui', selected);
         const page = view === 'List' && doctypes.has(name) && mode === 'List'
             ? document.getElementById(`page-${route}`) : null;

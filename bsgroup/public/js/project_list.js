@@ -66,11 +66,11 @@ D.isAmc = function (r) { return D.isTypedAmc(r) || D.isLegacyNameAmc(r.project_n
 D.isOpenProject = function (r) {
   if (D.isAmc(r)) return false;
   var st = String(r.status || '').toLowerCase();
-  return st === 'open' || st === 'on hold';
+  return st !== 'completed';
 };
 D.isAmcContract = function (r) {
   if (!D.isAmc(r)) return false;
-  return String(r.status || '').toLowerCase() !== 'cancelled';
+  return String(r.status || '').toLowerCase() !== 'completed';
 };
 D.elapsedPct = function (r) {
   var s = r.expected_start_date, e = r.expected_end_date;
@@ -675,6 +675,7 @@ function addLauncher(listview) {
 }
 frappe.listview_settings = frappe.listview_settings || {};
 frappe.listview_settings['Project'] = frappe.listview_settings['Project'] || {};
+frappe.listview_settings['Project'].filters = [['status','!=','Completed']];
 var prevOnload = frappe.listview_settings['Project'].__pcc_wrapped ? null : frappe.listview_settings['Project'].onload;
 frappe.listview_settings['Project'].onload = function (listview) {
   if (prevOnload) { try { prevOnload(listview); } catch (e) {} }

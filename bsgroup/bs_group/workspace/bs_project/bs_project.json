@@ -10,7 +10,7 @@
  "idx": 0,
  "indicator_color": "green",
  "is_hidden": 0,
- "label": "BS Project",
+ "label": "BS Project Support",
  "link_type": "DocType",
  "links": [],
  "modified": "2026-06-26 11:02:01.040409",
@@ -24,6 +24,6 @@
  "roles": [],
  "sequence_id": 2.0,
  "shortcuts": [],
- "title": "BS Project",
+ "title": "BS Project Support",
  "type": "Workspace"
 }

@@ -791,3 +791,5 @@ for _user_registry in (doctype_js, doctype_list_js):
 for _commercial_dt in ("Quotation", "Deal Cost Sheet"):
     _prior = doctype_js.get(_commercial_dt, [])
     doctype_js[_commercial_dt] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["public/js/commercial_studio.js"]
+
+after_migrate.append("bsgroup.project_support_navigation.install")

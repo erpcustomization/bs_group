@@ -48,7 +48,7 @@ def install():
                 except (ValueError, TypeError):
                     options = {}
                 remove = options.get("bs_section") in SECTIONS
-            if group == "BS Project" and row.type == "Link" and row.link_type == "DocType":
+            if group in {"BS Project", "BS Project Support"} and row.type == "Link" and row.link_type == "DocType":
                 remove = row.link_to in {"Task", "Timesheet", "Tech Task Scheduler"}
             if not remove:
                 retained.append(row)
