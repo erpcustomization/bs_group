@@ -39,9 +39,19 @@
         for(const sidebar of document.querySelectorAll('.body-sidebar[data-title="BS Group"]')) {
             const host=sidebar.querySelector('.sidebar-items');
             if(!host) continue;
+            if(!host.querySelector('.bs-all-apps')) {
+                const row=document.createElement('div');
+                row.className='standard-sidebar-item bs-all-apps';
+                const link=document.createElement('a');
+                link.className='item-anchor';
+                link.href='/desk';
+                link.textContent=__('All apps');
+                row.append(link);
+                host.prepend(row);
+            }
             const rows=[...host.children], candidates=[];
             for(const row of rows) {
-                if(row.classList.contains('bs-personal-dashboard')) continue;
+                if(row.classList.contains('bs-personal-dashboard') || row.classList.contains('bs-all-apps')) continue;
                 const app=appForSection(row.classList.contains('section-item')?row.dataset.id:null);
                 for(const link of row.querySelectorAll('a[href]')) candidates.push({app,href:link.getAttribute('href')});
             }
@@ -50,7 +60,7 @@
             try { sessionStorage.setItem(key,active); } catch (_) {}
             for(const row of rows) {
                 const app=appForSection(row.classList.contains('section-item')?row.dataset.id:null);
-                row.classList.toggle('bs-app-unrelated',!row.classList.contains('bs-personal-dashboard') && app!==active);
+                row.classList.toggle('bs-app-unrelated',!row.classList.contains('bs-personal-dashboard') && !row.classList.contains('bs-all-apps') && app!==active);
             }
             const title=sidebar.querySelector('.sidebar-header .header-title');
             if(title && title.textContent!==active) title.textContent=active;
