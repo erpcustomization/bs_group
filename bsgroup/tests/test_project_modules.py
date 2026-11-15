@@ -149,10 +149,28 @@ class ClassificationTests(ProjectModuleTests):
         result=self.m.overview('3cx','amc')
         self.assertEqual([p['name'] for p in result['projects']],['P1'])
         self.assertEqual([p['name'] for p in result['amcs']],['A1'])
-        self.assertEqual([p['name'] for p in result['unclassified']],['U1'])
+        self.assertEqual(result['unclassified'],[])
         self.f.get_list.assert_called_once()
         self.assertEqual(self.f.get_list.call_args.args,('Project',))
         self.assertNotIn('ignore_permissions',self.f.get_list.call_args.kwargs)
+
+    def test_unknown_records_obey_the_same_amc_partition(self):
+        self.f.get_list.return_value=[Record(name='P1',project_name='General work'),
+                                      Record(name='A1',project_name='General AMC')]
+        for module in self.m.MODULES:
+            for section in ('projects','dashboard','amc'):
+                result=self.m.overview(module,section)
+                self.assertEqual([p['name'] for p in result['unclassified']],
+                                 ['A1'] if section=='amc' else ['P1'])
+
+    def test_imported_underscore_titles_stay_in_amc_only(self):
+        self.f.get_list.return_value=[Record(name='A1',project_name='Access Medical_3CX_AMC'),
+                                      Record(name='A2',project_name='Network_Maintenance'),
+                                      Record(name='P1',project_name='3CX_Non_AMC_Installation')]
+        result=self.m.overview('3cx','projects')
+        self.assertEqual([p['name'] for p in result['projects']],['P1'])
+        self.assertEqual([p['name'] for p in result['amcs']],['A1'])
+        self.assertEqual(self.m.overview('infra','amc')['amcs'][0]['name'],'A2')
 
     def test_amc_navigation_upgrades_existing_groups_once(self):
         self.m.install()

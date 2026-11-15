@@ -166,7 +166,8 @@ def overview(module, section="dashboard"):
     amcs = [row for row in matching if row["is_amc"]]
     result = dict(module=module, title=MODULES[module][0], field=MODULES[module][1], section=section,
                   projects=projects, amcs=amcs,
-                  unclassified=[row for row in rows if not row["categories"]],
+                  unclassified=[row for row in rows if not row["categories"]
+                                and row["is_amc"] == (section == "amc")],
                   can_create=bool(frappe.has_permission("Project", "create")))
     if section not in ("dashboard", "projects", "amc"):
         result.update(requires_project=True)
@@ -175,8 +176,9 @@ def overview(module, section="dashboard"):
 
 def classify(row):
     """Read-only legacy grouping. Explicit selections always win; no document saves."""
-    title = str(row.get("project_name") or "")
-    kind = str(row.get("project_type") or "")
+    # Imported titles often use underscores as word separators.
+    title = str(row.get("project_name") or "").replace("_", " ")
+    kind = str(row.get("project_type") or "").replace("_", " ").strip()
     is_amc = kind in {"Remote AMC", "PPM AMC", "Adhoc AMC"} or (
         not re.search(r"non[\s_-]*amc", title, re.I) and
         bool(re.search(r"\bamc\b|\bmaintenance\b", title, re.I)))

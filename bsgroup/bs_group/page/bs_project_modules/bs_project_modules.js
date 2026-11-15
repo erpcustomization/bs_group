@@ -51,11 +51,11 @@ frappe.pages['bs-project-modules'].on_page_load = function(wrapper) {
             if(!rows.length) {table.html('<div class="bspm-empty">No matching accessible records.</div>');return;}
             table.html(`<table><thead><tr><th>${amc?'AMC / Maintenance':'Project'}</th><th>Customer</th><th>Status</th><th>${amc?'Contract start':'Start'}</th><th>${amc?'Renewal / End':'Expected end'}</th><th>Category</th></tr></thead><tbody>${rows.map(p=>`<tr><td><a href="/desk/project/${encodeURIComponent(p.name)}">${esc(p.project_name)}</a><div class="bspm-note">${esc(p.name)} · ${esc(p.company)}</div></td><td>${esc(p.customer||'—')}</td><td>${esc(p.status)}</td><td>${esc(p.expected_start_date||'—')}</td><td>${esc(p.expected_end_date||'—')}</td><td>${esc(p.categories.map(k=>modules[k]).join(', ')||'Unclassified')}<div class="bspm-note" style="${p.review_required?'color:#916000':''}">${esc(p.classification)}</div></td></tr>`).join('')}</tbody></table>`);
         }
-        $('<p class="bspm-note">').text('Saved category selections take priority. Older records grouped from their title or type are marked for confirmation. No project, assignment or work history is changed.').appendTo(host);
+        $('<p class="bspm-note">').text(section==='amc'?'AMC and maintenance contracts only. Projects appear in the Projects section.':'Projects only. AMC and maintenance contracts appear in the AMC section.').appendTo(host);
         draw(section==='amc'?data.amcs:data.projects,section==='amc');
         if(data.unclassified.length) {
             const review=$('<details class="bspm-hero" style="margin-top:18px">').appendTo(host);
-            $('<summary>').text(`Needs classification — ${data.unclassified.length} accessible records across all categories`).appendTo(review);
+            $('<summary>').text(`Needs classification — ${data.unclassified.length} ${section==='amc'?'AMC contracts':'projects'} across all categories`).appendTo(review);
             $('<p class="bspm-note">').text('These records have no saved category and no clear category in their title/type. An authorized project editor can open each record and select its categories in Details.').appendTo(review);
             $('<div>').html(data.unclassified.map(p=>`<p><a href="/desk/project/${encodeURIComponent(p.name)}">${esc(p.project_name)}</a> · ${esc(p.name)} · ${p.is_amc?'AMC':'Project'} · ${esc(p.status)}</p>`).join('')).appendTo(review);
         }
