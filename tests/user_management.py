@@ -111,8 +111,29 @@ class UserManagementTests(unittest.TestCase):
         doc.save.assert_not_called()
 
     def test_install_only_reloads_page_and_clears_cache(self):
+        self.m.install_app_icon=MagicMock()
         self.m.install()
         self.f.reload_doc.assert_called_once_with('bs_group','page','bs_user_management',force=True)
+        self.m.install_app_icon.assert_called_once_with()
         self.f.get_doc.assert_not_called();self.f.db.set_value.assert_not_called()
+
+    def test_app_icon_is_manager_only_and_does_not_change_users(self):
+        self.f.get_app_path.return_value=str(Path(__file__).parents[1]/'bsgroup/desktop_icon/bs_user_management.json')
+        self.f.db.exists.return_value=False
+        self.m.install_app_icon()
+        values=self.f.get_doc.call_args.args[0]
+        self.assertEqual(values['doctype'],'Desktop Icon')
+        self.assertEqual(values['roles'],[{'role':'System Manager'}])
+        self.assertEqual(values['link'],'/desk/bs-group/bs-user-management')
+        self.f.get_doc.return_value.insert.assert_called_once_with(ignore_permissions=True)
+        self.f.db.set_value.assert_not_called()
+
+    def test_existing_icon_has_manager_restriction_restored(self):
+        self.f.get_app_path.return_value=str(Path(__file__).parents[1]/'bsgroup/desktop_icon/bs_user_management.json')
+        self.f.db.exists.return_value=True
+        self.m.install_app_icon()
+        self.f.get_doc.assert_called_once_with('Desktop Icon','BS User Management')
+        self.f.get_doc.return_value.set.assert_called_once_with('roles',[{'role':'System Manager'}])
+        self.f.get_doc.return_value.save.assert_called_once_with(ignore_permissions=True)
 
 if __name__=='__main__':unittest.main()

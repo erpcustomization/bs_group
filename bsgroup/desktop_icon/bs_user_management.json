@@ -1,0 +1,15 @@
+{
+ "doctype": "Desktop Icon",
+ "name": "BS User Management",
+ "label": "BS User Management",
+ "app": "bsgroup",
+ "icon_type": "App",
+ "link_type": "External",
+ "link": "/desk/bs-group/bs-user-management",
+ "icon_image": "/assets/bsgroup/images/bs-user-management.svg",
+ "bg_color": "blue",
+ "hidden": 0,
+ "standard": 1,
+ "restrict_removal": 1,
+ "roles": [{"role": "System Manager"}]
+}

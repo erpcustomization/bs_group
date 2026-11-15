@@ -142,4 +142,19 @@ def install():
     frappe.reload_doc("bs_group", "page", "bs_user_management", force=True)
     from bsgroup.user_module_access import install as install_module_grants
     install_module_grants()
+    install_app_icon()
     frappe.clear_cache()
+
+
+def install_app_icon():
+    """Publish only the manager-restricted shortcut, never alter account roles."""
+    import json
+    from pathlib import Path
+    values = json.loads(Path(frappe.get_app_path("bsgroup", "desktop_icon", "bs_user_management.json")).read_text(encoding="utf-8"))
+    if frappe.db.exists("Desktop Icon", values["name"]):
+        doc = frappe.get_doc("Desktop Icon", values["name"])
+        doc.update({k: v for k, v in values.items() if k not in ("doctype", "name", "roles")})
+        doc.set("roles", values["roles"])
+        doc.save(ignore_permissions=True)
+    else:
+        frappe.get_doc(values).insert(ignore_permissions=True)

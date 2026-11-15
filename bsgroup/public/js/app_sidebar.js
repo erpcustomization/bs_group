@@ -2,6 +2,7 @@
 (() => {
     const groups = {
         'BS Sales': [],
+        'BS User Management': [],
         'BS Project': ['BS Project','BS Supply Projects','BS ELV Projects','BS Infra Projects','BS 3CX Projects'],
         ...Object.fromEntries(['BS HR','BS Helpdesk','BS Approvals','BS Procurement','BS AMC','BS PPM','BS Support'].map(x=>[x,[x]])),
     };
