@@ -239,7 +239,7 @@ def complete(name):
             "attached_to_name": doc.name, "is_private": 1}):
         frappe.throw(_("Upload a private document or image to this Delivery Request as proof."))
     from bsgroup.project_daily_work import capture
-    receipt = capture(project, task, notes, "delivery-" + doc.name + "-" + role, status_transition=True)
+    receipt = capture(project, task, notes, "delivery-" + doc.name + "-" + role, status_transition=True, check_labor=False)
     task.reload()
     with writing():
         doc.set(role + "_completed_on", now_datetime())

@@ -1,0 +1,142 @@
+{
+ "doctype": "DocType",
+ "name": "Project Labour Expense",
+ "module": "BS Group",
+ "engine": "InnoDB",
+ "autoname": "hash",
+ "field_order": [
+  "project",
+  "task",
+  "company",
+  "labor_preapproval",
+  "labor_line",
+  "skill",
+  "work_date",
+  "persons",
+  "rate",
+  "amount",
+  "currency",
+  "recorded_by",
+  "work_entry",
+  "work_done"
+ ],
+ "fields": [
+  {
+   "fieldname": "project",
+   "label": "Project",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "reqd": 1,
+   "options": "Project"
+  },
+  {
+   "fieldname": "task",
+   "label": "Task",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "reqd": 1,
+   "options": "Task"
+  },
+  {
+   "fieldname": "company",
+   "label": "Company",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "reqd": 1,
+   "options": "Company"
+  },
+  {
+   "fieldname": "labor_preapproval",
+   "label": "Labour Preapproval",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "reqd": 1,
+   "options": "Labor Preapproval"
+  },
+  {
+   "fieldname": "labor_line",
+   "label": "Approved Labour Line",
+   "fieldtype": "Data",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "skill",
+   "label": "Labour Type",
+   "fieldtype": "Data",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "work_date",
+   "label": "Work Date",
+   "fieldtype": "Date",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "persons",
+   "label": "Number of Labourers",
+   "fieldtype": "Int",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "rate",
+   "label": "Approved Daily Rate",
+   "fieldtype": "Currency",
+   "read_only": 1,
+   "reqd": 1,
+   "options": "currency"
+  },
+  {
+   "fieldname": "amount",
+   "label": "Labour Expense",
+   "fieldtype": "Currency",
+   "read_only": 1,
+   "reqd": 1,
+   "options": "currency"
+  },
+  {
+   "fieldname": "currency",
+   "label": "Currency",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "reqd": 1,
+   "options": "Currency"
+  },
+  {
+   "fieldname": "recorded_by",
+   "label": "Recorded By",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "reqd": 1,
+   "options": "User"
+  },
+  {
+   "fieldname": "work_entry",
+   "label": "Daily Work",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "reqd": 1,
+   "options": "Comment"
+  },
+  {
+   "fieldname": "work_done",
+   "label": "Work Done",
+   "fieldtype": "Small Text",
+   "read_only": 1,
+   "reqd": 1
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "track_changes": 1,
+ "sort_field": "creation",
+ "sort_order": "DESC"
+}

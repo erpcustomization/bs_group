@@ -212,7 +212,7 @@ def work_history(project, task):
 
 
 @frappe.whitelist(methods=["POST"])
-def save_work(project, task, work, request_id=None):
+def save_work(project, task, work, request_id=None, labor=None):
     doc, item = _read_task(project, task, lock=True)
     if doc.status == "Cancelled" or item.status in {"Cancelled", "Template"} or not _is_assigned(item, closed=True):
         frappe.throw(_("Only users assigned to this task can enter today's work."), frappe.PermissionError)
@@ -221,7 +221,7 @@ def save_work(project, task, work, request_id=None):
         frappe.throw(_("Enter the work completed today (up to 20,000 characters)."))
     from bsgroup.project_daily_work import timesheets_enabled, capture
     if timesheets_enabled():
-        return capture(doc, item, text, request_id)
+        return capture(doc, item, text, request_id, labor=labor)
     author = frappe.db.get_value("User", frappe.session.user, "full_name") or frappe.session.user
     content = "<p><strong>Today's work — " + str(getdate()) + "</strong></p><p>" + escape(text).replace("\n", "<br>") + "</p>"
     # Comments are the native Task activity history. The caller and task are
@@ -233,7 +233,7 @@ def save_work(project, task, work, request_id=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def set_task_status(project, task, status, expected_modified, reason=None, work=None, request_id=None):
+def set_task_status(project, task, status, expected_modified, reason=None, work=None, request_id=None, labor=None):
     from bsgroup.project_daily_work import enabled
     if enabled() and status == "Closed":
         status = "Completed"
@@ -260,7 +260,7 @@ def set_task_status(project, task, status, expected_modified, reason=None, work=
         if not text or len(text) > 20000:
             frappe.throw(_("Enter today's work before saving the status (up to 20,000 characters)."))
         from bsgroup.project_daily_work import capture
-        work_receipt = capture(doc, item, text, request_id, status_transition=True)
+        work_receipt = capture(doc, item, text, request_id, status_transition=True, labor=labor)
         # Native timesheet validation may update task totals and its timestamp.
         item.reload()
         if item.status == "Completed" and status != "Completed":
@@ -312,10 +312,12 @@ def autosave_task(project, task, changes, expected_modified, expected_assignees)
     if not isinstance(changes, dict) or not changes or set(changes) - allowed:
         frappe.throw(_("Choose valid Project Plan fields to update."))
     changes = dict(changes)
+    status_labor = None
     if isinstance(changes.get("status"), dict):
         change = changes["status"]
-        if set(change) != {"value", "reason", "work", "request_id"}:
+        if set(change) not in ({"value", "reason", "work", "request_id"}, {"value", "reason", "work", "request_id", "labor"}):
             frappe.throw(_("Choose a status and enter its reason."))
+        status_labor = change.get("labor")
         changes.update(status=change["value"], status_reason=change["reason"], status_work=change["work"], status_request_id=change["request_id"])
     if {"status_reason", "status_work", "status_request_id"}.intersection(changes) and "status" not in changes:
         frappe.throw(_("A status reason must accompany a status change."))
@@ -340,7 +342,7 @@ def autosave_task(project, task, changes, expected_modified, expected_assignees)
         if restricted() and changes.get("status") in ("Completed", "Closed"):
             completed_receipt = next((row for row in get_plan(project)["rows"] if row.name == task), None)
         if "status" in changes:
-            set_task_status(project, task, changes["status"], expected_modified, changes.get("status_reason"), changes.get("status_work"), changes.get("status_request_id"))
+            set_task_status(project, task, changes["status"], expected_modified, changes.get("status_reason"), changes.get("status_work"), changes.get("status_request_id"), labor=status_labor)
         # Read the receipt in this transaction, including native assignment and
         # permission changes. The next queued save uses this exact version.
         if completed_receipt is not None:

@@ -155,7 +155,8 @@ def get_consumed_person_days(lpre_name, exclude_attendance=None):
 	filters = {"labor_preapproval": lpre_name, "docstatus": 1}
 	if exclude_attendance:
 		filters["name"] = ["!=", exclude_attendance]
-	return frappe.db.count("Labor Attendance", filters)
+	from bsgroup.project_labor_work import totals
+	return frappe.db.count("Labor Attendance", filters) + totals(lpre_name)[0]
 
 
 def get_scheduled_labor_count(lpre):
@@ -237,7 +238,8 @@ def get_consumed_cost(lpre_name, exclude_voucher=None):
 		""",
 		values,
 	)
-	return frappe.utils.flt(result[0][0]) if result else 0
+	from bsgroup.project_labor_work import totals
+	return (frappe.utils.flt(result[0][0]) if result else 0) + totals(lpre_name)[1]
 
 
 def get_remaining_cost(lpre, exclude_voucher=None):
@@ -335,7 +337,7 @@ def get_summary_html(lpre_name):
 	)
 
 	scheduled_total = sum(flt(r.allocated_labor) for r in scheduler_rows)
-	consumed = sum(1 for r in attendance_rows if r.docstatus == 1)
+	consumed = get_consumed_person_days(lpre.name)
 	approved = flt(lpre.approved_person_days)
 	cap = scheduled_total if scheduled_total > 0 else approved
 	remaining = cap - consumed

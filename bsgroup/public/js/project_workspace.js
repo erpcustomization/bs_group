@@ -280,18 +280,20 @@
         colourPlanStatus(status,row.status);
         const remarks=$('<div class="small bs-task-status-remarks" style="white-space:pre-wrap;margin-top:8px">').text(row.custom_bs_status_reason || '').appendTo(statusCell);
         if(row.delivery_request) $('<button type="button" class="btn btn-default btn-sm" style="margin-top:8px">').text(__('Delivery Request')).on('click',()=>openProjectRecord(frm,{doctype:'Delivery Request'},row.delivery_request,()=>frm.reload_doc())).appendTo(statusCell);
-        status.val(row.status).on('change',()=>{
+        status.val(row.status).on('change',async()=>{
             const next=status.val(), needsReason=['On Hold','Delayed','Postponed','Customer Delayed'].includes(next);
             status.val(row.status);colourPlanStatus(status,row.status);
             const request_id=crypto.randomUUID();
+            const labor=await laborFields(project,row.name);
             const d=new frappe.ui.Dialog({title:__('Update status: {0}',[next]),fields:[
+                ...labor.fields,
                 {fieldname:'work',fieldtype:'Small Text',label:__("Today's work"),reqd:1,
                     description:__('Saved to your timesheet for today against this project and task.')},
                 ...(needsReason?[{fieldname:'reason',fieldtype:'Small Text',label:__('Reason for {0}',[next]),reqd:1}]:[])
             ],primary_action_label:__('Save work and status'),primary_action(v){
                 const work=(v.work || '').trim(), reason=(v.reason || '').trim();
                 if(!work || (needsReason && !reason)){frappe.msgprint(__('Enter today’s work and the required reason.'));return;}
-                controller.edit('status',{value:next,reason,work,request_id});
+                controller.edit('status',{value:next,reason,work,request_id,labor:labor.values(v)});
                 status.val(next);colourPlanStatus(status,next);d.hide();
             }});d.show();
         });
@@ -342,14 +344,16 @@
     }
     async function showWork(frm,project,row,entry) {
         const request_id=crypto.randomUUID();
+        const labor=entry?await laborFields(project,row.name):{fields:[],values:()=>null};
         const d=new frappe.ui.Dialog({title:entry?__('Enter today’s task'):__('Task Work History'),size:'large',fields:[
             {fieldname:'activity',fieldtype:'HTML',options:'<p><strong>'+esc(row.subject)+'</strong><br>'+esc(row.name)+'</p>'},
+            ...labor.fields,
             ...(entry?[{fieldname:'work',fieldtype:'Small Text',label:__('Work completed today'),reqd:1}]:[]),
             {fieldname:'history',fieldtype:'HTML'}],
             primary_action_label:entry?__('Save work'):__('Close'),async primary_action(values){
                 if(!entry) {d.hide();return;}
                 if(d.__saving)return;d.__saving=true;d.get_primary_btn().prop('disabled',true);
-                try {const {message:receipt}=await frappe.call({method:'bsgroup.project_plan.save_work',type:'POST',args:{project,task:row.name,work:values.work,request_id}});d.hide();frappe.show_alert({message:receipt.timesheet?__('Work saved to your task and today’s draft timesheet'):__('Today’s work saved'),indicator:'green'});if(frm.__bs_activity_tabs?.timesheets)frm.__bs_activity_tabs.timesheets.activity_project=null;}
+                try {const {message:receipt}=await frappe.call({method:'bsgroup.project_plan.save_work',type:'POST',args:{project,task:row.name,work:values.work,request_id,labor:labor.values(values)}});d.hide();frappe.show_alert({message:receipt.labor_expense?__('Work, timesheet and labour expense saved'):receipt.timesheet?__('Work saved to your task and today’s draft timesheet'):__('Today’s work saved'),indicator:'green'});for(const section of ['timesheets','expenses'])if(frm.__bs_activity_tabs?.[section])frm.__bs_activity_tabs[section].activity_project=null;}
                 finally {d.__saving=false;d.get_primary_btn().prop('disabled',false);}
             }});
         d.show();d.fields_dict.history.$wrapper.text(__('Loading work history…'));
@@ -358,6 +362,20 @@
         $('<h5>').text(__('Recent work updates')).appendTo(host);
         for(const log of history) {$('<p class="text-muted small">').text((log.comment_by || log.comment_email)+' · '+frappe.datetime.str_to_user(log.creation)).appendTo(host);$('<p style="white-space:pre-wrap">').text(log.text).appendTo(host);}
         if(!history.length) $('<p>').text(__('No work updates recorded yet.')).appendTo(host);
+    }
+    async function laborFields(project,task) {
+        const {message:data}=await frappe.call({method:'bsgroup.project_labor_work.context',args:{project,task}});
+        if(!data.required)return {fields:[],values:()=>null};
+        const choices=(data.lines||[]).map(line=>({...line,label:`${line.approval} · ${line.skill} · ${line.rate}/day · max ${line.daily_limit}/day · ${line.remaining_person_days} person-days remaining${line.current_persons?` · already recorded today: ${line.current_persons}`:''}`}));
+        return {fields:[
+            {fieldname:'labor_used',fieldtype:'Select',label:__('Did you use labour today?'),options:['','No','Yes'],reqd:1},
+            {fieldname:'labor_line',fieldtype:'Select',label:__('Approved labour'),options:['',...choices.map(r=>r.label)],depends_on:'eval:doc.labor_used=="Yes"',mandatory_depends_on:'eval:doc.labor_used=="Yes"'},
+            {fieldname:'labor_persons',fieldtype:'Int',label:__('Number of labourers used today'),depends_on:'eval:doc.labor_used=="Yes"',mandatory_depends_on:'eval:doc.labor_used=="Yes"',description:__('Enter the total for this approval line today, not an additional count. Saving again updates the same daily expense.')},
+            ...(!choices.length?[{fieldname:'labor_notice',fieldtype:'HTML',options:'<p class="text-warning">'+__('There is no approved labour allowance available for this task. Labour use requires approval first.')+'</p>'}]:[])
+        ],values:v=>{
+            const line=choices.find(r=>r.label===v.labor_line);
+            return {used:v.labor_used,approval:line?.approval,line:line?.value,persons:v.labor_persons,expected_modified:line?.expected_modified||''};
+        }};
     }
     async function render(frm, section) {
         frm.__bs_activity = section;
@@ -390,6 +408,10 @@
             ).join('') || '<tr><td colspan="5">No automatic schedules generated for this project yet.</td></tr>'}</tbody></table>`).appendTo(panel);
         }
         if (data.problem) $('<p class="text-muted">').text(data.problem).appendTo(panel);
+        if(data.labor_expenses?.length){
+            $('<h5>').text(__('Daily labour expenses')).appendTo(panel);
+            $('<div class="table-responsive">').html(`<table class="table table-bordered"><thead><tr><th>Date</th><th>Task / Approval</th><th>Labour</th><th>Rate</th><th>Expense</th><th>Work done</th></tr></thead><tbody>${data.labor_expenses.map(r=>`<tr><td>${esc(frappe.datetime.str_to_user(r.work_date))}</td><td>${esc(r.task)}<br>${esc(r.labor_preapproval)}</td><td>${esc(r.persons)} × ${esc(r.skill)}<br><small>${esc(r.recorded_by)}</small></td><td>${esc(r.rate)}</td><td>${esc(r.currency)} ${esc(r.amount)}<br><small>${esc(r.name)}</small></td><td style="white-space:pre-wrap">${esc(r.work_done)}</td></tr>`).join('')}</tbody></table>`).appendTo(panel);
+        }
         const actions = $('<div style="display:flex;gap:8px;margin-bottom:12px">').appendTo(panel);
         if (data.can_create) $('<button type="button" class="btn btn-primary btn-sm">').text(section==='expenses'?__('Add Expense'):__('New')+' '+__(data.doctype)).on('click',()=>{
             openProjectRecord(frm,data,null,()=>render(frm,section));

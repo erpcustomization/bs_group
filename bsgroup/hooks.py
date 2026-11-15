@@ -777,8 +777,12 @@ _supply_delivery_hooks(globals())
 # Administration UI only: native User forms retain all permission writes.
 after_migrate.append("bsgroup.user_management.install")
 after_migrate.append("bsgroup.uae_project_access.install")
-after_migrate.append("bsgroup.uae_expense_access.install")
+# Mithun's Account Select permission deployment remains explicitly on hold.
 doc_events["Project"]["on_update"].append("bsgroup.uae_project_access.project_updated")
+doc_events["Labor Attendance"]["before_validate"] = "bsgroup.project_labor_work.guard_attendance"
+doc_events.setdefault("Labor Payment Voucher", {})["before_validate"] = "bsgroup.project_labor_work.lock_voucher"
+doc_events["Labor Preapproval"]["before_cancel"] = "bsgroup.project_labor_work.guard_preapproval_cancel"
+doc_events["Project Labour Expense"] = {"on_update": "bsgroup.utils.project_cost_baseline.recalculate_project_baseline"}
 for _user_registry in (doctype_js, doctype_list_js):
     _prior = _user_registry.get("User", [])
     _user_registry["User"] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["public/js/bs_user_management_entry.js"]

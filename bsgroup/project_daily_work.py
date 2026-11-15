@@ -42,7 +42,7 @@ def install():
     ]}, update=False)
 
 
-def capture(project, task, work, request_id, status_transition=False):
+def capture(project, task, work, request_id, status_transition=False, labor=None, check_labor=True):
     from frappe.utils import getdate
     from bsgroup.project_plan import WORK_SUBJECT
     if (task.status in TERMINAL or project.status in ("Completed", "Cancelled")) and not status_transition:
@@ -51,6 +51,8 @@ def capture(project, task, work, request_id, status_transition=False):
         frappe.throw(_("Refresh the Project Plan and try saving your work again."))
     user = frappe.session.user
     key = "pdw-" + hashlib.sha256((user + "|" + task.name + "|" + request_id).encode()).hexdigest()[:32]
+    # Check retries under the same lock used for the daily draft.
+    frappe.get_doc("User", user, for_update=True)
     existing = frappe.db.get_value("Timesheet Detail", {"custom_bs_work_entry": key, "docstatus": ["!=", 2]}, "parent")
     if existing:
         return dict(name=key, task=task.name, timesheet=existing)
@@ -77,7 +79,16 @@ def capture(project, task, work, request_id, status_transition=False):
         hours=0, is_billable=0))
     # Native draft validation runs; no hours, payroll submission or billing is fabricated.
     sheet.save()
-    return dict(name=entry.name, task=task.name, timesheet=sheet.name, work_date=str(day))
+    from bsgroup.project_labor_work import record
+    expense = record(project, task, labor, entry.name, work, day) if check_labor else None
+    labor_data = frappe.parse_json(labor) if isinstance(labor, str) else (labor or {})
+    if labor_data.get('used') in ('Yes', 'No'):
+        entry.content += '<p>Labour used: ' + escape(labor_data['used'])
+        if expense:
+            entry.content += ' — ' + escape(str(labor_data.get('persons'))) + ' person(s). Expense: ' + escape(expense)
+        entry.content += '</p>'
+        entry.save(ignore_permissions=True)
+    return dict(name=entry.name, task=task.name, timesheet=sheet.name, work_date=str(day), labor_expense=expense)
 
 
 def normalize_closed(doc, method=None):

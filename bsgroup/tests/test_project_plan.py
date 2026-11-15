@@ -30,6 +30,7 @@ class ProjectPlanTests(unittest.TestCase):
                            exp_start_date=None,exp_end_date=None,priority='Medium',check_permission=Mock(),save=Mock())
         self.f.get_doc = Mock(side_effect=lambda dt,name,**kw: self.project if dt=='Project' else self.task)
         self.f.has_permission = Mock(return_value=True)
+        self.f.get_roles = Mock(return_value=[])
         self.f.get_list = Mock(return_value=[])
         self.f.get_all = Mock(return_value=[])
         self.f.db = Record(savepoint=Mock(),rollback=Mock(),exists=Mock(return_value=False),get_value=Mock(return_value=Record(enabled=1,user_type='System User')))
@@ -39,11 +40,14 @@ class ProjectPlanTests(unittest.TestCase):
         utils.strip_html=lambda value:value
         self.assign=Record(add=Mock(),remove=Mock())
         form=types.ModuleType('frappe.desk.form');form.assign_to=self.assign
-        self.patch=patch.dict(sys.modules,{'frappe':self.f,'frappe.utils':utils,'frappe.desk.form':form})
+        daily=types.SimpleNamespace(enabled=lambda:False,timesheets_enabled=lambda:False,capture=Mock(return_value={'timesheet':'TS-1'}))
+        self.patch=patch.dict(sys.modules,{'frappe':self.f,'frappe.utils':utils,'frappe.desk.form':form,
+            'bsgroup.project_daily_work':daily,'bsgroup.oman_assigned_project_access':types.SimpleNamespace(restricted=lambda:False)})
         self.patch.start()
         spec=importlib.util.spec_from_file_location('plan_test',Path(__file__).resolve().parents[1]/'project_plan.py')
         self.plan=importlib.util.module_from_spec(spec);spec.loader.exec_module(self.plan)
         self.task.meta=Record(has_field=lambda name:True)
+        self.task.reload=Mock()
 
     def tearDown(self):self.patch.stop()
 
@@ -78,7 +82,7 @@ class ProjectPlanTests(unittest.TestCase):
         with patch.object(self.plan, 'save_task') as save, patch.object(self.plan, 'set_task_status') as status, patch.object(self.plan, 'get_plan', return_value={'rows':[self.task], 'user_names':{}}):
             result=self.plan.autosave_task('P-A','TASK-A',{'status':'Delayed'},self.task.modified,[])
             save.assert_not_called()
-            status.assert_called_once_with('P-A','TASK-A','Delayed',self.task.modified)
+            status.assert_called_once_with('P-A','TASK-A','Delayed',self.task.modified,None,None,None,labor=None)
             self.assertEqual(result['row'],self.task)
 
     def test_autosave_combined_update_uses_new_version_and_rolls_back(self):
@@ -87,7 +91,7 @@ class ProjectPlanTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.plan.autosave_task('P-A','TASK-A',{'subject':'Changed','status':'Completed'},self.task.modified,[])
             self.assertEqual(save.call_args.kwargs['description'],'Scope')
-            status.assert_called_once_with('P-A','TASK-A','Completed','2026-11-11 13:00:00')
+            status.assert_called_once_with('P-A','TASK-A','Completed','2026-11-11 13:00:00',None,None,None,labor=None)
             self.f.db.rollback.assert_called_with(save_point='plan_autosave_testhash')
 
     def test_autosave_rejects_stale_or_unknown_fields(self):
@@ -165,7 +169,7 @@ class ProjectPlanTests(unittest.TestCase):
     def test_assigned_user_status_write_is_narrow_and_native(self):
         self.f.has_permission.return_value=False
         self.f.db.exists.return_value=True
-        result=self.plan.set_task_status('P-A','TASK-A','In Progress',self.task.modified)
+        result=self.plan.set_task_status('P-A','TASK-A','In Progress',self.task.modified,work='Installed',request_id='REQ')
         self.assertEqual(result['status'],'In Progress')
         self.task.save.assert_called_once_with(ignore_permissions=True)
         self.assertEqual(self.task.subject,'Activity')
@@ -175,6 +179,7 @@ class ProjectPlanTests(unittest.TestCase):
         self.f.has_permission.return_value=False
         with self.assertRaises(PermissionError): self.plan.set_task_status('P-A','TASK-A','Completed',self.task.modified)
         self.f.has_permission.return_value=True
+        self.f.db.exists.return_value=True
         with self.assertRaises(ValueError): self.plan.set_task_status('P-A','TASK-A','Administrator',self.task.modified)
         with self.assertRaises(ValueError): self.plan.set_task_status('P-A','TASK-A','Open','2000-01-01')
         self.task.save.assert_not_called()
@@ -183,7 +188,8 @@ class ProjectPlanTests(unittest.TestCase):
         self.task.project='P-B'
         with self.assertRaises(PermissionError):self.plan.set_task_status('P-A','TASK-A','Open',self.task.modified)
         self.task.project='P-A';self.task.save.side_effect=ValueError('dependency still open')
-        with self.assertRaises(ValueError):self.plan.set_task_status('P-A','TASK-A','Completed',self.task.modified)
+        self.f.db.exists.return_value=True
+        with self.assertRaises(ValueError):self.plan.set_task_status('P-A','TASK-A','Completed',self.task.modified,work='Installed',request_id='REQ')
         self.assertEqual(self.f.db.rollback.call_count,2)
 
     def test_completed_task_reopen_requires_native_write(self):

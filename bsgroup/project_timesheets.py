@@ -56,4 +56,14 @@ def save_work(project, timesheet, row_name, work, expected_work):
     row.description = value
     # Preserve the original work date, employee, task, hours and source history.
     sheet.save()
+    from bsgroup.project_labor_work import enabled, DT
+    if enabled() and row.get('custom_bs_work_entry'):
+        expense = frappe.db.get_value(DT, {'work_entry':row.custom_bs_work_entry}, 'name')
+        if expense:
+            # Text-only correction follows the same native Timesheet write check.
+            # It cannot change labour quantity, rate, author, date or allowance.
+            labour = frappe.get_doc(DT, expense)
+            labour.work_done = value
+            labour.flags.bs_daily_labor = True
+            labour.save(ignore_permissions=True)
     return dict(work=row.description, timesheet=sheet.name, row_name=row.name)

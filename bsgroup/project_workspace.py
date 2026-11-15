@@ -138,6 +138,8 @@ def context(project, section="tasks"):
     if controlled is not None:
         result.update(can_create=controlled["can_create"], problem=controlled.get("problem"))
         if section == "expenses":
+            from bsgroup.project_labor_work import expense_rows
+            result["labor_expenses"] = expense_rows(doc)
             result["defaults"].update(employee=controlled["employee"], expense_approver=controlled["expense_approver"])
             result["rows"] = controlled["claims"]
         else:
