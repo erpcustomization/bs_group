@@ -199,6 +199,23 @@
         for (const row of data.rows) drawPlanRow(frm,project,row,data,$('<tr>').appendTo(table));
         if (!data.rows.length) $('<tr><td colspan="7"></td></tr>').find('td').text(__('No activities yet. Add an activity or save this project with a Project Template to generate its tasks.')).end().appendTo(table);
     }
+    function colourPlanStatus(control,value) {
+        const colours={
+            'Open':['#eff6ff','#1e40af','#93c5fd'],
+            'In Progress':['#ecfeff','#155e75','#67e8f9'],
+            'Implementation In Progress':['#ecfeff','#155e75','#67e8f9'],
+            'On Hold':['#fff7ed','#9a3412','#fdba74'],
+            'Delayed':['#fff1f2','#9f1239','#fda4af'],
+            'Postponed':['#f5f3ff','#5b21b6','#c4b5fd'],
+            'Customer Delayed':['#fdf4ff','#86198f','#f0abfc'],
+            'Completed':['#ecfdf5','#065f46','#6ee7b7'],
+            'Closed':['#ecfdf5','#065f46','#6ee7b7'],
+            'Overdue':['#fef2f2','#991b1b','#f87171'],
+            'Cancelled':['#f1f5f9','#475569','#cbd5e1']
+        };
+        const [background,color,border]=colours[value] || colours.Open;
+        control.css({'background-color':background,color,'border-color':border,'font-weight':600,opacity:1});
+    }
     function drawPlanRow(frm,project,row,data,tr) {
         tr.empty();
         let description=row.description || '', selected=[...row.assigned_to], names={...data.user_names};
@@ -247,18 +264,19 @@
         $('<button type="button" class="btn btn-link btn-sm">').text(__('View work history')).on('click',()=>showWork(frm,project,row,false)).appendTo(work);
         const statusCell=cell(), status=$('<select class="form-control input-sm">').attr('aria-label',__('Status')+' '+row.name).prop('disabled',!row.can_change_status || !data.work_updates_ready).appendTo(statusCell);
         const options=[...data.status_options]; if(!options.includes(row.status)) options.unshift(row.status);
-        for(const value of options) $('<option>').val(value).text(__(value)).appendTo(status);
+        for(const value of options) colourPlanStatus($('<option>').val(value).text(__(value)).appendTo(status),value);
+        colourPlanStatus(status,row.status);
         const remarks=$('<div class="small bs-task-status-remarks" style="white-space:pre-wrap;margin-top:8px">').text(row.custom_bs_status_reason || '').appendTo(statusCell);
         status.val(row.status).on('change',()=>{
             const next=status.val();
             if(['On Hold','Delayed','Postponed','Customer Delayed'].includes(next)) {
-                status.val(row.status);
+                status.val(row.status);colourPlanStatus(status,row.status);
                 const d=new frappe.ui.Dialog({title:__('Reason for {0}',[next]),fields:[{fieldname:'reason',fieldtype:'Small Text',label:__('Reason'),reqd:1}],primary_action_label:__('Save Status'),primary_action(v){
                     const reason=(v.reason || '').trim();
                     if(!reason){frappe.msgprint(__('Enter a reason for this task status.'));return;}
-                    controller.edit('status',{value:next,reason});status.val(next);d.hide();
+                    controller.edit('status',{value:next,reason});status.val(next);colourPlanStatus(status,next);d.hide();
                 }});d.show();
-            } else {controller.edit('status',next);}
+            } else {controller.edit('status',next);colourPlanStatus(status,next);}
         });
         const overdue=$('<div class="text-warning small">').text(__('Past end date')).toggle(!!row.overdue).appendTo(statusCell);
         controller=planAutosave(row,async(changes,base)=>{
@@ -282,7 +300,7 @@
             if(!pending.has('assigned_to')){selected=[...row.assigned_to];label.text(selected.map(u=>names[u] || u).join(', ') || __('Unassigned'));}
             if(!pending.has('status')){
                 if(!status.find('option').toArray().some(o=>o.value===row.status)) $('<option>').val(row.status).text(__(row.status)).appendTo(status);
-                status.val(row.status);
+                status.val(row.status);colourPlanStatus(status,row.status);
                 remarks.text(row.custom_bs_status_reason || '');
             }
             tr.find('.bs-plan-edit').prop('disabled',!row.can_edit);
