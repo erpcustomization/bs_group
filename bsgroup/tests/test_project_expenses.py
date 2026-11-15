@@ -92,6 +92,8 @@ class ProjectExpenseTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'employee on an existing'): self.m.validate(self.doc)
 
     def test_missing_disabled_or_unprivileged_manager_blocks(self):
+        self.old()
+        self.doc.workflow_state = 'Pending Approval'
         self.project.custom_project_manager = None
         with self.assertRaisesRegex(ValueError, 'Project Manager'): self.m.validate(self.doc)
         self.project.custom_project_manager = 'MGR'; self.manager.status = 'Left'
@@ -103,8 +105,26 @@ class ProjectExpenseTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'disabled'): self.m.validate(self.doc)
 
     def test_manager_without_project_access_cannot_receive_claim(self):
+        self.old()
+        self.doc.workflow_state = 'Pending Approval'
         self.f.has_permission.return_value = False
         with self.assertRaisesRegex(ValueError, 'cannot access'): self.m.validate(self.doc)
+
+    def test_missing_manager_allows_only_draft_entry_without_forged_approver(self):
+        self.project.custom_project_manager = None
+        self.doc.expense_approver = 'other@example.com'
+        self.assertTrue(self.m.context('PROJ-1')['can_create'])
+        self.m.validate(self.doc)
+        self.assertIsNone(self.doc.expense_approver)
+        self.assertEqual(self.doc.expenses[0].project, 'PROJ-1')
+        self.old()
+        self.m.validate(self.doc)
+        for changes in [dict(workflow_state='Pending Approval'),
+                        dict(workflow_state='Draft', docstatus=1),
+                        dict(docstatus=0, approval_status='Approved')]:
+            self.doc.update(changes)
+            with self.assertRaisesRegex(ValueError, 'Project Manager'):
+                self.m.validate(self.doc)
 
     def test_wrong_manager_cannot_approve_or_reject(self):
         self.old(workflow_state='Pending Approval')

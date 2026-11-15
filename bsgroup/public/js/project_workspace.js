@@ -391,7 +391,7 @@
         }
         if (data.problem) $('<p class="text-muted">').text(data.problem).appendTo(panel);
         const actions = $('<div style="display:flex;gap:8px;margin-bottom:12px">').appendTo(panel);
-        if (data.can_create) $('<button type="button" class="btn btn-primary btn-sm">').text(__('New')+' '+__(data.doctype)).on('click',()=>{
+        if (data.can_create) $('<button type="button" class="btn btn-primary btn-sm">').text(section==='expenses'?__('Add Expense'):__('New')+' '+__(data.doctype)).on('click',()=>{
             openProjectRecord(frm,data,null,()=>render(frm,section));
         }).appendTo(actions);
         $('<button type="button" class="btn btn-default btn-sm">').text(__('Refresh')).on('click',()=>render(frm,section)).appendTo(actions);

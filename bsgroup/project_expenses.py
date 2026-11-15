@@ -38,8 +38,10 @@ def context(project):
     doc = project_doc(project)
     manager, problem = manager_for(doc)
     employee = own_employee(doc.company)
-    can_create = bool(frappe.has_permission("Expense Claim", "create") and employee and manager
+    can_create = bool(frappe.has_permission("Expense Claim", "create") and employee
                       and doc.status != "Cancelled")
+    if problem:
+        problem = _("You can add and save draft expenses now. Project Manager approval must be configured before sending them for approval.")
     if not employee:
         problem = _("Your login must be linked to one active Employee in this project's company to raise your expense claim.")
     elif not frappe.has_permission("Expense Claim", "create"):
@@ -85,10 +87,14 @@ def validate(doc, method=None):
     if old and old.employee != doc.employee:
         frappe.throw(_("The employee on an existing expense claim cannot be changed."))
     manager, problem = manager_for(project)
-    if problem:
-        frappe.throw(problem)
     previous = (old.get("workflow_state") or "Draft") if old else "Draft"
     state = doc.get("workflow_state") or "Draft"
+    # Recording a draft is independent of approval setup. Never permit a
+    # workflow transition or submitted claim to bypass the existing controls.
+    draft_only = (previous == "Draft" and state == "Draft" and doc.docstatus == 0
+                  and doc.get("approval_status") in (None, "", "Draft"))
+    if problem and not draft_only:
+        frappe.throw(problem)
     if not old and (state != "Draft" or doc.docstatus != 0 or doc.get("approval_status") not in (None, "", "Draft")):
         frappe.throw(_("New project expenses must start as drafts and follow the existing approval process."))
     if previous == "Pending Approval" and state in ("Approved by the Manager", "Reject by the Manager"):
