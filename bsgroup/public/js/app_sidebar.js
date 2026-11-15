@@ -55,7 +55,13 @@
                 ]),
         ];
     }
-    if(typeof module!=='undefined' && module.exports) {module.exports={groups,appForSection,routeMatches,chooseApp,isDashboard,dashboardLinks};return;}
+    function persistentMenu(current, privateSidebar) {
+        if(isDashboard(current.pathname)) return 'all';
+        if(current.searchParams.get('bs_app')==='BS Project' ||
+            /^\/desk\/(?:[^/]+\/)?(?:bs-project-modules|project|task|timesheet|tech-task-scheduler|delivery-request|site-survey-request)(?:\/|$)/.test(current.pathname)) return 'projects';
+        return privateSidebar ? 'all' : null;
+    }
+    if(typeof module!=='undefined' && module.exports) {module.exports={groups,appForSection,routeMatches,chooseApp,isDashboard,dashboardLinks,persistentMenu};return;}
     if(window.top!==window.self || window.bsAppSidebarInstalled) return;
     window.bsAppSidebarInstalled=true;
     const key='bs-sidebar-app:'+frappe.session.user;
@@ -71,12 +77,16 @@
         const current=new URL(location.href);
         const dashboard=isDashboard(current.pathname);
         for(const host of document.querySelectorAll('.body-sidebar .sidebar-items, .desk-sidebar .sidebar-items')) {
+            const mode=persistentMenu(current,host.closest('.body-sidebar')?.dataset.title==='Private');
             let nav=host.querySelector('.bs-dashboard-modules');
-            if(dashboard && frappe.boot.bs_work_dashboard) {
+            if(nav && nav.dataset.mode!==mode) {nav.remove();nav=null;}
+            if(mode && frappe.boot.bs_work_dashboard) {
                 if(!nav) {
                     nav=document.createElement('div');
                     nav.className='bs-dashboard-modules';
-                    for(const item of dashboardLinks(frappe.boot.bs_app_destinations)) {
+                    nav.dataset.mode=mode;
+                    const destinations=mode==='projects'?{'BS Project':frappe.boot.bs_app_destinations?.['BS Project']}:frappe.boot.bs_app_destinations;
+                    for(const item of dashboardLinks(destinations)) {
                         if(item.children) {
                             const section=document.createElement('div'), heading=document.createElement('div');
                             section.className='bs-dashboard-category';
@@ -111,6 +121,7 @@
         for(const sidebar of document.querySelectorAll('.body-sidebar[data-title="BS Group"]')) {
             const host=sidebar.querySelector('.sidebar-items');
             if(!host) continue;
+            if(host.querySelector('.bs-dashboard-modules')) continue;
             if(!host.querySelector('.bs-all-apps')) {
                 const row=document.createElement('div');
                 row.className='standard-sidebar-item bs-all-apps';

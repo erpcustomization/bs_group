@@ -1,6 +1,9 @@
 const assert=require('node:assert/strict');
-const {appForSection,chooseApp,routeMatches,groups,isDashboard,dashboardLinks}=require('../bsgroup/public/js/app_sidebar.js');
+const {appForSection,chooseApp,routeMatches,groups,isDashboard,dashboardLinks,persistentMenu}=require('../bsgroup/public/js/app_sidebar.js');
 const url=p=>new URL(p,'https://erp.bitssecureit.com');
+for(const path of ['/desk/private/project/PROJ-1','/desk/bs-group/bs-project-modules?bs_module=elv&bs_section=amc','/desk/task/TASK-1'])assert.equal(persistentMenu(url(path),false),'projects');
+assert.equal(persistentMenu(url('/desk/private/lead'),true),'all');
+assert.equal(persistentMenu(url('/desk/bs-group/lead'),false),null);
 const candidates=[
  {app:'BS Sales',href:'/desk/bs-group/quotation'},
  {app:'BS Sales',href:'/desk/bs-group/lead'},

@@ -5,10 +5,11 @@ class Element {
  prepend(child){child.parent=this;this.children.unshift(child);}
  remove(){this.parent.children=this.parent.children.filter(x=>x!==this);}
  querySelector(selector){return this.children.find(x=>x.classList.contains(selector.slice(1))) || null;}
+ closest(){return {dataset:{title:'Private'}};}
 }
 for(const scoped of [false,true]) {
  const host=new Element(),native=new Element();host.append(native);
- const document={body:{},head:new Element(),createElement:()=>new Element(),querySelectorAll:s=>s.includes('data-title')?[]:[host]};
+ const document={body:{},head:new Element(),createElement:()=>new Element(),querySelector:s=>host.querySelector(s),querySelectorAll:s=>s.includes('data-title')?[]:[host]};
  const location={href:'https://erp.bitssecureit.com/desk/private/my-work-dashboard',pathname:'/desk/private/my-work-dashboard'};
  const window={};window.top=window;window.self=window;
  const observers=[],changes=[],timers=[];
@@ -25,7 +26,8 @@ for(const scoped of [false,true]) {
  for(let i=0;i<5;i++){observers.forEach(fn=>fn());while(timers.length)timers.shift()();}
  assert.equal(host.children.filter(x=>x.classList.contains('bs-dashboard-modules')).length,1);
  location.pathname='/desk/bs-group/project';location.href='https://erp.bitssecureit.com'+location.pathname;run();
- assert(!host.querySelector('.bs-dashboard-modules'));assert(!native.classList.contains('bs-dashboard-hidden'));
+ assert(host.querySelector('.bs-dashboard-modules'));assert(native.classList.contains('bs-dashboard-hidden'));
+ assert.equal(host.querySelector('.bs-dashboard-modules').dataset.mode,'projects');
  location.pathname='/desk/my-work-dashboard';location.href='https://erp.bitssecureit.com'+location.pathname;run();
  assert(host.querySelector('.bs-dashboard-modules'));assert.equal(host.querySelector('.bs-dashboard-modules').style.display,undefined);
 }
