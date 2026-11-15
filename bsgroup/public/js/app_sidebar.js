@@ -35,14 +35,15 @@
     function isDashboard(path) {
         return /^\/desk\/(?:[^/]+\/)?my-work-dashboard\/?$/.test(path);
     }
-    function dashboardLinks(destinations) {
+    function dashboardLinks(destinations, supportLinks=[]) {
         return [
             {label:'Dashboard',href:'/desk/my-work-dashboard'},
             {label:'All apps',href:'/desk'},
             ...Object.entries(destinations || {}).filter(([app,path])=>groups[app] && typeof path==='string' && path.startsWith('/desk/'))
                 .flatMap(([app,path])=>[
                     {label:app==='BS Project'?'BS Project Support':app,
-                        href:path+(path.includes('?')?'&':'?')+'bs_app='+encodeURIComponent(app)},
+                        href:path+(path.includes('?')?'&':'?')+'bs_app='+encodeURIComponent(app),
+                        ...(app==='BS Project' && supportLinks.length ? {children:supportLinks.filter(x=>typeof x.href==='string' && x.href.startsWith('/desk/'))} : {})},
                     // Project is the first server destination only when Project read
                     // is allowed. A Task/Timesheet-only fallback must not add these.
                     ...(app==='BS Project' && path==='/desk/bs-group/project'
@@ -86,7 +87,7 @@
                     nav.className='bs-dashboard-modules';
                     nav.dataset.mode=mode;
                     const destinations=mode==='projects'?{'BS Project':frappe.boot.bs_app_destinations?.['BS Project']}:frappe.boot.bs_app_destinations;
-                    for(const item of dashboardLinks(destinations)) {
+                    for(const item of dashboardLinks(destinations,frappe.boot.bs_project_support_links || [])) {
                         if(item.children) {
                             const section=document.createElement('div'), heading=document.createElement('div');
                             section.className='bs-dashboard-category';

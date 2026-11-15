@@ -32,4 +32,20 @@ with patch.dict(sys.modules,{'frappe':f,'bsgroup.scoped_sales_access':s,'bsgroup
     assert m.destinations()['BS HR'].endswith('/hr-dashboard')
     f.get_roles.return_value=['System Manager']
     assert m.destinations()['BS User Management'].endswith('/bs-user-management')
+    f.session=types.SimpleNamespace(user='mithun@example.com')
+    f.get_roles.return_value=['Projects User']
+    f.has_permission=lambda dt,p: dt in {'Project','Task','Site Survey Request','Tech Task Scheduler'}
+    f.get_doc=lambda dt,name:types.SimpleNamespace(disabled=0,
+        ref_doctype='Tech Task Scheduler' if name=='Tech Task Scheduler Report' else 'Task',
+        roles=[types.SimpleNamespace(role='Sales Manager' if name=='Tech Task Scheduler Report' else 'Projects User')])
+    links=m.project_support_links()
+    assert [x['label'] for x in links]==['Project','Site Survey Request','Task','Tech Task Scheduler','Task Summary Report','Task Scheduler Report']
+    assert all('bs_app=BS%20Project' in x['href'] for x in links)
+    assert not any(x['label']=='Delivery Request' for x in links)
+    s.scope.return_value='sales'
+    assert m.project_support_links()==[]
+    s.scope.return_value=None
+    f.has_permission=lambda dt,p:False
+    assert m.project_support_links()==[]
 print('PASS system login, portal preservation, role scope, read permissions and HR guard')
+print('PASS Project Support submenu: DocType access, report roles, scoped users and denied links')

@@ -142,8 +142,9 @@ def show_lead_intake_navigation():
 
 
 def boot_session(bootinfo):
-    from bsgroup.app_navigation import destinations
+    from bsgroup.app_navigation import destinations, project_support_links
     bootinfo.bs_app_destinations = destinations()
+    bootinfo.bs_project_support_links = project_support_links()
     from bsgroup.work_dashboard import screens
     from bsgroup.hr_management import can_manage
     bootinfo.bs_hr_management = can_manage()
