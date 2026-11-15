@@ -6,7 +6,7 @@ import frappe
 FIELD = "custom_bs_module_grants"
 MODULES = {
     "Sales": {"records": ("Lead", "Opportunity", "Deal Cost Sheet", "Quotation"), "edit": ("Sales User",)},
-    "Projects": {"records": ("Project", "Task", "Timesheet", "Delivery Request"), "edit": ("Projects User",), "approve": ("Projects Manager",)},
+    "Projects": {"records": ("Project", "Task", "Timesheet", "Delivery Request", "Labor Preapproval"), "edit": ("Projects User",), "approve": ("Projects Manager",)},
     "HR": {"records": ("Employee", "Employee Checkin", "Leave Application", "Attendance", "Expense Claim", "Employee Advance"), "edit": ("HR User",), "approve": ("Leave Approver", "Expense Approver")},
     "Procurement": {"records": ("Material Request", "Purchase Order"), "edit": ("Purchase User",)},
 }
