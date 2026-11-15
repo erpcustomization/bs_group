@@ -2,12 +2,13 @@
 (() => {
     const routes = frappe.boot?.bs_app_destinations;
     if (!routes || window.top !== window.self) return;
+    const appId = name => name === 'BS Project Support' ? 'BS Project' : name;
     const scopedRoute = (name, route) => route ? route + (route.includes('?') ? '&' : '?') + 'bs_app=' + encodeURIComponent(name) : route;
     let scheduled = false;
     function update() {
         scheduled = false;
         document.querySelectorAll('a.desktop-icon[data-id]').forEach(tile => {
-            const name = tile.dataset.id;
+            const name = appId(tile.dataset.id);
             if (!Object.prototype.hasOwnProperty.call(routes, name)) return;
             const route = scopedRoute(name, routes[name]);
             tile.hidden = !route;
@@ -18,9 +19,10 @@
     // sidebar item (Lead). Follow our permission-checked destination instead.
     document.addEventListener('click', event => {
         const tile = event.target.closest?.('a.desktop-icon[data-id]');
-        if (!tile || !Object.prototype.hasOwnProperty.call(routes, tile.dataset.id)) return;
+        if (!tile || !Object.prototype.hasOwnProperty.call(routes, appId(tile.dataset.id))) return;
         if (event.target.closest('.hide-button')) return;
-        const route = scopedRoute(tile.dataset.id, routes[tile.dataset.id]);
+        const name = appId(tile.dataset.id);
+        const route = scopedRoute(name, routes[name]);
         if (!route) { event.preventDefault(); event.stopImmediatePropagation(); return; }
         if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button) return;
         event.preventDefault(); event.stopImmediatePropagation();
