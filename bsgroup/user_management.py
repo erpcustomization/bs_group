@@ -1,4 +1,4 @@
-"""Read-only administration overview. All edits use native permission-checked forms."""
+"""User administration with narrowly scoped, native permission-checked edits."""
 import frappe
 from frappe import _
 
@@ -44,6 +44,9 @@ def details(user):
     doc.check_permission("read")
     roles = sorted(set(frappe.get_roles(user)))
     result = {"name": doc.name, "first_name": doc.first_name,
+        "middle_name": doc.get("middle_name"), "last_name": doc.get("last_name"),
+        "modified": str(doc.get("modified") or ""),
+        "assigned_roles": sorted({r.role for r in doc.get("roles", [])}),
         "full_name": doc.full_name, "enabled": doc.enabled, "user_type": doc.user_type,
         "last_login": doc.last_login, "roles": roles,
         "role_profiles": [r.role_profile for r in doc.get("role_profiles", [])],
@@ -75,6 +78,61 @@ def details(user):
         result["history"] = frappe.get_list("Version", filters={"ref_doctype": "User", "docname": user},
             fields=["name", "owner", "creation"], order_by="creation desc", limit_page_length=20)
     return result
+
+
+@frappe.whitelist()
+def search_roles(search=""):
+    require_manager()
+    if not frappe.has_permission("User", "write"):
+        frappe.throw(_("User write access is required."), frappe.PermissionError)
+    term = str(search or "").strip()[:120]
+    if not term:
+        return []
+    return frappe.get_list("Role", filters={"disabled": 0,
+        "name": ["not in", ["All", "Guest", "Administrator", "Desk User"]]},
+        or_filters=[["name", "like", "%" + term + "%"]],
+        fields=["name"], order_by="name asc", limit_page_length=20)
+
+
+@frappe.whitelist(methods=["POST"])
+def save_account(user, expected_modified, changes):
+    require_manager()
+    changes = frappe.parse_json(changes) if isinstance(changes, str) else changes
+    allowed = {"first_name", "middle_name", "last_name", "enabled", "user_type", "roles"}
+    if not isinstance(changes, dict) or set(changes) - allowed:
+        frappe.throw(_("Unsupported account change."))
+    doc = frappe.get_doc("User", user)
+    doc.check_permission("write")
+    if str(doc.modified) != str(expected_modified):
+        frappe.throw(_("This account was updated elsewhere. Refresh before saving."))
+    if "first_name" in changes and not str(changes["first_name"] or "").strip():
+        frappe.throw(_("First Name is required."))
+    if "enabled" in changes and changes["enabled"] not in (0, 1):
+        frappe.throw(_("Invalid account status."))
+    if "user_type" in changes and changes["user_type"] not in ("System User", "Website User"):
+        frappe.throw(_("Invalid account type."))
+    if "roles" in changes:
+        if doc.get("role_profiles") or doc.get("role_profile_name"):
+            frappe.throw(_("This account's roles are controlled by its existing role profile."))
+        roles = changes["roles"]
+        if not isinstance(roles, list) or any(not isinstance(r, str) for r in roles):
+            frappe.throw(_("Invalid roles."))
+        current = {r.role for r in doc.get("roles", [])}
+        for role in set(roles) - current:
+            if role in ("All", "Guest", "Administrator", "Desk User") or not frappe.db.exists(
+                    "Role", {"name": role, "disabled": 0}):
+                frappe.throw(_("Choose an enabled assignable role."))
+        doc.set("roles", [r for r in doc.get("roles", []) if r.role in roles])
+        for role in sorted(set(roles) - current):
+            doc.append("roles", {"role": role})
+    for field, value in changes.items():
+        if field != "roles":
+            doc.set(field, value.strip() if isinstance(value, str) else value)
+    # Native User validation, field permissions, hooks, versioning and concurrency remain in force.
+    # Do not replace profiles, restrictions, sharing, passwords or unspecified account settings.
+    if changes:
+        doc.save()
+    return {"name": doc.name, "modified": str(doc.modified)}
 
 
 def install():

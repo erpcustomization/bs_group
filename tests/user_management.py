@@ -51,6 +51,63 @@ class UserManagementTests(unittest.TestCase):
         self.assertNotIn('SECRET',str(result));self.assertEqual(result['first_name'],'Employee')
         self.f.db.set_value.assert_not_called();self.f.db.sql.assert_not_called()
 
+    def editable_doc(self):
+        doc=Doc(name='employee@example.com',modified='v1',first_name='Employee',
+            roles=[Doc(role='Employee'),Doc(role='Sales User')],
+            block_modules=[Doc(module='HR')],api_key='preserved',
+            check_permission=MagicMock(),save=MagicMock())
+        doc['set']=lambda key,value:doc.__setitem__(key,value)
+        doc['append']=lambda key,value:doc[key].append(Doc(value))
+        self.f.get_doc.return_value=doc
+        return doc
+
+    def test_save_checks_target_and_preserves_unedited_access(self):
+        doc=self.editable_doc()
+        self.m.save_account(doc.name,'v1',{'first_name':' Updated '})
+        doc.check_permission.assert_called_once_with('write')
+        self.assertEqual(doc.first_name,'Updated')
+        self.assertEqual([r.role for r in doc.roles],['Employee','Sales User'])
+        self.assertEqual(doc.block_modules,[{'module':'HR'}])
+        self.assertEqual(doc.api_key,'preserved')
+        doc.save.assert_called_once_with()
+        self.f.db.set_value.assert_not_called()
+
+    def test_save_rejects_stale_version_and_secrets(self):
+        doc=self.editable_doc()
+        with self.assertRaises(PermissionError):self.m.save_account(doc.name,'old',{'first_name':'New'})
+        with self.assertRaises(PermissionError):self.m.save_account(doc.name,'v1',{'api_key':'replace'})
+        doc.save.assert_not_called()
+
+    def test_save_rejects_missing_first_name_and_invalid_account_settings(self):
+        doc=self.editable_doc()
+        for changes in ({'first_name':' '},{'enabled':2},{'user_type':'Administrator'}):
+            with self.assertRaises(PermissionError):self.m.save_account(doc.name,'v1',changes)
+        doc.save.assert_not_called()
+
+    def test_roles_only_change_when_explicitly_requested(self):
+        doc=self.editable_doc();self.f.db.exists.return_value=True
+        self.m.save_account(doc.name,'v1',{'roles':['Employee','Projects User']})
+        self.assertEqual([r.role for r in doc.roles],['Employee','Projects User'])
+        doc.save.assert_called_once_with()
+
+    def test_profile_roles_and_implicit_roles_are_protected(self):
+        doc=self.editable_doc();doc['role_profile_name']='Sales'
+        with self.assertRaises(PermissionError):self.m.save_account(doc.name,'v1',{'roles':[]})
+        doc['role_profile_name']=None
+        with self.assertRaises(PermissionError):self.m.save_account(doc.name,'v1',{'roles':['Administrator']})
+        doc.save.assert_not_called()
+
+    def test_save_denied_without_manager_or_target_write(self):
+        doc=self.editable_doc();doc.check_permission.side_effect=PermissionError
+        with self.assertRaises(PermissionError):self.m.save_account(doc.name,'v1',{'first_name':'New'})
+        doc.save.assert_not_called()
+        self.f.only_for.side_effect=PermissionError
+        with self.assertRaises(PermissionError):self.m.save_account(doc.name,'v1',{})
+
+    def test_empty_changes_do_not_write(self):
+        doc=self.editable_doc();self.m.save_account(doc.name,'v1',{})
+        doc.save.assert_not_called()
+
     def test_install_only_reloads_page_and_clears_cache(self):
         self.m.install()
         self.f.reload_doc.assert_called_once_with('bs_group','page','bs_user_management',force=True)
