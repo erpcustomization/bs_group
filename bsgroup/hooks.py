@@ -774,6 +774,12 @@ after_migrate.append("bsgroup.oman_quotation_flow.sync_status_options")
 from bsgroup.supply_delivery import configure_hooks as _supply_delivery_hooks
 _supply_delivery_hooks(globals())
 
+# Administration UI only: native User forms retain all permission writes.
+after_migrate.append("bsgroup.user_management.install")
+for _user_registry in (doctype_js, doctype_list_js):
+    _prior = _user_registry.get("User", [])
+    _user_registry["User"] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["public/js/bs_user_management_entry.js"]
+
 # Presentation layer only, shared by the two commercial document forms.
 for _commercial_dt in ("Quotation", "Deal Cost Sheet"):
     _prior = doctype_js.get(_commercial_dt, [])

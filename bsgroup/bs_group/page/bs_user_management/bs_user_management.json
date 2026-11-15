@@ -1,0 +1,5 @@
+{
+ "doctype": "Page", "name": "bs-user-management", "page_name": "bs-user-management",
+ "module": "BS Group", "title": "BS User Management", "standard": "Yes",
+ "system_page": 0, "roles": [{"role": "System Manager"}]
+}
