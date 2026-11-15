@@ -77,6 +77,8 @@ def details(user):
     if frappe.has_permission("Version", "read"):
         result["history"] = frappe.get_list("Version", filters={"ref_doctype": "User", "docname": user},
             fields=["name", "owner", "creation"], order_by="creation desc", limit_page_length=20)
+    from bsgroup.user_module_access import public_details
+    result["module_access"] = public_details(doc)
     return result
 
 
@@ -138,4 +140,6 @@ def save_account(user, expected_modified, changes):
 def install():
     # No User, Has Role, User Permission, DocShare or Role records are changed here.
     frappe.reload_doc("bs_group", "page", "bs_user_management", force=True)
+    from bsgroup.user_module_access import install as install_module_grants
+    install_module_grants()
     frappe.clear_cache()

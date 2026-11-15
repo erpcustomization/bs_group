@@ -16,6 +16,8 @@ class UserManagementTests(unittest.TestCase):
         self.f.PermissionError=PermissionError
         self.f.throw.side_effect=lambda message,*a:(_ for _ in ()).throw(PermissionError(message))
         sys.modules['frappe']=self.f
+        self.modules=MagicMock();self.modules.public_details.return_value=[]
+        sys.modules['bsgroup.user_module_access']=self.modules
         spec=importlib.util.spec_from_file_location('user_management',Path(__file__).parents[1]/'bsgroup/user_management.py')
         self.m=importlib.util.module_from_spec(spec);spec.loader.exec_module(self.m)
         self.f.has_permission.return_value=True

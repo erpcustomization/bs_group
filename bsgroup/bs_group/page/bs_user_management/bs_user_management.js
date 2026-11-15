@@ -4,6 +4,7 @@ frappe.pages['bs-user-management'].on_page_load = function(wrapper) {
     let request = 0, detailRequest = 0, start = 0, selected, rows = [], dirty = false;
     const style = document.createElement('style');
     style.textContent = `.bs-users{--blue:#1758bd;color:#173251;padding:8px}.bs-users .hero{background:linear-gradient(120deg,#102d52,#20599b);color:white;border-radius:16px;padding:24px;margin-bottom:18px}.bs-users h2{font-size:24px;font-weight:750;margin:0 0 6px}.bs-users h3{font-size:17px;font-weight:700}.bs-users .tools{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px}.bs-users .tools input{min-width:260px;flex:1}.bs-users input,.bs-users select{border:1px solid #cedbed;border-radius:8px;padding:10px;background:white}.bs-users .layout{display:grid;grid-template-columns:minmax(320px,40%) minmax(0,1fr);gap:18px}.bs-users .card{border:1px solid #dae4f1;border-radius:14px;background:white;padding:18px;margin-bottom:14px}.bs-users .directory{padding:0;overflow:hidden}.bs-users .person{width:100%;display:flex;align-items:center;gap:12px;border:0;border-bottom:1px solid #edf1f6;padding:15px;text-align:left;background:white;color:inherit}.bs-users .person:hover,.bs-users .person.selected{background:#edf4ff}.bs-users .avatar{width:40px;height:40px;flex-shrink:0;border-radius:12px;background:#e7effc;color:#1758bd;display:grid;place-items:center;font-weight:750}.bs-users .identity{min-width:0;flex:1}.bs-users .identity strong{display:block;font-size:15px}.bs-users small{display:block;color:#60758c;overflow-wrap:anywhere}.bs-users .badge{display:inline-block;border-radius:20px;padding:4px 9px;font-size:11px;background:#e9f1ff;color:#245ca7;margin:3px}.bs-users .disabled{background:#f0f1f3;color:#686f78}.bs-users .warning{background:#fff5df;color:#78581e;padding:10px;border-radius:8px}.bs-users .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.bs-users .btn{border-radius:8px}.bs-users .muted{color:#60758c}.bs-users .matrix{width:100%;font-size:12px}.bs-users .matrix th,.bs-users .matrix td{padding:8px 4px;border-bottom:1px solid #edf1f6;text-align:center}.bs-users .matrix th:first-child,.bs-users .matrix td:first-child{text-align:left}.bs-users details{border-top:1px solid #edf1f6;padding:12px 0}.bs-users summary{cursor:pointer;font-weight:700}.bs-users .footer{display:flex;justify-content:space-between;align-items:center;padding:12px}.bs-users .empty{padding:28px;text-align:center;color:#60758c}@media(max-width:900px){.bs-users .layout{grid-template-columns:1fr}.bs-users .hero{padding:18px}}`;
+    style.textContent += `.bs-users .hero h2{color:#fff!important}.bs-users .module-access{width:100%;table-layout:fixed;border-collapse:collapse;margin:16px 0}.bs-users .module-access th,.bs-users .module-access td{padding:12px 6px;border-bottom:1px solid #e3ebf6;vertical-align:top}.bs-users .module-access thead{background:#edf4ff;color:#174b86}.bs-users .module-access td{text-align:center}.bs-users .module-access input[type=checkbox]{width:19px;height:19px;accent-color:#1758bd;cursor:pointer}.bs-users .module-access input:disabled{cursor:default}.bs-users .module-access small{font-weight:400;font-size:11px;margin-top:5px}.bs-users .module-access details{border:0;font-size:11px;padding:8px 0}.bs-users .permission-note{line-height:1.35}.bs-users .layout{grid-template-columns:minmax(240px,30%) minmax(0,1fr);align-items:start}@media(max-width:900px){.bs-users .layout{grid-template-columns:1fr}}`;
     root.append(style);
     root.append('<div class="hero"><h2>BS User Management</h2><div>People, accounts and access — in one place</div></div>');
     const tools = $('<div class="tools">').appendTo(root);
@@ -65,9 +66,9 @@ frappe.pages['bs-user-management'].on_page_load = function(wrapper) {
                 accountPanel(inline,d,mode);
             }
             button(actions,'Account Details',()=>openPanel('Account Details'));
-            button(actions,'Roles & Permissions',()=>openPanel('Roles & Permissions'));
+            button(actions,'Permissions',()=>openPanel('Permissions'));
             button(actions,'Account Settings',()=>openPanel('Account Settings'));
-            openPanel('Roles & Permissions');
+            openPanel('Permissions');
             const advanced=$('<details class="card">').appendTo(detail);
             $('<summary>').text('Advanced access details & history').appendTo(advanced);
             const access=$('<div>').appendTo(advanced);$('<h3>').text('Module permissions').appendTo(access);
@@ -92,9 +93,8 @@ frappe.pages['bs-user-management'].on_page_load = function(wrapper) {
     }
     function accountPanel(host,d,mode) {
         host.empty();$('<h3>').text(mode).appendTo(host);
-        const originalRoles=[...(d.assigned_roles||[])];
-        const chosen=new Set(originalRoles), controls={}, labels={first_name:'First Name',middle_name:'Middle Name',last_name:'Last Name',enabled:'Account status',user_type:'Account type'};
-        const profileManaged=!!(d.role_profile||(d.role_profiles||[]).length);
+        if(mode==='Permissions'){modulePanel(host,d);return;}
+        const controls={}, labels={first_name:'First Name',middle_name:'Middle Name',last_name:'Last Name',enabled:'Account status',user_type:'Account type'};
         function field(key,options){
             const label=$('<label style="display:block;margin:12px 0">').text(labels[key]+(key==='first_name'?' *':'')).appendTo(host);
             const input=$(options?'<select>':'<input type="text">').attr('aria-label',labels[key]).css({display:'block',width:'100%',marginTop:'6px'}).appendTo(label);
@@ -110,27 +110,6 @@ frappe.pages['bs-user-management'].on_page_load = function(wrapper) {
             field('enabled',[[1,'Active'],[0,'Disabled']]);
             field('user_type',[['System User','ERP user'],['Website User','Portal user']]);
             $('<small>').text('Other account settings are retained. Disabling an account prevents sign-in.').appendTo(host);
-        } else {
-            $('<p class="muted">').text('Assigned roles only. Search to add a role; remove one using ×. Save applies your changes.').appendTo(host);
-            const chips=$('<div aria-label="Assigned roles">').appendTo(host);
-            function renderRoles(){chips.empty();for(const role of [...chosen].sort()){
-                const chip=$('<span class="badge">').text(role).appendTo(chips);
-                if(d.can_write&&!profileManaged) $('<button type="button" style="border:0;background:none;color:inherit;margin-left:6px">').attr('aria-label','Remove '+role).text('×').appendTo(chip).on('click',()=>{chosen.delete(role);dirty=true;save.prop('disabled',false);renderRoles();});
-            }if(!chosen.size)$('<small>').text('No directly assigned roles.').appendTo(chips);}
-            renderRoles();
-            if(profileManaged)$('<p class="muted">').text('Roles are managed by the existing profile: '+[...(d.role_profiles||[]),d.role_profile].filter(Boolean).join(', ')+'. Profile rules are retained.').appendTo(host);
-            else if(d.can_write){
-                const searchRole=$('<input type="search" aria-label="Search roles to add" placeholder="Search a role to add…" style="width:100%;margin-top:14px">').appendTo(host);
-                const results=$('<div class="actions" aria-label="Matching roles">').appendTo(host);let timer,seq=0;
-                searchRole.on('input',()=>{clearTimeout(timer);const token=++seq;results.empty();const term=searchRole.val().trim();if(!term)return;
-                    timer=setTimeout(async()=>{try{const r=await frappe.call({method:'bsgroup.user_management.search_roles',args:{search:term}});if(token!==seq||!host[0].contains(searchRole[0]))return;results.empty();
-                        const matches=(r.message||[]).filter(x=>!chosen.has(x.name));
-                        for(const role of matches)button(results,'Add '+role.name,()=>{chosen.add(role.name);dirty=true;save.prop('disabled',false);renderRoles();searchRole.val('');results.empty();++seq;});
-                        if(!matches.length)$('<small>').text('No other matching roles.').appendTo(results);
-                    }catch(e){if(token===seq)results.text('Unable to search roles with your current permissions.');}},250);
-                });
-            }
-            $('<small style="margin-top:12px">').text('Assignments, record restrictions and approval rules still apply.').appendTo(host);
         }
         const footer=$('<div class="actions">').appendTo(host);
         const save=button(footer,'Save changes',()=>{
@@ -140,10 +119,6 @@ frappe.pages['bs-user-management'].on_page_load = function(wrapper) {
                 if(value!==(d[key]??'')){changes[key]=value;review.push(labels[key]+': '+(key==='enabled'?(value?'Active':'Disabled'):value||'(blank)'));}
             }
             if('first_name' in changes&&!changes.first_name){frappe.msgprint('First Name is required.');return;}
-            if(mode==='Roles & Permissions'&&!profileManaged){
-                const added=[...chosen].filter(x=>!originalRoles.includes(x)),removed=originalRoles.filter(x=>!chosen.has(x));
-                if(added.length||removed.length){changes.roles=[...chosen];if(added.length)review.push('Add roles: '+added.join(', '));if(removed.length)review.push('Remove roles: '+removed.join(', '));}
-            }
             if(!Object.keys(changes).length){dirty=false;save.prop('disabled',true);frappe.show_alert('No changes to save.');return;}
             const content=$('<div>');$('<p>').text('Save these changes for '+d.name+'?').appendTo(content);for(const line of review)$('<p>').text(line).appendTo(content);
             frappe.confirm(content.html(),async()=>{
@@ -153,7 +128,54 @@ frappe.pages['bs-user-management'].on_page_load = function(wrapper) {
             });
         },true).prop('disabled',true);
         button(footer,'Discard changes',()=>{dirty=false;accountPanel(host,d,mode);});
-        if(!d.can_write||(mode==='Roles & Permissions'&&profileManaged))footer.hide();
+        if(!d.can_write)footer.hide();
+    }
+    function modulePanel(host,d){
+        const changes={};
+        $('<p class="muted">').text('View, edit and approve by module. Existing access is protected; new grants can be added or removed here.').appendTo(host);
+        const table=$('<table class="module-access"><thead><tr><th>Module</th><th>View</th><th>Edit</th><th>Approve</th></tr></thead><tbody></tbody></table>').appendTo(host);
+        for(const row of d.module_access||[]){
+            const tr=$('<tr>').appendTo(table.find('tbody'));
+            const title=$('<th scope="row">').text(row.module).appendTo(tr);
+            const scope=$('<details>').appendTo(title);$('<summary>').text('Scope & rules').appendTo(scope);
+            $('<small>').text(row.records.join(', ')).appendTo(scope);
+            if(row.note)$('<small>').text(row.note).appendTo(scope);
+            for(const action of ['view','edit','approve']){
+                const cell=row.cells[action],key=row.module+'.'+action;
+                const td=$('<td>').appendTo(tr),label=$('<label>').appendTo(td);
+                const input=$('<input type="checkbox">').attr('aria-label',row.module+' '+action).attr('title',cell.reason||cell.note)
+                    .prop({checked:cell.checked,indeterminate:cell.partial,disabled:!d.can_write||(!cell.editable&&!cell.managed)}).appendTo(label);
+                $('<small>').text(cell.status).appendTo(label);
+                if(cell.reason)$('<small class="permission-note">').text(cell.reason).appendTo(td);
+                if(action==='approve')$('<small>').text(cell.note).appendTo(scope);
+                input.on('change',()=>{const enabled=input.prop('checked');if(enabled===cell.managed)delete changes[key];else changes[key]=enabled;dirty=!!Object.keys(changes).length;review.prop('disabled',!dirty);});
+            }
+        }
+        $('<small>').text('Limited means access to some record types. Ownership, company restrictions, task assignments and approval conditions still apply. A disabled account cannot sign in.').appendTo(host);
+        const footer=$('<div class="actions">').appendTo(host);
+        const review=button(footer,'Preview changes',async()=>{
+            review.prop('disabled',true);
+            try{
+                const response=await frappe.call({method:'bsgroup.user_module_access.preview',args:{user:d.name,expected_modified:d.modified,changes}});
+                const p=response.message;
+                if(!p.has_changes){frappe.msgprint('No access changes to save.');return;}
+                const dialog=new frappe.ui.Dialog({title:'Review permission changes',size:'large',fields:[{fieldname:'preview',fieldtype:'HTML'}],primary_action_label:'Save permissions',primary_action:async()=>{
+                    dialog.disable_primary_action();
+                    try{await frappe.call({method:'bsgroup.user_module_access.save',args:{user:d.name,expected_modified:d.modified,changes,preview_token:p.token},freeze:true,freeze_message:'Saving permissions…'});dirty=false;dialog.hide();frappe.show_alert({message:'Module permissions saved',indicator:'green'});await load();await show(d.name);}
+                    catch(e){dialog.enable_primary_action();}
+                }});
+                const content=dialog.fields_dict.preview.$wrapper;
+                $('<p>').text('Account: '+d.name).appendTo(content);
+                for(const change of p.changes)$('<p>').text(change.module+' — '+change.permission+': '+(change.enabled?'Add grant':'Remove new grant')).appendTo(content);
+                $('<p>').text(p.note).appendTo(content);
+                const impact=$('<table class="table table-bordered"><thead><tr><th>Records</th><th>Added</th><th>Removed</th></tr></thead><tbody></tbody></table>').appendTo(content);
+                for(const item of p.impact){const tr=$('<tr>').appendTo(impact.find('tbody'));$('<td>').text(item.record+(item.own_records?' (own records)':'')+(item.field_level?' (restricted fields '+item.field_level+')':'')).appendTo(tr);$('<td>').text(item.added.join(', ')||'—').appendTo(tr);$('<td>').text(item.removed.join(', ')||'—').appendTo(tr);}
+                if(!p.impact.length)$('<p>').text('These rights are already covered by another grant. Existing record access remains unchanged.').appendTo(content);
+                dialog.show();
+            }finally{review.prop('disabled',!dirty);}
+        },true).prop('disabled',true);
+        button(footer,'Discard changes',()=>{dirty=false;host.empty();$('<h3>').text('Permissions').appendTo(host);modulePanel(host,d);});
+        if(!d.can_write)footer.hide();
     }
     function editor(doctype,name,tab,defaults={}) {
         const dialog=new frappe.ui.Dialog({title:name?`${doctype} · ${name}`:`New ${doctype}`,size:'extra-large',fields:[{fieldname:'editor',fieldtype:'HTML'}]});
