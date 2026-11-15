@@ -9,6 +9,13 @@
     function appForSection(section) {
         return Object.keys(groups).find(app=>groups[app].includes(section)) || 'BS Sales';
     }
+    function appForRow(row) {
+        if(row.classList.contains('section-item')) return appForSection(row.dataset.id);
+        // Native workspace navigation can render these as top-level links.
+        return ['Site Survey Request','Delivery Request','Project','Task Summary Report',
+            'Task Scheduler Report','Tech Task Scheduler Report'].includes(row.dataset.id)
+            ? 'BS Project' : 'BS Sales';
+    }
     function routeMatches(current, target) {
         const normalize = path=>decodeURIComponent(path).replace(/^\/desk\/bs-group\//,'/desk/').replace(/\/$/,'');
         const path=normalize(current.pathname), base=normalize(target.pathname);
@@ -53,14 +60,14 @@
             const rows=[...host.children], candidates=[];
             for(const row of rows) {
                 if(row.classList.contains('bs-personal-dashboard') || row.classList.contains('bs-all-apps')) continue;
-                const app=appForSection(row.classList.contains('section-item')?row.dataset.id:null);
+                const app=appForRow(row);
                 for(const link of row.querySelectorAll('a[href]')) candidates.push({app,href:link.getAttribute('href')});
             }
             const active=chooseApp(current,candidates,previous);
             previous=active;
             try { sessionStorage.setItem(key,active); } catch (_) {}
             for(const row of rows) {
-                const app=appForSection(row.classList.contains('section-item')?row.dataset.id:null);
+                const app=appForRow(row);
                 row.classList.toggle('bs-app-unrelated',!row.classList.contains('bs-personal-dashboard') && !row.classList.contains('bs-all-apps') && app!==active);
             }
             const title=sidebar.querySelector('.sidebar-header .header-title');
