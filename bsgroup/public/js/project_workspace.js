@@ -268,15 +268,19 @@
         colourPlanStatus(status,row.status);
         const remarks=$('<div class="small bs-task-status-remarks" style="white-space:pre-wrap;margin-top:8px">').text(row.custom_bs_status_reason || '').appendTo(statusCell);
         status.val(row.status).on('change',()=>{
-            const next=status.val();
-            if(['On Hold','Delayed','Postponed','Customer Delayed'].includes(next)) {
-                status.val(row.status);colourPlanStatus(status,row.status);
-                const d=new frappe.ui.Dialog({title:__('Reason for {0}',[next]),fields:[{fieldname:'reason',fieldtype:'Small Text',label:__('Reason'),reqd:1}],primary_action_label:__('Save Status'),primary_action(v){
-                    const reason=(v.reason || '').trim();
-                    if(!reason){frappe.msgprint(__('Enter a reason for this task status.'));return;}
-                    controller.edit('status',{value:next,reason});status.val(next);colourPlanStatus(status,next);d.hide();
-                }});d.show();
-            } else {controller.edit('status',next);colourPlanStatus(status,next);}
+            const next=status.val(), needsReason=['On Hold','Delayed','Postponed','Customer Delayed'].includes(next);
+            status.val(row.status);colourPlanStatus(status,row.status);
+            const request_id=crypto.randomUUID();
+            const d=new frappe.ui.Dialog({title:__('Update status: {0}',[next]),fields:[
+                {fieldname:'work',fieldtype:'Small Text',label:__("Today's work"),reqd:1,
+                    description:__('Saved to your timesheet for today against this project and task.')},
+                ...(needsReason?[{fieldname:'reason',fieldtype:'Small Text',label:__('Reason for {0}',[next]),reqd:1}]:[])
+            ],primary_action_label:__('Save work and status'),primary_action(v){
+                const work=(v.work || '').trim(), reason=(v.reason || '').trim();
+                if(!work || (needsReason && !reason)){frappe.msgprint(__('Enter today’s work and the required reason.'));return;}
+                controller.edit('status',{value:next,reason,work,request_id});
+                status.val(next);colourPlanStatus(status,next);d.hide();
+            }});d.show();
         });
         const overdue=$('<div class="text-warning small">').text(__('Past end date')).toggle(!!row.overdue).appendTo(statusCell);
         controller=planAutosave(row,async(changes,base)=>{
@@ -308,6 +312,7 @@
             workButton.prop('disabled',!row.can_log_work);
             overdue.toggle(!!row.overdue);
             if(frm.__bs_activity_tabs?.tasks)frm.__bs_activity_tabs.tasks.activity_project=null;
+            if(frm.__bs_activity_tabs?.timesheets)frm.__bs_activity_tabs.timesheets.activity_project=null;
         });
         $('<button type="button" class="btn btn-link btn-xs">').text(__('Retry')).on('click',()=>controller.flush()).appendTo(recovery);
         $('<button type="button" class="btn btn-link btn-xs">').text(__('Reload row')).on('click',()=>{

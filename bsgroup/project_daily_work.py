@@ -42,10 +42,10 @@ def install():
     ]}, update=False)
 
 
-def capture(project, task, work, request_id):
+def capture(project, task, work, request_id, status_transition=False):
     from frappe.utils import getdate
     from bsgroup.project_plan import WORK_SUBJECT
-    if task.status in TERMINAL or project.status in ("Completed", "Cancelled"):
+    if (task.status in TERMINAL or project.status in ("Completed", "Cancelled")) and not status_transition:
         frappe.throw(_("This task is closed. Reopen it before recording more work."))
     if not request_id or not isinstance(request_id, str) or len(request_id) > 100:
         frappe.throw(_("Refresh the Project Plan and try saving your work again."))
