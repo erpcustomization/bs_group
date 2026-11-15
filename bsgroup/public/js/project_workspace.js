@@ -328,6 +328,7 @@
             overdue.toggle(!!row.overdue);
             if(frm.__bs_activity_tabs?.tasks)frm.__bs_activity_tabs.tasks.activity_project=null;
             if(frm.__bs_activity_tabs?.timesheets)frm.__bs_activity_tabs.timesheets.activity_project=null;
+            for(const section of ['expenses','labor'])if(frm.__bs_activity_tabs?.[section])frm.__bs_activity_tabs[section].activity_project=null;
         });
         $('<button type="button" class="btn btn-link btn-xs">').text(__('Retry')).on('click',()=>controller.flush()).appendTo(recovery);
         $('<button type="button" class="btn btn-link btn-xs">').text(__('Reload row')).on('click',()=>{

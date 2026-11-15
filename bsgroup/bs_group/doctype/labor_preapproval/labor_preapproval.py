@@ -310,6 +310,7 @@ def get_summary_html(lpre_name):
 	the dashboard can never itself drift out of sync.
 	"""
 	lpre = frappe.get_doc("Labor Preapproval", lpre_name)
+	lpre.check_permission("read")
 
 	task = lpre.task if lpre.source == "Project" else None
 	task_condition = "AND tsl.task = %(task)s" if task else "AND (tsl.task IS NULL OR tsl.task = '')"
@@ -395,6 +396,16 @@ def get_summary_html(lpre_name):
 	) or '<tr><td colspan="4" class="lpre-empty">No Tech Task Scheduler allocation yet</td></tr>'
 
 	remaining_color = "lpre-stat-red" if remaining <= 0 else "lpre-stat-green"
+	from bsgroup.project_labor_work import enabled, DT
+	daily_rows = frappe.get_all(DT, filters={"labor_preapproval": lpre.name},
+		fields=["work_date", "recorded_by", "skill", "persons", "rate", "amount", "currency", "work_done"],
+		order_by="work_date desc") if enabled() else []
+	daily_body = "".join(
+		f'<tr><td>{esc(str(r.work_date))}</td><td>{esc(r.recorded_by)}</td>'
+		f'<td>{esc(r.skill)}</td><td>{flt(r.persons)}</td><td>{flt(r.rate)}</td>'
+		f'<td>{esc(r.currency)} {flt(r.amount)}</td><td>{esc(r.work_done)}</td></tr>'
+		for r in daily_rows
+	) or '<tr><td colspan="7" class="lpre-empty">No daily labour expenses recorded yet</td></tr>'
 
 	return f"""
 	<style>
@@ -463,6 +474,11 @@ def get_summary_html(lpre_name):
 			<tbody>{scheduler_body}</tbody>
 		</table>
 
+		<h6>Daily Work — Labour Expenses</h6>
+		<table>
+			<thead><tr><th>Date</th><th>Recorded by</th><th>Skill</th><th>Persons</th><th>Approved rate</th><th>Expense</th><th>Work done</th></tr></thead>
+			<tbody>{daily_body}</tbody>
+		</table>
 		<h6>Labor Attendance</h6>
 		<table>
 			<thead><tr><th>Attendance</th><th>Labour</th><th>Check-In</th><th>Check-Out</th><th>Status</th></tr></thead>
