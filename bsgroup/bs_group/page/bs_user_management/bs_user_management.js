@@ -132,13 +132,14 @@ frappe.pages['bs-user-management'].on_page_load = function(wrapper) {
     }
     function modulePanel(host,d){
         const changes={};
+        const recordName=name=>({'Material Request':'Purchase Requisition','Deal Cost Sheet':'Costing Sheet','Labor Preapproval':'Labour Approval','Employee Checkin':'Attendance Check-ins'}[name]||name);
         $('<p class="muted">').text('View, edit and approve by module. Existing access is protected; new grants can be added or removed here.').appendTo(host);
         const table=$('<table class="module-access"><thead><tr><th>Module</th><th>View</th><th>Edit</th><th>Approve</th></tr></thead><tbody></tbody></table>').appendTo(host);
         for(const row of d.module_access||[]){
             const tr=$('<tr>').appendTo(table.find('tbody'));
             const title=$('<th scope="row">').text(row.module).appendTo(tr);
             const scope=$('<details>').appendTo(title);$('<summary>').text('Scope & rules').appendTo(scope);
-            $('<small>').text(row.records.join(', ')).appendTo(scope);
+            $('<small>').text(row.records.map(recordName).join(', ')).appendTo(scope);
             if(row.note)$('<small>').text(row.note).appendTo(scope);
             for(const action of ['view','edit','approve']){
                 const cell=row.cells[action],key=row.module+'.'+action;
@@ -146,7 +147,7 @@ frappe.pages['bs-user-management'].on_page_load = function(wrapper) {
                 const input=$('<input type="checkbox">').attr('aria-label',row.module+' '+action).attr('title',cell.reason||cell.note)
                     .prop({checked:cell.checked,indeterminate:cell.partial,disabled:!d.can_write||(!cell.editable&&!cell.managed)}).appendTo(label);
                 $('<small>').text(cell.status).appendTo(label);
-                if(cell.reason)$('<small class="permission-note">').text(cell.reason).appendTo(td);
+                if(cell.reason){$('<small class="permission-note">').attr('title',cell.reason).text(cell.inherited?'Protected':'Restricted').appendTo(td);$('<small>').text(action.charAt(0).toUpperCase()+action.slice(1)+': '+cell.reason).appendTo(scope);}
                 if(action==='approve')$('<small>').text(cell.note).appendTo(scope);
                 input.on('change',()=>{const enabled=input.prop('checked');if(enabled===cell.managed)delete changes[key];else changes[key]=enabled;dirty=!!Object.keys(changes).length;review.prop('disabled',!dirty);});
             }
@@ -169,7 +170,7 @@ frappe.pages['bs-user-management'].on_page_load = function(wrapper) {
                 for(const change of p.changes)$('<p>').text(change.module+' — '+change.permission+': '+(change.enabled?'Add grant':'Remove new grant')).appendTo(content);
                 $('<p>').text(p.note).appendTo(content);
                 const impact=$('<table class="table table-bordered"><thead><tr><th>Records</th><th>Added</th><th>Removed</th></tr></thead><tbody></tbody></table>').appendTo(content);
-                for(const item of p.impact){const tr=$('<tr>').appendTo(impact.find('tbody'));$('<td>').text(item.record+(item.own_records?' (own records)':'')+(item.field_level?' (restricted fields '+item.field_level+')':'')).appendTo(tr);$('<td>').text(item.added.join(', ')||'—').appendTo(tr);$('<td>').text(item.removed.join(', ')||'—').appendTo(tr);}
+                for(const item of p.impact){const tr=$('<tr>').appendTo(impact.find('tbody'));$('<td>').text(recordName(item.record)+(item.own_records?' (own records)':'')+(item.field_level?' (restricted fields '+item.field_level+')':'')).appendTo(tr);$('<td>').text(item.added.join(', ')||'—').appendTo(tr);$('<td>').text(item.removed.join(', ')||'—').appendTo(tr);}
                 if(!p.impact.length)$('<p>').text('These rights are already covered by another grant. Existing record access remains unchanged.').appendTo(content);
                 dialog.show();
             }finally{review.prop('disabled',!dirty);}
