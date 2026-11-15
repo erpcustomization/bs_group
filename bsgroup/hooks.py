@@ -795,3 +795,5 @@ for _commercial_dt in ("Quotation", "Deal Cost Sheet"):
 after_migrate.append("bsgroup.project_support_navigation.install")
 
 after_migrate.append("bsgroup.labour_approvals.install")
+
+after_migrate.append("bsgroup.project_expense_categories.install")

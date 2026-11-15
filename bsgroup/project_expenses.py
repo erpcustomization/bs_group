@@ -56,6 +56,14 @@ def context(project):
     claims = frappe.get_list("Expense Claim", filters=filters,
         fields=["name", "employee_name", "posting_date", "workflow_state", "status", "total_claimed_amount"],
         order_by="creation desc", page_length=100) if frappe.has_permission("Expense Claim", "read") else []
+    if claims:
+        categories = {}
+        for line in frappe.get_all("Expense Claim Detail", filters={"parent": ["in", [r.name for r in claims]], "parenttype": "Expense Claim"},
+                fields=["parent", "custom_project_expense_category"]):
+            if line.custom_project_expense_category:
+                categories.setdefault(line.parent, set()).add(line.custom_project_expense_category)
+        for claim in claims:
+            claim.expense_categories = ", ".join(sorted(categories.get(claim.name, set())))
     return {"project": doc.name, "project_name": doc.project_name, "company": doc.company,
             "employee": employee, "expense_approver": manager, "can_create": can_create,
             "problem": problem, "claims": claims,
@@ -69,6 +77,8 @@ def validate(doc, method=None):
         if doc.get("project") != old.get("project"):
             frappe.throw(_("The project on an existing expense claim cannot be changed."))
         return
+    from bsgroup.project_expense_categories import validate as validate_categories
+    validate_categories(doc)
     project = project_doc(doc.get("project"))
     if old and old.get("project") and old.project != project.name:
         frappe.throw(_("The project on an existing expense claim cannot be changed. Raise a separate claim from the correct project."))

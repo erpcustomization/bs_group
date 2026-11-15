@@ -415,13 +415,24 @@
         }
         const actions = $('<div style="display:flex;gap:8px;margin-bottom:12px">').appendTo(panel);
         if (data.can_create) $('<button type="button" class="btn btn-primary btn-sm">').text(section==='expenses'?__('Add Expense'):__('New')+' '+__(data.doctype)).on('click',()=>{
-            openProjectRecord(frm,data,null,()=>render(frm,section));
+            if(section==='expenses') {
+                const categories=data.expense_categories;
+                const choice=new frappe.ui.Dialog({title:__('Add Project Expense'),fields:[
+                    {fieldname:'category',label:__('What is this expense for?'),fieldtype:'Select',options:['',...Object.keys(categories)],reqd:1}
+                ],primary_action_label:__('Continue'),primary_action(values){
+                    choice.hide();
+                    const selected={...data,child:{field:'expenses',values:{
+                        custom_project_expense_category:values.category,expense_type:categories[values.category],
+                        expense_date:frappe.datetime.get_today(),project:frm.doc.name}}};
+                    openProjectRecord(frm,selected,null,()=>render(frm,section));
+                }});choice.show();
+            } else openProjectRecord(frm,data,null,()=>render(frm,section));
         }).appendTo(actions);
         $('<button type="button" class="btn btn-default btn-sm">').text(__('Refresh')).on('click',()=>render(frm,section)).appendTo(actions);
         if (!data.available) {$('<p>').text(__('This activity is restricted by your existing access.')).appendTo(panel); return;}
 
         const records=$('<div class="table-responsive">').html(`<table class="table table-bordered"><thead><tr><th>Record</th><th>Details</th><th>Status</th></tr></thead><tbody>${data.rows.map(row=>
-            `<tr><td><button type="button" class="btn btn-link btn-xs" data-record="${esc(row.name)}">${esc(row.name)}</button></td><td>${esc(row.subject||row.employee_name||row.user||row.task||'—')}${row.custom_date?'<br>'+esc(frappe.datetime.str_to_user(row.custom_date)):''}</td><td>${esc(row.workflow_state||row.status||['Draft','Submitted','Cancelled'][row.docstatus])}</td></tr>`
+            `<tr><td><button type="button" class="btn btn-link btn-xs" data-record="${esc(row.name)}">${esc(row.name)}</button></td><td>${esc(row.subject||row.employee_name||row.user||row.task||'—')}${row.expense_categories?'<br>'+esc(row.expense_categories):''}${row.custom_date?'<br>'+esc(frappe.datetime.str_to_user(row.custom_date)):''}</td><td>${esc(row.workflow_state||row.status||['Draft','Submitted','Cancelled'][row.docstatus])}</td></tr>`
         ).join('') || '<tr><td colspan="3">No records for this project.</td></tr>'}</tbody></table>`).appendTo(panel);
         records.on('click','button[data-record]',e=>openProjectRecord(frm,data,e.currentTarget.dataset.record,()=>render(frm,section)));
         $('<p class="text-muted">').text(__('Showing up to 100 accessible records linked to this project.')).appendTo(panel);

@@ -31,11 +31,14 @@ class ProjectExpenseTests(unittest.TestCase):
         self.f.get_list = Mock(return_value=[])
         self.patch = patch.dict(sys.modules, {'frappe': self.f})
         self.patch.start()
+        category_spec=importlib.util.spec_from_file_location('bsgroup.project_expense_categories',Path(__file__).resolve().parents[1]/'project_expense_categories.py')
+        category_module=importlib.util.module_from_spec(category_spec);category_spec.loader.exec_module(category_module)
+        self.category_patch=patch.dict(sys.modules,{'bsgroup.project_expense_categories':category_module});self.category_patch.start()
         spec = importlib.util.spec_from_file_location('project_expenses_test', Path(__file__).resolve().parents[1]/'project_expenses.py')
         self.m = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.m)
         self.doc = Record(project='PROJ-1', employee='EMP', company='Company A', docstatus=0,
-                          workflow_state='Draft', approval_status='Draft', expenses=[Record()], taxes=[Record()],
+                          workflow_state='Draft', approval_status='Draft', expenses=[Record(name='ROW',idx=1,custom_project_expense_category='Food',expense_type='Food')], taxes=[Record()],
                           get_doc_before_save=Mock(return_value=None))
 
     def value(self, doctype, name, fields, **kwargs):
@@ -50,7 +53,7 @@ class ProjectExpenseTests(unittest.TestCase):
         self.doc.get_doc_before_save.return_value = old
         return old
 
-    def tearDown(self): self.patch.stop()
+    def tearDown(self): self.category_patch.stop(); self.patch.stop()
 
     def test_missing_project_blocks_before_any_lookup(self):
         self.doc.project = None

@@ -142,6 +142,8 @@ def context(project, section="tasks"):
             result["labor_expenses"] = expense_rows(doc)
             result["defaults"].update(employee=controlled["employee"], expense_approver=controlled["expense_approver"])
             result["rows"] = controlled["claims"]
+            from bsgroup.project_expense_categories import CATEGORIES
+            result["expense_categories"] = CATEGORIES
         else:
             result["defaults"] = controlled["defaults"]
             result["rows"] = controlled["records"]

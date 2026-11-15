@@ -1,4 +1,11 @@
 (() => {
+    const types={'Transportation':'Travel','Petrol / fuel':'Travel','Food':'Food','Food for labourers':'Food','Project material expense':'Others'};
+    frappe.ui.form.on('Expense Claim Detail',{
+        async custom_project_expense_category(frm,cdt,cdn){
+            const row=locals[cdt][cdn],type=types[row.custom_project_expense_category];
+            if(frm.doc.project && type) await frappe.model.set_value(cdt,cdn,'expense_type',type);
+        }
+    });
     frappe.ui.form.on('Expense Claim', {
         refresh(frm) {
             if (frm.is_new() && !frm.doc.project) {
@@ -15,6 +22,7 @@
                 frm.set_df_property('expense_approver','reqd',0);
                 frm.set_df_property('employee','read_only',1);
                 frm.set_df_property('company','read_only',1);
+                frm.fields_dict.expenses?.grid?.update_docfield_property('custom_project_expense_category','reqd',frm.is_new()?1:0);
                 for (const field of ['expenses','taxes']) {
                     frm.fields_dict[field]?.grid?.update_docfield_property('project','read_only',1);
                 }
