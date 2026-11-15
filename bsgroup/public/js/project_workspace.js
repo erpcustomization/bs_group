@@ -221,9 +221,11 @@
         const subject=input(titleCell,__('Activity'),'subject',row.subject);
         $('<div class="text-muted small">').text(row.name).appendTo(titleCell);
         indicator.appendTo(titleCell);recovery.appendTo(titleCell);
-        $('<button type="button" class="btn btn-link btn-xs">').text(__('Open task form')).on('click',()=>{
-            if(dirtyRows.size) return frappe.msgprint(__('Wait for automatic saving to finish or resolve the row save error.'));
-            openProjectRecord(frm,{doctype:'Task'},row.name,()=>renderPlan(frm));
+        $('<button type="button" class="btn btn-default btn-xs bs-plan-edit">').text(__('Edit activity')).prop('disabled',!row.can_edit).on('click',()=>{
+            const d=new frappe.ui.Dialog({title:__('Edit Activity'),fields:[{fieldname:'subject',fieldtype:'Small Text',label:__('Activity'),reqd:1,default:subject.val()}],primary_action_label:__('Save'),primary_action(v){
+                const value=(v.subject || '').trim();if(!value)return;
+                subject.val(value);controller.edit('subject',value);d.hide();
+            }});d.show();
         }).appendTo(titleCell);
         const descriptionCell=cell();
         const preview=$('<div style="white-space:pre-wrap;max-width:250px;max-height:100px;overflow:auto">').text(row.description_text || '—').appendTo(descriptionCell);
@@ -246,7 +248,18 @@
         const statusCell=cell(), status=$('<select class="form-control input-sm">').attr('aria-label',__('Status')+' '+row.name).prop('disabled',!row.can_change_status || !data.work_updates_ready).appendTo(statusCell);
         const options=[...data.status_options]; if(!options.includes(row.status)) options.unshift(row.status);
         for(const value of options) $('<option>').val(value).text(__(value)).appendTo(status);
-        status.val(row.status).on('change',()=>controller.edit('status',status.val()));
+        const remarks=$('<div class="small bs-task-status-remarks" style="white-space:pre-wrap;margin-top:8px">').text(row.custom_bs_status_reason || '').appendTo(statusCell);
+        status.val(row.status).on('change',()=>{
+            const next=status.val();
+            if(['On Hold','Delayed','Postponed','Customer Delayed'].includes(next)) {
+                status.val(row.status);
+                const d=new frappe.ui.Dialog({title:__('Reason for {0}',[next]),fields:[{fieldname:'reason',fieldtype:'Small Text',label:__('Reason'),reqd:1}],primary_action_label:__('Save Status'),primary_action(v){
+                    const reason=(v.reason || '').trim();
+                    if(!reason){frappe.msgprint(__('Enter a reason for this task status.'));return;}
+                    controller.edit('status',{value:next,reason});status.val(next);d.hide();
+                }});d.show();
+            } else {controller.edit('status',next);}
+        });
         const overdue=$('<div class="text-warning small">').text(__('Past end date')).toggle(!!row.overdue).appendTo(statusCell);
         controller=planAutosave(row,async(changes,base)=>{
             const {message:receipt}=await frappe.call({method:'bsgroup.project_plan.autosave_task',type:'POST',args:{project,task:row.name,changes,expected_modified:base.modified,expected_assignees:base.assigned_to}});
@@ -270,6 +283,7 @@
             if(!pending.has('status')){
                 if(!status.find('option').toArray().some(o=>o.value===row.status)) $('<option>').val(row.status).text(__(row.status)).appendTo(status);
                 status.val(row.status);
+                remarks.text(row.custom_bs_status_reason || '');
             }
             tr.find('.bs-plan-edit').prop('disabled',!row.can_edit);
             status.prop('disabled',!row.can_change_status || !data.work_updates_ready);

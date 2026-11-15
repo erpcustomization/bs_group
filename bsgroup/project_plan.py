@@ -6,7 +6,8 @@ import frappe
 from frappe import _
 from frappe.utils import getdate, get_datetime, strip_html
 
-PLAN_STATUSES = ("Open", "In Progress", "Delayed", "On Hold", "Completed")
+PLAN_STATUSES = ("Open", "In Progress", "Delayed", "On Hold", "Postponed", "Customer Delayed", "Completed")
+REASON_STATUSES = {"Delayed", "On Hold", "Postponed", "Customer Delayed"}
 WORK_SUBJECT = "Project Plan daily work"
 
 
@@ -58,6 +59,9 @@ def install():
     if not frappe.get_meta("Task").has_field("custom_bs_plan_status_managed"):
         create_custom_fields({"Task": [dict(fieldname="custom_bs_plan_status_managed", label="Project Plan Status Managed",
             fieldtype="Check", insert_after="status", hidden=1, read_only=1, default="0")]}, update=False)
+    if not frappe.get_meta("Task").has_field("custom_bs_status_reason"):
+        create_custom_fields({"Task": [dict(fieldname="custom_bs_status_reason", label="Status Remarks",
+            fieldtype="Small Text", insert_after="status", read_only=1, no_copy=1)]}, update=False)
     from frappe.custom.doctype.property_setter.property_setter import make_property_setter
     options = [value for value in (frappe.get_meta("Task").get_field("status").options or "").splitlines() if value]
     combined = options + [value for value in PLAN_STATUSES if value not in options]
@@ -131,7 +135,7 @@ def get_plan(project):
     can_edit = bool(doc.status not in {"Completed", "Cancelled"} and frappe.has_permission("Project", "write", doc=doc)
                     and frappe.has_permission("Task", "write"))
     rows = frappe.get_list("Task", filters={"project": doc.name, "is_template": 0},
-        fields=["name", "subject", "description", "exp_start_date", "exp_end_date", "status", "parent_task", "is_group", "_assign", "modified"],
+        fields=["name", "subject", "description", "exp_start_date", "exp_end_date", "status", "parent_task", "is_group", "_assign", "modified", "custom_bs_status_reason"],
         order_by="lft asc, creation asc", limit_page_length=0) if frappe.has_permission("Task", "read") else []
     assigned = set()
     for row in rows:
@@ -215,7 +219,7 @@ def save_work(project, task, work, request_id=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def set_task_status(project, task, status, expected_modified):
+def set_task_status(project, task, status, expected_modified, reason=None):
     from bsgroup.project_daily_work import enabled
     if enabled() and status == "Closed":
         status = "Completed"
@@ -229,7 +233,12 @@ def set_task_status(project, task, status, expected_modified):
         if project_locked or item.status in {"Cancelled", "Template"} or not (writable or assigned):
             frappe.throw(_("You cannot change this task's status."), frappe.PermissionError)
         if status not in PLAN_STATUSES:
-            frappe.throw(_("Choose Open, In Progress, Delayed, On Hold or Completed."))
+            frappe.throw(_("Choose a valid Project Plan status."))
+        reason = (reason or "").strip()
+        if status in REASON_STATUSES and not reason:
+            frappe.throw(_("Enter a reason for this task status."))
+        if len(reason) > 2000:
+            frappe.throw(_("Keep the status reason within 2,000 characters."))
         if not item.meta.has_field("custom_bs_plan_status_managed"):
             frappe.throw(_("The Project Plan work screen must be enabled by an administrator first."))
         if not expected_modified or get_datetime(item.modified) != get_datetime(expected_modified):
@@ -238,11 +247,19 @@ def set_task_status(project, task, status, expected_modified):
             item.progress = 0
             item.completed_on = None
             item.completed_by = None
+        previous_status = item.status
         item.status = status
+        item.custom_bs_status_reason = reason if status in REASON_STATUSES else ""
         item.custom_bs_plan_status_managed = 1
         # The assigned-user exception is limited to this status-only endpoint.
         # Native validation, dependencies, assignment closure and audit run.
         item.save(ignore_permissions=not writable)
+        if reason:
+            frappe.get_doc(dict(doctype="Comment", comment_type="Info", reference_doctype="Task",
+                reference_name=item.name, content="Status changed from " + escape(previous_status) + " to "
+                + escape(status) + ". Reason: " + escape(reason), comment_email=frappe.session.user,
+                comment_by=frappe.get_cached_value("User", frappe.session.user, "full_name") or frappe.session.user
+            )).insert(ignore_permissions=True)
         return {"name": item.name, "status": item.status, "modified": item.modified}
     except Exception:
         frappe.db.rollback(save_point=savepoint)
@@ -271,16 +288,24 @@ def assignment_choices(project, task):
 def autosave_task(project, task, changes, expected_modified, expected_assignees):
     """Serialize one row's field changes using the existing guarded save paths."""
     changes = frappe.parse_json(changes) if isinstance(changes, str) else changes
-    allowed = {"subject", "description", "start_date", "end_date", "assigned_to", "status"}
+    allowed = {"subject", "description", "start_date", "end_date", "assigned_to", "status", "status_reason"}
     if not isinstance(changes, dict) or not changes or set(changes) - allowed:
         frappe.throw(_("Choose valid Project Plan fields to update."))
+    changes = dict(changes)
+    if isinstance(changes.get("status"), dict):
+        change = changes["status"]
+        if set(change) != {"value", "reason"}:
+            frappe.throw(_("Choose a status and enter its reason."))
+        changes.update(status=change["value"], status_reason=change["reason"])
+    if "status_reason" in changes and "status" not in changes:
+        frappe.throw(_("A status reason must accompany a status change."))
     savepoint = "plan_autosave_" + frappe.generate_hash(length=10)
     frappe.db.savepoint(savepoint)
     try:
         doc, item = _read_task(project, task, lock=True)
         if not expected_modified or get_datetime(item.modified) != get_datetime(expected_modified):
             frappe.throw(_("This task changed elsewhere. Reload the row before editing it again."))
-        details = {key: value for key, value in changes.items() if key != "status"}
+        details = {key: value for key, value in changes.items() if key not in {"status", "status_reason"}}
         if details:
             save_task(project, task,
                 subject=details.get("subject", item.subject),
@@ -290,10 +315,18 @@ def autosave_task(project, task, changes, expected_modified, expected_assignees)
                 assigned_to=details.get("assigned_to", expected_assignees),
                 expected_modified=expected_modified, expected_assignees=expected_assignees)
             expected_modified = frappe.db.get_value("Task", task, "modified")
+        completed_receipt = None
+        from bsgroup.oman_assigned_project_access import restricted
+        if restricted() and changes.get("status") in ("Completed", "Closed"):
+            completed_receipt = next((row for row in get_plan(project)["rows"] if row.name == task), None)
         if "status" in changes:
-            set_task_status(project, task, changes["status"], expected_modified)
+            set_task_status(project, task, changes["status"], expected_modified, changes.get("status_reason"))
         # Read the receipt in this transaction, including native assignment and
         # permission changes. The next queued save uses this exact version.
+        if completed_receipt is not None:
+            completed_receipt.update(status="Completed", modified=frappe.db.get_value("Task", task, "modified"),
+                can_edit=False, can_change_status=False, can_log_work=False, custom_bs_status_reason="", overdue=False)
+            return {"row": completed_receipt, "user_names": {}}
         plan = get_plan(project)
         row = next((row for row in plan["rows"] if row.name == task), None)
         if not row:
