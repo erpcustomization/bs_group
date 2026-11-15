@@ -131,6 +131,32 @@
         button.classList.add('bs-search-filter');
         button.setAttribute('aria-label','Filter');
         area.classList.add('bs-search-header');
+        // Project's native quick filters may contain saved values. Keep them
+        // reachable inside Filter rather than hiding an active saved search.
+        const quick = area.querySelector('.list-page-form');
+        if (view.doctype === 'Project' && quick && !view._bs_project_quick_filters) {
+          view._bs_project_quick_filters = true;
+          const home = document.createElement('div');
+          home.hidden = true;
+          quick.before(home);
+          home.append(quick);
+          $(button).on('shown.bs.popover.bs_project', () => {
+            const body = document.getElementById(button.getAttribute('aria-describedby'))?.querySelector('.popover-body');
+            if (!body) return;
+            let box = body.querySelector('.bs-project-quick-filters');
+            if (!box) {
+              box = document.createElement('div');
+              box.className = 'bs-project-quick-filters';
+              const label = document.createElement('strong');
+              label.textContent = __('Project filters');
+              box.append(label);
+              body.prepend(box);
+            }
+            box.append(quick);
+            $(button).popover('update');
+          });
+          $(button).on('hide.bs.popover.bs_project', () => home.append(quick));
+        }
         const sorter = area.querySelector('.sort-selector');
         if (sorter && !view._bs_search_sort) {
           view._bs_search_sort = true;
