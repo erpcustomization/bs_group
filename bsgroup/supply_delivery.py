@@ -122,7 +122,7 @@ def synchronize(task_name):
     stage, status = procurement_stage(request)
     with writing():
         if task.status != status or task.get("custom_bs_status_reason") != stage:
-            task.update(status=status, custom_bs_status_reason=stage)
+            task.update(dict(status=status, custom_bs_status_reason=stage))
             task.save(ignore_permissions=True)
         coordinator, person = task.get("custom_bs_delivery_coordinator"), task.get("custom_bs_delivery_person")
         paired = bool(coordinator and person and coordinator != person and assignees(task.name) == {coordinator, person})
@@ -134,7 +134,7 @@ def synchronize(task_name):
         elif delivery and (delivery.procurement_stage != stage or paired and (delivery.coordinator != coordinator or delivery.delivery_person != person)):
             delivery.procurement_stage = stage
             if paired and not delivery.coordinator_completed_on and not delivery.delivery_completed_on:
-                delivery.update(coordinator=coordinator, delivery_person=person)
+                delivery.update(dict(coordinator=coordinator, delivery_person=person))
             delivery.save(ignore_permissions=True)
     return delivery.name if delivery else None
 
@@ -182,7 +182,7 @@ def assign(project, task, coordinator, delivery_person, expected_modified):
     if existing and (existing.coordinator_completed_on or existing.delivery_completed_on) and (existing.coordinator != coordinator or existing.delivery_person != delivery_person):
         frappe.throw(_("A participant has already submitted work. Keep these delivery participants to retain their accountability."))
     with writing():
-        item.update(custom_bs_delivery_coordinator=coordinator, custom_bs_delivery_person=delivery_person)
+        item.update(dict(custom_bs_delivery_coordinator=coordinator, custom_bs_delivery_person=delivery_person))
         item.save()
         save_task(project, task, item.subject, item.description, item.exp_start_date, item.exp_end_date,
             [coordinator, delivery_person], item.modified, sorted(assignees(task)))
@@ -246,10 +246,10 @@ def complete(name):
         both = bool(doc.coordinator_completed_on and doc.delivery_completed_on)
         doc.status = "Completed" if both else "Awaiting delivery person" if role == "coordinator" else "Awaiting coordinator"
         if both:
-            doc.update(completed_by=user, completed_on=now_datetime())
+            doc.update(dict(completed_by=user, completed_on=now_datetime()))
         doc.save(ignore_permissions=True)
         if both:
-            task.update(status="Completed", progress=100, custom_bs_status_reason="Coordinator and delivery person both completed their work with proof and notes.")
+            task.update(dict(status="Completed", progress=100, custom_bs_status_reason="Coordinator and delivery person both completed their work with proof and notes."))
             task.save(ignore_permissions=True)
         project.reload()
         statuses = frappe.get_all("Task", filters={"project": project.name, "is_template": 0}, pluck="status")

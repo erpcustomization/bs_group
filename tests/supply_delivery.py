@@ -15,6 +15,11 @@ ROOT = Path(__file__).parents[1]
 
 
 class Doc(dict):
+    def update(self, values):
+        # Frappe Document.update accepts a mapping, not keyword arguments.
+        super().update(values)
+        return self
+
     def set(self, key, value):
         self[key] = value
 
@@ -51,7 +56,7 @@ class DeliveryTests(unittest.TestCase):
 
     def test_procurement_states_never_complete_delivery(self):
         for state,approval,docstatus,expected in [('Pending','Draft',0,'Open'),('Pending','Rejected',0,'On Hold'),('Stopped','Approved',1,'On Hold'),('Ordered','Approved',1,'In Progress'),('Received','Approved',1,'In Progress'),('Cancelled','Approved',2,'On Hold')]:
-            self.pr.update(status=state,workflow_state=approval,docstatus=docstatus)
+            self.pr.update(dict(status=state,workflow_state=approval,docstatus=docstatus))
             self.assertEqual(self.env['procurement_stage'](self.pr)[1],expected)
 
     def test_only_pure_supply_is_collapsed(self):
