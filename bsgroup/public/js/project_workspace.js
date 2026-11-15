@@ -267,6 +267,7 @@
         for(const value of options) colourPlanStatus($('<option>').val(value).text(__(value)).appendTo(status),value);
         colourPlanStatus(status,row.status);
         const remarks=$('<div class="small bs-task-status-remarks" style="white-space:pre-wrap;margin-top:8px">').text(row.custom_bs_status_reason || '').appendTo(statusCell);
+        if(row.delivery_request) $('<button type="button" class="btn btn-default btn-sm" style="margin-top:8px">').text(__('Delivery Request')).on('click',()=>openProjectRecord(frm,{doctype:'Delivery Request'},row.delivery_request,()=>frm.reload_doc())).appendTo(statusCell);
         status.val(row.status).on('change',()=>{
             const next=status.val(), needsReason=['On Hold','Delayed','Postponed','Customer Delayed'].includes(next);
             status.val(row.status);colourPlanStatus(status,row.status);

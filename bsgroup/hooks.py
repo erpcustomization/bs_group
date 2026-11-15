@@ -771,6 +771,9 @@ from bsgroup.oman_assigned_project_access import configure_hooks as _oman_assign
 _oman_assigned_access_hooks(globals())
 after_migrate.append("bsgroup.oman_quotation_flow.sync_status_options")
 
+from bsgroup.supply_delivery import configure_hooks as _supply_delivery_hooks
+_supply_delivery_hooks(globals())
+
 # Presentation layer only, shared by the two commercial document forms.
 for _commercial_dt in ("Quotation", "Deal Cost Sheet"):
     _prior = doctype_js.get(_commercial_dt, [])

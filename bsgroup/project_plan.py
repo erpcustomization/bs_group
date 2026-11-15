@@ -157,6 +157,8 @@ def get_plan(project):
         row["can_change_status"] = project_status_editable and row.status not in {"Cancelled", "Template"} and (
             _status_actor(doc, item))
         row["overdue"] = bool(row.exp_end_date and getdate(row.exp_end_date) < getdate() and row.status not in {"Completed", "Cancelled"})
+        from bsgroup.supply_delivery import plan_details
+        row.update(plan_details(item))
         assigned.update(row["assigned_to"])
     names = {r.name: r.full_name or r.name for r in frappe.get_all("User", filters={"name": ["in", sorted(assigned)]},
              fields=["name", "full_name"])} if assigned else {}
