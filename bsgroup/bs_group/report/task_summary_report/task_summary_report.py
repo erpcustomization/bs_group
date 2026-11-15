@@ -31,7 +31,7 @@ COMPLETED_STATUS    = "Completed"
 
 def execute(filters=None):
     columns = get_columns()
-    data = get_data(filters)
+    data = get_data(filters or {})
     return columns, data
 
 
@@ -78,7 +78,7 @@ def get_data(filters):
     if filters.get("assigned_to"):
         conditions.append(["_assign", "like", f"%{filters['assigned_to']}%"])
 
-    tasks = frappe.get_all(
+    tasks = frappe.get_list(
         "Task",
         fields=[
             "name", "subject", "project", "project.project_name as project_name",
@@ -88,6 +88,7 @@ def get_data(filters):
         ],
         filters=conditions,
         order_by="creation asc",
+        limit_page_length=0,
     )
 
     # Resolve assigned-to display names

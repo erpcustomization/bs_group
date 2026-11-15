@@ -797,3 +797,9 @@ after_migrate.append("bsgroup.project_support_navigation.install")
 after_migrate.append("bsgroup.labour_approvals.install")
 
 after_migrate.append("bsgroup.project_expense_categories.install")
+
+after_migrate.append("bsgroup.project_support_access.install")
+_prior = doc_events.setdefault("User", {}).get("before_validate", [])
+doc_events["User"]["before_validate"] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.project_support_access.sync_user"]
+permission_query_conditions["Tech Task Scheduler"] = "bsgroup.project_support_access.scheduler_query"
+has_permission["Tech Task Scheduler"] = "bsgroup.project_support_access.scheduler_permission"

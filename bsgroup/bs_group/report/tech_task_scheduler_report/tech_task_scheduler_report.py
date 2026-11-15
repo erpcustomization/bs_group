@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 def execute(filters=None):
 	columns = get_columns()
-	data = get_data(filters)
+	data = get_data(filters or {})
 	return columns, data
 
 
@@ -25,6 +25,10 @@ def get_columns():
 def get_data(filters):
 	conditions = []
 	values = {}
+	from bsgroup.project_support_access import limited_scheduler
+	if limited_scheduler():
+		conditions.append("ttsl.resource = %(support_viewer)s")
+		values["support_viewer"] = frappe.session.user
 
 	# Date filter logic
 	if filters.get("date_filter") and filters.get("date_filter") != "All":

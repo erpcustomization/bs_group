@@ -91,7 +91,7 @@ def get_data(filters):
             conditions.append(["exp_end_date", "<", getdate(today())])
             conditions.append(["status", "not in", ["Completed", "Cancelled"]])
 
-    tasks = frappe.get_all(
+    tasks = frappe.get_list(
         "Task",
         fields=[
             "name", "subject", "project", "status", "priority",
@@ -101,6 +101,7 @@ def get_data(filters):
         ],
         filters=conditions,
         order_by="lft asc",
+        limit_page_length=0,
     )
 
     user_emails = set()
