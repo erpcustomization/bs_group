@@ -43,7 +43,7 @@
                 .flatMap(([app,path])=>[
                     {label:app==='BS Project'?'BS Project Support':app,
                         href:path+(path.includes('?')?'&':'?')+'bs_app='+encodeURIComponent(app),
-                        ...(app==='BS Project' && supportLinks.length ? {children:supportLinks.filter(x=>typeof x.href==='string' && x.href.startsWith('/desk/'))} : {})},
+                        ...(app==='BS Project' && supportLinks.length ? {children:supportLinks.filter(x=>x.label!=='Project' && typeof x.href==='string' && x.href.startsWith('/desk/'))} : {})},
                     // Project is the first server destination only when Project read
                     // is allowed. A Task/Timesheet-only fallback must not add these.
                     ...(app==='BS Project' && path==='/desk/bs-group/project'
@@ -69,7 +69,7 @@
     let previous, scheduled=false;
     try { previous=sessionStorage.getItem(key); } catch (_) {}
     const style=document.createElement('style');
-    style.textContent='.bs-app-unrelated,.bs-dashboard-hidden{display:none!important}'+
+    style.textContent='.bs-app-unrelated,.bs-dashboard-hidden,.bs-general-project-hidden{display:none!important}'+
         '.bs-dashboard-category{margin:10px 0 5px}.bs-dashboard-category-title{font-weight:600;padding:7px 12px;cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;border-radius:8px}'+
         '.bs-dashboard-category-title::-webkit-details-marker{display:none}'+
         '.bs-dashboard-category-title::after{content:"";width:6px;height:6px;border-right:1px solid currentColor;border-bottom:1px solid currentColor;transform:rotate(-45deg);margin:0 4px 0 10px}'+
@@ -82,6 +82,13 @@
         scheduled=false;
         const current=new URL(location.href);
         const dashboard=isDashboard(current.pathname);
+        // Navigation only. Keep category URLs, direct Project forms and permissions intact.
+        for(const link of document.querySelectorAll('.body-sidebar[data-title="BS Group"] a[href]')) {
+            if(link.textContent.trim()!==__('Project')) continue;
+            const target=new URL(link.getAttribute('href'),location.origin);
+            if(/^\/desk\/(?:bs-group\/)?project\/?$/.test(target.pathname))
+                link.closest('.standard-sidebar-item')?.classList.add('bs-general-project-hidden');
+        }
         for(const host of document.querySelectorAll('.body-sidebar .sidebar-items, .desk-sidebar .sidebar-items')) {
             const mode=persistentMenu(current,host.closest('.body-sidebar')?.dataset.title==='Private');
             let nav=host.querySelector('.bs-dashboard-modules');

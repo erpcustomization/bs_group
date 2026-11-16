@@ -46,7 +46,7 @@ with patch.dict(sys.modules,{'frappe':f,'bsgroup.scoped_sales_access':s,'bsgroup
         ref_doctype='Tech Task Scheduler' if name=='Tech Task Scheduler Report' else 'Task',
         roles=[types.SimpleNamespace(role='Sales Manager' if name=='Tech Task Scheduler Report' else 'Projects User')])
     links=m.project_support_links()
-    assert [x['label'] for x in links]==['Project','Site Survey Request','Task','Tech Task Scheduler','Task Summary Report','Task Scheduler Report']
+    assert [x['label'] for x in links]==['Site Survey Request','Task','Tech Task Scheduler','Task Summary Report','Task Scheduler Report']
     assert all('bs_app=BS%20Project' in x['href'] for x in links)
     assert not any(x['label']=='Delivery Request' for x in links)
     s.scope.return_value='sales'

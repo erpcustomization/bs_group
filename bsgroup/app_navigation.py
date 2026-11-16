@@ -54,7 +54,7 @@ def project_support_links():
         return (allowed is None or dt in allowed) and frappe.db.exists("DocType", dt) and frappe.has_permission(dt, permission)
 
     links = [dict(label=dt, href="/desk/bs-group/" + frappe.scrub(dt).replace("_", "-") + "?bs_app=BS%20Project")
-             for dt in ("Project", "Site Survey Request", "Delivery Request", "Task", "Timesheet", "Tech Task Scheduler")
+             for dt in ("Site Survey Request", "Delivery Request", "Task", "Timesheet", "Tech Task Scheduler")
              if permitted(dt)]
     roles = set(frappe.get_roles())
     for name in ("Task Summary Report", "Task Scheduler Report", "Tech Task Scheduler Report"):

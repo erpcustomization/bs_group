@@ -45,7 +45,7 @@ assert.equal(JSON.stringify(permitted),before);
 const support=[{label:'Project',href:'/desk/bs-group/project?bs_app=BS%20Project'},
  {label:'Site Survey Request',href:'/desk/bs-group/site-survey-request?bs_app=BS%20Project'},
  {label:'Delivery Request',href:'/desk/bs-group/delivery-request?bs_app=BS%20Project'}];
-assert.deepEqual(dashboardLinks(permitted,support).find(x=>x.label==='BS Project Support').children,support);
+assert.deepEqual(dashboardLinks(permitted,support).find(x=>x.label==='BS Project Support').children,support.filter(x=>x.label!=='Project'));
 assert.equal(dashboardLinks({'BS Project':null},support).length,2);
 const categories=dashboardLinks(permitted).filter(x=>x.children);
 assert.deepEqual(categories.map(x=>x.label),['Supply Projects','3CX Projects','Infra Projects','ELV Projects']);
