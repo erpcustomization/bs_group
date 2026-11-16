@@ -30,8 +30,12 @@ def request_supplementary_survey(opportunity, team, instructions, location, cont
     doc.update({key: value.strip() for key, value in values.items()})
     doc.custom_elv_site_survey_required = int(team in ("ELV", "ELV and Technical Team"))
     doc.custom_technical_site_survey_required = int(team in ("Technical Team", "ELV and Technical Team"))
-    pre = frappe.db.get_value("Presales Request", {"opportunity": doc.name,
-        "docstatus": ["<", 2], "status": ["!=", "Cancelled"]}, "name")
+    pre = None
+    if cint(doc.get("custom_presales_required")):
+        pre = frappe.db.get_value("Presales Request", {"opportunity": doc.name,
+            "docstatus": ["<", 2], "status": ["!=", "Cancelled"]}, "name")
+        if not pre:
+            frappe.throw(_("This Opportunity requests presales support, but its active Presales Request is missing. Restore its presales link before requesting the survey."))
     survey = frappe.get_doc(dict(doctype="Site Survey Request", opportunity=doc.name,
         supplementary_survey=1, status="Requested", requested_by=frappe.session.user,
         request_date=nowdate(), site_address=location.strip(),

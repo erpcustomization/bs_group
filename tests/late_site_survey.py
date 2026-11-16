@@ -62,6 +62,21 @@ class LateSurveyTests(TestCase):
         self.survey.insert.assert_not_called()
         self.frappe.db.set_value.assert_not_called()
 
+    def test_no_presales_choice_never_routes_to_presales(self):
+        self.opp.custom_presales_required=0
+        self.env['request_supplementary_survey'](**self.args)
+        self.assertIsNone(self.survey.presales_request)
+        self.assertFalse(any(c.args[0]=='Presales Request' for c in self.frappe.db.get_value.call_args_list))
+        self.assertEqual(len(self.frappe.db.set_value.call_args_list),1)
+        self.assertEqual(self.frappe.db.set_value.call_args.args[0],'Opportunity')
+
+    def test_presales_choice_requires_real_link_instead_of_silent_misrouting(self):
+        self.frappe.db.get_value.side_effect=None
+        self.frappe.db.get_value.return_value=None
+        with self.assertRaisesRegex(ValueError,'active Presales Request is missing'):
+            self.env['request_supplementary_survey'](**self.args)
+        self.survey.insert.assert_not_called()
+
     def test_permission_denial_precedes_read_or_write(self):
         self.opp.check_permission.side_effect=PermissionError
         with self.assertRaises(PermissionError): self.env['request_supplementary_survey'](**self.args)
