@@ -1,0 +1,15 @@
+{
+ "doctype": "Desktop Icon",
+ "name": "BS Procurement",
+ "label": "BS Procurement",
+ "app": "bsgroup",
+ "icon_type": "App",
+ "link_type": "External",
+ "link": "/desk/bs-group/bs-procurement?bs_app=BS%20Procurement",
+ "icon_image": "/assets/bsgroup/images/bs-procurement.svg",
+ "bg_color": "blue",
+ "hidden": 0,
+ "standard": 1,
+ "restrict_removal": 1,
+ "roles": [{"role":"System Manager"},{"role":"Purchase User"},{"role":"Purchase Manager"},{"role":"Sales Manager"},{"role":"Commercial Controller"},{"role":"Managing Director"},{"role":"Accounts User"},{"role":"Accounts Manager"}]
+}

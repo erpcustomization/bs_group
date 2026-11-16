@@ -5,6 +5,7 @@ import frappe
 
 
 def ensure_sidebar():
+    ensure_app_icon()
     if not frappe.db.exists("DocType", "Sidebar") or not frappe.db.exists("Sidebar", "BS Group"):
         return
     sidebar = frappe.get_doc("Sidebar", "BS Group")
@@ -53,3 +54,18 @@ def ensure_sidebar():
             row.idx = i
         sidebar.save(ignore_permissions=True)
         frappe.clear_cache()
+
+
+def ensure_app_icon():
+    """Register navigation only, using the Procurement page's existing roles."""
+    from pathlib import Path
+    values = json.loads(Path(frappe.get_app_path("bsgroup", "desktop_icon", "bs_procurement.json")).read_text())
+    values["roles"] = [{"role": row.role} for row in frappe.get_doc("Page", "bs-procurement").roles]
+    if frappe.db.exists("Desktop Icon", values["name"]):
+        doc = frappe.get_doc("Desktop Icon", values["name"])
+        doc.update({k: v for k, v in values.items() if k not in ("doctype", "name", "roles")})
+        doc.set("roles", values["roles"])
+        doc.save(ignore_permissions=True)
+    else:
+        frappe.get_doc(values).insert(ignore_permissions=True)
+    frappe.clear_cache()

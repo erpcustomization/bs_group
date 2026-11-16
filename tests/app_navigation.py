@@ -32,6 +32,10 @@ with patch.dict(sys.modules,{'frappe':f,'bsgroup.scoped_sales_access':s,'bsgroup
     assert m.destinations()['BS HR'].endswith('/hr-dashboard')
     f.get_roles.return_value=['System Manager']
     assert m.destinations()['BS User Management'].endswith('/bs-user-management')
+    with patch.object(f, 'has_permission', lambda dt,p: dt == 'Material Request'):
+        assert m.destinations()['BS Procurement'] == '/desk/bs-group/bs-procurement'
+    with patch.object(f, 'has_permission', lambda dt,p: False):
+        assert m.destinations()['BS Procurement'] is None
     f.session=types.SimpleNamespace(user='mithun@example.com')
     f.get_roles.return_value=['Projects User']
     f.has_permission=lambda dt,p: dt in {'Project','Task','Site Survey Request','Tech Task Scheduler'}

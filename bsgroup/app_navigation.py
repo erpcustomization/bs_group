@@ -34,7 +34,7 @@ def destinations():
         "BS PPM": first("PPM Plan", "PPM Visit"),
         "BS Support": first("Issue"),
         "BS Approvals": first("Labor Preapproval", "Employee Advance", "Expense Claim", "Material Request", "Cheque Request"),
-        "BS Procurement": first("Material Request", "Purchase Order"),
+        "BS Procurement": "/desk/bs-group/bs-procurement" if first("Material Request", "Purchase Order") else None,
         "BS HR": "/desk/bs-group/hr-dashboard" if can_manage() else None,
         "BS User Management": "/desk/bs-group/bs-user-management"
             if "System Manager" in frappe.get_roles() else None,
