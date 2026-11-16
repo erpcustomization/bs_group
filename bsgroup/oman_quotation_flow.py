@@ -24,7 +24,7 @@ TERMINAL = {"Won", "Lost"}
 STATUS_CHOICES = ("Quote sent", "Under negotiation", "Under approval", "Approved",
                   "Awaiting PO", "Follow-up", "Lost", "Expired", "Won")
 # Retain historical values without offering them for new transitions.
-STAGES = set(STATUS_CHOICES) | {"Draft", "Sent", "Delayed", "Cancelled"}
+STAGES = set(STATUS_CHOICES) | {"Draft", "Sent", "Delayed", "Cancelled", "Rework Required"}
 _operation = ContextVar("oman_quote_operation", default=None)
 
 

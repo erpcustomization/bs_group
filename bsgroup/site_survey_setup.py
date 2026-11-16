@@ -58,6 +58,11 @@ def execute():
         make_property_setter("Presales Request", field, "reqd", 0, "Check")
         make_property_setter("Presales Request", field, "mandatory_depends_on",
             "eval:!doc.custom_site_survey_request || !['Awaiting Site Survey Results','Site Survey Results Received','Cancelled','On Hold'].includes(doc.status)", "Data")
+    for dt, field in (("Presales Request", "status"), ("Deal Cost Sheet", "custom_deal_status"),
+                      ("Quotation", "custom_pipeline_stage")):
+        choices = (frappe.get_meta(dt).get_field(field).options or "").splitlines()
+        if "Rework Required" not in choices:
+            make_property_setter(dt, field, "options", "\n".join(choices + ["Rework Required"]), "Text")
     ensure_navigation()
     from bsgroup.site_survey import backfill_request_details
     backfill_request_details()

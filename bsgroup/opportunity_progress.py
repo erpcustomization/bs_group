@@ -17,6 +17,8 @@ def resolve(opportunity, surveys, presales, sheets, now=None, quotations=()):
     if native in ("Lost", "Closed", "Converted"):
         return dict(label=native, color="red" if native == "Lost" else "green")
     live_sheets = [s for s in sheets if s.docstatus < 2 and s.get("custom_record_authority") != "Superseded"]
+    if any(s.get("custom_deal_status") == "Rework Required" for s in live_sheets) or any(p.get("status") == "Rework Required" for p in presales):
+        return dict(label="Rework Required", color="orange")
     live_names = {s.name for s in live_sheets}
     if any(q.docstatus == 1 and (not q.get("custom_deal_cost_sheet") or q.custom_deal_cost_sheet in live_names) for q in quotations):
         return dict(label="Quoted", color="green")

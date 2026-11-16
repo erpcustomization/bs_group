@@ -22,7 +22,7 @@
             const indicator=function(row){
                 if(row.custom_oman_flow){
                     const stage=row.custom_pipeline_stage||'Draft';
-                    const colors={'Quote sent':'blue','Under negotiation':'orange','Under approval':'purple',Approved:'cyan','Awaiting PO':'yellow',Won:'green',Lost:'red',Delayed:'orange',Cancelled:'gray',Sent:'blue','Follow-up':'orange',Expired:'gray',Draft:'gray'};
+                    const colors={'Rework Required':'orange','Quote sent':'blue','Under negotiation':'orange','Under approval':'purple',Approved:'cyan','Awaiting PO':'yellow',Won:'green',Lost:'red',Delayed:'orange',Cancelled:'gray',Sent:'blue','Follow-up':'orange',Expired:'gray',Draft:'gray'};
                     return [stage,colors[stage]||'gray','custom_pipeline_stage,=,'+stage];
                 }
                 return original?.call(this,row);

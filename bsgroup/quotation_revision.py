@@ -97,8 +97,16 @@ def _begin(quotation, presales, expected_modified):
     return dict(result, presales_request=request.name)
 
 
-def finish(sheet):
+def finish(sheet, quotation_updated=True):
     """Called only after the governed BOQ and same quotation save succeeds."""
+    if sheet.custom_deal_status == "Rework Required":
+        # A completed governed costing revision resolves the late-survey rework.
+        pending = frappe.db.exists("Site Survey Request", {"opportunity": sheet.opportunity,
+            "supplementary_survey": 1, "status": ["not in", ["Completed", "Cancelled"]]})
+        if not pending and quotation_updated:
+            from bsgroup.site_survey import complete_survey_rework
+            complete_survey_rework(sheet)
+        return
     if sheet.custom_deal_status != REVISION:
         return
     request = linked_presales(sheet)

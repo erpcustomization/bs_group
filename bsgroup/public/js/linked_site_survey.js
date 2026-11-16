@@ -59,7 +59,7 @@
             {fieldname:'location',label:__('Site Location'),fieldtype:'Small Text',reqd:1,default:frm.doc.custom_survey_location},
             {fieldname:'contact_name',label:__('Contact Person'),fieldtype:'Data',reqd:1,default:frm.doc.custom_survey_contact_name || frm.doc.custom_contact_person_name},
             {fieldname:'contact_phone',label:__('Contact Phone'),fieldtype:'Data',reqd:1,default:frm.doc.custom_survey_contact_phone || frm.doc.contact_mobile},
-            {fieldtype:'HTML',options:'<p>'+__('The existing DCS and Presales Request will remain at their current stage. Survey details will be available in Additional Details.')+'</p>'}
+            {fieldtype:'HTML',options:'<p>'+__('Submitting marks the linked DCS and quotation as Rework Required. Presales is included only when requested on the saved Opportunity. Won or Lost quotations cannot receive a late survey. Survey details will be available in Additional Details.')+'</p>'}
         ],primary_action_label:__('Send Site Survey Request'),async primary_action(values) {
             if (dialog._sending) return;
             dialog._sending = true;

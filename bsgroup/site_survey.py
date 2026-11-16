@@ -42,6 +42,7 @@ def request_supplementary_survey(opportunity, team, instructions, location, cont
             "docstatus": ["<", 2], "status": ["!=", "Cancelled"]}, "name")
         if not pre:
             frappe.throw(_("This Opportunity requests presales support, but its active Presales Request is missing. Restore its presales link before requesting the survey."))
+    rework_records = late_survey_rework_records(doc, pre)
     survey = frappe.get_doc(dict(doctype="Site Survey Request", opportunity=doc.name,
         supplementary_survey=1, status="Requested", requested_by=frappe.session.user,
         request_date=nowdate(), site_address=location.strip(),
@@ -55,7 +56,48 @@ def request_supplementary_survey(opportunity, team, instructions, location, cont
     if pre:
         # The request remains at its existing stage, including Costing in Progress.
         frappe.db.set_value("Presales Request", pre, "custom_site_survey_request", survey.name)
+    mark_survey_rework(rework_records, survey.name)
     return {"name": survey.name, "created": True}
+
+
+REWORK_REQUIRED = "Rework Required"
+
+
+def late_survey_rework_records(opportunity, presales):
+    sheets = frappe.get_all("Deal Cost Sheet", filters={"opportunity": opportunity.name,
+        "docstatus": ["<", 2], "custom_record_authority": ["!=", "Superseded"]}, pluck="name")
+    links = {"opportunity": opportunity.name}
+    if sheets:
+        links["custom_deal_cost_sheet"] = ["in", sheets]
+    quotes = frappe.get_all("Quotation", filters={"docstatus": ["<", 2]},
+        or_filters=links, pluck="name")
+    records = []
+    for name in sorted(sheets):
+        sheet = frappe.get_doc("Deal Cost Sheet", name, for_update=True)
+        if sheet.get("custom_deal_status") in ("Won", "Lost") or sheet.get("custom_award_state") == "Awarded":
+            frappe.throw(_("A late site survey cannot be requested: the linked costing sheet is already Won, Lost or awarded."))
+        records.append((sheet, "custom_deal_status"))
+    for name in sorted(quotes):
+        quote = frappe.get_doc("Quotation", name, for_update=True)
+        if quote.get("custom_pipeline_stage") in ("Won", "Lost") or quote.get("status") in ("Lost", "Ordered"):
+            frappe.throw(_("A late site survey cannot be requested: linked quotation {0} is already Won or Lost.").format(name))
+        records.append((quote, "custom_pipeline_stage"))
+    if presales:
+        records.append((frappe.get_doc("Presales Request", presales, for_update=True), "status"))
+    return records
+
+
+def mark_survey_rework(records, survey):
+    for record, field in records:
+        previous = record.get(field)
+        if previous == REWORK_REQUIRED:
+            continue
+        frappe.db.set_value(record.doctype, record.name, field, REWORK_REQUIRED)
+        frappe.clear_document_cache(record.doctype, record.name)
+        frappe.get_doc(dict(doctype="Version", ref_doctype=record.doctype, docname=record.name,
+            data=frappe.as_json(dict(changed=[[field, previous, REWORK_REQUIRED]],
+                added=[], removed=[], row_changed=[])))).insert(ignore_permissions=True)
+        record.add_comment("Info", _("Rework Required following late Site Survey Request {0}.").format(survey))
 
 
 @frappe.whitelist()
@@ -101,7 +143,7 @@ def presales_handoff(name):
     label = pre.status
     if pre.status == "Costing in Progress":
         label = "Deal Cost Sheet in Progress"
-    elif pre.status not in ("Cancelled", "Completed", "Won", "Lost", "Submitted to Sales", "Ready for Quotation", "On Hold", "Rework"):
+    elif pre.status not in ("Cancelled", "Completed", "Won", "Lost", "Submitted to Sales", "Ready for Quotation", "On Hold", "Rework", REWORK_REQUIRED):
         label = "Awaiting Site Survey" if survey and not survey.get("supplementary_survey") and survey.status not in ("Completed", "Cancelled") else "Open with Presales"
     return {"label": label, "results": survey.results if survey and survey.status == "Completed" else None}
 
@@ -282,3 +324,22 @@ def survey_permission(doc, user=None, permission_type=None, ptype=None):
     if user not in (doc.salesperson, doc.requested_by, doc.assigned_to):
         return False
     return None
+
+
+def complete_survey_rework(sheet):
+    records = [(sheet, "custom_deal_status", "Submitted to Sales")]
+    if sheet.get("presales_request"):
+        pre = frappe.get_doc("Presales Request", sheet.presales_request)
+        if pre.opportunity == sheet.opportunity:
+            records.append((pre, "status", "Submitted to Sales"))
+    if sheet.get("custom_quotation"):
+        quote = frappe.get_doc("Quotation", sheet.custom_quotation)
+        if quote.get("custom_deal_cost_sheet") == sheet.name:
+            records.append((quote, "custom_pipeline_stage", "Draft"))
+    for doc, field, target in records:
+        if doc.get(field) == REWORK_REQUIRED:
+            frappe.db.set_value(doc.doctype, doc.name, field, target)
+            frappe.clear_document_cache(doc.doctype, doc.name)
+            frappe.get_doc(dict(doctype="Version", ref_doctype=doc.doctype, docname=doc.name,
+                data=frappe.as_json(dict(changed=[[field, REWORK_REQUIRED, target]], added=[], removed=[], row_changed=[])))).insert(ignore_permissions=True)
+            doc.add_comment("Info", _("Site survey rework completed through costing revision {0}.").format(sheet.name))

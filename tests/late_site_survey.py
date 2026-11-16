@@ -39,8 +39,34 @@ class LateSurveyTests(TestCase):
             if isinstance(n,ast.FunctionDef): n.decorator_list=[]
         self.env={'frappe':self.frappe,'_':lambda x:x,'cint':lambda x:int(x or 0),'nowdate':lambda:'2026-11-16'}
         exec(compile(tree,'site_survey','exec'),self.env)
+        self.real_mark = self.env['mark_survey_rework']
+        self.env['mark_survey_rework'] = Mock()
         self.args=dict(opportunity='OPP-TEST',team='ELV',instructions='Inspect network',
             location='Test site',contact_name='Test contact',contact_phone='000')
+
+    def test_won_and_lost_quotes_block_before_survey_creation(self):
+        for state in ('Won', 'Lost'):
+            q=Row(name='Q-TEST',doctype='Quotation',custom_pipeline_stage=state)
+            self.frappe.get_all.side_effect=lambda dt, **kw: ['Q-TEST'] if dt=='Quotation' else []
+            self.frappe.get_doc.side_effect=lambda dt,name=None,**kw: q if dt=='Quotation' else self.opp
+            with self.assertRaisesRegex(ValueError, 'Won or Lost'):
+                self.env['request_supplementary_survey'](**self.args)
+            self.survey.insert.assert_not_called()
+            self.env['mark_survey_rework'].assert_not_called()
+
+    def test_rework_marks_only_collected_records_and_audits(self):
+        records=[(Row(name='DCS',doctype='Deal Cost Sheet',custom_deal_status='Submitted to Sales',add_comment=Mock()),'custom_deal_status'),
+                 (Row(name='QTN',doctype='Quotation',custom_pipeline_stage='Quote sent',add_comment=Mock()),'custom_pipeline_stage'),
+                 (Row(name='PRE',doctype='Presales Request',status='In Progress',add_comment=Mock()),'status')]
+        self.frappe.clear_document_cache=Mock()
+        self.frappe.as_json=lambda value:value
+        version=Row(insert=Mock())
+        self.frappe.get_doc=Mock(return_value=version)
+        self.real_mark(records,'SSR-TEST')
+        self.assertEqual(len(self.frappe.db.set_value.call_args_list),3)
+        self.assertTrue(all(c.args[-1]=='Rework Required' for c in self.frappe.db.set_value.call_args_list))
+        self.assertEqual(version.insert.call_count,3)
+        for doc,field in records:doc.add_comment.assert_called_once()
 
     def test_late_request_preserves_existing_work_and_qualification(self):
         result=self.env['request_supplementary_survey'](**self.args)
