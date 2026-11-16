@@ -33,6 +33,14 @@ def route_options(row):
 
 def install():
     """Idempotent installation only. Never reclassify projects, change roles, or replace templates."""
+    from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+    kickoff_field = "custom_expected_kick_off_meeting_date"
+    existing = frappe.get_meta("Project").get_field(kickoff_field)
+    if existing and existing.fieldtype != "Date":
+        frappe.throw(_("Project kick-off meeting date already exists with an incompatible type."))
+    if not existing:
+        create_custom_fields({"Project": [dict(fieldname=kickoff_field, label="Expected Kick-off Meeting Date",
+                           fieldtype="Date", reqd=0, insert_after="expected_end_date")]}, update=False)
     if not frappe.db.exists("DocType", "Sidebar") or not frappe.db.exists("Sidebar", "BS Group"):
         return {"installed": False, "reason": "The existing BS Group sidebar is not available on this site."}
     sidebar = frappe.get_doc("Sidebar", "BS Group")
@@ -50,13 +58,6 @@ def install():
             fields.append(dict(fieldname=field, label=title, fieldtype="Check", default="0", insert_after=after,
                                description="Select every module this project belongs to." if not fields else None))
         after = field
-    kickoff_field = "custom_expected_kick_off_meeting_date"
-    existing = frappe.get_meta("Project").get_field(kickoff_field)
-    if existing and existing.fieldtype != "Date":
-        frappe.throw(_("Project kick-off meeting date already exists with an incompatible type."))
-    if not existing:
-        fields.append(dict(fieldname=kickoff_field, label="Expected Kick-off Meeting Date",
-                           fieldtype="Date", reqd=0, insert_after="expected_end_date"))
     if fields:
         create_custom_fields({"Project": fields}, update=False)
     if not frappe.db.exists("Page", "bs-project-modules"):
