@@ -692,7 +692,7 @@ function bsChairmanDashboard(wrapper) {
         const att=data.attendance;
         const attendance=panel(top,'People & attendance',`${att.total} employees · ${data.day}`);
         const layout=$('<div class="ex-attendance">').appendTo(attendance.box);
-        const categories=[['on_time','On time','#198578'],['late','Late · IN/OUT complete','#b78c49'],['pending_checkout','Late · awaiting checkout','#d3b587'],['no_checkin','Not checked in','#b16c65'],['leave','On leave','#8b9aad'],['on_duty','On duty / WFH','#6292ac'],['off','Day off','#c9d3dd'],['not_started','Shift not started','#dfe5eb'],['partial_day','Half-day leave / duty','#a5adbc'],['unconfigured','Shift not assigned','#879099']];
+        const categories=[['on_time','On time','#198578'],['late','Late · checked out','#b78c49'],['pending_checkout','Late · checkout pending','#d3b587'],['no_checkin','Not checked in','#b16c65'],['leave','On leave','#8b9aad'],['on_duty','On duty / WFH','#6292ac'],['off','Day off','#c9d3dd'],['not_started','Shift not started','#dfe5eb'],['partial_day','Half-day leave / duty','#a5adbc'],['unconfigured','Shift not assigned','#879099']];
         let position=0;const stops=[];categories.forEach(([key,label,color])=>{const end=position+(att.total?att.totals[key]/att.total*100:0);if(end>position)stops.push(`${color} ${position}% ${end}%`);position=end;});
         const ring=$('<div class="ex-donut" role="img">').attr('aria-label',categories.map(([k,l])=>`${l}: ${att.totals[k]}`).join(', ')).css('background',stops.length?`conic-gradient(${stops.join(',')})`:'#edf1f5').appendTo(layout);
         const center=$('<div class="ex-donut-inner">').appendTo(ring);$('<strong>').text(number(att.totals.on_time+att.totals.late+att.totals.pending_checkout)).appendTo(center);$('<span>').text('arrivals counted').appendTo(center);
@@ -702,7 +702,7 @@ function bsChairmanDashboard(wrapper) {
             const row=$('<div class="ex-att-row">').appendTo(rows);$('<span class="ex-dot">').css('background',color).appendTo(row);$('<span>').text(label).appendTo(row);details($('<button type="button">').text(att.totals[key]).appendTo(row),label,att.details[key],row);
         });
         if(att.totals.no_checkin || att.totals.unconfigured) $('<div class="ex-alert">').text(`${att.totals.no_checkin} without check-in · ${att.totals.unconfigured} missing shift assignments`).appendTo(attendance.box);
-        $('<p class="ex-note">').text('Actual punches only. Manual Present records excluded. Late arrivals without checkout are separated.').appendTo(attendance.box);
+        $('<p class="ex-note">').text('Actual punches only. Manual Present records excluded. Checkout must follow the latest check-in. Details show seconds and the original punch sequence.').appendTo(attendance.box);
         bsAnnualTargets(content, day);
         const bottom=$('<div class="ex-grid">').appendTo(content);
         const team=panel(bottom,'Team performance','Contribution by sales owner · selected day');

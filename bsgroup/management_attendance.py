@@ -8,6 +8,36 @@ from bsgroup.attendance_widget import shift_bounds
 TZ = ZoneInfo('Asia/Dubai')
 
 
+def punch_summary(logs):
+    """Read-only display pairing; an earlier OUT cannot close a later IN."""
+    ordered = sorted(logs, key=lambda row: row[0])
+    ins = [stamp for stamp, kind in ordered if kind == 'IN']
+    first = ins[0] if ins else None
+    latest_in = ins[-1] if ins else None
+    checkout = next((stamp for stamp, kind in reversed(ordered)
+                     if kind == 'OUT' and latest_in and stamp > latest_in), None)
+    return first, checkout, ordered
+
+
+def punch_details(employee, logs, start):
+    first, checkout, ordered = punch_summary(logs)
+    clock = lambda stamp: stamp.strftime('%I:%M:%S %p')
+    label = f"{employee.employee_name or employee.name} ({employee.name})"
+    label += ' · Check-in: ' + (clock(first) if first else 'Not recorded')
+    label += ' · Check-out: ' + (clock(checkout) if checkout else
+        ('Pending — no OUT after latest IN' if first else 'No matching IN recorded'))
+    if start:
+        label += ' · Shift starts ' + clock(start)
+        if first and first > start:
+            seconds = int((first - start).total_seconds())
+            minutes, seconds = divmod(seconds, 60)
+            label += f' · Late by {minutes}m {seconds}s'
+    if ordered:
+        label += ' · Recorded punches: ' + ' → '.join(
+            f'{kind or "Unspecified"} {clock(stamp)}' for stamp, kind in ordered)
+    return label
+
+
 def classify(start, now, first, last_out, holiday=False, leave=0, duty=0):
     if holiday:
         return 'off'
@@ -94,17 +124,11 @@ def overview(day):
         start = shift_bounds(day,shift)[0] if shift else None
         holiday_list = (shift.holiday_list if shift else None) or employee.holiday_list
         employee_logs = punches.get(employee.name,[])
-        first = next((stamp for stamp,kind in employee_logs if kind=='IN'),None)
-        last_out = next((stamp for stamp,kind in reversed(employee_logs) if kind=='OUT'),None)
+        first, last_out, _ = punch_summary(employee_logs)
         status = classify(start,now,first,last_out,holiday_list in off_lists,
                           leave_by_employee.get(employee.name,0),duty_by_employee.get(employee.name,0))
         totals[status] += 1
-        label = f"{employee.employee_name or employee.name} ({employee.name})"
-        label += ' · Check-in: ' + (first.strftime('%I:%M %p') if first else 'Not recorded')
-        label += ' · Check-out: ' + (last_out.strftime('%I:%M %p') if last_out else 'Not recorded')
-        if start:
-            label += ' · Shift starts ' + start.strftime('%I:%M %p')
-        details[status].append(label)
+        details[status].append(punch_details(employee, employee_logs, start))
     for rows in details.values():
         rows.sort(key=str.casefold)
     return dict(total=len(employees),totals=totals,details=details,day=str(day))
