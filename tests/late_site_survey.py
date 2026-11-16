@@ -54,6 +54,19 @@ class LateSurveyTests(TestCase):
             self.survey.insert.assert_not_called()
             self.env['mark_survey_rework'].assert_not_called()
 
+    def test_no_presales_rework_collects_dcs_and_quote_only(self):
+        dcs=Row(name='DCS',doctype='Deal Cost Sheet',custom_deal_status='Submitted to Sales')
+        q=Row(name='QTN',doctype='Quotation',custom_pipeline_stage='Quote sent')
+        self.frappe.get_all.side_effect=lambda dt,**kw: ['DCS'] if dt=='Deal Cost Sheet' else ['QTN']
+        self.frappe.get_doc.side_effect=lambda dt,name=None,**kw: dcs if dt=='Deal Cost Sheet' else q
+        result=self.env['late_survey_rework_records'](self.opp,None)
+        self.assertEqual([(d.doctype,f) for d,f in result],[('Deal Cost Sheet','custom_deal_status'),('Quotation','custom_pipeline_stage')])
+        self.assertFalse(any(c.args[0]=='Presales Request' for c in self.frappe.get_doc.call_args_list))
+
+    def test_requested_presales_is_included_in_rework(self):
+        result=self.env['late_survey_rework_records'](self.opp,'PR-TEST')
+        self.assertEqual(result,[(self.pre,'status')])
+
     def test_rework_marks_only_collected_records_and_audits(self):
         records=[(Row(name='DCS',doctype='Deal Cost Sheet',custom_deal_status='Submitted to Sales',add_comment=Mock()),'custom_deal_status'),
                  (Row(name='QTN',doctype='Quotation',custom_pipeline_stage='Quote sent',add_comment=Mock()),'custom_pipeline_stage'),
