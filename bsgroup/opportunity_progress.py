@@ -20,7 +20,8 @@ def resolve(opportunity, surveys, presales, sheets, now=None, quotations=()):
     live_names = {s.name for s in live_sheets}
     if any(q.docstatus == 1 and (not q.get("custom_deal_cost_sheet") or q.custom_deal_cost_sheet in live_names) for q in quotations):
         return dict(label="Quoted", color="green")
-    active_surveys = [s for s in surveys if s.status not in ("Completed", "Cancelled")]
+    active_surveys = [s for s in surveys if s.status not in ("Completed", "Cancelled")
+        and not s.get("supplementary_survey")]
     if active_surveys:
         if active_surveys[0].status == "Scheduled":
             return dict(label="Site Survey Scheduled", color="blue")
@@ -69,7 +70,7 @@ def resolve_many(opportunities):
         for row in rows:
             grouped.setdefault(row.opportunity, []).append(row)
         return grouped
-    surveys = related("Site Survey Request", ["status", "completed_on"])
+    surveys = related("Site Survey Request", ["status", "completed_on", "supplementary_survey"])
     presales = related("Presales Request", ["status", "docstatus", "custom_site_survey_request"])
     sheets = related("Deal Cost Sheet", ["docstatus", "custom_deal_status", "custom_record_authority"])
     sheet_owners = {s.name: name for name, rows in sheets.items() for s in rows}

@@ -21,7 +21,7 @@ class SiteSurveyRequest(Document):
         if before and self.opportunity != before.opportunity:
             frappe.throw(_("The linked Opportunity cannot be changed."))
         if before:
-            for field in ("requested_by", "request_date", "presales_request"):
+            for field in ("requested_by", "request_date", "presales_request", "supplementary_survey"):
                 current, original = self.get(field), before.get(field)
                 if field == "request_date":
                     current = getdate(current) if current else None
@@ -29,7 +29,8 @@ class SiteSurveyRequest(Document):
                 if current != original:
                     frappe.throw(_("The request origin and linked Presales Request cannot be changed."))
         opp = frappe.get_doc("Opportunity", self.opportunity)
-        self.survey_request_details = (before.get("survey_request_details") if before else None) or request_details(opp)
+        self.survey_request_details = (before.get("survey_request_details") if before else None) or (
+            self.survey_request_details if self.flags.from_opportunity else None) or request_details(opp)
         if self.is_new() and not self.flags.from_opportunity:
             frappe.throw(_("Request the site survey from the Opportunity."))
         for target, source in {
@@ -38,9 +39,13 @@ class SiteSurveyRequest(Document):
             "contact_email": "contact_email",
             "elv_required": "custom_elv_site_survey_required",
             "technical_required": "custom_technical_site_survey_required"}.items():
+            if self.get("supplementary_survey") and target in ("elv_required", "technical_required"):
+                if before:
+                    self.set(target, before.get(target))
+                continue
             self.set(target, opp.get(source))
         self.title = self.title or opp.title or opp.name
-        if self.is_new():
+        if self.is_new() and not self.get("supplementary_survey"):
             self.contact_person = opp.get("custom_survey_contact_name") or opp.get("custom_contact_person_name")
             self.contact_phone = opp.get("custom_survey_contact_phone") or opp.get("contact_mobile")
         self.salesperson_name = frappe.db.get_value("User", self.salesperson, "full_name") if self.salesperson else None
@@ -65,7 +70,7 @@ class SiteSurveyRequest(Document):
             pre = frappe.get_doc("Presales Request", self.presales_request)
             if pre.custom_site_survey_request != self.name:
                 frappe.throw(_("The Presales Request does not match this survey."))
-            if pre.status == WAITING:
+            if pre.status == WAITING and not self.get("supplementary_survey"):
                 pre.status = RECEIVED
                 pre.custom_survey_results = self.results
                 pre.save(ignore_permissions=True)

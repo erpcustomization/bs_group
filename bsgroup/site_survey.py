@@ -9,6 +9,63 @@ DEFERRED_FIELDS = ("presales_owner", "due_date", "priority", "solution_summary",
 FLAGS = ("custom_elv_site_survey_required", "custom_technical_site_survey_required")
 
 
+@frappe.whitelist(methods=["POST"])
+def request_supplementary_survey(opportunity, team, instructions, location, contact_name, contact_phone):
+    """A late survey supplements the current work; it never restarts intake."""
+    doc = frappe.get_doc("Opportunity", opportunity, for_update=True)
+    doc.check_permission("write")
+    if doc.docstatus == 2 or doc.status in ("Lost", "Closed"):
+        frappe.throw(_("A site survey cannot be requested for a closed Opportunity."))
+    existing = frappe.db.get_value("Site Survey Request", {"opportunity": doc.name}, "name")
+    if existing:
+        return {"name": existing, "created": False}
+    if team not in ("ELV", "Technical Team", "ELV and Technical Team"):
+        frappe.throw(_("Choose the site survey team."))
+    values = dict(custom_survey_instructions=instructions, custom_survey_location=location,
+        custom_survey_contact_name=contact_name, custom_survey_contact_phone=contact_phone)
+    if any(not isinstance(value, str) or not value.strip() for value in values.values()):
+        frappe.throw(_("Enter survey instructions, location, contact name and phone."))
+    # Build a request snapshot without changing the original qualification or
+    # saving the Opportunity through hooks that dispatch presales/costing again.
+    doc.update({key: value.strip() for key, value in values.items()})
+    doc.custom_elv_site_survey_required = int(team in ("ELV", "ELV and Technical Team"))
+    doc.custom_technical_site_survey_required = int(team in ("Technical Team", "ELV and Technical Team"))
+    pre = frappe.db.get_value("Presales Request", {"opportunity": doc.name,
+        "docstatus": ["<", 2], "status": ["!=", "Cancelled"]}, "name")
+    survey = frappe.get_doc(dict(doctype="Site Survey Request", opportunity=doc.name,
+        supplementary_survey=1, status="Requested", requested_by=frappe.session.user,
+        request_date=nowdate(), site_address=location.strip(),
+        contact_person=contact_name.strip(), contact_phone=contact_phone.strip(),
+        elv_required=doc.custom_elv_site_survey_required,
+        technical_required=doc.custom_technical_site_survey_required,
+        survey_request_details=request_details(doc), presales_request=pre))
+    survey.flags.from_opportunity = True
+    survey.insert(ignore_permissions=True)
+    frappe.db.set_value("Opportunity", doc.name, "custom_site_survey_request", survey.name)
+    if pre:
+        # The request remains at its existing stage, including Costing in Progress.
+        frappe.db.set_value("Presales Request", pre, "custom_site_survey_request", survey.name)
+    return {"name": survey.name, "created": True}
+
+
+@frappe.whitelist()
+def linked_survey_details(doctype, name):
+    if doctype not in ("Opportunity", "Deal Cost Sheet"):
+        frappe.throw(_("Unsupported survey source."))
+    doc = frappe.get_doc(doctype, name)
+    doc.check_permission("read")
+    opportunity = doc.name if doctype == "Opportunity" else doc.get("opportunity")
+    if not opportunity:
+        return []
+    # A reader of the linked business record can see its operational survey,
+    # without granting access to other surveys or commercial Opportunity fields.
+    return frappe.get_all("Site Survey Request", filters={"opportunity": opportunity},
+        fields=["name", "status", "request_date", "planned_date", "assigned_to",
+            "site_address", "contact_person", "contact_phone", "survey_request_details",
+            "results", "attachment", "completed_on", "supplementary_survey"],
+        order_by="creation desc")
+
+
 @frappe.whitelist()
 def opportunity_survey_results(name):
     opportunity = frappe.get_doc("Opportunity", name)
@@ -24,18 +81,18 @@ def presales_handoff(name):
     pre = frappe.get_doc("Presales Request", name)
     pre.check_permission("read")
     survey = frappe.db.get_value("Site Survey Request", pre.get("custom_site_survey_request"),
-        ["status", "results"], as_dict=True) if pre.get("custom_site_survey_request") else None
+        ["status", "results", "supplementary_survey"], as_dict=True) if pre.get("custom_site_survey_request") else None
     label = pre.status
     if pre.status == "Costing in Progress":
         label = "Deal Cost Sheet in Progress"
     elif pre.status not in ("Cancelled", "Completed", "Won", "Lost", "Submitted to Sales", "Ready for Quotation", "On Hold", "Rework"):
-        label = "Awaiting Site Survey" if survey and survey.status not in ("Completed", "Cancelled") else "Open with Presales"
+        label = "Awaiting Site Survey" if survey and not survey.get("supplementary_survey") and survey.status not in ("Completed", "Cancelled") else "Open with Presales"
     return {"label": label, "results": survey.results if survey and survey.status == "Completed" else None}
 
 
 def create_costing_after_survey(survey):
     """Complete the no-presales handoff in the survey save transaction."""
-    if survey.status != "Completed" or survey.presales_request:
+    if survey.status != "Completed" or survey.presales_request or survey.get("supplementary_survey"):
         return
     frappe.db.sql("SELECT name FROM `tabOpportunity` WHERE name=%s FOR UPDATE", survey.opportunity)
     opportunity = frappe.get_doc("Opportunity", survey.opportunity)
@@ -162,14 +219,14 @@ def default_presales_owner():
 
 def validate_presales(doc, method=None):
     link = doc.get("custom_site_survey_request")
-    survey = frappe.db.get_value("Site Survey Request", link, ["opportunity", "status"], as_dict=True) if link else None
+    survey = frappe.db.get_value("Site Survey Request", link, ["opportunity", "status", "supplementary_survey"], as_dict=True) if link else None
     if link and (not survey or survey.opportunity != doc.opportunity):
         frappe.throw(_("The Site Survey Request must belong to this Opportunity."))
     if doc.status in (WAITING, RECEIVED) and not survey:
         frappe.throw(_("A linked Site Survey Request is required for this status."))
     if doc.status == RECEIVED and survey.status != "Completed":
         frappe.throw(_("Complete the site survey and record its results first."))
-    if survey and survey.status != "Completed" and doc.status not in (WAITING, "Cancelled", "On Hold"):
+    if survey and not survey.get("supplementary_survey") and survey.status != "Completed" and doc.status not in (WAITING, "Cancelled", "On Hold"):
         frappe.throw(_("This Presales Request is awaiting site survey results."))
     if doc.status != "Draft" and not (survey and doc.status in (WAITING, RECEIVED, "Cancelled", "On Hold")):
         missing = [doc.meta.get_label(f) for f in DEFERRED_FIELDS if not doc.get(f)]

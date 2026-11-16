@@ -24,6 +24,7 @@
   "currency",
   "opportunity_amount",
   "presales_request",
+  "supplementary_survey",
   "sales_details",
   "salesperson",
   "salesperson_name",
@@ -45,6 +46,14 @@
   "activity_panel"
  ],
  "fields": [
+  {
+   "fieldname": "supplementary_survey",
+   "label": "Requested after Opportunity submission",
+   "fieldtype": "Check",
+   "read_only": 1,
+   "no_copy": 1,
+   "default": "0"
+  },
   {
    "fieldname": "activity_panel",
    "label": "Comments and Activity",
