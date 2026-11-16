@@ -77,6 +77,8 @@ def late_survey_rework_records(opportunity, presales):
         if sheet.get("custom_deal_status") in ("Won", "Lost") or sheet.get("custom_award_state") == "Awarded":
             frappe.throw(_("A late site survey cannot be requested: the linked costing sheet is already Won, Lost or awarded."))
         records.append((sheet, "custom_deal_status"))
+        if presales and sheet.get("presales_request") == presales:
+            records.append((sheet, "custom_presales_status"))
     for name in sorted(quotes):
         quote = frappe.get_doc("Quotation", name, for_update=True)
         if quote.get("custom_pipeline_stage") in ("Won", "Lost") or quote.get("status") in ("Lost", "Ordered"):
@@ -332,6 +334,7 @@ def complete_survey_rework(sheet):
         pre = frappe.get_doc("Presales Request", sheet.presales_request)
         if pre.opportunity == sheet.opportunity:
             records.append((pre, "status", "Submitted to Sales"))
+            records.append((sheet, "custom_presales_status", "Submitted to Sales"))
     if sheet.get("custom_quotation"):
         quote = frappe.get_doc("Quotation", sheet.custom_quotation)
         if quote.get("custom_deal_cost_sheet") == sheet.name:

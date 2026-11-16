@@ -63,6 +63,12 @@ def execute():
         choices = (frappe.get_meta(dt).get_field(field).options or "").splitlines()
         if "Rework Required" not in choices:
             make_property_setter(dt, field, "options", "\n".join(choices + ["Rework Required"]), "Text")
+    # Synchronise the DCS summary for late requests created before this update.
+    for row in frappe.get_all("Deal Cost Sheet", filters={"custom_deal_status": "Rework Required", "docstatus": ["<", 2]},
+                             fields=["name", "presales_request", "custom_presales_status"]):
+        if row.presales_request and row.custom_presales_status != "Rework Required" and frappe.db.get_value(
+                "Presales Request", row.presales_request, "status") == "Rework Required":
+            frappe.db.set_value("Deal Cost Sheet", row.name, "custom_presales_status", "Rework Required")
     ensure_navigation()
     from bsgroup.site_survey import backfill_request_details
     backfill_request_details()
