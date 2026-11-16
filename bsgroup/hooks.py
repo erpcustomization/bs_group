@@ -803,3 +803,6 @@ _prior = doc_events.setdefault("User", {}).get("before_validate", [])
 doc_events["User"]["before_validate"] = ([_prior] if isinstance(_prior, str) else list(_prior)) + ["bsgroup.project_support_access.sync_user"]
 permission_query_conditions["Tech Task Scheduler"] = "bsgroup.project_support_access.scheduler_query"
 has_permission["Tech Task Scheduler"] = "bsgroup.project_support_access.scheduler_permission"
+
+after_migrate.append("bsgroup.weekly_commercial_email.install")
+scheduler_events.setdefault("cron", {}).setdefault("*/5 10-11 * * 1", []).append("bsgroup.weekly_commercial_email.send_reports")
