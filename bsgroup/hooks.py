@@ -471,6 +471,7 @@ override_whitelisted_methods = {
 }
 
 extend_doctype_class = {
+    "Material Request": ["bsgroup.procurement_material_request.SalesHandoverRequestMixin"],
     "Task": ["bsgroup.project_plan.ProjectPlanTaskMixin"],
     "Project": ["bsgroup.project_daily_work.ProjectDailyWorkMixin"],
     "Holiday List": [
