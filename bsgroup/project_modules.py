@@ -50,6 +50,13 @@ def install():
             fields.append(dict(fieldname=field, label=title, fieldtype="Check", default="0", insert_after=after,
                                description="Select every module this project belongs to." if not fields else None))
         after = field
+    kickoff_field = "custom_expected_kick_off_meeting_date"
+    existing = frappe.get_meta("Project").get_field(kickoff_field)
+    if existing and existing.fieldtype != "Date":
+        frappe.throw(_("Project kick-off meeting date already exists with an incompatible type."))
+    if not existing:
+        fields.append(dict(fieldname=kickoff_field, label="Expected Kick-off Meeting Date",
+                           fieldtype="Date", reqd=0, insert_after="expected_end_date"))
     if fields:
         create_custom_fields({"Project": fields}, update=False)
     if not frappe.db.exists("Page", "bs-project-modules"):

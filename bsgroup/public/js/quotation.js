@@ -356,7 +356,8 @@ frappe.ui.form.on("Quotation", {
                     {fieldtype:'HTML',fieldname:'project_info',options:'<p><strong>A new project will be created automatically for this quotation.</strong> Aira AI will automatically generate the project plan from the quotation and linked costing sheet. Please select ELV Project, 3CX Project, Infra Project or Supply Only (choose all that apply) and enter the expected completion date. The project start date will be set to today; the project team can assign a manager and refine the plan later. If AI is unavailable, the project remains created and its plan shows the action required.</p>'},
                     {fieldname:'expected_end_date',label:__('Expected Project Completion Date'),fieldtype:'Date',reqd:1,
                         description:__('Sales must enter this date before sending to Procurement. It sets the project completion date and the schedule for its project plan.')},
-                    {fieldname:'customer',label:__('Customer'),fieldtype:'Link',options:'Customer',reqd:1,default:data.project_customer,read_only:!!data.project_customer},
+                    {fieldtype:'Date',fieldname:'expected_kick_off_meeting_date',label:__('Expected Kick-off Meeting Date'),reqd:0},
+                {fieldname:'customer',label:__('Customer'),fieldtype:'Link',options:'Customer',reqd:1,default:data.project_customer,read_only:!!data.project_customer},
                     {fieldname:'custom_project_description',label:__('Project Description'),fieldtype:'Small Text',reqd:1,default:data.project_description}
                 ];
                 const dialog = new frappe.ui.Dialog({
@@ -378,7 +379,7 @@ frappe.ui.form.on("Quotation", {
                     async primary_action(values) {
                         const selected=modules.filter(([key])=>values['module_'+key]).map(([key])=>key);
                         if(!selected.length){frappe.msgprint(__('Choose at least one project module.'));return;}
-                        const projectDetails=Object.fromEntries(['expected_end_date','customer','custom_project_description'].map(key=>[key,values[key]]));
+                        const projectDetails=Object.fromEntries(['expected_end_date','expected_kick_off_meeting_date','customer','custom_project_description'].map(key=>[key,values[key]]));
                         dialog.disable_primary_action();
                         try {
                             const result = await frappe.call({

@@ -109,6 +109,10 @@ def save_project(q, sheet, modules, details=None):
         frappe.throw(_("Project end date cannot be before its start date."))
     subject = q.get("custom_subject") or sheet.get("subject") or "Project"
     project.update(dict(expected_start_date=start_date, expected_end_date=details["expected_end_date"]))
+    if details.get("expected_kick_off_meeting_date"):
+        if not meta.has_field("custom_expected_kick_off_meeting_date"):
+            frappe.throw(_("Install the project kick-off meeting date field before sending this handover."))
+        project.set("custom_expected_kick_off_meeting_date", getdate(details["expected_kick_off_meeting_date"]))
     # Older clients can still provide these optional fields. New sales popups
     # leave them for the project team, without inventing a manager or type.
     for field in ("project_type", "custom_project_manager"):

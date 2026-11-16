@@ -195,6 +195,7 @@
             ...[
                 {fieldtype:'Date',fieldname:'expected_end_date',label:__('Expected Project Completion Date'),reqd:1,
                     description:__('Sales must enter this date before sending to Procurement. It sets the project completion date and the schedule for its project plan.')},
+                {fieldtype:'Date',fieldname:'expected_kick_off_meeting_date',label:__('Expected Kick-off Meeting Date'),reqd:0},
                 {fieldtype:'Link',fieldname:'customer',label:__('Customer'),options:'Customer',reqd:1,default:data.project_customer},
                 {fieldtype:'Small Text',fieldname:'custom_project_description',label:__('Project Description'),reqd:1,default:data.project_description},
             ]
@@ -230,7 +231,7 @@
                         reason:values.reason,customer_po:values.customer_po,customer_po_reference:values.customer_po_reference,
                         schedule_date:values.schedule_date,
                         project_modules:JSON.stringify(projectModules),project_details:JSON.stringify(Object.fromEntries(
-                            ['expected_end_date','customer','custom_project_description'].map(key=>[key,values[key]])))});
+                            ['expected_end_date','expected_kick_off_meeting_date','customer','custom_project_description'].map(key=>[key,values[key]])))});
                     dialog.hide();await frm.reload_doc();
                     if(result?.requisition) frappe.msgprint(__('Purchase Requisition created: {0}',[frappe.utils.escape_html(result.requisition)]));
                     if(result?.project) frappe.msgprint(__('Project created/linked: {0}. Open Project Plan to follow automatic planning.',[frappe.utils.escape_html(result.project)]));
