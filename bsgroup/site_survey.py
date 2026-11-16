@@ -54,16 +54,22 @@ def request_supplementary_survey(opportunity, team, instructions, location, cont
 
 @frappe.whitelist()
 def linked_survey_details(doctype, name):
-    if doctype not in ("Opportunity", "Deal Cost Sheet"):
+    if doctype not in ("Opportunity", "Deal Cost Sheet", "Presales Request"):
         frappe.throw(_("Unsupported survey source."))
     doc = frappe.get_doc(doctype, name)
     doc.check_permission("read")
     opportunity = doc.name if doctype == "Opportunity" else doc.get("opportunity")
     if not opportunity:
         return []
+    filters = {"opportunity": opportunity}
+    if doctype == "Presales Request":
+        if not doc.get("custom_site_survey_request"):
+            return []
+        filters["name"] = doc.custom_site_survey_request
+        filters["presales_request"] = doc.name
     # A reader of the linked business record can see its operational survey,
     # without granting access to other surveys or commercial Opportunity fields.
-    return frappe.get_all("Site Survey Request", filters={"opportunity": opportunity},
+    return frappe.get_all("Site Survey Request", filters=filters,
         fields=["name", "status", "request_date", "planned_date", "assigned_to",
             "site_address", "contact_person", "contact_phone", "survey_request_details",
             "results", "attachment", "completed_on", "supplementary_survey"],

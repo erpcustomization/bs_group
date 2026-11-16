@@ -77,4 +77,5 @@
         return render(frm);
     }});
     frappe.ui.form.on('Deal Cost Sheet',{refresh:render});
+    frappe.ui.form.on('Presales Request',{refresh:render});
 })();

@@ -811,6 +811,6 @@ doctype_list_js["Employee Checkin"] = "public/js/employee_checkin_shift.js"
 scheduler_events.setdefault("cron", {}).setdefault("*/5 10-11 * * 1", []).append("bsgroup.weekly_commercial_email.send_reports")
 
 # Late surveys are requested only from Opportunity; both linked forms show progress.
-for _survey_view_dt in ("Opportunity", "Deal Cost Sheet"):
+for _survey_view_dt in ("Opportunity", "Deal Cost Sheet", "Presales Request"):
     _survey_view_js = doctype_js.get(_survey_view_dt, [])
     doctype_js[_survey_view_dt] = ([_survey_view_js] if isinstance(_survey_view_js, str) else list(_survey_view_js)) + ["public/js/linked_site_survey.js"]
