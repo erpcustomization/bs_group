@@ -198,7 +198,8 @@ def classify(row):
         bool(re.search(r"\bamc\b|\bmaintenance\b", title, re.I)))
     selected = [key for key, (_, field) in MODULES.items() if row.get(field) in (1, "1", True)]
     if selected:
-        return dict(categories=selected, is_amc=bool(is_amc), classification="Saved category", review_required=False)
+        review = str(row.get("custom_bs_category_review_note") or "").strip()
+        return dict(categories=selected, is_amc=bool(is_amc), classification=review or "Saved category", review_required=bool(review))
     text = kind + " " + title
     patterns = {
         "3cx": r"\b3cx\b",
@@ -219,7 +220,7 @@ def portfolio():
         frappe.throw(_("Project access is restricted by your existing permissions."), frappe.PermissionError)
     meta = frappe.get_meta("Project")
     fields = ["name", "project_name", "status", "project_type", "percent_complete", "company", "modified"]
-    fields += [field for field in ["customer", "custom_project_manager", "expected_start_date", "expected_end_date"]
+    fields += [field for field in ["customer", "custom_project_manager", "expected_start_date", "expected_end_date", "custom_bs_category_review_note"]
                + [field for _, field in MODULES.values()] if meta.has_field(field)]
     rows = frappe.get_list("Project", fields=fields, order_by="creation desc", limit_page_length=0)
     return [dict(row, **classify(row)) for row in rows]

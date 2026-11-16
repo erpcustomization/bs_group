@@ -33,7 +33,7 @@ class ProjectModuleTests(unittest.TestCase):
         self.f.flags=types.SimpleNamespace(in_migrate=False)
         self.f.get_doc=Mock(return_value=self.sidebar)
         self.f.db=Record(exists=lambda dt,name:self.page_exists if dt=='Page' else True)
-        self.f.get_meta=lambda dt:Record(get_field=lambda name:self.fields.get(name),has_field=lambda name:name in self.fields or dt!='Project')
+        self.f.get_meta=lambda dt:Record(get_field=lambda name:Record(fieldtype='Date') if name=='custom_expected_kick_off_meeting_date' else self.fields.get(name),has_field=lambda name:name in self.fields or dt!='Project')
         self.f.clear_cache=Mock();self.f.reload_doc=Mock(side_effect=self.reload)
         custom=types.ModuleType('frappe.custom.doctype.custom_field.custom_field')
         custom.create_custom_fields=self.create_fields=Mock(side_effect=self.add_fields)
