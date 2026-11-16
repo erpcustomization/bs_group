@@ -44,14 +44,21 @@
         });
         tab.refresh();
     }
-    function request(frm) {
-        if (frm.is_dirty()) { frappe.msgprint(__('Save your Opportunity changes first.')); return; }
+    function request(frm, confirmedUnsaved = false) {
+        if (frm.is_dirty() && !confirmedUnsaved) {
+            frappe.confirm(__('This Opportunity has unsaved changes. You can send the site survey without saving the Opportunity. The survey details entered here will be carried into the request popup. After the survey is saved, the Opportunity will reload and other unsaved edits will be discarded. Continue?'),
+                () => request(frm, true));
+            return;
+        }
+        const team = frm.doc.custom_elv_site_survey_required
+            ? (frm.doc.custom_technical_site_survey_required ? 'ELV and Technical Team' : 'ELV')
+            : (frm.doc.custom_technical_site_survey_required ? 'Technical Team' : '');
         const dialog = new frappe.ui.Dialog({title:__('Request Site Survey'),fields:[
-            {fieldname:'team',label:__('Survey Team'),fieldtype:'Select',options:'\nELV\nTechnical Team\nELV and Technical Team',reqd:1},
-            {fieldname:'instructions',label:__('What should the survey team do?'),fieldtype:'Small Text',reqd:1},
-            {fieldname:'location',label:__('Site Location'),fieldtype:'Small Text',reqd:1},
-            {fieldname:'contact_name',label:__('Contact Person'),fieldtype:'Data',reqd:1,default:frm.doc.custom_contact_person_name},
-            {fieldname:'contact_phone',label:__('Contact Phone'),fieldtype:'Data',reqd:1,default:frm.doc.contact_mobile},
+            {fieldname:'team',label:__('Survey Team'),fieldtype:'Select',options:'\nELV\nTechnical Team\nELV and Technical Team',reqd:1,default:team},
+            {fieldname:'instructions',label:__('What should the survey team do?'),fieldtype:'Small Text',reqd:1,default:frm.doc.custom_survey_instructions},
+            {fieldname:'location',label:__('Site Location'),fieldtype:'Small Text',reqd:1,default:frm.doc.custom_survey_location},
+            {fieldname:'contact_name',label:__('Contact Person'),fieldtype:'Data',reqd:1,default:frm.doc.custom_survey_contact_name || frm.doc.custom_contact_person_name},
+            {fieldname:'contact_phone',label:__('Contact Phone'),fieldtype:'Data',reqd:1,default:frm.doc.custom_survey_contact_phone || frm.doc.contact_mobile},
             {fieldtype:'HTML',options:'<p>'+__('The existing DCS and Presales Request will remain at their current stage. Survey details will be available in Additional Details.')+'</p>'}
         ],primary_action_label:__('Send Site Survey Request'),async primary_action(values) {
             if (dialog._sending) return;
