@@ -13,8 +13,9 @@ function bsDashboardPunches(parent, afterPunch) {
         try {
             state=(await frappe.call({method:'bsgroup.dashboard_punch.context',quiet:true})).message;
             status.text(state.allowed?(state.last_time?__('Last {0}: {1}',[state.last_type==='IN'?__('Check In'):__('Check Out'),frappe.datetime.str_to_user(state.last_time)+' · '+(state.last_location || __('Location not recorded'))]):__('No attendance punches yet')):__('Contact HR to enable check-in access.'));
-            buttons.IN.prop('disabled',busy || !state.allowed || state.last_type==='IN');
-            buttons.OUT.prop('disabled',busy || !state.allowed || state.last_type!=='IN');
+            if(state.previous_checkout_missing) status.append(document.createTextNode(' · '+__('Previous checkout missing. You can check in for the new shift.')));
+            buttons.IN.prop('disabled',busy || !state.allowed || !state.can_check_in);
+            buttons.OUT.prop('disabled',busy || !state.allowed || !state.can_check_out);
         } catch(e) {state=null;Object.values(buttons).forEach(b=>b.prop('disabled',true));status.text(__('Attendance unavailable. Please contact HR or reload.'));}
     }
     async function submit(kind) {

@@ -2,7 +2,25 @@
 import math
 import frappe
 from bsgroup.attendance_place import describe_location
-from frappe.utils import now_datetime, cint
+from frappe.utils import now_datetime, cint, get_datetime
+
+
+def previous_shift_open(emp, row, now):
+    """Only changes available actions; never closes or edits an old punch."""
+    if not row or row.log_type != 'IN':
+        return False
+    from hrms.hr.doctype.shift_assignment.shift_assignment import get_actual_start_end_datetime_of_shift
+    stamp = get_datetime(row.time)
+    if stamp >= now:
+        return False
+    current = get_actual_start_end_datetime_of_shift(emp, now, consider_default_shift=True)
+    if current:
+        return stamp < current['actual_start']
+    previous = get_actual_start_end_datetime_of_shift(emp, stamp, consider_default_shift=True)
+    if previous and now <= previous['actual_end']:
+        return False  # An overnight shift must not reset at midnight.
+    # Preserve off-shift/unassigned punching, with a new local working day.
+    return stamp.date() < now.date()
 
 
 def employee():
@@ -22,7 +40,11 @@ def context():
     emp=employee()
     allowed=bool(cint(frappe.db.get_single_value('HR Settings','allow_employee_checkin_from_mobile_app'))) and frappe.has_permission('Employee Checkin','create')
     row=latest(emp)
+    new_shift=previous_shift_open(emp, row, now_datetime())
     return dict(allowed=allowed,last_name=row.name if row else '',last_type=row.log_type if row else None,
+                can_check_in=not row or row.log_type != 'IN' or new_shift,
+                can_check_out=bool(row and row.log_type == 'IN' and not new_shift),
+                previous_checkout_missing=new_shift,
                 last_time=str(row.time) if row else None,
                 last_location=describe_location(row.latitude, row.longitude) if row else None,
                 location_required=bool(cint(frappe.db.get_single_value('HR Settings','allow_geolocation_tracking'))))
@@ -39,7 +61,7 @@ def punch(log_type, expected_last='', latitude=None, longitude=None):
         frappe.throw('Check-in access is not enabled. Please contact HR.',frappe.PermissionError)
     if (expected_last or '')!=state['last_name']:
         frappe.throw('Attendance changed. Refresh and try again.')
-    if log_type==state['last_type'] or (log_type=='OUT' and state['last_type']!='IN'):
+    if not state['can_check_in' if log_type == 'IN' else 'can_check_out']:
         frappe.throw('This action does not match your latest attendance record. Refresh and try again.')
     if state['location_required'] and (latitude is None or longitude is None):
         frappe.throw('Allow location access to mark attendance.')
