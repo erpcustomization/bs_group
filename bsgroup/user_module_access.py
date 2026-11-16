@@ -17,6 +17,8 @@ LABELS = dict(read="View", write="Edit", create="Create", submit="Submit", cance
 def install():
     from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
     create_custom_fields({"User": [dict(fieldname=FIELD, label="BS Module Grants", fieldtype="Long Text", hidden=1, read_only=1, no_copy=1)]}, update=False)
+    available = {m:[dt for dt in spec['records'] if frappe.db.exists('DocType',dt)] for m,spec in MODULES.items()}
+    ensure_viewers({viewer(m) for m in available}, dict(available=available))
 
 
 def viewer(module):
@@ -97,9 +99,6 @@ def blocked_reason(doc, roles, module):
         return "Existing access is controlled by an access profile."
     if doc.user_type != 'System User':
         return "This is a portal account; ERP module grants require an ERP account."
-    scoped = 'BS Scoped Sales' in roles or 'BS Scoped Presales' in roles
-    if scoped and module != 'Sales':
-        return "This account has an existing Sales-only workspace."
     if module == 'HR' and doc.name not in ('muskan@bitssecureit.com','Administrator') and 'System Manager' not in roles:
         return "BS HR management is restricted to Muskan and administrators. Employee self-service is unchanged."
     if module == 'Projects' and doc.name == 'amar@bitssecureit.com':
@@ -210,12 +209,18 @@ def plan(doc, changes):
             grants.pop(key,None)
     needed={role for values in grants.values() for role in values}
     after=context['base'] | needed
+    from bsgroup.user_management import delegated, PROTECTED_ROLES
+    if delegated() and (after - context['assigned']) & PROTECTED_ROLES:
+        frappe.throw('Administrator and approval-owner roles cannot be granted from this console.')
     before_rights=rights_for(context['rules'],context['assigned'] | context['implicit'])
     after_rights=rights_for(context['rules'],after | context['implicit'])
     impact=[]
     for key in sorted(before_rights.keys() | after_rights.keys()):
         before=before_rights.get(key,set());after_actions=after_rights.get(key,set())
         added=after_actions-before; removed=before-after_actions
+        protected_records={'User','Role','Role Profile','User Permission','DocType','Custom DocPerm','Server Script','Client Script','Workflow','System Settings','Email Account','Connected App','OAuth Client','Access Log'}
+        if delegated() and key[0] in protected_records and added & {'write','create','delete','submit','cancel','share','import','amend'}:
+            frappe.throw('This module role includes administration permissions. A System Manager must review it.')
         if added or removed:
             impact.append(dict(record=key[0],field_level=key[1],own_records=bool(key[2]),
                 added=[LABELS.get(a,a.title()) for a in sorted(added)], removed=[LABELS.get(a,a.title()) for a in sorted(removed)]))
@@ -236,20 +241,20 @@ def ensure_viewers(roles,context):
         role=viewer(module)
         if role not in roles or frappe.db.exists('Role',role):
             continue
-        frappe.get_doc(dict(doctype='Role',role_name=role,desk_access=1)).insert()
+        frappe.get_doc(dict(doctype='Role',role_name=role,desk_access=1)).insert(ignore_permissions=True)
         for dt in records:
             setup_custom_perms(dt)
             rule=dict(doctype='Custom DocPerm',parent=dt,parenttype='DocType',parentfield='permissions',
                 role=role,permlevel=0,if_owner=0,**{a:int(a in ('read','select')) for a in RIGHTS})
-            frappe.get_doc(rule).insert()
+            frappe.get_doc(rule).insert(ignore_permissions=True)
             frappe.clear_cache(doctype=dt)
 
 
 def load_target(user,expected_modified):
-    from bsgroup.user_management import require_manager
+    from bsgroup.user_management import require_manager, check_target
     require_manager()
     doc=frappe.get_doc('User',user)
-    doc.check_permission('write')
+    check_target(doc)
     if str(doc.modified)!=str(expected_modified):
         frappe.throw('This account changed. Refresh and review it again before saving.')
     return doc
@@ -279,10 +284,28 @@ def save(user,expected_modified,changes,preview_token):
     for role in payload['roles']:
         if role not in old:doc.append('roles',dict(role=role))
     doc.set(FIELD,json.dumps(payload['state'],sort_keys=True))
-    doc.save()
+    from bsgroup.user_management import save_target
+    save_target(doc)
     if {r.role for r in doc.roles}!=set(payload['roles']):
         frappe.throw('An existing account rule changed the proposed access. No changes were saved; review the account profile.')
     doc.add_comment('Info','Module permissions updated after preview: '+', '.join(
         r['module']+' '+r['permission']+(' added' if r['enabled'] else ' removed') for r in public['changes']))
     frappe.clear_cache(user=user)
     return dict(saved=True)
+
+
+def granted_screens(user=None):
+    """Extra navigation only for explicitly saved grants whose roles remain assigned."""
+    user=user or frappe.session.user
+    roles=set(frappe.get_roles(user))
+    raw=frappe.db.get_value('User',user,FIELD)
+    try:
+        grants=json.loads(raw or '{}').get('grants',{})
+    except (ValueError,TypeError,AttributeError):
+        return set()
+    result=set()
+    for key,assigned in grants.items():
+        module=key.split('.')[0]
+        if module in MODULES and assigned and isinstance(assigned,list) and set(assigned)<=roles:
+            result.update(MODULES[module]['records'])
+    return result

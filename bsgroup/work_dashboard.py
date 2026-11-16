@@ -1,6 +1,6 @@
 """Personal dashboard using the same permissions as each document list."""
 import frappe
-from bsgroup.scoped_sales_access import scope, SCREENS, show_lead_intake_navigation
+from bsgroup.scoped_sales_access import scope, SCREENS, show_lead_intake_navigation, allowed_screens
 
 
 @frappe.whitelist()
@@ -40,7 +40,7 @@ def navigation_script():
 def screens():
     mode = scope()
     if mode:
-        result = list(SCREENS[mode])
+        result = list(allowed_screens())
         if show_lead_intake_navigation():
             result.append('Lead Intake')
         return result

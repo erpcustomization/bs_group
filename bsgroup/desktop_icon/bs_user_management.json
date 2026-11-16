@@ -11,5 +11,5 @@
  "hidden": 0,
  "standard": 1,
  "restrict_removal": 1,
- "roles": [{"role": "System Manager"}]
+ "roles": [{"role": "System Manager"}, {"role": "BS User Administrator"}]
 }

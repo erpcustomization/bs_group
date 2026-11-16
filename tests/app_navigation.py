@@ -12,6 +12,7 @@ f.scrub=lambda s:s.lower().replace(' ','_')
 f.has_permission=lambda dt,p:dt in {'Lead','Project','HD Ticket','Employee Advance','Presales Request'}
 f.get_roles=Mock(return_value=['Projects User'])
 s=types.ModuleType('bsgroup.scoped_sales_access');s.scope=Mock(return_value=None);s.SCREENS={'sales':('Lead',),'presales':('Presales Request',)}
+s.allowed_screens=lambda:s.SCREENS.get(s.scope())
 h=types.ModuleType('bsgroup.hr_management');h.can_manage=Mock(return_value=False)
 with patch.dict(sys.modules,{'frappe':f,'bsgroup.scoped_sales_access':s,'bsgroup.hr_management':h}):
     spec=importlib.util.spec_from_file_location('navigation',root/'bsgroup/app_navigation.py')
@@ -31,6 +32,8 @@ with patch.dict(sys.modules,{'frappe':f,'bsgroup.scoped_sales_access':s,'bsgroup
     s.scope.return_value=None;h.can_manage.return_value=True
     assert m.destinations()['BS HR'].endswith('/hr-dashboard')
     f.get_roles.return_value=['System Manager']
+    assert m.destinations()['BS User Management'].endswith('/bs-user-management')
+    f.get_roles.return_value=['BS User Administrator']
     assert m.destinations()['BS User Management'].endswith('/bs-user-management')
     with patch.object(f, 'has_permission', lambda dt,p: dt == 'Material Request'):
         assert m.destinations()['BS Procurement'] == '/desk/bs-group/bs-procurement'

@@ -21,6 +21,8 @@ class UserManagementTests(unittest.TestCase):
         spec=importlib.util.spec_from_file_location('user_management',Path(__file__).parents[1]/'bsgroup/user_management.py')
         self.m=importlib.util.module_from_spec(spec);spec.loader.exec_module(self.m)
         self.f.has_permission.return_value=True
+        self.f.session.user='manager@example.com'
+        self.f.get_roles.return_value=['System Manager']
 
     def test_non_manager_is_rejected_before_data_lookup(self):
         self.f.only_for.side_effect=PermissionError
@@ -46,7 +48,7 @@ class UserManagementTests(unittest.TestCase):
         doc=Doc(name='employee@example.com',first_name='Employee',full_name='Employee Name',enabled=1,
                 user_type='System User',last_login=None,roles=[],api_key='SECRET',api_secret='SECRET',
                 check_permission=MagicMock())
-        self.f.get_doc.return_value=doc;self.f.get_roles.return_value=['Employee']
+        self.f.get_doc.return_value=doc;self.f.get_roles.side_effect=lambda user=None:['Employee'] if user else ['System Manager']
         self.f.get_list.return_value=[];self.f.db.exists.return_value=False
         result=self.m.details(doc.name)
         doc.check_permission.assert_called_once_with('read')
@@ -112,6 +114,7 @@ class UserManagementTests(unittest.TestCase):
 
     def test_install_only_reloads_page_and_clears_cache(self):
         self.m.install_app_icon=MagicMock()
+        self.f.db.exists.return_value=True
         self.m.install()
         self.f.reload_doc.assert_called_once_with('bs_group','page','bs_user_management',force=True)
         self.m.install_app_icon.assert_called_once_with()
@@ -123,7 +126,7 @@ class UserManagementTests(unittest.TestCase):
         self.m.install_app_icon()
         values=self.f.get_doc.call_args.args[0]
         self.assertEqual(values['doctype'],'Desktop Icon')
-        self.assertEqual(values['roles'],[{'role':'System Manager'}])
+        self.assertEqual(values['roles'],[{'role':'System Manager'},{'role':'BS User Administrator'}])
         self.assertEqual(values['link'],'/desk/bs-group/bs-user-management')
         self.f.get_doc.return_value.insert.assert_called_once_with(ignore_permissions=True)
         self.f.db.set_value.assert_not_called()
@@ -133,7 +136,54 @@ class UserManagementTests(unittest.TestCase):
         self.f.db.exists.return_value=True
         self.m.install_app_icon()
         self.f.get_doc.assert_called_once_with('Desktop Icon','BS User Management')
-        self.f.get_doc.return_value.set.assert_called_once_with('roles',[{'role':'System Manager'}])
+        self.f.get_doc.return_value.set.assert_called_once_with('roles',[{'role':'System Manager'},{'role':'BS User Administrator'}])
         self.f.get_doc.return_value.save.assert_called_once_with(ignore_permissions=True)
+
+    def as_delegate(self):
+        self.f.session.user='muskan@bitssecureit.com'
+        self.f.get_roles.side_effect=lambda user=None:['Employee'] if user and user!=self.f.session.user else ['BS User Administrator']
+
+    def test_delegate_can_edit_allowlisted_account_fields_without_raw_user_write(self):
+        self.as_delegate();doc=self.editable_doc()
+        self.m.save_account(doc.name,'v1',{'first_name':'Updated'})
+        doc.check_permission.assert_not_called()
+        doc.save.assert_called_once_with(ignore_permissions=True)
+        self.assertEqual([r.role for r in doc.roles],['Employee','Sales User'])
+
+    def test_delegate_cannot_assign_raw_roles_or_edit_privileged_targets(self):
+        self.as_delegate();doc=self.editable_doc()
+        with self.assertRaises(PermissionError):self.m.save_account(doc.name,'v1',{'roles':['System Manager']})
+        for name in ('Administrator','Guest','mohan@bitssecureit.com','muskan@bitssecureit.com'):
+            doc['name']=name
+            with self.assertRaises(PermissionError):self.m.save_account(name,'v1',{'enabled':0})
+        doc['name']='another@example.com';self.f.get_roles.side_effect=lambda user=None:['System Manager'] if user else ['BS User Administrator']
+        with self.assertRaises(PermissionError):self.m.save_account(doc.name,'v1',{'enabled':0})
+        doc.save.assert_not_called()
+
+    def test_delegate_directory_returns_safe_fields_without_generic_user_access(self):
+        self.as_delegate();self.f.get_all.return_value=[]
+        self.f.has_permission.return_value=False
+        result=self.m.directory()
+        self.assertTrue(result['can_create'])
+        self.assertNotIn('api_key',self.f.get_all.call_args.kwargs['fields'])
+
+    def test_delegate_creation_has_no_admin_role_password_or_email(self):
+        self.as_delegate()
+        utils=MagicMock();sys.modules['frappe.utils']=utils
+        self.f.db.exists.return_value=False
+        self.m.create_account('new@example.com','New','Person',0)
+        values=self.f.get_doc.call_args.args[0]
+        self.assertEqual(values['roles'],[{'role':'Employee'}])
+        self.assertEqual(values['enabled'],0)
+        self.assertEqual(values['send_welcome_email'],0)
+        self.assertNotIn('new_password',values)
+        self.f.get_doc.return_value.insert.assert_called_once_with(ignore_permissions=True)
+
+    def test_create_rejects_missing_name_and_existing_account(self):
+        self.as_delegate();sys.modules['frappe.utils']=MagicMock()
+        with self.assertRaises(PermissionError):self.m.create_account('new@example.com',' ')
+        self.f.db.exists.return_value=True
+        with self.assertRaises(PermissionError):self.m.create_account('existing@example.com','Person')
+        self.f.get_doc.assert_not_called()
 
 if __name__=='__main__':unittest.main()

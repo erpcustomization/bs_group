@@ -17,6 +17,14 @@ def scope(user=None):
     return PRESALES if PRESALES in roles else SALES if SALES in roles else None
 
 
+def allowed_screens(user=None):
+    mode=scope(user)
+    if not mode:
+        return None
+    from bsgroup.user_module_access import granted_screens
+    return tuple(dict.fromkeys((*SCREENS[mode], *sorted(granted_screens(user)))))
+
+
 def own(alias, field, user):
     who = frappe.db.escape(user)
     return f"COALESCE(NULLIF({alias}.`{field}`, ''), {alias}.owner) = {who}"
@@ -157,7 +165,7 @@ def boot_session(bootinfo):
     mode = scope()
     if not mode:
         return
-    allowed = SCREENS[mode]
+    allowed = allowed_screens()
     if show_lead_intake_navigation():
         allowed = (*allowed, "Lead Intake")
     bootinfo.bs_scoped_screens = list(allowed)

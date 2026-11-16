@@ -1,5 +1,5 @@
 (() => {
-    const allowed=()=>frappe.user.has_role('System Manager');
+    const allowed=()=>frappe.user.has_role('System Manager') || frappe.user.has_role('BS User Administrator');
     const open=()=>frappe.set_route('bs-user-management');
     frappe.ui.form.on('User', {refresh(frm) {
         frm.set_df_property('first_name','reqd',1);

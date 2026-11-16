@@ -12,11 +12,11 @@ def on_session_creation(login_manager):
 
 
 def destinations():
-    from bsgroup.scoped_sales_access import scope, SCREENS
+    from bsgroup.scoped_sales_access import scope, SCREENS, allowed_screens
     from bsgroup.hr_management import can_manage
 
     mode = scope()
-    allowed = SCREENS.get(mode) if mode else None
+    allowed = allowed_screens()
 
     def first(*doctypes):
         for dt in doctypes:
@@ -37,7 +37,7 @@ def destinations():
         "BS Procurement": "/desk/bs-group/bs-procurement" if first("Material Request", "Purchase Order") else None,
         "BS HR": "/desk/bs-group/hr-dashboard" if can_manage() else None,
         "BS User Management": "/desk/bs-group/bs-user-management"
-            if "System Manager" in frappe.get_roles() else None,
+            if {"System Manager", "BS User Administrator"}.intersection(frappe.get_roles()) else None,
     }
     return routes
 
@@ -45,10 +45,10 @@ def destinations():
 def project_support_links():
     """Navigation only: use existing DocType and report grants, never write roles."""
     from urllib.parse import quote
-    from bsgroup.scoped_sales_access import scope, SCREENS
+    from bsgroup.scoped_sales_access import scope, SCREENS, allowed_screens
 
     mode = scope()
-    allowed = SCREENS.get(mode) if mode else None
+    allowed = allowed_screens()
 
     def permitted(dt, permission="read"):
         return (allowed is None or dt in allowed) and frappe.db.exists("DocType", dt) and frappe.has_permission(dt, permission)

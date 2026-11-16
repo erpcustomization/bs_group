@@ -13,6 +13,11 @@ class ModuleAccessTests(unittest.TestCase):
         self.f=MagicMock();self.f.whitelist=lambda *a,**k:lambda f:f
         self.f.throw.side_effect=lambda msg,*a:(_ for _ in ()).throw(ValueError(msg))
         self.f.parse_json=json.loads
+        self.manager=MagicMock();self.manager.delegated.return_value=False
+        self.manager.PROTECTED_ROLES={'System Manager','BS User Administrator'}
+        self.manager.save_target.side_effect=lambda doc:doc.save()
+        self.manager.check_target.side_effect=lambda doc:doc.check_permission('write')
+        sys.modules['bsgroup.user_management']=self.manager
         sys.modules['frappe']=self.f
         spec=importlib.util.spec_from_file_location('module_access',Path(__file__).parents[1]/'bsgroup/user_module_access.py')
         self.m=importlib.util.module_from_spec(spec);spec.loader.exec_module(self.m)
@@ -41,9 +46,11 @@ class ModuleAccessTests(unittest.TestCase):
     def test_hr_management_gate_is_preserved(self):
         with self.assertRaisesRegex(ValueError,'Muskan'):self.m.plan(self.doc,{'HR.edit':True})
 
-    def test_scoped_sales_cannot_expand_to_other_modules(self):
+    def test_scoped_sales_can_add_other_module_without_removing_scope(self):
         self.context['assigned'].add('BS Scoped Sales');self.context['base'].add('BS Scoped Sales')
-        with self.assertRaisesRegex(ValueError,'Sales-only'):self.m.plan(self.doc,{'Projects.edit':True})
+        payload,_,_=self.m.plan(self.doc,{'Projects.edit':True})
+        self.assertIn('BS Scoped Sales',payload['roles'])
+        self.assertIn('Projects User',payload['roles'])
 
     def test_profiles_are_protected(self):
         self.doc['role_profile_name']='Existing'
@@ -92,11 +99,22 @@ class ModuleAccessTests(unittest.TestCase):
         self.assertEqual(json.loads(self.doc[self.m.FIELD])['owned_roles'],['Projects User'])
 
     def test_load_target_requires_manager_write_and_fresh_version(self):
-        manager=MagicMock();sys.modules['bsgroup.user_management']=manager
+        manager=self.manager
         self.f.get_doc.return_value=self.doc
         self.m.load_target(self.doc.name,'v1');self.doc.check_permission.assert_called_with('write')
         with self.assertRaisesRegex(ValueError,'changed'):self.m.load_target(self.doc.name,'old')
         manager.require_manager.side_effect=PermissionError
         with self.assertRaises(PermissionError):self.m.load_target(self.doc.name,'v1')
+
+    def test_delegate_rejects_module_role_with_user_admin_rights(self):
+        self.manager.delegated.return_value=True
+        self.rules.append(dict(parent='User',role='Projects User',write=1))
+        with self.assertRaisesRegex(ValueError,'administration'):self.m.plan(self.doc,{'Projects.edit':True})
+
+    def test_navigation_uses_only_recorded_grants_with_live_roles(self):
+        self.f.get_roles.return_value=['Employee','Projects User']
+        self.f.db.get_value.return_value=json.dumps({'grants':{'Projects.edit':['Projects User'],'Procurement.edit':['Purchase User']}})
+        self.assertIn('Project',self.m.granted_screens('person@example.com'))
+        self.assertNotIn('Purchase Order',self.m.granted_screens('person@example.com'))
 
 if __name__=='__main__':unittest.main()

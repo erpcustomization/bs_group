@@ -201,7 +201,20 @@ frappe.pages['bs-user-management'].on_page_load = function(wrapper) {
         dialog.$wrapper.on('hidden.bs.modal',()=>{clearInterval(timer);frame.remove();load();if(selected)show(selected);});
         dialog.show();frame.attr('src','/desk');
     }
+    function createUser(){
+        const dialog=new frappe.ui.Dialog({title:'Create user',fields:[
+            {fieldname:'first_name',label:'First Name',fieldtype:'Data',reqd:1},
+            {fieldname:'last_name',label:'Last Name',fieldtype:'Data'},
+            {fieldname:'email',label:'Email',fieldtype:'Data',options:'Email',reqd:1},
+            {fieldname:'enabled',label:'Enable account',fieldtype:'Check',default:1},
+            {fieldtype:'HTML',options:'<p>Module permissions are chosen after creation. No administrator role is added. No invitation email is sent; the user can use Forgot Password after activation.</p>'}
+        ],primary_action_label:'Create user',primary_action:async(values)=>{
+            dialog.disable_primary_action();
+            try{const r=await frappe.call({method:'bsgroup.user_management.create_account',args:values,freeze:true});dialog.hide();await load();await show(r.message.name);frappe.show_alert({message:'User created. Review module permissions below.',indicator:'green'});}
+            catch(e){dialog.enable_primary_action();}
+        }});dialog.show();
+    }
     let debounce;search.on('input',()=>{clearTimeout(debounce);debounce=setTimeout(()=>{start=0;load();},250);});
-    state.add(kind).on('change',()=>{start=0;load();});refresh.on('click',()=>{load();if(selected)show(selected);});create.on('click',()=>editor('User'));
+    state.add(kind).on('change',()=>{start=0;load();});refresh.on('click',()=>{load();if(selected)show(selected);});create.on('click',createUser);
     load();
 };
