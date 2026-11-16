@@ -70,7 +70,12 @@
     try { previous=sessionStorage.getItem(key); } catch (_) {}
     const style=document.createElement('style');
     style.textContent='.bs-app-unrelated,.bs-dashboard-hidden{display:none!important}'+
-        '.bs-dashboard-category{margin:10px 0 5px}.bs-dashboard-category-title{font-weight:600;padding:5px 12px}'+
+        '.bs-dashboard-category{margin:10px 0 5px}.bs-dashboard-category-title{font-weight:600;padding:7px 12px;cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;border-radius:8px}'+
+        '.bs-dashboard-category-title::-webkit-details-marker{display:none}'+
+        '.bs-dashboard-category-title::after{content:"";width:6px;height:6px;border-right:1px solid currentColor;border-bottom:1px solid currentColor;transform:rotate(-45deg);margin:0 4px 0 10px}'+
+        '.bs-dashboard-category[open]>.bs-dashboard-category-title::after{transform:rotate(45deg)}'+
+        '.bs-dashboard-category-title:hover{background:rgba(128,160,210,.16)}'+
+        '.bs-dashboard-category-title:focus-visible{outline:2px solid #75aaff;outline-offset:1px}'+
         '.bs-dashboard-category .standard-sidebar-item{margin-left:12px}';
     document.head.append(style);
     function update() {
@@ -89,10 +94,16 @@
                     const destinations=mode==='projects'?{'BS Project':frappe.boot.bs_app_destinations?.['BS Project']}:frappe.boot.bs_app_destinations;
                     for(const item of dashboardLinks(destinations,frappe.boot.bs_project_support_links || [])) {
                         if(item.children) {
-                            const section=document.createElement('div'), heading=document.createElement('div');
+                            const section=document.createElement('details'), heading=document.createElement('summary');
                             section.className='bs-dashboard-category';
                             heading.className='bs-dashboard-category-title';
                             heading.textContent=__(item.label);
+                            const sectionKey=key+':section:'+item.label;
+                            section.open=true;
+                            try {section.open=sessionStorage.getItem(sectionKey)!=='closed';} catch (_) {}
+                            section.addEventListener('toggle',()=>{
+                                try {sessionStorage.setItem(sectionKey,section.open?'open':'closed');} catch (_) {}
+                            });
                             section.append(heading);
                             for(const child of item.children) {
                                 const row=document.createElement('div'), link=document.createElement('a');
