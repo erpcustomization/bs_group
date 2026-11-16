@@ -70,7 +70,7 @@
     }
     frappe.ui.form.on('Opportunity',{refresh(frm) {
         frm.remove_custom_button(__('Request Site Survey'));
-        if (!frm.is_new() && frm.doc.docstatus !== 2 && !['Lost','Closed'].includes(frm.doc.status)
+        if (frappe.session.user === 'mohan@bitssecureit.com' && !frm.is_new() && frm.doc.docstatus !== 2 && !['Lost','Closed'].includes(frm.doc.status)
             && !frm.doc.custom_site_survey_request && frm.perm?.some(p=>p.write)) {
             frm.add_custom_button(__('Request Site Survey'),()=>request(frm));
         }

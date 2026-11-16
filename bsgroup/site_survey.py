@@ -9,9 +9,15 @@ DEFERRED_FIELDS = ("presales_owner", "due_date", "priority", "solution_summary",
 FLAGS = ("custom_elv_site_survey_required", "custom_technical_site_survey_required")
 
 
+def require_late_survey_manager():
+    if frappe.session.user != "mohan@bitssecureit.com":
+        frappe.throw(_("Only Mohan can request a late site survey after Opportunity submission."), frappe.PermissionError)
+
+
 @frappe.whitelist(methods=["POST"])
 def request_supplementary_survey(opportunity, team, instructions, location, contact_name, contact_phone):
     """A late survey supplements the current work; it never restarts intake."""
+    require_late_survey_manager()
     doc = frappe.get_doc("Opportunity", opportunity, for_update=True)
     doc.check_permission("write")
     if doc.docstatus == 2 or doc.status in ("Lost", "Closed"):
@@ -176,6 +182,12 @@ def create_requests(doc, method=None):
     frappe.db.get_value("Opportunity", doc.name, "name", for_update=True)
     survey_name = frappe.db.get_value("Site Survey Request", {"opportunity": doc.name}, "name")
     if survey_needed and not survey_name:
+        # Cover ordinary Opportunity saves as well as the dedicated button.
+        # Initial intake is unaffected; late routing cannot be bypassed by API save.
+        if frappe.db.exists("Deal Cost Sheet", {"opportunity": doc.name, "docstatus": ["<", 2]}) or frappe.db.exists(
+                "Presales Request", {"opportunity": doc.name, "docstatus": ["<", 2], "status": ["!=", "Cancelled"]}):
+            require_late_survey_manager()
+            frappe.throw(_("Use Request Site Survey on the Opportunity to preserve the existing costing and presales work."))
         if cint(doc.get("custom_survey_step")) < 3:
             return
         survey = frappe.get_doc({"doctype": "Site Survey Request", "opportunity": doc.name,

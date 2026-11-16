@@ -27,11 +27,12 @@ class LateSurveyTests(TestCase):
             return self.opp if dt=='Opportunity' else self.pre
         def value(dt, *args, **kw):
             return 'PR-TEST' if dt=='Presales Request' else None
-        def fail(message):
-            raise ValueError(message)
+        def fail(message, exception=ValueError):
+            raise exception(message)
         self.frappe=SimpleNamespace(get_doc=Mock(side_effect=get_doc),
             db=SimpleNamespace(get_value=Mock(side_effect=value),set_value=Mock()),
-            get_all=Mock(return_value=[]),session=Row(user='sales@test'),throw=fail)
+            get_all=Mock(return_value=[]),session=Row(user='mohan@bitssecureit.com'),throw=fail,
+            PermissionError=PermissionError)
         tree=ast.parse((Path(__file__).resolve().parents[1]/'bsgroup/site_survey.py').read_text())
         tree.body=[n for n in tree.body if not isinstance(n,(ast.Import,ast.ImportFrom))]
         for n in tree.body:
@@ -82,6 +83,14 @@ class LateSurveyTests(TestCase):
         with self.assertRaises(PermissionError): self.env['request_supplementary_survey'](**self.args)
         self.frappe.db.get_value.assert_not_called()
         self.frappe.db.set_value.assert_not_called()
+
+    def test_non_mohan_cannot_call_late_request_even_with_write_access(self):
+        for user in ('sales@test','Administrator','presales@test'):
+            self.frappe.session.user=user
+            with self.assertRaises(PermissionError):
+                self.env['request_supplementary_survey'](**self.args)
+        self.frappe.get_doc.assert_not_called()
+        self.survey.insert.assert_not_called()
 
     def test_invalid_and_closed_requests_rejected(self):
         for key,value in [('team','bad'),('instructions',' '),('contact_phone','')]:
