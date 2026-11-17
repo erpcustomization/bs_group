@@ -152,7 +152,18 @@ frappe.pages['bs-user-management'].on_page_load = function(wrapper) {
                 input.on('change',()=>{const enabled=input.prop('checked');if(enabled===cell.managed)delete changes[key];else changes[key]=enabled;dirty=!!Object.keys(changes).length;review.prop('disabled',!dirty);});
             }
         }
-        $('<small>').text('Limited means access to some record types. Ownership, company restrictions, task assignments and approval conditions still apply. A disabled account cannot sign in.').appendTo(host);
+        const manager=(d.module_access||[]).find(row=>row.module==='Projects')?.cells?.manager;
+        if(manager){
+            const card=$('<div class="card project-manager-access">').appendTo(host);
+            const label=$('<label style="display:flex;gap:10px;align-items:center;font-weight:600">').appendTo(card);
+            const input=$('<input type="checkbox">').attr('aria-label',manager.label)
+                .prop({checked:manager.checked,disabled:!d.can_write||(!manager.editable&&!manager.managed)}).appendTo(label);
+            $('<span>').text(manager.label).appendTo(label);
+            $('<p class="muted">').text(manager.note).appendTo(card);
+            if(manager.reason)$('<small>').text(manager.reason).appendTo(card);
+            input.on('change',()=>{const enabled=input.prop('checked');if(enabled===manager.managed)delete changes['Projects.manager'];else changes['Projects.manager']=enabled;dirty=!!Object.keys(changes).length;review.prop('disabled',!dirty);});
+        }
+        $('<small>').text('Limited means access to some record types. Existing restrictions apply except for the explicitly reviewed all-projects manager grant above. A disabled account cannot sign in.').appendTo(host);
         const footer=$('<div class="actions">').appendTo(host);
         const review=button(footer,'Preview changes',async()=>{
             review.prop('disabled',true);

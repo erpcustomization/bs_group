@@ -4,6 +4,11 @@ import json
 import frappe
 
 FIELD = "custom_bs_module_grants"
+PROJECT_MANAGER_LABEL = "BS Project Manager — All Projects & AMCs"
+PROJECT_MANAGER_ROLES = {"BS Projects Manager", "Projects User", "BS Project Support Viewer"}
+PROJECT_MANAGER_NOTE = ("Manage all projects and AMCs in this site, including plans, tasks, assignments, "
+    "timesheets and project requests. This expands assignment-only project access. "
+    "Existing financial and labour approval controls remain unchanged; this does not grant System Manager access.")
 MODULES = {
     "Sales": {"records": ("Lead", "Opportunity", "Deal Cost Sheet", "Quotation"), "edit": ("Sales User",)},
     "Projects": {"records": ("Project", "Task", "Timesheet", "Delivery Request", "Labor Preapproval"), "edit": ("Projects User",), "approve": ("Projects Manager",)},
@@ -130,6 +135,11 @@ def context_for(doc):
 
 
 def grant_roles(module, action, context):
+    if module == 'Projects' and action == 'manager':
+        # Include native workflow/navigation companion roles in the preview;
+        # the User hooks must not add unreviewed roles after Save.
+        return PROJECT_MANAGER_ROLES.copy() if all(frappe.db.exists('Role', {'name':r,'disabled':0})
+            for r in PROJECT_MANAGER_ROLES) else set()
     if action == 'view':
         return {viewer(module)}
     candidates = MODULES[module].get(action,())
@@ -177,6 +187,20 @@ def summarize(doc, context, roles=None):
             row['cells'][action]=dict(status=status, managed=managed, inherited=inherited_full,
                 checked=managed or inherited_full or status in ('Available','Eligible requests'), partial=status=='Limited' and not managed,
                 editable=not bool(reason), reason=reason, note=note)
+        if module == 'Projects':
+            inherited = 'BS Projects Manager' in context['base'] | context['implicit']
+            checked = 'BS Projects Manager' in roles
+            managed = bool(grants.get('Projects.manager')) and set(grants['Projects.manager']) <= roles
+            reason = blocked_reason(doc, roles, 'Project Manager')
+            if not reason and not doc.get('enabled', 1):
+                reason = 'Enable this ERP account before adding all-projects manager access.'
+            if not reason and inherited:
+                reason = 'Included in existing access; protected from removal here.'
+            if not reason and not grant_roles(module, 'manager', context):
+                reason = 'The project manager role setup is incomplete. Ask a System Manager to review it.'
+            row['cells']['manager'] = dict(label=PROJECT_MANAGER_LABEL, checked=checked,
+                managed=managed, inherited=inherited, editable=not bool(reason), reason=reason,
+                note=PROJECT_MANAGER_NOTE, status='Granted' if checked else 'Not granted')
         result.append(row)
     return result
 
@@ -194,7 +218,9 @@ def plan(doc, changes):
     grants={k:list(v) for k,v in context['state'].get('grants',{}).items() if isinstance(v,list) and set(v)<=context['assigned']}
     for key,enabled in changes.items():
         parts=key.split('.')
-        if len(parts)!=2 or parts[0] not in MODULES or parts[1] not in ('view','edit','approve') or type(enabled) is not bool:
+        if (len(parts)!=2 or parts[0] not in MODULES
+                or parts[1] not in (('view','edit','approve','manager') if parts[0]=='Projects' else ('view','edit','approve'))
+                or type(enabled) is not bool):
             frappe.throw('Choose valid module permissions.')
         module,action=parts
         cell=rows[module]['cells'][action]
@@ -209,6 +235,13 @@ def plan(doc, changes):
             grants.pop(key,None)
     needed={role for values in grants.values() for role in values}
     after=context['base'] | needed
+    # Match the existing User navigation hook before hashing the preview.
+    # Retain supporting access when another project grant still needs it.
+    from bsgroup.project_support_access import TECHNICAL_ROLES, ROLE as support_role
+    if doc.get('enabled', 1) and doc.user_type == 'System User' and after & TECHNICAL_ROLES:
+        after.add(support_role)
+    elif support_role not in context['base']:
+        after.discard(support_role)
     from bsgroup.user_management import delegated, PROTECTED_ROLES
     if delegated() and (after - context['assigned']) & PROTECTED_ROLES:
         frappe.throw('Administrator and approval-owner roles cannot be granted from this console.')
@@ -229,9 +262,10 @@ def plan(doc, changes):
         policy=dict(fixed_sales=context['fixed_sales'],approval_roles={m:sorted(v) for m,v in context['approval_roles'].items()}),
         rules=sorted(context['rules'],key=lambda r:json.dumps(r,sort_keys=True,default=str)))
     token=hashlib.sha256(json.dumps(payload,sort_keys=True,default=str).encode()).hexdigest()
-    public=dict(token=token,changes=[dict(module=k.split('.')[0],permission=k.split('.')[1].title(),enabled=v) for k,v in changes.items()],
+    public=dict(token=token,changes=[dict(module=k.split('.')[0],permission=(PROJECT_MANAGER_LABEL if k=='Projects.manager' else k.split('.')[1].title()),enabled=v) for k,v in changes.items()],
         impact=impact,has_changes=bool(changes) and (after!=context['assigned'] or payload['state']!=context['state']),
-        note='Existing roles, assigned records and approval policies are preserved. The listed record permissions are the complete role-grant changes, including any effects outside the selected module.')
+        note=('Existing roles, assigned records and approval policies are preserved. The listed record permissions are the complete role-grant changes, including any effects outside the selected module.'
+              + (' ' + PROJECT_MANAGER_NOTE if 'Projects.manager' in changes else '')))
     return payload,public,context
 
 

@@ -19,6 +19,9 @@ class ModuleAccessTests(unittest.TestCase):
         self.manager.check_target.side_effect=lambda doc:doc.check_permission('write')
         sys.modules['bsgroup.user_management']=self.manager
         sys.modules['frappe']=self.f
+        spec=importlib.util.spec_from_file_location('bsgroup.project_support_access',Path(__file__).parents[1]/'bsgroup/project_support_access.py')
+        support=importlib.util.module_from_spec(spec);spec.loader.exec_module(support)
+        sys.modules['bsgroup.project_support_access']=support
         spec=importlib.util.spec_from_file_location('module_access',Path(__file__).parents[1]/'bsgroup/user_module_access.py')
         self.m=importlib.util.module_from_spec(spec);spec.loader.exec_module(self.m)
         self.doc=Doc(name='person@example.com',modified='v1',user_type='System User',roles=[Doc(role='Employee')],check_permission=MagicMock(),save=MagicMock(),add_comment=MagicMock())
@@ -31,10 +34,10 @@ class ModuleAccessTests(unittest.TestCase):
 
     def test_preview_is_read_only_and_preserves_inherited_roles(self):
         payload,public,_=self.m.plan(self.doc,{'Projects.edit':True})
-        self.assertEqual(set(payload['roles']),{'Employee','Projects User'})
+        self.assertEqual(set(payload['roles']),{'Employee','Projects User','BS Project Support Viewer'})
         self.assertTrue(public['has_changes']);self.assertTrue(public['impact'])
         self.doc.save.assert_not_called();self.f.db.set_value.assert_not_called()
-        self.assertEqual(payload['state']['owned_roles'],['Projects User'])
+        self.assertEqual(payload['state']['owned_roles'],['BS Project Support Viewer','Projects User'])
 
     def test_empty_preview_is_not_a_change(self):
         self.assertFalse(self.m.plan(self.doc,{})[1]['has_changes'])
@@ -95,8 +98,8 @@ class ModuleAccessTests(unittest.TestCase):
         changes={'Projects.edit':True};token=self.m.plan(self.doc,changes)[1]['token']
         self.m.save(self.doc.name,'v1',changes,token)
         self.doc.save.assert_called_once_with()
-        self.assertEqual({r['role'] for r in self.doc.roles},{'Employee','Projects User'})
-        self.assertEqual(json.loads(self.doc[self.m.FIELD])['owned_roles'],['Projects User'])
+        self.assertEqual({r['role'] for r in self.doc.roles},{'Employee','Projects User','BS Project Support Viewer'})
+        self.assertEqual(json.loads(self.doc[self.m.FIELD])['owned_roles'],['BS Project Support Viewer','Projects User'])
 
     def test_load_target_requires_manager_write_and_fresh_version(self):
         manager=self.manager
@@ -116,5 +119,89 @@ class ModuleAccessTests(unittest.TestCase):
         self.f.db.get_value.return_value=json.dumps({'grants':{'Projects.edit':['Projects User'],'Procurement.edit':['Purchase User']}})
         self.assertIn('Project',self.m.granted_screens('person@example.com'))
         self.assertNotIn('Purchase Order',self.m.granted_screens('person@example.com'))
+
+    def test_delegate_can_preview_project_manager_with_full_scope_and_companions(self):
+        self.manager.delegated.return_value=True
+        self.rules.extend([dict(parent='Project',role='BS Projects Manager',read=1,write=1,create=1),
+                           dict(parent='User',role='BS Projects Manager',select=1)])
+        payload,public,_=self.m.plan(self.doc,{'Projects.manager':True})
+        self.assertEqual(set(payload['roles']),{'Employee'}|self.m.PROJECT_MANAGER_ROLES)
+        self.assertEqual(set(payload['state']['owned_roles']),self.m.PROJECT_MANAGER_ROLES)
+        self.assertIn('all projects and AMCs',public['note'])
+        self.assertIn('assignment-only',public['note'])
+        self.assertEqual(public['changes'][0]['permission'],self.m.PROJECT_MANAGER_LABEL)
+        self.doc.save.assert_not_called()
+        self.assertNotIn('Projects Manager',payload['roles'])
+        self.assertNotIn('System Manager',payload['roles'])
+
+    def test_delegate_manager_save_matches_actual_user_hooks(self):
+        self.manager.delegated.return_value=True
+        self.m.load_target=lambda *a:self.doc;self.m.ensure_viewers=MagicMock()
+        self.doc['meta']=Doc(has_field=lambda name:True)
+        def save_with_hooks(doc):
+            for name in ('project_manager_access','project_support_access'):
+                spec=importlib.util.spec_from_file_location(name,Path(__file__).parents[1]/('bsgroup/'+name+'.py'))
+                module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+                module.sync_user(doc)
+            doc.save()
+        self.doc['enabled']=1
+        self.manager.save_target.side_effect=save_with_hooks
+        change={'Projects.manager':True}
+        self.m.save(self.doc.name,'v1',change,self.m.plan(self.doc,change)[1]['token'])
+        self.assertEqual({r.role for r in self.doc.roles},{'Employee'}|self.m.PROJECT_MANAGER_ROLES)
+        self.doc.save.assert_called_once()
+        state=json.loads(self.doc[self.m.FIELD])
+        self.context.update(assigned={'Employee'}|self.m.PROJECT_MANAGER_ROLES,state=state,owned=self.m.PROJECT_MANAGER_ROLES)
+        self.assertFalse(self.m.plan(self.doc,change)[1]['has_changes'])
+        change={'Projects.manager':False}
+        self.m.save(self.doc.name,'v1',change,self.m.plan(self.doc,change)[1]['token'])
+        self.assertEqual({r.role for r in self.doc.roles},{'Employee'})
+
+    def test_manager_removal_retains_existing_and_shared_roles(self):
+        roles=self.m.PROJECT_MANAGER_ROLES
+        self.context.update(assigned={'Employee'}|roles,base={'Employee','Projects User'},
+            state={'grants':{'Projects.manager':sorted(roles),'Projects.view':['BS Console Projects View']},
+                   'owned_roles':sorted(roles-{'Projects User'})})
+        self.context['assigned'].add('BS Console Projects View')
+        after=self.m.plan(self.doc,{'Projects.manager':False})[0]
+        self.assertEqual(set(after['roles']),{'Employee','Projects User','BS Console Projects View','BS Project Support Viewer'})
+
+    def test_preexisting_manager_is_protected(self):
+        self.context['assigned'].add('BS Projects Manager');self.context['base'].add('BS Projects Manager')
+        row=next(r for r in self.m.summarize(self.doc,self.context) if r['module']=='Projects')
+        self.assertTrue(row['cells']['manager']['checked'])
+        self.assertFalse(row['cells']['manager']['editable'])
+        self.assertIn('BS Projects Manager',self.m.plan(self.doc,{'Projects.manager':False})[0]['roles'])
+
+    def test_manager_requires_complete_roles_and_fresh_preview(self):
+        self.f.db.exists.side_effect=lambda dt,filters: not (dt=='Role' and isinstance(filters,dict) and filters.get('name')=='BS Projects Manager')
+        with self.assertRaisesRegex(ValueError,'incomplete'):self.m.plan(self.doc,{'Projects.manager':True})
+        self.f.db.exists.side_effect=None
+        self.m.load_target=lambda *a:self.doc
+        token=self.m.plan(self.doc,{'Projects.manager':True})[1]['token']
+        self.rules.append(dict(parent='Project',role='BS Projects Manager',delete=1))
+        with self.assertRaisesRegex(ValueError,'preview'):self.m.save(self.doc.name,'v1',{'Projects.manager':True},token)
+        self.doc.save.assert_not_called()
+
+    def test_delegate_rejects_tampered_manager_admin_permissions(self):
+        self.manager.delegated.return_value=True
+        self.rules.append(dict(parent='User',role='BS Projects Manager',write=1))
+        with self.assertRaisesRegex(ValueError,'administration'):self.m.plan(self.doc,{'Projects.manager':True})
+
+    def test_manager_option_not_accepted_on_other_modules_or_profiles(self):
+        with self.assertRaises(ValueError):self.m.plan(self.doc,{'Sales.manager':True})
+        self.doc['role_profile_name']='Protected profile'
+        with self.assertRaisesRegex(ValueError,'profile'):self.m.plan(self.doc,{'Projects.manager':True})
+
+    def test_manager_keeps_sales_scope_and_other_permissions(self):
+        self.context['assigned'].update({'BS Scoped Sales','Purchase User'})
+        self.context['base'].update({'BS Scoped Sales','Purchase User'})
+        after=self.m.plan(self.doc,{'Projects.manager':True})[0]
+        self.assertTrue({'Employee','BS Scoped Sales','Purchase User'}<=set(after['roles']))
+        self.assertEqual(set(after['roles'])-self.context['assigned'],self.m.PROJECT_MANAGER_ROLES)
+
+    def test_disabled_account_cannot_receive_new_manager_grant(self):
+        self.doc['enabled']=0
+        with self.assertRaisesRegex(ValueError,'Enable'):self.m.plan(self.doc,{'Projects.manager':True})
 
 if __name__=='__main__':unittest.main()
