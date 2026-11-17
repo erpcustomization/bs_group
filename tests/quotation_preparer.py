@@ -55,5 +55,20 @@ class SignatureTests(unittest.TestCase):
     def test_unknown_layout_untouched(self):
         self.assertEqual(self.m.patch_html('<p>Other format</p>'), '<p>Other format</p>')
 
+    def test_signature_switches_user_and_escapes_profile_text(self):
+        from jinja2 import Environment
+        template = Environment().from_string(self.m.SIGNATURE)
+        paul = template.render(doc=dict(company='UAE'), quotation_preparer=self.m.quotation_preparer)
+        self.f.session.user = 'sanisha@example.com'
+        self.f.get_doc.return_value = dict(full_name='Sanisha <Sales>', email='sanisha@example.com', phone='456')
+        self.f.db.get_value.return_value = dict(designation='Sales Executive')
+        sanisha = template.render(doc=dict(company='UAE'), quotation_preparer=self.m.quotation_preparer)
+        self.assertIn('Paul', paul)
+        self.assertNotIn('Paul', sanisha)
+        self.assertIn('Sanisha &lt;Sales&gt;', sanisha)
+        self.assertIn('Sales Executive', sanisha)
+        self.assertIn('sanisha@example.com', sanisha)
+        self.assertIn('456', sanisha)
+
 if __name__ == '__main__':
     unittest.main()
