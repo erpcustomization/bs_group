@@ -22,7 +22,8 @@ def allowed_screens(user=None):
     if not mode:
         return None
     from bsgroup.user_module_access import granted_screens
-    return tuple(dict.fromkeys((*SCREENS[mode], *sorted(granted_screens(user)))))
+    from bsgroup.project_manager_access import enabled, SCREENS as project_screens
+    return tuple(dict.fromkeys((*SCREENS[mode], *sorted(granted_screens(user)), *(project_screens if enabled(user) else ()))))
 
 
 def own(alias, field, user):
@@ -31,6 +32,9 @@ def own(alias, field, user):
 
 
 def condition(doctype, user):
+    from bsgroup.project_manager_access import enabled, SCREENS as project_screens
+    if doctype in project_screens and enabled(user):
+        return None
     # Desk User has an inherited Lead-create grant. Respect the explicit CRM
     # block on the shared Help Desk login before any native/owner fallback.
     if user == "helpdesk@bitssecureit.com" and doctype in (

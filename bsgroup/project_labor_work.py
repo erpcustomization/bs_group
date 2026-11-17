@@ -152,7 +152,7 @@ def expense_rows(project):
     from bsgroup.project_expenses import manager_for
     manager, _problem = manager_for(project)
     filters = {'project':project.name}
-    if manager != frappe.session.user and not set(frappe.get_roles()) & {'System Manager','Accounts Manager','Accounts User','HR Manager'}:
+    if manager != frappe.session.user and not set(frappe.get_roles()) & {'System Manager','Accounts Manager','Accounts User','HR Manager','BS Projects Manager'}:
         filters['recorded_by'] = frappe.session.user
     return frappe.get_all(DT, filters=filters, fields=['name','task','work_date','persons','skill',
         'rate','amount','currency','recorded_by','work_done','labor_preapproval'], order_by='work_date desc', limit_page_length=100)

@@ -301,6 +301,8 @@ def validate_presales(doc, method=None):
 
 
 def survey_query(user=None):
+    if "BS Projects Manager" in frappe.get_roles(user or frappe.session.user):
+        return ""
     user = user or frappe.session.user
     if user == "Administrator" or set(frappe.get_roles(user)) & {"System Manager", "Projects Manager", "Presales", "Sales Manager"}:
         return ""
@@ -320,6 +322,8 @@ def presales_query(user=None):
 
 
 def survey_permission(doc, user=None, permission_type=None, ptype=None):
+    if "BS Projects Manager" in frappe.get_roles(user or frappe.session.user):
+        return None
     user = user or frappe.session.user
     if user == "Administrator" or set(frappe.get_roles(user)) & {"System Manager", "Projects Manager", "Presales", "Sales Manager"}:
         return None

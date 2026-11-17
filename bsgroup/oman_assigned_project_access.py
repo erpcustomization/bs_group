@@ -9,6 +9,8 @@ READER_ROLE = 'BS Assigned Project Reader'
 
 def restricted(user=None):
     from bsgroup.hr_email import is_oman
+    if "BS Projects Manager" in frappe.get_roles(user or frappe.session.user):
+        return False
     return is_oman() and (user or frappe.session.user) == 'amar@bitssecureit.com'
 
 

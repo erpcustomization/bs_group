@@ -55,7 +55,7 @@ def screens():
         ({'Sales User', 'Sales Manager', 'Sales Master Manager'},
          ['Lead', 'Opportunity', 'Deal Cost Sheet', 'Quotation']),
         ({'Presales'}, ['Presales Request', 'Deal Cost Sheet', 'Quotation']),
-        ({'Projects User', 'Projects Manager'},
+        ({'Projects User', 'Projects Manager', 'BS Projects Manager'},
          ['Project', 'Task', 'Timesheet', 'Tech Task Scheduler', 'Site Survey Request']),
         ({'Purchase User', 'Purchase Manager'},
          ['Material Request', 'Purchase Order', 'Purchase Receipt']),

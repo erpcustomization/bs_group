@@ -51,6 +51,12 @@ class ProjectPlanTests(unittest.TestCase):
 
     def tearDown(self):self.patch.stop()
 
+    def test_site_project_manager_can_manage_unassigned_task(self):
+        self.f.get_roles.return_value=['BS Projects Manager']
+        self.assertTrue(self.plan._status_actor(self.project,self.task))
+        self.f.get_roles.return_value=[]
+        self.assertFalse(self.plan._status_actor(self.project,self.task))
+
     def test_oman_picker_and_save_allow_employee_before_task_access(self):
         access=types.ModuleType('bsgroup.oman_assigned_project_access')
         access.applies=Mock(return_value=True)

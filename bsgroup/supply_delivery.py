@@ -44,6 +44,8 @@ def assignees(task):
 
 
 def manager(project, user):
+    if "BS Projects Manager" in frappe.get_roles(user or frappe.session.user):
+        return True
     if user == "Administrator" or user == "mohan@bitssecureit.com":
         return True
     employee = frappe.db.get_value("Project", project, "custom_project_manager")
@@ -64,6 +66,8 @@ def permission(doc, user=None, permission_type=None, **kwargs):
 
 def query(user=None):
     user = user or frappe.session.user
+    if "BS Projects Manager" in frappe.get_roles(user or frappe.session.user):
+        return ""
     if user in ("Administrator", "mohan@bitssecureit.com"):
         return ""
     u = frappe.db.escape(user)

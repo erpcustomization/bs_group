@@ -3,6 +3,7 @@ import frappe
 
 ROLE = "BS Project Support Viewer"
 TECHNICAL_ROLES = {
+    "BS Projects Manager",
     "Projects User", "Projects Manager", "Project Manager", "Project Engineer",
     "Technical Engineer", "Technician", "BS Assigned Project Reader", "BS Project Full Access",
 }

@@ -149,7 +149,7 @@ def get_plan(project):
         row["can_edit"] = can_edit and _editable(row)
         item = frappe.get_doc("Task", row.name)
         row["can_edit"] = row["can_edit"] and frappe.has_permission("Task", "write", doc=item)
-        row["can_log_work"] = doc.status != "Cancelled" and row.status not in {"Cancelled", "Template"} and _is_assigned(item, closed=True)
+        row["can_log_work"] = doc.status != "Cancelled" and row.status not in {"Cancelled", "Template"} and (_is_assigned(item, closed=True) or _status_manager(doc))
         from bsgroup.project_daily_work import timesheets_enabled, TERMINAL
         if timesheets_enabled() and (row.status in TERMINAL or doc.status == "Completed"):
             row["can_log_work"] = False
@@ -175,6 +175,8 @@ def get_plan(project):
 
 
 def _status_manager(project):
+    if "BS Projects Manager" in frappe.get_roles():
+        return True
     if frappe.session.user == "mohan@bitssecureit.com":
         return True
     manager = project.get("custom_project_manager")
@@ -214,8 +216,8 @@ def work_history(project, task):
 @frappe.whitelist(methods=["POST"])
 def save_work(project, task, work, request_id=None, labor=None):
     doc, item = _read_task(project, task, lock=True)
-    if doc.status == "Cancelled" or item.status in {"Cancelled", "Template"} or not _is_assigned(item, closed=True):
-        frappe.throw(_("Only users assigned to this task can enter today's work."), frappe.PermissionError)
+    if doc.status == "Cancelled" or item.status in {"Cancelled", "Template"} or not (_is_assigned(item, closed=True) or _status_manager(doc)):
+        frappe.throw(_("Only assigned users or project managers can enter today's work."), frappe.PermissionError)
     text = (work or "").strip()
     if not text or len(text) > 20000:
         frappe.throw(_("Enter the work completed today (up to 20,000 characters)."))

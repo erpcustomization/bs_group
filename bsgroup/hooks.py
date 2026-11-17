@@ -807,6 +807,8 @@ permission_query_conditions["Tech Task Scheduler"] = "bsgroup.project_support_ac
 has_permission["Tech Task Scheduler"] = "bsgroup.project_support_access.scheduler_permission"
 
 after_migrate.append("bsgroup.weekly_commercial_email.install")
+after_migrate.append("bsgroup.project_manager_access.install")
+doc_events["User"]["before_validate"].insert(0, "bsgroup.project_manager_access.sync_user")
 
 doctype_list_js["Employee Checkin"] = "public/js/employee_checkin_shift.js"
 scheduler_events.setdefault("cron", {}).setdefault("*/5 10-11 * * 1", []).append("bsgroup.weekly_commercial_email.send_reports")
