@@ -38,11 +38,13 @@ def reconcile_pending():
             continue
         q = frappe.get_doc("Quotation", sheet.custom_quotation, for_update=True)
         request = frappe.get_doc("Presales Request", sheet.presales_request, for_update=True)
-        if (q.docstatus != 0 or q.custom_pipeline_stage in ("Won", "Lost", QUOTE_REWORK)
+        if (q.docstatus != 0 or q.custom_pipeline_stage in ("Won", "Lost")
                 or q.custom_deal_cost_sheet != sheet.name or quotation_deal_identity(sheet, q)
                 or request.docstatus == 2 or request.status != REWORK
                 or request.custom_deal_cost_sheet != sheet.name or not _same_deal(sheet, request)):
             continue
+        from bsgroup.dcs.revision_source_access import ensure_source_read
+        ensure_source_read(sheet, q, request)
         record(sheet, request, "QUOTATION_PRESALES_REWORK_DISPLAY_REPAIRED",
                [(q, dict(custom_pipeline_stage=QUOTE_REWORK))])
 
@@ -112,6 +114,8 @@ def _begin(quotation, presales, expected_modified):
             frappe.throw("This revision is already with Presales. Complete the existing rework before starting another revision.")
         return result
     request = linked_presales(sheet)
+    from bsgroup.dcs.revision_source_access import ensure_source_read
+    ensure_source_read(sheet, q, request)
     # Scoped Sales cannot open Presales documents. Their write access to this
     # quotation AND DCS authorises this one identity-checked handoff, not general
     # Presales read/write access. No request content is returned to the caller.
