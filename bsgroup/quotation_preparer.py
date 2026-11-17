@@ -1,5 +1,6 @@
 """Use the authenticated PDF preparer's business profile, never the offer owner."""
 import re
+import json
 
 import frappe
 
@@ -35,7 +36,7 @@ def patch_html(html):
     if "BS quotation converter signature v1" in html:
         return html
     # Cover-page signatures in the deployed regional Proposal formats.
-    proposal = r'(<div class="cover-closing"[^>]*>With Regards,</div>).*?(?=\n\s*</div>\s*\n\s*\{\{ footer\(\) \}\})'
+    proposal = r'(<div class="cover-closing"[^>]*>With Regards,</div>).*?(?=\s*</div>\s*(?:\{\{ footer\(\) \}\}\s*)?</div>)'
     if re.search(proposal, html, flags=re.S):
         return re.sub(proposal, lambda m: m.group(1) + "\n" + SIGNATURE, html, count=1, flags=re.S)
     # Enterprise layouts keep their independent authorised-signatory block;
@@ -47,11 +48,29 @@ def patch_html(html):
     return html
 
 
+def patch_format_data(value):
+    if not value:
+        return value
+    rows = json.loads(value)
+    changed = False
+    if isinstance(rows, list):
+        for row in rows:
+            if isinstance(row, dict) and row.get("fieldtype") in ("HTML", "Custom HTML"):
+                original = row.get("options") or ""
+                updated = patch_html(original)
+                if updated != original:
+                    row["options"] = updated
+                    changed = True
+    return json.dumps(rows, ensure_ascii=False) if changed else value
+
+
 def install():
     for name in frappe.get_all("Print Format", filters={"doc_type": "Quotation"}, pluck="name"):
         fmt = frappe.get_doc("Print Format", name)
         updated = patch_html(fmt.html)
-        if updated != (fmt.html or ""):
+        data = patch_format_data(fmt.get("format_data"))
+        if updated != (fmt.html or "") or data != fmt.get("format_data"):
             fmt.html = updated
+            fmt.format_data = data
             fmt.save(ignore_permissions=True)
 

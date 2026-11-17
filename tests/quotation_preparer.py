@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import sys
 import unittest
@@ -33,7 +34,7 @@ class SignatureTests(unittest.TestCase):
         self.assertEqual(result['name'], 'Paul')
 
     def test_regional_proposal_replacement_idempotent(self):
-        old = '<div><div class="cover-closing">With Regards,</div>\n<p class="sig-name">{{ doc.owner_name or "Gopinath Sundaram" }}</p>\n<p>{{ doc.owner_title }}</p>\n</div>\n{{ footer() }}'
+        old = '<div><div class="cover-closing">With Regards,</div>\n<p class="sig-name">{{ doc.owner_name or "Gopinath Sundaram" }}</p>\n<p>{{ doc.owner_title }}</p>\n</div>\n{{ footer() }}\n</div>'
         new = self.m.patch_html(old)
         self.assertNotIn('Gopinath', new)
         self.assertNotIn('doc.owner', new)
@@ -54,6 +55,17 @@ class SignatureTests(unittest.TestCase):
 
     def test_unknown_layout_untouched(self):
         self.assertEqual(self.m.patch_html('<p>Other format</p>'), '<p>Other format</p>')
+
+    def test_builder_signature_and_layout_preserved(self):
+        old = '<div><div class="cover-closing" style="margin-top:30px">With Regards,</div>\n{% set signatory = "Raj" %}\n<p class="sig-name">{{ signatory }}</p>\n{% if sales_phone %}<p>{{ sales_phone }}</p>{% endif %}\n</div>\n</div>\n<table>Items unchanged</table>'
+        data = json.dumps([dict(fieldtype='Section Break'),dict(fieldtype='HTML', options=old)])
+        updated = self.m.patch_format_data(data)
+        rows = json.loads(updated)
+        self.assertEqual(rows[0], dict(fieldtype='Section Break'))
+        self.assertIn('<table>Items unchanged</table>', rows[1]['options'])
+        self.assertNotIn('sales_phone', rows[1]['options'])
+        self.assertNotIn('"Raj"', rows[1]['options'])
+        self.assertEqual(self.m.patch_format_data(updated), updated)
 
     def test_signature_switches_user_and_escapes_profile_text(self):
         from jinja2 import Environment
