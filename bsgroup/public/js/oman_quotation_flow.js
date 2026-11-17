@@ -18,10 +18,9 @@
                         args:{quotation:frm.doc.name,presales:values.presales,expected_modified:frm.doc.modified},freeze:true})).message;
                     if (!result?.dcs) return;
                     dialog.hide();
-                    await frappe.set_route('Form','Deal Cost Sheet',result.dcs);
-                    frappe.show_alert({message: values.presales === 'Yes'
-                        ? __('Costing sheet: To be revised. Presales Request: Rework.')
-                        : __('Use Revise BOQ to update the costing sheet and this same quotation.'), indicator:'blue'},10);
+                    // Reload the linked record from the server. SPA navigation can reuse
+                    // a cached DCS and workspace routing can leave the old quotation open.
+                    window.location.assign('/desk/bs-group/deal-cost-sheet/' + encodeURIComponent(result.dcs));
                 } finally { dialog.__saving = false; }
             }
         });

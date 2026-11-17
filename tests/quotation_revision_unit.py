@@ -55,9 +55,10 @@ class RevisionTests(unittest.TestCase):
         self.assertEqual(self.d.custom_deal_status,'To be revised')
         self.assertEqual(self.p.status,'Rework')
         self.assertEqual(self.d.docstatus,1)
-        self.assertEqual(self.q,self.original['Quotation','Q-1'])
+        self.assertEqual(self.q.custom_pipeline_stage,'Rework Required')
+        self.assertEqual(self.q.name,'Q-1')
         self.begin()
-        self.assertEqual(frappe.db.set_value.call_count,2)
+        self.assertEqual(frappe.db.set_value.call_count,3)
         self.assertEqual(self.event.call_count,1)
         self.assertIn('write',self.d._permissions)
         self.assertFalse(self.p.get('_permissions'))
@@ -66,11 +67,39 @@ class RevisionTests(unittest.TestCase):
         self.assertEqual(self.begin('No')['dcs'],'D-1')
         frappe.db.set_value.assert_not_called()
 
+    def test_pending_display_repair_is_idempotent(self):
+        self.d.custom_deal_status='To be revised'
+        self.d.custom_presales_status='Rework'; self.p.status='Rework'
+        with patch.object(frappe,'get_all',return_value=['D-1']):
+            revision.reconcile_pending(); revision.reconcile_pending()
+        self.assertEqual(self.q.custom_pipeline_stage,'Rework Required')
+        self.assertEqual(frappe.db.set_value.call_count,1)
+
+    def test_pending_display_repair_preserves_terminal_quote(self):
+        self.q.custom_pipeline_stage='Won'
+        with patch.object(frappe,'get_all',return_value=['D-1']):
+            revision.reconcile_pending()
+        frappe.db.set_value.assert_not_called()
+
     def test_yes_then_successful_boq_completion_returns_to_sales(self):
         self.begin(); revision.finish(self.d)
         self.assertEqual(self.d.custom_deal_status,'Submitted to Sales')
         self.assertEqual(self.p.status,'Submitted to Sales')
+        self.assertEqual(self.q.custom_pipeline_stage,'Draft')
+        self.assertEqual(self.q.name,'Q-1')
         self.assertEqual(self.event.call_count,2)
+
+    def test_costing_only_save_does_not_complete_presales_rework(self):
+        self.begin(); revision.finish(self.d, quotation_updated=False)
+        self.assertEqual(self.d.custom_deal_status,'To be revised')
+        self.assertEqual(self.p.status,'Rework')
+        self.assertEqual(self.q.custom_pipeline_stage,'Rework Required')
+
+    def test_completion_rejects_changed_quotation_link(self):
+        self.begin(); self.q.custom_deal_cost_sheet='OTHER'
+        with self.assertRaisesRegex(ValidationError,'same linked Draft'):
+            revision.finish(self.d)
+        self.assertEqual(self.p.status,'Rework')
 
     def test_missing_request_does_not_silently_create_one(self):
         self.d.presales_request=None
@@ -113,6 +142,7 @@ class RevisionTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'audit failure'):self.begin()
         self.assertEqual(self.d.custom_deal_status,'Quoted')
         self.assertEqual(self.p.status,'Submitted to Sales')
+        self.assertEqual(self.q.custom_pipeline_stage,'Sent')
         frappe.db.rollback.assert_called_once()
 
 

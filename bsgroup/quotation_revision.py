@@ -6,6 +6,7 @@ from bsgroup.dcs.governance import make_request_key, record_governance_event
 
 REVISION = "To be revised"
 REWORK = "Rework"
+QUOTE_REWORK = "Rework Required"
 
 
 def install():
@@ -16,10 +17,34 @@ def install():
         return
     from frappe.custom.doctype.property_setter.property_setter import make_property_setter
     for doctype, field, status in (("Presales Request", "status", REWORK),
-                                  ("Deal Cost Sheet", "custom_deal_status", REVISION)):
+                                  ("Deal Cost Sheet", "custom_deal_status", REVISION),
+                                  ("Quotation", "custom_pipeline_stage", QUOTE_REWORK)):
         options = (frappe.get_meta(doctype).get_field(field).options or "").splitlines()
         if status not in options:
             make_property_setter(doctype, field, "options", "\n".join(options + [status]), "Text")
+    reconcile_pending()
+
+
+def reconcile_pending():
+    """Repair display state for existing, identity-checked presales handoffs."""
+    from bsgroup.bs_group.doctype.deal_cost_sheet.deal_cost_sheet import quotation_deal_identity
+    for name in frappe.get_all("Deal Cost Sheet", filters={"docstatus": 1,
+            "custom_deal_status": REVISION, "custom_presales_status": REWORK}, pluck="name"):
+        sheet = frappe.get_doc("Deal Cost Sheet", name, for_update=True)
+        if (not sheet.custom_quotation or not sheet.presales_request
+                or sheet.custom_record_authority == "Superseded"
+                or sheet.custom_award_state == "Awarded"
+                or sheet.custom_delivery_release_state in ("Released", "Released with MD Override")):
+            continue
+        q = frappe.get_doc("Quotation", sheet.custom_quotation, for_update=True)
+        request = frappe.get_doc("Presales Request", sheet.presales_request, for_update=True)
+        if (q.docstatus != 0 or q.custom_pipeline_stage in ("Won", "Lost", QUOTE_REWORK)
+                or q.custom_deal_cost_sheet != sheet.name or quotation_deal_identity(sheet, q)
+                or request.docstatus == 2 or request.status != REWORK
+                or request.custom_deal_cost_sheet != sheet.name or not _same_deal(sheet, request)):
+            continue
+        record(sheet, request, "QUOTATION_PRESALES_REWORK_DISPLAY_REPAIRED",
+               [(q, dict(custom_pipeline_stage=QUOTE_REWORK))])
 
 
 def linked_presales(sheet):
@@ -93,6 +118,7 @@ def _begin(quotation, presales, expected_modified):
     record(sheet, request, "QUOTATION_PRESALES_REWORK_REQUESTED", [
         (sheet, dict(custom_deal_status=REVISION, custom_presales_status=REWORK)),
         (request, dict(status=REWORK)),
+        (q, dict(custom_pipeline_stage=QUOTE_REWORK)),
     ])
     return dict(result, presales_request=request.name)
 
@@ -107,10 +133,15 @@ def finish(sheet, quotation_updated=True):
             from bsgroup.site_survey import complete_survey_rework
             complete_survey_rework(sheet)
         return
-    if sheet.custom_deal_status != REVISION:
+    if sheet.custom_deal_status != REVISION or not quotation_updated:
         return
     request = linked_presales(sheet)
+    quote = frappe.get_doc("Quotation", sheet.custom_quotation, for_update=True)
+    if quote.custom_deal_cost_sheet != sheet.name or quote.docstatus != 0:
+        frappe.throw("Presales completion requires the same linked Draft quotation.")
+    # The revised offer must be reviewed/sent again; it is no longer the sent offer.
+    quote_updates = [(quote, dict(custom_pipeline_stage="Draft"))] if quote.custom_pipeline_stage == QUOTE_REWORK else []
     record(sheet, request, "QUOTATION_PRESALES_REWORK_COMPLETED", [
         (sheet, dict(custom_deal_status="Submitted to Sales", custom_presales_status="Submitted to Sales")),
         (request, dict(status="Submitted to Sales")),
-    ])
+    ] + quote_updates)
