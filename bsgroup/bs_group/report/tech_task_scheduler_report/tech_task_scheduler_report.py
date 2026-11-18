@@ -7,6 +7,9 @@ from datetime import datetime, timedelta
 def execute(filters=None):
 	columns = get_columns()
 	data = get_data(filters or {})
+	if (filters or {}).get("include_scheduled_helpdesk"):
+		from bsgroup.tech_ops_tickets import with_helpdesk_schedule
+		data = with_helpdesk_schedule(data)
 	return columns, data
 
 
@@ -96,6 +99,9 @@ def get_data(filters):
 		SELECT
 			ttsl.date,
 			ttsl.category,
+			CASE WHEN ttsl.category = 'HD Ticket'
+				THEN COALESCE(NULLIF(ttsl.ticket, ''), ttsl.category_name)
+				ELSE NULL END AS ticket_id,
 			
 			CASE 
 				WHEN ttsl.category = 'Project' THEN proj.project_name
