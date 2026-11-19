@@ -167,7 +167,7 @@ def get_plan(project):
         from bsgroup.project_ai_plan import summary
         ai_plan = summary(doc.name)
     return dict(project=doc.name, project_name=doc.project_name, rows=rows, user_names=names,
-                ai_plan=ai_plan,
+                ai_plan=ai_plan, can_delete=bool(doc.status not in {"Completed", "Cancelled"} and _status_manager(doc)),
                 can_create=bool(doc.status not in {"Completed", "Cancelled"} and frappe.has_permission("Project", "write", doc=doc)
                                 and frappe.has_permission("Task", "create")), company=doc.company,
                 can_read_tasks=bool(frappe.has_permission("Task", "read")), status_options=list(PLAN_STATUSES),
@@ -186,6 +186,47 @@ def _status_manager(project):
 
 def _status_actor(project, task):
     return _status_manager(project) or (task.status != "Completed" and _is_assigned(task))
+
+
+@frappe.whitelist(methods=["POST"])
+def delete_activities(project, activities):
+    """Manager-only removal of unused activities; never bypass link checks."""
+    doc = _project(project)
+    if doc.status in {"Completed", "Cancelled"} or not _status_manager(doc):
+        frappe.throw(_("Only the project manager can delete activities from an open project."), frappe.PermissionError)
+    values = frappe.parse_json(activities) if isinstance(activities, str) else activities
+    if not isinstance(values, list) or not values or len(values) > 100 or any(
+        not isinstance(v, dict) or set(v) != {"name", "modified"} or not isinstance(v["name"], str)
+        or not v["name"] or not v["modified"] for v in values
+    ) or len({v["name"] for v in values}) != len(values):
+        frappe.throw(_("Select between 1 and 100 distinct activities."))
+    savepoint = "plan_delete_" + frappe.generate_hash(length=10)
+    frappe.db.savepoint(savepoint)
+    try:
+        tasks = []
+        for value in sorted(values, key=lambda v: v["name"]):
+            item = frappe.get_doc("Task", value["name"], for_update=True)
+            item.check_permission("read")
+            if item.project != doc.name:
+                frappe.throw(_("The activity must belong to this project."), frappe.PermissionError)
+            if get_datetime(item.modified) != get_datetime(value["modified"]):
+                frappe.throw(_("An activity changed. Refresh the plan before deleting."))
+            if item.status in {"Completed", "Closed", "Cancelled", "Template"} or item.get("is_group") or item.get("is_template"):
+                frappe.throw(_("{0}: completed, closed, template or group activities cannot be deleted here.").format(item.name))
+            if (frappe.db.exists("Comment", {"reference_doctype": "Task", "reference_name": item.name, "comment_type": "Comment"})
+                or frappe.db.exists("Timesheet Detail", {"task": item.name})):
+                frappe.throw(_("{0}: recorded work exists. Keep this activity to preserve its history.").format(item.name))
+            tasks.append(item)
+        for item in tasks:
+            # Authorization above is scoped to this project; native link protection,
+            # delete hooks and Deleted Document recovery remain enabled.
+            frappe.delete_doc("Task", item.name, ignore_permissions=True)
+        doc.add_comment("Info", _("Project Plan activities deleted: {0}").format(
+            "; ".join(item.name + " — " + item.subject for item in tasks)))
+        return {"deleted": [item.name for item in tasks]}
+    except Exception:
+        frappe.db.rollback(save_point=savepoint)
+        raise
 
 
 def _is_assigned(item, closed=False):

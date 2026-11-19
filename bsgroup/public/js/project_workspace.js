@@ -195,7 +195,30 @@
             openProjectRecord(frm,{doctype:'Task',defaults:{project,company:data.company}},null,()=>renderPlan(frm));
         }).appendTo(actions);
         if (!data.can_read_tasks) {$('<p>').text(__('Your current access does not allow viewing project tasks.')).appendTo(host); return;}
+        data.delete_selection=new Map();
+        if(data.can_delete) {
+            const remove=$('<button type="button" class="btn btn-danger btn-sm" disabled>').text(__('Delete selected')).appendTo(actions);
+            data.update_delete_selection=()=>remove.prop('disabled',!data.delete_selection.size);
+            remove.on('click',()=>{
+                if(frm.__bs_plan_dirty.size)return frappe.msgprint(__('Wait for automatic saving to finish before deleting activities.'));
+                const activities=[...data.delete_selection.values()];
+                if(!activities.length)return;
+                frappe.confirm(__('Delete {0} selected activities? Activities with recorded work or linked records are protected. This removes their task assignments.',[activities.length]),async()=>{
+                    if(frm.__bs_plan_dirty.size)return frappe.msgprint(__('Wait for automatic saving to finish.'));
+                    remove.prop('disabled',true);
+                    try {
+                        await frappe.call({method:'bsgroup.project_plan.delete_activities',type:'POST',args:{project,activities},freeze:true});
+                        await frm.reload_doc();
+                    } finally {data.update_delete_selection();}
+                });
+            });
+        }
         const table = $('<div class="table-responsive">').html('<table class="table table-bordered"><thead><tr><th>Activity</th><th>Description</th><th>Start Date</th><th>End Date</th><th>Assigned To</th><th>Today’s Work</th><th>Status</th></tr></thead><tbody></tbody></table>').appendTo(host).find('tbody');
+        if(data.can_delete) {
+            const selectAll=$('<input type="checkbox" aria-label="Select all activities">');
+            table.closest('table').find('thead tr').prepend($('<th style="width:36px">').append(selectAll));
+            selectAll.on('change',()=>table.find('.bs-plan-delete-select:not(:disabled)').prop('checked',selectAll.prop('checked')).trigger('change'));
+        }
         for (const row of data.rows) drawPlanRow(frm,project,row,data,$('<tr>').appendTo(table));
         if (!data.rows.length) $('<tr><td colspan="7"></td></tr>').find('td').text(__('No activities yet. Add an activity or save this project with a Project Template to generate its tasks.')).end().appendTo(table);
     }
@@ -218,6 +241,17 @@
     }
     function drawPlanRow(frm,project,row,data,tr) {
         tr.empty();
+        if(data.can_delete) {
+            const selectable=!['Completed','Closed','Cancelled','Template'].includes(row.status) && !row.is_group;
+            const select=$('<input type="checkbox" class="bs-plan-delete-select">').attr('aria-label',__('Select activity')+' '+row.name)
+                .prop('disabled',!selectable).prop('checked',data.delete_selection.has(row.name));
+            $('<td style="width:36px;vertical-align:top">').append(select).appendTo(tr);
+            select.on('change',()=>{
+                if(select.prop('checked'))data.delete_selection.set(row.name,{name:row.name,modified:row.modified});
+                else data.delete_selection.delete(row.name);
+                data.update_delete_selection();
+            });
+        }
         let description=row.description || '', selected=[...row.assigned_to], names={...data.user_names};
         const dirtyRows=frm.__bs_plan_dirty;
         const cell=()=> $('<td style="vertical-align:top;min-width:130px">').appendTo(tr);
@@ -310,6 +344,7 @@
             recovery.prop('hidden',!state.failed);
         },(receipt,pending)=>{
             row=receipt.row;Object.assign(names,receipt.user_names);
+            if(data.delete_selection.has(row.name))data.delete_selection.set(row.name,{name:row.name,modified:row.modified});
             // Update only acknowledged fields; preserve anything typed while
             // the request was in flight and keep the user's focus in place.
             if(!pending.has('subject'))subject.val(row.subject);

@@ -51,6 +51,49 @@ class ProjectPlanTests(unittest.TestCase):
 
     def tearDown(self):self.patch.stop()
 
+    def delete_activity(self):
+        return self.plan.delete_activities('P-A',[dict(name='TASK-A',modified=self.task.modified)])
+
+    def test_delete_denies_assigned_user_without_manager_authority(self):
+        self.f.delete_doc=Mock()
+        with self.assertRaises(PermissionError): self.delete_activity()
+        self.f.delete_doc.assert_not_called()
+
+    def test_manager_delete_preserves_native_link_checks(self):
+        self.f.get_roles.return_value=['BS Projects Manager']
+        self.f.delete_doc=Mock()
+        self.project.add_comment=Mock()
+        self.assertEqual(self.delete_activity(),{'deleted':['TASK-A']})
+        self.f.delete_doc.assert_called_once_with('Task','TASK-A',ignore_permissions=True)
+        self.project.add_comment.assert_called_once()
+
+    def test_delete_blocks_other_project_and_recorded_work(self):
+        self.f.get_roles.return_value=['BS Projects Manager']
+        self.f.delete_doc=Mock()
+        self.task.project='P-B'
+        with self.assertRaises(PermissionError): self.delete_activity()
+        self.task.project='P-A'
+        self.f.db.exists.return_value=True
+        with self.assertRaises(ValueError): self.delete_activity()
+        self.f.delete_doc.assert_not_called()
+        self.f.db.rollback.assert_called()
+
+    def test_delete_rolls_back_link_failure(self):
+        self.f.get_roles.return_value=['BS Projects Manager']
+        self.f.delete_doc=Mock(side_effect=ValueError('Linked delivery request'))
+        with self.assertRaises(ValueError): self.delete_activity()
+        self.f.db.rollback.assert_called_with(save_point='plan_delete_testhash')
+
+    def test_delete_rejects_stale_completed_and_duplicate_selections(self):
+        self.f.get_roles.return_value=['BS Projects Manager']
+        self.f.delete_doc=Mock()
+        with self.assertRaises(ValueError): self.plan.delete_activities('P-A',[dict(name='TASK-A',modified='2000-01-01')])
+        self.task.status='Completed'
+        with self.assertRaises(ValueError): self.delete_activity()
+        row=dict(name='TASK-A',modified=self.task.modified)
+        with self.assertRaises(ValueError): self.plan.delete_activities('P-A',[row,row])
+        self.f.delete_doc.assert_not_called()
+
     def test_site_project_manager_can_manage_unassigned_task(self):
         self.f.get_roles.return_value=['BS Projects Manager']
         self.assertTrue(self.plan._status_actor(self.project,self.task))
