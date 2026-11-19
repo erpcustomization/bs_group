@@ -44,7 +44,7 @@
     scheduleUnread();
   }
   // Keep the native notification button and its event handlers in the dock,
-  // while positioning it in the top bar above the active list's Filter button.
+  // Give it a reserved upper-right slot, never over Save/Submit or Filter.
   let notificationFrame;
   function positionNotification() {
     notificationFrame = null;
@@ -52,15 +52,17 @@
     if (!bell) return;
     const visible = selector => Array.from(document.querySelectorAll(selector)).find(e => e.getClientRects().length);
     const header = visible('.page-head');
+    document.querySelectorAll('.page-head.bs-notification-space').forEach(el => {
+      if (el !== header) el.classList.remove('bs-notification-space');
+    });
     if (!header) {
       bell.classList.remove('bs-header-notification');
       return;
     }
-    const filter = visible('.standard-actions .filter-button');
+    if (!header.classList.contains('bs-notification-space')) header.classList.add('bs-notification-space');
     const h = header.getBoundingClientRect();
-    const f = filter?.getBoundingClientRect();
-    const left = Math.max(0, Math.min(innerWidth - 42, f ? f.left + f.width / 2 - 17 : innerWidth - 58));
-    const top = Math.max(0, h.top + (h.height - 34) / 2);
+    const left = Math.max(0, Math.min(innerWidth - 46, h.right - 46));
+    const top = Math.max(8, h.top + 8);
     if (!bell.classList.contains('bs-header-notification')) bell.classList.add('bs-header-notification');
     if (bell.style.left !== `${left}px`) bell.style.left = `${left}px`;
     if (bell.style.top !== `${top}px`) bell.style.top = `${top}px`;
