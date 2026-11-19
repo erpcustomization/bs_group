@@ -19,6 +19,10 @@ METHOD = 'bsgroup.project_schedule.run'
 TERMINAL = {'Completed', 'Closed', 'Cancelled', 'Template'}
 
 
+def is_on_hold(status):
+    return ' '.join(str(status or '').replace('-', ' ').split()).casefold() in {'hold', 'on hold'}
+
+
 def identity(*parts):
     return sha256('|'.join(map(str, parts)).encode()).hexdigest()[:32]
 
@@ -33,7 +37,7 @@ def profile():
 
 
 def eligible_task(task, day):
-    return (task.status not in TERMINAL and not task.get('is_template')
+    return (task.status not in TERMINAL and not is_on_hold(task.status) and not task.get('is_template')
             and bool(task.exp_start_date) and getdate(task.exp_start_date) <= day)
 
 
@@ -53,6 +57,7 @@ def task_rows(user, day, company, excluded=None):
     for name in sorted({a.reference_name for a in assignments if a.reference_name}):
         task = frappe.get_doc('Task', name)
         reason = ('No linked project' if not task.project else
+            'Task on hold' if is_on_hold(task.status) else
             'Task completed / closed / cancelled / template' if task.status in TERMINAL or task.get('is_template') else
             'Missing start date' if not task.exp_start_date else
             'Start date is after the schedule date' if getdate(task.exp_start_date) > day else '')
@@ -62,6 +67,7 @@ def task_rows(user, day, company, excluded=None):
             continue
         project = frappe.get_doc('Project', task.project)
         reason = ('Project company does not match employee company' if project.company != company else
+            'Project on hold' if is_on_hold(project.status) else
             'Project completed / closed / cancelled' if project.status in TERMINAL else
             'Missing Project read access' if not frappe.has_permission('Project', 'read', doc=project, user=user) else
             'Missing Task read access' if not frappe.has_permission('Task', 'read', doc=task, user=user) else '')
@@ -135,16 +141,8 @@ def sync_schedule(project, user, day, rows):
 
 
 def message(employee, day, rows, region):
-    lines = [f'<p>Hello {escape(employee)},</p>',
-        f'<p><b>These are the tasks scheduled for tomorrow ({day:%d %B %Y}) — {region}.</b></p>',
-        '<ul>']
-    for row in rows:
-        lines.append('<li><b>' + escape(row['project_title']) + '</b>: '
-            + escape(row['task_title']) + ' (' + escape(row['task']) + ')'
-            + (' — due ' + escape(row['due_date']) if row['due_date'] else '')
-            + (' — <b>Overdue</b>' if row['status'] == 'Overdue' else '') + '</li>')
-    lines.extend(['</ul>', '<p>Please update your daily work and task status in the project’s Project Plan.</p>'])
-    return ''.join(lines)
+    from bsgroup.project_schedule_message import employee_section, introduction, footer
+    return introduction(day, region) + employee_section(employee, rows) + footer()
 
 
 def validate_endpoint(url):
@@ -278,6 +276,19 @@ def preview(day=None):
         frappe.throw('This feature is available only on the Oman and UAE sites.')
     day = getdate(day) if day else datetime.now(profile().TZ).date() + timedelta(days=1)
     return candidates(day, frappe.get_single(SETTINGS), sent_day=day - timedelta(days=1))
+
+
+@frappe.whitelist()
+def message_preview(day=None):
+    """Read-only preview of the exact group message; never reserves or sends."""
+    planned = preview(day)
+    day = getdate(day) if day else datetime.now(profile().TZ).date() + timedelta(days=1)
+    from bsgroup.project_schedule_group import compose, configuration
+    body, count = compose(day, planned, configuration()[0])
+    frappe.respond_as_web_page('Teams task summary preview',
+        '<p><b>PREVIEW ONLY — no messages sent.</b> Held tasks and projects are excluded.</p>'
+        + (body if count else '<p>No eligible tasks for this date.</p>'),
+        indicator_color='blue')
 
 
 @frappe.whitelist(methods=['POST'])

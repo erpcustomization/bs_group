@@ -21,7 +21,8 @@ class GroupTests(unittest.TestCase):
         self.scheduler.validate_endpoint=Mock()
         self.requests=types.ModuleType('requests');self.requests.post=Mock(return_value=types.SimpleNamespace(status_code=202))
         self.requests.RequestException=type('RequestException',(Exception,),{})
-        self.p=patch.dict(sys.modules,{'frappe':self.f,'bsgroup.hr_email':self.hr,'bsgroup.project_schedule':self.scheduler,'requests':self.requests});self.p.start()
+        package=types.ModuleType('bsgroup');package.__path__=[str(Path(__file__).resolve().parents[1]/'bsgroup')]
+        self.p=patch.dict(sys.modules,{'bsgroup':package,'frappe':self.f,'bsgroup.hr_email':self.hr,'bsgroup.project_schedule':self.scheduler,'requests':self.requests});self.p.start()
         spec=importlib.util.spec_from_file_location('group',Path(__file__).resolve().parents[1]/'bsgroup/project_schedule_group.py')
         self.m=importlib.util.module_from_spec(spec);spec.loader.exec_module(self.m)
         self.settings=Mock();self.settings.get.return_value=1;self.settings.get_password.return_value='test-endpoint'
@@ -35,7 +36,10 @@ class GroupTests(unittest.TestCase):
         body,count=self.m.compose(self.day,self.people)
         self.assertEqual(count,2);self.assertIn('Amar',body);self.assertIn('Nowfal',body)
         self.assertIn('&lt;Activity&gt;',body);self.assertIn('15 November 2026',body)
-        self.assertIn('Overdue',body)
+        self.assertIn('OVERDUE',body)
+        self.assertIn('<br/><hr/><br/>',body)
+        self.assertEqual(body.count('Project: Dema'),2)
+        self.assertIn('14 Nov 2026',body)
 
     def test_holidays_exclusions_and_same_person_duplicates(self):
         self.people[0]['rows'].append(self.row)

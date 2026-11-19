@@ -32,7 +32,9 @@ class ScheduleTests(unittest.TestCase):
         self.requests = types.ModuleType('requests')
         self.requests.RequestException = type('RequestException', (Exception,), {})
         self.requests.post = Mock(return_value=R(status_code=202))
-        self.modules = patch.dict(sys.modules, {'frappe': self.f, 'frappe.utils': self.utils, 'requests': self.requests})
+        package = types.ModuleType('bsgroup')
+        package.__path__ = [str(Path(__file__).resolve().parents[1]/'bsgroup')]
+        self.modules = patch.dict(sys.modules, {'bsgroup':package, 'frappe': self.f, 'frappe.utils': self.utils, 'requests': self.requests})
         self.modules.start()
         spec = importlib.util.spec_from_file_location('schedule_under_test', Path(__file__).resolve().parents[1]/'bsgroup/project_schedule.py')
         self.m = importlib.util.module_from_spec(spec);spec.loader.exec_module(self.m)
@@ -55,6 +57,26 @@ class ScheduleTests(unittest.TestCase):
             self.assertFalse(self.m.eligible_task(R(status=status,exp_start_date='2026-01-01'),self.day))
         for start in (None,'2026-11-17'):
             self.assertFalse(self.m.eligible_task(R(status='Open',exp_start_date=start),self.day))
+
+    def test_held_task_or_project_is_excluded_until_reopened(self):
+        self.f.get_all.return_value = [R(reference_name='T1')]
+        task = R(name='T1',project='P1',subject='Work',status='Open',exp_start_date='2026-01-01')
+        project = R(name='P1',project_name='Project',company='AE',status='Open')
+        self.f.get_doc.side_effect = lambda dt,name: task if dt == 'Task' else project
+        for status in ('Hold','On Hold',' on hold ','ON HOLD','on-hold'):
+            task.status = status
+            self.assertFalse(self.m.eligible_task(task,self.day))
+            excluded=[]
+            self.assertEqual(self.m.task_rows('one',self.day,'AE',excluded),[])
+            self.assertEqual(excluded[0]['reason'],'Task on hold')
+            task.status='Open';project.status=status;excluded=[]
+            self.assertEqual(self.m.task_rows('one',self.day,'AE',excluded),[])
+            self.assertEqual(excluded[0]['reason'],'Project on hold')
+            project.status='Open'
+        self.assertEqual(len(self.m.task_rows('one',self.day,'AE')),1)
+        for status in ('Delayed','Customer Delayed','Postponed'):
+            task.status=status
+            self.assertEqual(len(self.m.task_rows('one',self.day,'AE')),1)
 
     def test_duplicate_todos_yield_one_row(self):
         self.f.get_all.return_value=[R(reference_name='T1'),R(reference_name='T1')]
@@ -147,7 +169,9 @@ class ScheduleTests(unittest.TestCase):
     def test_message_tomorrow_and_escaped(self):
         body=self.m.message('Employee',self.day,[self.row],'UAE')
         self.assertIn('scheduled for tomorrow (16 November 2026)',body)
-        self.assertIn('&lt;Task&gt;',body);self.assertIn('Overdue',body)
+        self.assertIn('&lt;Task&gt;',body);self.assertIn('OVERDUE',body)
+        self.assertIn('15 Nov 2026',body)
+        self.assertNotIn('00:00:00',body)
 
     def test_repeat_attempt_never_posts(self):
         self.f.db.exists.return_value=True

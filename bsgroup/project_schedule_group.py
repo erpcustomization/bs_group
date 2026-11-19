@@ -16,24 +16,18 @@ def configuration():
 
 
 def compose(day, candidates, region='Oman'):
-    parts = [f'<p><b>These are the tasks scheduled for tomorrow ({day:%d %B %Y}) — {escape(region)}.</b></p>']
+    from bsgroup.project_schedule_message import employee_section, introduction, footer, unique_rows
+    parts = [introduction(day, region)]
     count = 0
     for candidate in candidates:
         if candidate['reason'] or not candidate['rows']:
             continue
-        parts.append('<h3>' + escape(candidate['employee_name']) + '</h3><ul>')
-        seen = set()
-        for row in candidate['rows']:
-            if row['task'] in seen:
-                continue
-            seen.add(row['task'])
-            count += 1
-            parts.append('<li><b>' + escape(row['project_title']) + '</b>: '
-                + escape(row['task_title']) + ' (' + escape(row['task']) + ')'
-                + (' — due ' + escape(row['due_date']) if row['due_date'] else '')
-                + (' — <b>Overdue</b>' if row['status'] == 'Overdue' else '') + '</li>')
-        parts.append('</ul>')
-    parts.append('<p>Please update your daily work and task status in the project’s Project Plan.</p>')
+        rows = unique_rows(candidate['rows'])
+        if count:
+            parts.append('<br/><hr/><br/>')
+        parts.append(employee_section(candidate['employee_name'], rows))
+        count += len(rows)
+    parts.append(footer())
     return ''.join(parts), count
 
 
