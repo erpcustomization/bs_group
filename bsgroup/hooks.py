@@ -807,6 +807,7 @@ permission_query_conditions["Tech Task Scheduler"] = "bsgroup.project_support_ac
 has_permission["Tech Task Scheduler"] = "bsgroup.project_support_access.scheduler_permission"
 
 after_migrate.append("bsgroup.weekly_commercial_email.install")
+after_migrate.append("bsgroup.monthly_sales_targets_email.install")
 after_migrate.append("bsgroup.project_manager_access.install")
 after_migrate.append("bsgroup.quotation_preparer.install")
 jinja = {"methods": ["bsgroup.quotation_preparer.quotation_preparer"]}
@@ -814,6 +815,7 @@ doc_events["User"]["before_validate"].insert(0, "bsgroup.project_manager_access.
 
 doctype_list_js["Employee Checkin"] = "public/js/employee_checkin_shift.js"
 scheduler_events.setdefault("cron", {}).setdefault("*/5 10-11 * * 1", []).append("bsgroup.weekly_commercial_email.send_reports")
+scheduler_events.setdefault("cron", {}).setdefault("*/5 10-11 1 * *", []).append("bsgroup.monthly_sales_targets_email.send_reports")
 
 # Late surveys are requested only from Opportunity; both linked forms show progress.
 for _survey_view_dt in ("Opportunity", "Deal Cost Sheet", "Presales Request"):
