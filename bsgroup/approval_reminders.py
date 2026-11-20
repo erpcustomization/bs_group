@@ -136,11 +136,10 @@ def page():
     rows = collect(now)
     job = frappe.db.get_value('Scheduled Job Type', {'method': METHOD},
         ['cron_format', 'stopped', 'last_execution'], as_dict=True)
-    from frappe.sessions import get_csrf_token
     subject, body = compose(rows, now)
     setup = ''
     if 'System Manager' in frappe.get_roles():
-        setup = f'<form method="post" action="/api/method/bsgroup.approval_reminders.enable"><input type="hidden" name="csrf_token" value="{escape(get_csrf_token(), quote=True)}"><button type="submit">Enable daily 9 AM reminder</button></form>'
+        setup = '''<button type="button" onclick="this.disabled=true;frappe.call({method:'bsgroup.approval_reminders.enable',type:'POST',callback:r=>{document.getElementById('activation').textContent='Enabled: daily at 9:00 AM. Refresh to view schedule.';this.disabled=false},error:()=>{this.disabled=false}})">Enable daily 9 AM reminder</button><p id="activation"></p>'''
     frappe.respond_as_web_page('Daily approval reminders',
         f'<h2>{escape(site_profile()["region"])} — Daily approval reminder</h2>'
         f'<p>To: {FIXED_APPROVER} · Every day at 9:00 AM (UTC+4). More than 48 hours pending.</p>'
