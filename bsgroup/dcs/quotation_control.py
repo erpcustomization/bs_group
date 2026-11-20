@@ -13,11 +13,13 @@ def validate_quotation(doc, method=None):
         if not doc.is_new() and previous and previous.docstatus == 1 and not previous.get("custom_deal_cost_sheet"):
             return
         frappe.throw("Complete and submit the Deal Cost Sheet, then create the Quotation from that sheet.")
-    sheet = frappe.get_doc("Deal Cost Sheet", doc.custom_deal_cost_sheet, for_update=doc.docstatus == 1)
+    sheet = frappe.get_doc("Deal Cost Sheet", doc.custom_deal_cost_sheet, for_update=True)
     if doc.docstatus == 1:
         from bsgroup.dcs.obligation import assert_clearance
         assert_clearance(sheet)
     validate_position(sheet, doc)
+    from bsgroup.dcs.quotation_discount import sync
+    sync(doc, sheet)
     if doc.docstatus == 0:
         doc.custom_dcs_revision_reference = sheet.custom_revision_reference
 
@@ -38,6 +40,10 @@ def validate_position(sheet, quotation):
     if quotation.docstatus == 1 and reference and reference != sheet.custom_revision_reference:
         frappe.throw("Quotation is stale: its DCS revision has changed. Review a replacement quotation.")
     selling = sheet.custom_working_total_selling if sheet.custom_dcs_revision_no else sheet.total_selling
+    from bsgroup.oman_quotation_flow import pilot
+    if pilot(quotation):
+        from bsgroup.dcs.quotation_discount import gross_selling
+        selling = gross_selling(sheet)
     if abs(flt(quotation.total) - flt(selling)) > money_tolerance(currency):
         frappe.throw("Quotation selling total differs from the current DCS position.")
     expected = sorted((r.item_code, flt(r.qty), money_round(r.selling_rate, currency)) for r in sheet.items)

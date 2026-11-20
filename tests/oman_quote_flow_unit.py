@@ -76,7 +76,7 @@ class FlowTests(unittest.TestCase):
         frappe.get_doc.reset_mock();frappe.get_doc.side_effect=None
         frappe.get_all.reset_mock();frappe.get_all.return_value=[];frappe.db.reset_mock();frappe.db.get_value.side_effect=None
         self.q=Doc(name='Q-1',docstatus=0,custom_deal_cost_sheet='DCS-1',custom_pipeline_stage='Draft',
-            custom_oman_revision_no=0,custom_oman_flow=1,modified='M1',currency='OMR',flags=Doc(),total=125)
+            custom_oman_revision_no=0,custom_oman_flow=1,modified='M1',currency='OMR',flags=Doc(),total=125,net_total=125)
         self.s=Doc(name='DCS-1',custom_quotation='Q-1',docstatus=1,currency='OMR',company='OM',total_selling=125,
             items=[Doc(item_code='ITEM',item_name='Item',description='Scope',qty=1,cost_rate=80,selling_rate=125)],addtional_charges=[])
     def mod(self,name,**members):

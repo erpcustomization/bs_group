@@ -628,7 +628,7 @@ def dcs_submit_advance_presales_status(doc):
 DEAL_STATUS_KEPT_ON_SUBMIT = ("Won", "Lost")
 
 QUOTATION_LINK_FIELDS = [
-	"name", "docstatus", "opportunity", "quotation_to", "party_name", "company", "custom_deal_cost_sheet", "total", "modified",
+	"name", "docstatus", "opportunity", "quotation_to", "party_name", "company", "custom_deal_cost_sheet", "total", "net_total", "modified",
 ]
 
 
@@ -676,7 +676,7 @@ def quotation_relationship_intact(doc):
 		return False
 	if not q.custom_deal_cost_sheet or q.custom_deal_cost_sheet not in (doc.name, doc.amended_from):
 		return False
-	return abs(frappe.utils.flt(q.total) - frappe.utils.flt(doc.total_selling)) <= 0.005
+	return abs(frappe.utils.flt(q.net_total) - frappe.utils.flt(doc.total_selling)) <= 0.005
 
 
 def deal_status_preserved_on_submit(doc):
@@ -929,6 +929,8 @@ def calculate_deal_financials(doc):
 
 	doc.total_cost = products_cost_total + services_cost_total + additional_charges_total + total_resource_cost
 	doc.total_selling = products_selling_total + services_selling_total + sum(frappe.utils.flt(c.get("selling_amount")) for c in doc.addtional_charges or [])
+	from bsgroup.dcs.quotation_discount import apply_to_calculated_sheet
+	apply_to_calculated_sheet(doc)
 	from bsgroup.dcs.input_validation import non_negative
 	non_negative(doc.total_cost, "Calculated buying total")
 	non_negative(doc.total_selling, "Calculated selling total")

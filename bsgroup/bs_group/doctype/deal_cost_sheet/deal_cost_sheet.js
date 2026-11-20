@@ -1838,7 +1838,7 @@ function dcsLiveCalc(frm, applyToDoc) {
                 '<div style="font-weight:600">Selling ' + format_currency(_lvSell, _lvCur,dcs_money_precision(frm)) +
                 ' &nbsp;&middot;&nbsp; Cost ' + format_currency(_lvCost, _lvCur,dcs_money_precision(frm)) +
                 ' &nbsp;&middot;&nbsp; Margin ' + _lvMpc.toFixed(3) + '%</div>' +
-                '<div style="color:#777;margin-top:3px">Figures below include items, labour and additional charges. Earlier totals-only adjustments may differ until reconciled to a BOQ revision.</div>' +
+                '<div style="color:#777;margin-top:3px">Selling and margin above are after quotation discount, excluding VAT. The table below shows the BOQ before discount; purchase costs remain unchanged.</div>' +
                 '</div>';
         }
         wrapper.innerHTML = '<div style="margin:8px 0">' +
@@ -1857,7 +1857,9 @@ function dcsLiveCalc(frm, applyToDoc) {
             '<td style="text-align:right">' + frappe.format(totalSell, {fieldtype:'Currency'}) + '</td>' +
             '<td style="text-align:right">' + frappe.format(marginVal, {fieldtype:'Currency'}) + '</td>' +
             '<td style="text-align:right">' + marginPct.toFixed(2) + '%</td>' +
-            '</tr></tbody></table></div>';
+            '</tr>' + (_lvRev > 0 && Math.abs(totalSell-_lvSell)>0.0005 ?
+                '<tr><td>Quotation discount / commercial adjustment</td><td></td><td style="text-align:right">'+format_currency(_lvSell-totalSell,_lvCur,dcs_money_precision(frm))+'</td><td></td><td></td></tr>'+
+                '<tr style="font-weight:bold"><td>Net selling after discount (excl. VAT)</td><td style="text-align:right">'+format_currency(_lvCost,_lvCur,dcs_money_precision(frm))+'</td><td style="text-align:right">'+format_currency(_lvSell,_lvCur,dcs_money_precision(frm))+'</td><td style="text-align:right">'+format_currency(_lvSell-_lvCost,_lvCur,dcs_money_precision(frm))+'</td><td style="text-align:right">'+_lvMpc.toFixed(3)+'%</td></tr>':'') + '</tbody></table></div>';
     }
 }
 

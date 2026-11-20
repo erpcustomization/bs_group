@@ -101,6 +101,8 @@ def before_validate(q, method=None):
     """
     if not pilot(q) or q.docstatus == 2:
         return
+    from bsgroup.dcs.quotation_discount import preserve_rate_precision
+    preserve_rate_precision(q)
     previous = q.get_doc_before_save()
     if previous and previous.docstatus != 0:
         return
@@ -266,7 +268,7 @@ def sync_draft(sheet, previous_sheet=None):
     q.flags.ignore_mandatory = True  # Incomplete commercial details remain a Draft.
     with operation(q, "revise"):
         q.save()
-    if abs(flt(q.total) - flt(sheet.total_selling)) > money_tolerance(sheet.currency):
+    if abs(flt(q.net_total) - flt(sheet.total_selling)) > money_tolerance(sheet.currency):
         frappe.throw("Quotation discounts or pricing rules changed the DCS total. The revision was not saved.")
     snapshot(q, "After DCS revision")
     return f"Quotation {q.name} updated in place · R{q.custom_oman_revision_no}."
