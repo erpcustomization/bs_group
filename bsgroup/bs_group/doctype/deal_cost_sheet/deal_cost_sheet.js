@@ -1789,9 +1789,11 @@ function dcsLiveCalc(frm, applyToDoc) {
         return sum + units * flt(row.cost_rate);
     }, 0);
     var chargeCost = (frm.doc.addtional_charges || []).reduce(function (sum, row) { return sum + flt(row.amount); }, 0);
+    var chargeSell = (frm.doc.addtional_charges || []).reduce(function (sum, row) { return sum + flt(row.selling_amount); }, 0);
     totalCost += resourceCost + chargeCost;
+    totalSell += chargeSell;
     if (resourceCost) { cats['Labour / Resources'] = {cost:resourceCost, sell:0}; }
-    if (chargeCost) { cats['Additional Charges'] = {cost:chargeCost, sell:0}; }
+    if (chargeCost || chargeSell) { cats['Additional Charges'] = {cost:chargeCost, sell:chargeSell}; }
     
     var marginVal = totalSell - totalCost;
     var marginPct = totalSell > 0 ? (marginVal / totalSell * 100) : 0;
