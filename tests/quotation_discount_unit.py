@@ -138,6 +138,7 @@ class DiscountTests(unittest.TestCase):
         exec(compile(ast.Module(body=[n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name in names],type_ignores=[]),'negotiation','exec'),module.__dict__)
         module.write_revision=Mock(return_value='R2')
         self.d.total_cost=174609;self.d.custom_working_total_selling=240420.5;self.d.custom_baseline_selling=240420.5
+        frappe.db.set_value.side_effect=lambda dt,name,values: values.update(modified='now',modified_by='sales@example.com')
         with patch.dict(sys.modules,{'bsgroup.api.dcs.negotiation':module,'bsgroup.dcs.governance':types.SimpleNamespace(record_governance_event=Mock())}):
             discount.record_net_revision(self.d,218000,'Test')
         values=frappe.db.set_value.call_args.args[2]

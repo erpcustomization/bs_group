@@ -104,7 +104,9 @@ def record_net_revision(sheet, selling, reason):
         custom_approval_required=req, custom_approval_reason=why_approval(concession, margin),
         custom_margin_gate=gate, custom_margin_gate_reason=why_gate(margin))
     before = {key: sheet.get(key) for key in values}
-    frappe.db.set_value('Deal Cost Sheet', sheet.name, values)
+    # Frappe adds modified/modified_by to the supplied dict in place.
+    # Keep the audited commercial change set separate from those timestamps.
+    frappe.db.set_value('Deal Cost Sheet', sheet.name, dict(values))
     record_governance_event(sheet.name, 'DCS_QUOTATION_DISCOUNT_SYNC', action_label='Reconcile quotation net selling',
         source_endpoint='quotation_discount', reason=reason, revision_no=no, revision_reference=ref,
         changes=[dict(dt='Deal Cost Sheet',dn=sheet.name,field=k,old=before[k],new=v) for k,v in values.items()])
