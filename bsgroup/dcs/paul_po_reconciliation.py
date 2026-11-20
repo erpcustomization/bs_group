@@ -89,7 +89,10 @@ def reconcile():
     q.apply_discount_on='Net Total'; q.additional_discount_percentage=0; q.discount_amount=23789.33
     q.calculate_taxes_and_totals()
     for key,value in [('total',241789.33),('net_total',218000),('total_taxes_and_charges',10900),('grand_total',228900)]:
-        if abs(flt(q.get(key))-value)>.005: frappe.throw('PO reconciliation calculation failed: '+key)
+        if abs(flt(q.get(key))-value)>.005:
+            frappe.throw('PO reconciliation calculation failed: '+key+' = '+str(q.get(key))+
+                '; lines = '+frappe.as_json([dict(rate=x.rate,amount=x.amount,margin_type=x.margin_type,
+                margin_rate_or_amount=x.margin_rate_or_amount,rate_with_margin=x.rate_with_margin) for x in q.items]))
     from bsgroup.dcs.quotation_discount import record_net_revision
     record_net_revision(d,218000,REASON)
     frappe.db.set_value('Deal Cost Sheet',d.name,dict(custom_frozen_revision_no=d.custom_dcs_revision_no,
