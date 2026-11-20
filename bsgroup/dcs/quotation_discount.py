@@ -12,6 +12,13 @@ def preserve_rate_precision(quotation):
     purchasing precision. This retains agreed line amounts for large quantities.
     """
     rate_fields = {'rate', 'price_list_rate', 'net_rate', 'base_rate', 'base_net_rate', 'base_price_list_rate'}
+    if not quotation.get('items'):
+        return
+    parent_precision = quotation.precision
+    quotation.precision = lambda fieldname, parentfield=None: (
+        max(9, parent_precision(fieldname, parentfield) or 0)
+        if parentfield == 'items' and fieldname in rate_fields
+        else parent_precision(fieldname, parentfield))
     for row in quotation.get('items') or []:
         original = row.precision
         row.precision = lambda fieldname, parentfield=None, original=original: (

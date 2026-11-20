@@ -120,7 +120,10 @@ class DiscountTests(unittest.TestCase):
 
     def test_rate_precision_only_not_amount_or_cost(self):
         row=Doc(precision=lambda field,parent=None:2)
-        discount.preserve_rate_precision(Doc(items=[row]))
+        q=Doc(items=[row],precision=lambda field,parent=None:2)
+        discount.preserve_rate_precision(q)
+        self.assertEqual(q.precision('rate','items'),9)
+        self.assertEqual(q.precision('amount','items'),2)
         self.assertEqual(row.precision('rate'),9)
         self.assertEqual(row.precision('amount'),2)
         self.assertEqual(row.precision('custom_cost_rate'),2)
