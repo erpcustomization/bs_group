@@ -4,6 +4,16 @@ frappe.pages['bs-project-modules'].on_page_load = function(wrapper) {
     const modules = {supply:'BS Supply Projects',elv:'BS ELV Projects',infra:'BS Infra Projects','3cx':'BS 3CX Projects'};
     const sections = {dashboard:'Dashboard',projects:'Projects',amc:'AMC'};
     const esc = value => frappe.utils.escape_html(String(value ?? ''));
+    function statusBadge(value) {
+        const palette={'open':['#dbeafe','#1e40af'],'in progress':['#cffafe','#155e75'],
+            'on hold':['#fef3c7','#92400e'],'hold':['#fef3c7','#92400e'],
+            'delayed':['#fee2e2','#991b1b'],'overdue':['#fee2e2','#991b1b'],
+            'customer delayed':['#ede9fe','#5b21b6'],'postponed':['#ffedd5','#9a3412'],
+            'completed':['#dcfce7','#166534'],'closed':['#dcfce7','#166534'],
+            'cancelled':['#e2e8f0','#475569']};
+        const [bg,fg]=palette[String(value||'').toLowerCase()]||['#e2e8f0','#334155'];
+        return `<span style="display:inline-block;white-space:nowrap;border-radius:20px;padding:5px 11px;font-weight:700;background:${bg};color:${fg}">${esc(value||'Not set')}</span>`;
+    }
     let key='supply', section='dashboard', version=0;
     let selectedStatus='Not completed', searchText='', searchTimer;
     const filters=$('<div class="bspm-nav" style="align-items:center">').insertBefore(host);
@@ -57,7 +67,7 @@ frappe.pages['bs-project-modules'].on_page_load = function(wrapper) {
         function draw(rows, amc=false) {
             const table=$('<div class="bspm-table">').appendTo(host);
             if(!rows.length) {table.html('<div class="bspm-empty">No matching accessible records.</div>');return;}
-            table.html(`<table><thead><tr><th>${amc?'AMC / Maintenance':'Project'}</th><th>Customer</th><th>Status</th><th>${amc?'Contract start':'Start'}</th><th>${amc?'Renewal / End':'Expected end'}</th><th>Category</th></tr></thead><tbody>${rows.map(p=>`<tr><td><a href="/desk/project/${encodeURIComponent(p.name)}">${esc(p.project_name)}</a><div class="bspm-note">${esc(p.name)} · ${esc(p.company)}</div></td><td>${esc(p.customer||'—')}</td><td>${esc(p.status)}</td><td>${esc(p.expected_start_date||'—')}</td><td>${esc(p.expected_end_date||'—')}</td><td>${esc(p.categories.map(k=>modules[k]).join(', ')||'Unclassified')}<div class="bspm-note" style="${p.review_required?'color:#916000':''}">${esc(p.classification)}</div></td></tr>`).join('')}</tbody></table>`);
+            table.html(`<table><thead><tr><th>${amc?'AMC / Maintenance':'Project'}</th><th>Customer</th><th>Status</th><th>${amc?'Contract start':'Start'}</th><th>${amc?'Renewal / End':'Expected end'}</th><th>Category</th></tr></thead><tbody>${rows.map(p=>`<tr><td><a href="/desk/project/${encodeURIComponent(p.name)}">${esc(p.project_name)}</a><div class="bspm-note">${esc(p.name)} · ${esc(p.company)}</div></td><td>${esc(p.customer||'—')}</td><td>${statusBadge(p.status)}</td><td>${esc(p.expected_start_date||'—')}</td><td>${esc(p.expected_end_date||'—')}</td><td>${esc(p.categories.map(k=>modules[k]).join(', ')||'Unclassified')}<div class="bspm-note" style="${p.review_required?'color:#916000':''}">${esc(p.classification)}</div></td></tr>`).join('')}</tbody></table>`);
         }
         $('<p class="bspm-note">').text(section==='amc'?'AMC and maintenance contracts only. Projects appear in the Projects section.':'Projects only. AMC and maintenance contracts appear in the AMC section.').appendTo(host);
         draw(section==='amc'?data.amcs:data.projects,section==='amc');

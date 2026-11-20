@@ -2,6 +2,12 @@
 frappe.listview_settings = frappe.listview_settings || {};
 frappe.listview_settings['Project'] = frappe.listview_settings['Project'] || {};
 frappe.listview_settings['Project'].filters = [['status','!=','Completed']];
+frappe.listview_settings['Project'].get_indicator = doc => {
+    const colors={'open':'blue','in progress':'cyan','on hold':'orange','hold':'orange',
+        'delayed':'red','overdue':'red','customer delayed':'purple','postponed':'orange',
+        'completed':'green','closed':'green','cancelled':'gray'};
+    return [__(doc.status), colors[String(doc.status||'').toLowerCase()]||'gray', `status,=,${doc.status}`];
+};
 // Project Command Centre - persistent auto-loader
 // Artifact version : 2026-08-08-frozen.11
 // Artifact SHA-256 : 363d044c…e6a6e628  (full hash recorded in change log)

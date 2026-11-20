@@ -1,5 +1,9 @@
 frappe.ui.form.on('Project', {
     refresh(frm) {
+        const colors={'open':'blue','in progress':'cyan','on hold':'orange','hold':'orange',
+            'delayed':'red','overdue':'red','customer delayed':'purple','postponed':'orange',
+            'completed':'green','closed':'green','cancelled':'gray'};
+        if(frm.doc.status) frm.page.set_indicator(__(frm.doc.status), colors[String(frm.doc.status).toLowerCase()]||'gray');
         const schedule=frm.fields_dict.custom_bs_boq_schedule;
         if(schedule) {
             schedule.grid.cannot_add_rows=true;
