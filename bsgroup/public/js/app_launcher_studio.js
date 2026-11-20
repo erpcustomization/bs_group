@@ -16,7 +16,7 @@
         'ERPNext Settings':'Business settings and configuration', 'Bits Secure HR':'Human resources workspace'
     };
     const css = `
-    .bs-launcher{max-width:1240px!important;width:100%!important;margin:0 auto!important;padding:32px 28px 64px!important;box-sizing:border-box}
+    .bs-launcher{display:block!important;max-width:1240px!important;width:100%!important;margin:0 auto!important;padding:32px 28px 64px!important;box-sizing:border-box}
     .bs-launcher .bs-launcher-hero{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:24px;padding:34px 38px;margin:0 0 30px;border-radius:22px;background:linear-gradient(115deg,#102b50,#194a80);color:#fff;box-shadow:0 12px 32px #12375f18}
     .bs-launcher-hero:after{content:'';position:absolute;right:130px;top:-130px;width:340px;height:340px;border:1px solid #ffffff14;border-radius:50%;pointer-events:none}
     .bs-launcher .bs-launcher-kicker{font-size:10px;font-weight:700;letter-spacing:2.5px;color:#b9d8fc;text-transform:uppercase;margin-bottom:10px}
@@ -36,7 +36,7 @@
     .bs-launcher>.icons-container>.icons>.desktop-icon>.icon-container{flex-shrink:0;width:50px!important;height:50px!important;min-width:50px!important;margin:0!important;border-radius:13px!important;box-shadow:none!important}
     .bs-launcher>.icons-container>.icons>.desktop-icon>.icon-container:not([style]){background:#f0f5fc!important}
     .bs-launcher>.icons-container>.icons>.desktop-icon>.icon-container>.app-icon{width:40px!important;height:40px!important;object-fit:contain}
-    .bs-launcher>.icons-container>.icons>.desktop-icon>.icon-caption{min-width:0;flex:1;text-align:left!important;width:auto!important;max-width:none!important;margin:0!important;padding:0!important}
+    .bs-launcher>.icons-container>.icons>.desktop-icon>.icon-caption{min-width:0;flex:1;text-align:left!important;width:auto!important;height:auto!important;max-height:none!important;overflow:visible!important;max-width:none!important;margin:0!important;padding:0!important}
     .bs-launcher>.icons-container>.icons>.desktop-icon>.icon-caption>.icon-title{font-size:14px!important;font-weight:700!important;line-height:1.4!important;color:var(--text-color,#16365b)!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;max-width:none!important;width:auto!important;margin:0!important}
     .bs-launcher .bs-launcher-description{font-size:11px;line-height:1.6;color:var(--text-muted,#6f8199);margin-top:5px;white-space:normal}
     .bs-launcher>.icons-container>.icons>.desktop-icon.bs-launcher-business{border-top:3px solid #285da5!important;padding-top:20px!important}
