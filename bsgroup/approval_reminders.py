@@ -139,7 +139,9 @@ def page():
     subject, body = compose(rows, now)
     setup = ''
     if 'System Manager' in frappe.get_roles():
-        setup = '''<button type="button" onclick="this.disabled=true;frappe.call({method:'bsgroup.approval_reminders.enable',type:'POST',callback:r=>{document.getElementById('activation').textContent='Enabled: daily at 9:00 AM. Refresh to view schedule.';this.disabled=false},error:()=>{this.disabled=false}})">Enable daily 9 AM reminder</button><p id="activation"></p>'''
+        from frappe.sessions import get_csrf_token
+        setup = '''<form action="/api/method/bsgroup.approval_reminders.enable" method="post" onsubmit="event.preventDefault();const f=this,b=f.querySelector('button'),o=document.getElementById('activation');b.disabled=true;fetch(f.action,{method:'POST',credentials:'same-origin',body:new URLSearchParams(new FormData(f))}).then(async r=>{const data=await r.json();if(!r.ok)throw new Error(data.exception||'Activation failed');o.textContent='Enabled: daily at 9:00 AM. Refresh to view schedule.';}).catch(e=>{o.textContent=e.message;}).finally(()=>{b.disabled=false;});">
+        <input type="hidden" name="csrf_token" value="TOKEN"><button type="submit">Enable daily 9 AM reminder</button></form><p id="activation"></p>'''.replace('TOKEN',escape(get_csrf_token(),quote=True))
     frappe.respond_as_web_page('Daily approval reminders',
         f'<h2>{escape(site_profile()["region"])} — Daily approval reminder</h2>'
         f'<p>To: {FIXED_APPROVER} · Every day at 9:00 AM (UTC+4). More than 48 hours pending.</p>'
