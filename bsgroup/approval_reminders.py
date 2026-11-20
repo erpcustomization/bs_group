@@ -53,7 +53,8 @@ def pending_since(row):
 def collect(now):
     original = frappe.session.user
     try:
-        frappe.set_user(FIXED_APPROVER)
+        if original != FIXED_APPROVER:
+            frappe.set_user(FIXED_APPROVER)
         rows = []
         for row in pending()['requests']:
             since, basis = pending_since(row)
@@ -62,7 +63,8 @@ def collect(now):
                     days=round((now.replace(tzinfo=None)-get_datetime(since)).total_seconds()/86400, 1)))
         return sorted(rows, key=lambda r: r['since'])
     finally:
-        frappe.set_user(original)
+        if original != FIXED_APPROVER:
+            frappe.set_user(original)
 
 
 def compose(rows, now):

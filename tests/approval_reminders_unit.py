@@ -63,6 +63,13 @@ class Tests(unittest.TestCase):
             with self.assertRaises(ValueError):r.collect(self.now)
         self.assertEqual(frappe.session.user,'Administrator')
 
+    def test_preview_preserves_mohan_session(self):
+        frappe.session.user=r.FIXED_APPROVER
+        with patch.object(r,'pending',return_value={'requests':[]}),patch.object(frappe,'set_user') as switch:
+            self.assertEqual(r.collect(self.now),[])
+            switch.assert_not_called()
+        frappe.session.user='Administrator'
+
     def test_empty_digest_no_queue(self):
         with patch.object(r,'datetime') as clock,patch.object(r,'collect',return_value=[]):
             clock.now.return_value=self.now
