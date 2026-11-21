@@ -99,7 +99,8 @@ def enable():
     # Apply the requested weekly time change as part of this reviewed setup.
     from bsgroup.weekly_commercial_email import install as install_weekly
     install_weekly()
-    if not frappe.db.get_single_value('Selling Settings', ANCHOR):
+    existing_anchor = frappe.db.get_single_value('Selling Settings', ANCHOR)
+    if not existing_anchor or str(existing_anchor) == '0001-01-01':
         frappe.db.set_single_value('Selling Settings', ANCHOR, datetime.now(TZ).date())
     frappe.db.set_single_value('Selling Settings', FLAG, 1)
     return dict(enabled=True, anchor=str(frappe.db.get_single_value('Selling Settings', ANCHOR)))
