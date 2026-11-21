@@ -266,8 +266,7 @@ def import_package(mode='preview'):
     if not frappe.db.exists('Customer',package['customer']['name']):
         cust=package['customer']
         frappe.get_doc(dict(doctype='Customer',customer_name=cust['customer_name'],customer_type=cust['customer_type'],
-            customer_group=frappe.db.get_single_value('Selling Settings','customer_group') or 'All Customer Groups',
-            territory=frappe.db.get_single_value('Selling Settings','territory') or 'All Territories'))\
+            customer_group='Commercial',territory='Oman'))\
             .insert(ignore_permissions=True,set_name=cust['name'])
     # Original timestamps and statuses are imported without replaying historical workflows.
     for item in docs:
