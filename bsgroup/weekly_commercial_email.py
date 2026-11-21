@@ -11,7 +11,7 @@ from bsgroup.hr_email import site_profile
 TZ = ZoneInfo('Asia/Dubai')
 METHOD = 'bsgroup.weekly_commercial_email.send_reports'
 FLAG = 'custom_bs_weekly_commercial_reports'
-CRON = '*/5 10-11 * * 1'  # 10:30 first send; subsequent ticks recover failures only.
+CRON = '*/5 9-10 * * 1'  # 09:30 first send; subsequent ticks recover failures only.
 MOHAN = 'mohan@bitssecureit.com'
 KINDS = {'Sales': {'Sales User', 'Sales Manager', 'Sales Master Manager', 'BS Scoped Sales'},
          'Presales': {'Presales', 'BS Scoped Presales'}}
@@ -26,7 +26,7 @@ def period(monday):
 
 
 def due(now):
-    return now.weekday() == 0 and time(10, 30) <= now.time().replace(tzinfo=None) < time(12)
+    return now.weekday() == 0 and time(9, 30) <= now.time().replace(tzinfo=None) < time(11)
 
 
 def key(user, kind, monday):
@@ -240,7 +240,7 @@ def install():
     from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
     if not frappe.get_meta('Selling Settings').has_field(FLAG):
         create_custom_fields({'Selling Settings':[dict(fieldname=FLAG,label='Weekly sales and presales reports',fieldtype='Check',default='0',
-            description='Monday 10:30 AM UTC+4; previous Monday–Sunday; CC reporting manager or Mohan. Test records excluded.')]},update=False)
+            description='Monday 09:30 AM UTC+4; previous Monday–Sunday; CC reporting manager or Mohan. Test records excluded.')]},update=False)
         frappe.db.set_single_value('Selling Settings',FLAG,1)
     from frappe.core.doctype.scheduled_job_type.scheduled_job_type import insert_single_event
     insert_single_event('Cron',METHOD,CRON)
@@ -257,4 +257,4 @@ def page():
         rows.append(f'<h3>{escape(person["name"])} — {person["kind"]}</h3><p>To: {escape(person["user"])} · CC: {escape(", ".join(person["cc"]) or "Self; no duplicate CC")} · {status}</p><details><summary>{escape(subject)}</summary>{body}</details>')
     job=frappe.db.get_value('Scheduled Job Type',{'method':METHOD},['cron_format','stopped','last_execution'],as_dict=True)
     enabled=frappe.db.get_single_value('Selling Settings',FLAG)
-    frappe.respond_as_web_page('Weekly sales and presales reports',f'<h2>Monday 10:30 AM — {escape(site_profile()["region"])}</h2><p>Enabled: {bool(enabled)} · Job: {escape(str(job))}</p><p>Period: {data["start"]} to {data["end"]-timedelta(days=1)}. Read-only preview; no emails sent by this page.</p>'+''.join(rows))
+    frappe.respond_as_web_page('Weekly sales and presales reports',f'<h2>Monday 09:30 AM — {escape(site_profile()["region"])}</h2><p>Enabled: {bool(enabled)} · Job: {escape(str(job))}</p><p>Period: {data["start"]} to {data["end"]-timedelta(days=1)}. Read-only preview; no emails sent by this page.</p>'+''.join(rows))

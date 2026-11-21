@@ -18,9 +18,9 @@ class PeriodicTests(unittest.TestCase):
 
     def test_mid_month_fixed_window(self):
         self.assertEqual(self.ns['periods'](datetime(2026,11,21,17,30),self.anchor),[])
-        r=self.ns['periods'](datetime(2026,12,15,17,30),self.anchor)
-        self.assertEqual(r,[('Mid-Month',datetime(2026,12,1),datetime(2026,12,15,17,30))])
-        self.assertEqual(self.ns['periods'](datetime(2026,12,15,18,55),self.anchor),r)
+        r=self.ns['periods'](datetime(2026,12,15,9,30),self.anchor)
+        self.assertEqual(r,[('Mid-Month',datetime(2026,12,1),datetime(2026,12,15,9,30))])
+        self.assertEqual(self.ns['periods'](datetime(2026,12,15,10,55),self.anchor),r)
 
     def test_month_end_and_leap_year(self):
         self.assertEqual(self.ns['periods'](datetime(2026,11,30,17,30),self.anchor)[0],
@@ -29,7 +29,7 @@ class PeriodicTests(unittest.TestCase):
         self.assertEqual(self.ns['periods'](datetime(2028,2,29,17,30),date(2028,2,28))[0][0],'Month-End')
 
     def test_no_early_or_late_send(self):
-        for hour,minute in [(17,29),(19,0),(23,0)]:
+        for hour,minute in [(9,29),(11,0),(17,30),(23,0)]:
             self.assertEqual(self.ns['periods'](datetime(2026,12,15,hour,minute),self.anchor),[])
 
     def test_month_end_does_not_also_send_mid_month(self):
@@ -43,7 +43,7 @@ class PeriodicTests(unittest.TestCase):
         f.get_doc.side_effect=lambda doc:Mock(db_insert=lambda:markers.add(doc['name']))
         f.sendmail.return_value='QUEUE'
         f.DuplicateEntryError=type('DuplicateEntryError',(Exception,),{})
-        now=Mock();now.now.return_value=datetime(2026,12,15,17,30)
+        now=Mock();now.now.return_value=datetime(2026,12,15,9,30)
         self.ns.update(frappe=f,datetime=now,TZ=None,FLAG='enabled',ANCHOR='anchor',
             site_profile=lambda:True,collect_range=lambda a,b:{},
             people=lambda:[dict(user='rahul@bitssecureit.com',kind='Sales',cc=['mohan@bitssecureit.com'])],

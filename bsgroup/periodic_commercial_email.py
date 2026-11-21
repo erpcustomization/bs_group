@@ -8,21 +8,23 @@ from bsgroup.weekly_commercial_email import people, collect_range, report, TZ
 from bsgroup.hr_email import site_profile
 
 METHOD = 'bsgroup.periodic_commercial_email.send_reports'
-CRON = '*/5 17-18 * * *'
+CRON = '*/5 9-10,17-18 * * *'
 FLAG = 'custom_bs_periodic_work_reports'
 ANCHOR = 'custom_bs_periodic_report_anchor'
 
 
 def periods(now, anchor):
-    """Fixed 17:30 cutoffs; recovery ticks do not expand a report's range."""
+    """Fixed cutoffs; recovery ticks do not expand a report's range."""
     today = now.date()
-    if today < anchor or not time(17, 30) <= now.time().replace(tzinfo=None) < time(19):
+    if today < anchor:
         return []
-    end = datetime.combine(today, time(17, 30))
+    clock = now.time().replace(tzinfo=None)
     result = []
-    if today.day == 15:
+    if today.day == 15 and time(9, 30) <= clock < time(11):
+        end = datetime.combine(today, time(9, 30))
         result.append(('Mid-Month', datetime.combine(today.replace(day=1), time()), end))
-    if today.day == calendar.monthrange(today.year, today.month)[1]:
+    if today.day == calendar.monthrange(today.year, today.month)[1] and time(17, 30) <= clock < time(19):
+        end = datetime.combine(today, time(17, 30))
         result.append(('Month-End', datetime.combine(today.replace(day=1), time()), end))
     return result
 
@@ -94,6 +96,9 @@ def enable():
     if not site_profile():
         frappe.throw('Unsupported site.')
     install()
+    # Apply the requested weekly time change as part of this reviewed setup.
+    from bsgroup.weekly_commercial_email import install as install_weekly
+    install_weekly()
     if not frappe.db.get_single_value('Selling Settings', ANCHOR):
         frappe.db.set_single_value('Selling Settings', ANCHOR, datetime.now(TZ).date())
     frappe.db.set_single_value('Selling Settings', FLAG, 1)
@@ -105,10 +110,10 @@ def preview():
     """Render representative reports without queues, markers or settings writes."""
     frappe.only_for('System Manager')
     now=datetime.now(TZ)
-    end=datetime.combine(now.date(),time(17,30))
     roster=people()
     output=[]
     for cadence,start in [('Mid-Month',datetime.combine(now.date().replace(day=1),time())),('Month-End',datetime.combine(now.date().replace(day=1),time()))]:
+        end=datetime.combine(now.date(),time(9,30) if cadence=='Mid-Month' else time(17,30))
         data=collect_range(start,end)
         for kind in ('Sales','Presales'):
             person=next((p for p in roster if p['kind']==kind),None)
@@ -128,6 +133,6 @@ def page():
     anchor = frappe.db.get_single_value('Selling Settings', ANCHOR)
     job = frappe.db.get_value('Scheduled Job Type', {'method':METHOD}, ['stopped','cron_format','last_execution'], as_dict=True)
     roster = ''.join(f'<li>{escape(p["name"])} — {p["kind"]}: {escape(p["user"])}; CC: {escape(", ".join(p["cc"]) or "none (self)")}</li>' for p in people())
-    html = f'<h2>{escape(site_profile()["region"])} — Periodic sales and presales reports</h2><p>Enabled: {bool(enabled)} · Enabled from: {anchor} · Job: {escape(str(job))}</p><p>15th of every month at 17:30: work from the 1st to the cutoff. Separate last-day-of-month report at 17:30: work from the 1st to the cutoff. Existing weekly and monthly target reports are unchanged. Test transactions excluded. Current reporting manager in CC; Mohan fallback.</p><ul>{roster}</ul>'
+    html = f'<h2>{escape(site_profile()["region"])} — Periodic sales and presales reports</h2><p>Enabled: {bool(enabled)} · Enabled from: {anchor} · Job: {escape(str(job))}</p><p>Weekly: Monday 09:30. Mid-month: 15th at 09:30, work from the 1st to the cutoff. Month-end: last day at 17:30, work from the 1st to the cutoff. All times UTC+4. Monthly target reports remain unchanged. Test transactions excluded. Current reporting manager in CC; Mohan fallback.</p><ul>{roster}</ul>'
     html += '<form id="enable"><button>Enable periodic reports</button></form><pre id="result"></pre><script>document.getElementById("enable").onsubmit=async function(e){e.preventDefault();const b=this.querySelector("button");b.disabled=true;try{const r=await fetch("/api/method/bsgroup.periodic_commercial_email.enable",{method:"POST",headers:{"X-Frappe-CSRF-Token":"TOKEN"}});document.getElementById("result").textContent=JSON.stringify(await r.json(),null,2);}finally{b.disabled=false;}};</script>'
     frappe.respond_as_web_page('Periodic work reports', html.replace('TOKEN', escape(get_csrf_token(),quote=True)))
