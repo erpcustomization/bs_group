@@ -212,6 +212,8 @@ def make_plan(package):
                     continue
                 if dt=='Customer' and value==package['customer']['name']:
                     continue
+                if dt=='Project Type' and value=='Major Project':
+                    continue
                 if not frappe.db.exists(dt,value):
                     missing.append(f"{item['doctype']} {item.get('name')} / {f.fieldname}: {dt} {value}")
     if missing:
@@ -259,6 +261,8 @@ def import_package(mode='preview'):
     if mode!='apply':frappe.throw('Unsupported transfer operation.')
     protected=clean_hash(frappe.get_doc('Project','PROJ-0078'))
     install_fields()
+    if not frappe.db.exists('Project Type','Major Project'):
+        frappe.get_doc(dict(doctype='Project Type',project_type='Major Project')).insert(ignore_permissions=True)
     if not frappe.db.exists('Customer',package['customer']['name']):
         cust=package['customer']
         frappe.get_doc(dict(doctype='Customer',customer_name=cust['customer_name'],customer_type=cust['customer_type'],
@@ -373,3 +377,45 @@ def history(project):
     for row in sorted(package['records'],key=lambda r:(r.get('creation') or '',r['doctype'],r['name'])):
         html+='<details><summary>'+escape(str(row.get('creation') or '')+' · '+row['doctype']+' · '+row['name'])+'</summary><pre style="white-space:pre-wrap">'+escape(json.dumps(row,ensure_ascii=False,indent=2))+'</pre></details>'
     frappe.respond_as_web_page('Transferred project history',html)
+
+
+@frappe.whitelist(methods=['POST'])
+def archive_source():
+    require_site(AE)
+    upload=frappe.request.files.get('receipt')
+    if not upload:frappe.throw('Select the verified Oman receipt.')
+    receipt=json.loads(upload.read())
+    receipt=receipt.get('message',receipt)
+    if not (receipt.get('verified') and receipt.get('protected_project_unchanged') and
+            receipt.get('package_sha')==PACKAGE_SHA and receipt.get('source_fingerprint')==SOURCE_FINGERPRINT and
+            receipt.get('target')==TARGET and receipt.get('task_count')==110 and not receipt.get('failures')):
+        frappe.throw('The verified Oman transfer receipt is required before archiving.')
+    project=frappe.get_doc('Project',SOURCE,for_update=True)
+    if project.get('custom_bs_archived'):
+        return dict(archived=True,already_archived=True,target=TARGET)
+    if digest(source_records())!=SOURCE_FINGERPRINT:
+        frappe.throw('UAE source changed after export. Reconcile the changes before archiving.')
+    install_fields()
+    original=project.as_dict()
+    values=dict(is_active='No',collect_progress=0,custom_bs_archived=1,
+        custom_bs_transfer_source='Transferred to Oman / '+TARGET,
+        custom_bs_transfer_manifest=json.dumps(dict(receipt=receipt,original_status=project.status,
+            original_is_active=project.is_active,original_collect_progress=project.collect_progress)))
+    frappe.db.set_value('Project',SOURCE,values,update_modified=False)
+    frappe.get_doc(dict(doctype='Version',ref_doctype='Project',docname=SOURCE,
+        data=json.dumps({'changed':[[k,original.get(k),v] for k,v in values.items() if k!='custom_bs_transfer_manifest']}))).insert(ignore_permissions=True)
+    frappe.get_doc(dict(doctype='Comment',comment_type='Info',reference_doctype='Project',reference_name=SOURCE,
+        content='Archived after verified transfer to Oman ELV: '+TARGET+'. All 110 tasks and historical records preserved. Original records remain available here for audit.')).insert(ignore_permissions=True)
+    frappe.clear_document_cache('Project',SOURCE)
+    return dict(archived=True,source=SOURCE,target=TARGET,source_tasks_retained=110,
+                original_status_preserved=project.status)
+
+
+@frappe.whitelist(methods=['GET'])
+def archive_page():
+    require_site(AE)
+    from frappe.sessions import get_csrf_token
+    form='''<h2>Archive UAE MOG source after Oman verification</h2><p>Retain all UAE records for audit. Exclude the archived project from active categories and future automatic Teams task schedules. PROJ-0078 is not changed.</p>
+    <form id="archive"><input type="file" name="receipt" accept=".json" required><input type="hidden" name="csrf_token" value="TOKEN"><button type="submit">Archive verified UAE source</button></form><pre id="result"></pre>
+    <script>document.getElementById('archive').onsubmit=async function(e){e.preventDefault();const b=this.querySelector('button');b.disabled=true;try{const r=await fetch('/api/method/bsgroup.mog_project_transfer.archive_source',{method:'POST',credentials:'same-origin',headers:{'X-Frappe-CSRF-Token':this.elements.csrf_token.value},body:new FormData(this)});document.getElementById('result').textContent=JSON.stringify(await r.json(),null,2);}catch(e){document.getElementById('result').textContent=e.message;}finally{b.disabled=false;}};</script>'''
+    frappe.respond_as_web_page('Archive transferred UAE project',form.replace('TOKEN',escape(get_csrf_token(),quote=True)))

@@ -66,7 +66,8 @@ def task_rows(user, day, company, excluded=None):
                 excluded.append(dict(task=name, title=task.subject, reason=reason))
             continue
         project = frappe.get_doc('Project', task.project)
-        reason = ('Project company does not match employee company' if project.company != company else
+        reason = ('Project archived after transfer' if project.get('custom_bs_archived') else
+            'Project company does not match employee company' if project.company != company else
             'Project on hold' if is_on_hold(project.status) else
             'Project completed / closed / cancelled' if project.status in TERMINAL else
             'Missing Project read access' if not frappe.has_permission('Project', 'read', doc=project, user=user) else

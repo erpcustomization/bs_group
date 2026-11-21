@@ -144,6 +144,7 @@ D.nextMilestone = function (tasks) {
 };
 D.fetchProjects = function () {
   return frappe.call({ method: 'frappe.client.get_list', args: { doctype: 'Project',
+    filters: frappe.meta.has_field('Project','custom_bs_archived') ? {custom_bs_archived:0} : {},
     fields: ['name','project_name','customer','project_type','status','percent_complete','expected_start_date','expected_end_date','custom_project_manager'],
     limit_page_length: 0, order_by: 'modified desc' } }).then(function (r) { return r.message || []; });
 };

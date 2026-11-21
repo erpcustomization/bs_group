@@ -133,7 +133,10 @@ def visible_projects(key):
     field = MODULES[key][1]
     if not frappe.get_meta("Project").has_field(field):
         frappe.throw(_("Project modules have not been installed yet."))
-    return frappe.get_list("Project", filters={field: 1},
+    filters={field: 1}
+    if frappe.get_meta('Project').has_field('custom_bs_archived'):
+        filters['custom_bs_archived']=0
+    return frappe.get_list("Project", filters=filters,
         fields=["name", "project_name", "status", "project_type", "percent_complete", "company", "modified"],
         order_by="creation desc", limit_page_length=0)
 
@@ -222,5 +225,6 @@ def portfolio():
     fields = ["name", "project_name", "status", "project_type", "percent_complete", "company", "modified"]
     fields += [field for field in ["customer", "custom_project_manager", "expected_start_date", "expected_end_date", "custom_bs_category_review_note"]
                + [field for _, field in MODULES.values()] if meta.has_field(field)]
-    rows = frappe.get_list("Project", fields=fields, order_by="creation desc", limit_page_length=0)
+    filters={'custom_bs_archived':0} if meta.has_field('custom_bs_archived') else {}
+    rows = frappe.get_list("Project", filters=filters, fields=fields, order_by="creation desc", limit_page_length=0)
     return [dict(row, **classify(row)) for row in rows]
