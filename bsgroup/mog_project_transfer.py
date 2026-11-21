@@ -62,6 +62,13 @@ def source_records():
                                       pluck='name', limit_page_length=0):
                 linked[(dt,name)] = frappe.get_doc(dt,name).as_dict()
     records = [project] + tasks + list(linked.values())
+    # Legacy scheduler rows sometimes only populated category_name, not project.
+    schedulers = set(frappe.get_all('Tech Task Scheduler List',
+        filters={'category_name':SOURCE},pluck='parent',limit_page_length=0))
+    schedulers.update(d.get('scheduler') for d in records if d.doctype == 'Scheduler Execution' and d.get('scheduler'))
+    for name in sorted(schedulers):
+        if ('Tech Task Scheduler',name) not in linked:
+            records.append(frappe.get_doc('Tech Task Scheduler',name).as_dict())
     refs = {}
     for record in records:
         refs.setdefault(record.doctype, []).append(record.name)
