@@ -319,6 +319,7 @@ def import_package(mode='preview'):
     from frappe.utils.file_manager import save_file
     archive=save_file('MOG-Salalah-UAE-transfer-history.json',raw,'Project',TARGET,is_private=1)
     files=[]
+    attachment_copies={}
     file_records={r['name']:r for r in package['records'] if r['doctype']=='File'}
     for f in package['files']:
         if f.get('external'):
@@ -326,7 +327,10 @@ def import_package(mode='preview'):
         content=base64.b64decode(f['content'],validate=True)
         if hashlib.sha256(content).hexdigest()!=f['sha256']:frappe.throw('Attachment checksum mismatch.')
         record=file_records[f['name']]
-        saved=save_file(f['name']+'-'+record['file_name'],content,'Project',TARGET,is_private=1)
+        saved=attachment_copies.get(f['sha256'])
+        if saved is None:
+            saved=save_file(f['name']+'-'+record['file_name'],content,'Project',TARGET,is_private=1)
+            attachment_copies[f['sha256']]=saved
         files.append(dict(source=f['name'],url=saved.file_url,sha256=f['sha256'],file=saved.name))
     frappe.db.set_value('Project',TARGET,'custom_bs_transfer_history',archive.file_url,update_modified=False)
     expected=[]
