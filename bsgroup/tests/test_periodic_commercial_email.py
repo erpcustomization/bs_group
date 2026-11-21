@@ -16,11 +16,11 @@ class PeriodicTests(unittest.TestCase):
         exec(compile(ast.Module(body=nodes,type_ignores=[]), 'periodic', 'exec'), self.ns)
         self.anchor = date(2026,11,21)
 
-    def test_first_run_and_fixed_fifteen_day_window(self):
+    def test_mid_month_fixed_window(self):
         self.assertEqual(self.ns['periods'](datetime(2026,11,21,17,30),self.anchor),[])
-        r=self.ns['periods'](datetime(2026,12,6,17,30),self.anchor)
-        self.assertEqual(r,[('15-Day',datetime(2026,11,21,17,30),datetime(2026,12,6,17,30))])
-        self.assertEqual(self.ns['periods'](datetime(2026,12,6,18,55),self.anchor),r)
+        r=self.ns['periods'](datetime(2026,12,15,17,30),self.anchor)
+        self.assertEqual(r,[('Mid-Month',datetime(2026,12,1),datetime(2026,12,15,17,30))])
+        self.assertEqual(self.ns['periods'](datetime(2026,12,15,18,55),self.anchor),r)
 
     def test_month_end_and_leap_year(self):
         self.assertEqual(self.ns['periods'](datetime(2026,11,30,17,30),self.anchor)[0],
@@ -30,12 +30,12 @@ class PeriodicTests(unittest.TestCase):
 
     def test_no_early_or_late_send(self):
         for hour,minute in [(17,29),(19,0),(23,0)]:
-            self.assertEqual(self.ns['periods'](datetime(2026,12,6,hour,minute),self.anchor),[])
+            self.assertEqual(self.ns['periods'](datetime(2026,12,15,hour,minute),self.anchor),[])
 
-    def test_coincident_reports_are_separate(self):
+    def test_month_end_does_not_also_send_mid_month(self):
         r=self.ns['periods'](datetime(2026,11,30,17,30),date(2026,11,15))
-        self.assertEqual(len(r),2)
-        self.assertNotEqual(self.ns['key']('u','Sales',r[0][0],r[0][2]),self.ns['key']('u','Sales',r[1][0],r[1][2]))
+        self.assertEqual(len(r),1)
+        self.assertEqual(r[0][0],'Month-End')
 
     def test_retry_does_not_queue_duplicate_and_uses_current_cc(self):
         f=Mock(); markers=set(); f.db.get_single_value.side_effect=lambda dt,field: 1 if field=='enabled' else self.anchor
@@ -43,7 +43,7 @@ class PeriodicTests(unittest.TestCase):
         f.get_doc.side_effect=lambda doc:Mock(db_insert=lambda:markers.add(doc['name']))
         f.sendmail.return_value='QUEUE'
         f.DuplicateEntryError=type('DuplicateEntryError',(Exception,),{})
-        now=Mock();now.now.return_value=datetime(2026,12,6,17,30)
+        now=Mock();now.now.return_value=datetime(2026,12,15,17,30)
         self.ns.update(frappe=f,datetime=now,TZ=None,FLAG='enabled',ANCHOR='anchor',
             site_profile=lambda:True,collect_range=lambda a,b:{},
             people=lambda:[dict(user='rahul@bitssecureit.com',kind='Sales',cc=['mohan@bitssecureit.com'])],

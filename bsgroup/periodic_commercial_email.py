@@ -1,4 +1,4 @@
-"""Opt-in 15-calendar-day and month-end sales/presales work reports."""
+"""Opt-in mid-month (15th) and month-end sales/presales work reports."""
 import calendar
 from datetime import datetime, date, time, timedelta
 from hashlib import sha256
@@ -20,9 +20,8 @@ def periods(now, anchor):
         return []
     end = datetime.combine(today, time(17, 30))
     result = []
-    days = (today - anchor).days
-    if days > 0 and days % 15 == 0:
-        result.append(('15-Day', end - timedelta(days=15), end))
+    if today.day == 15:
+        result.append(('Mid-Month', datetime.combine(today.replace(day=1), time()), end))
     if today.day == calendar.monthrange(today.year, today.month)[1]:
         result.append(('Month-End', datetime.combine(today.replace(day=1), time()), end))
     return result
@@ -82,8 +81,8 @@ def install():
         return
     from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
     create_custom_fields({'Selling Settings': [
-        dict(fieldname=FLAG, label='15-day and month-end work reports', fieldtype='Check', default='0'),
-        dict(fieldname=ANCHOR, label='15-day work report anchor', fieldtype='Date'),
+        dict(fieldname=FLAG, label='Mid-month and month-end work reports', fieldtype='Check', default='0'),
+        dict(fieldname=ANCHOR, label='Periodic work reports enabled from', fieldtype='Date'),
     ]}, update=False)
     from frappe.core.doctype.scheduled_job_type.scheduled_job_type import insert_single_event
     insert_single_event('Cron', METHOD, CRON)
@@ -109,7 +108,7 @@ def preview():
     end=datetime.combine(now.date(),time(17,30))
     roster=people()
     output=[]
-    for cadence,start in [('15-Day',end-timedelta(days=15)),('Month-End',datetime.combine(now.date().replace(day=1),time()))]:
+    for cadence,start in [('Mid-Month',datetime.combine(now.date().replace(day=1),time())),('Month-End',datetime.combine(now.date().replace(day=1),time()))]:
         data=collect_range(start,end)
         for kind in ('Sales','Presales'):
             person=next((p for p in roster if p['kind']==kind),None)
@@ -129,6 +128,6 @@ def page():
     anchor = frappe.db.get_single_value('Selling Settings', ANCHOR)
     job = frappe.db.get_value('Scheduled Job Type', {'method':METHOD}, ['stopped','cron_format','last_execution'], as_dict=True)
     roster = ''.join(f'<li>{escape(p["name"])} — {p["kind"]}: {escape(p["user"])}; CC: {escape(", ".join(p["cc"]) or "none (self)")}</li>' for p in people())
-    html = f'<h2>{escape(site_profile()["region"])} — Periodic sales and presales reports</h2><p>Enabled: {bool(enabled)} · Anchor: {anchor} · Job: {escape(str(job))}</p><p>Every 15 calendar days at 17:30, beginning 15 days after the anchor. Separate month-end report at 17:30. Existing weekly and monthly target reports are unchanged. Test transactions excluded. Current reporting manager in CC; Mohan fallback.</p><ul>{roster}</ul>'
+    html = f'<h2>{escape(site_profile()["region"])} — Periodic sales and presales reports</h2><p>Enabled: {bool(enabled)} · Enabled from: {anchor} · Job: {escape(str(job))}</p><p>15th of every month at 17:30: work from the 1st to the cutoff. Separate last-day-of-month report at 17:30: work from the 1st to the cutoff. Existing weekly and monthly target reports are unchanged. Test transactions excluded. Current reporting manager in CC; Mohan fallback.</p><ul>{roster}</ul>'
     html += '<form id="enable"><button>Enable periodic reports</button></form><pre id="result"></pre><script>document.getElementById("enable").onsubmit=async function(e){e.preventDefault();const b=this.querySelector("button");b.disabled=true;try{const r=await fetch("/api/method/bsgroup.periodic_commercial_email.enable",{method:"POST",headers:{"X-Frappe-CSRF-Token":"TOKEN"}});document.getElementById("result").textContent=JSON.stringify(await r.json(),null,2);}finally{b.disabled=false;}};</script>'
     frappe.respond_as_web_page('Periodic work reports', html.replace('TOKEN', escape(get_csrf_token(),quote=True)))
