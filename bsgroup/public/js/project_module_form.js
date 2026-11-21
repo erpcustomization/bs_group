@@ -1,5 +1,13 @@
 frappe.ui.form.on('Project', {
     refresh(frm) {
+        if(frm.doc.custom_bs_transfer_source && frm.doc.custom_bs_transfer_manifest && !frm.doc.custom_bs_archived) {
+            frm.add_custom_button(__('Transferred Work History'),()=>{
+                const dialog=new frappe.ui.Dialog({title:__('Transferred UAE Work History'),size:'extra-large',
+                    fields:[{fieldtype:'HTML',fieldname:'history'}]});
+                dialog.fields_dict.history.$wrapper.html(`<iframe title="Transferred project history" style="width:100%;height:70vh;border:0" src="/api/method/bsgroup.mog_project_transfer.history?project=${encodeURIComponent(frm.doc.name)}"></iframe>`);
+                dialog.show();
+            });
+        }
         const colors={'open':'blue','in progress':'cyan','on hold':'orange','hold':'orange',
             'delayed':'red','overdue':'red','customer delayed':'purple','postponed':'orange',
             'completed':'green','closed':'green','cancelled':'gray'};
