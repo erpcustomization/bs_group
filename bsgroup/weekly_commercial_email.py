@@ -45,6 +45,9 @@ def people():
         user = employee.user_id
         if not user or user in seen or user in ('Administrator', 'Guest'):
             continue
+        # Shared ERP mailbox is not a salesperson or presales employee.
+        if user.strip().lower() == 'erp@bitssecureit.com':
+            continue
         if not frappe.db.get_value('User', user, 'enabled') or not frappe.utils.validate_email_address(user):
             continue
         seen.add(user)
