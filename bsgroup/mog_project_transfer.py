@@ -292,7 +292,7 @@ def import_package(mode='preview'):
                 if any(comparable(actual[child['name']].get(k))!=comparable(v) for k,v in child.items()):
                     frappe.throw('Transferred task dependency mismatch.')
     from frappe.utils.nestedset import rebuild_tree
-    rebuild_tree('Task','parent_task')
+    rebuild_tree('Task')
     from frappe.utils.file_manager import save_file
     archive=save_file('MOG-Salalah-UAE-transfer-history.json',raw,'Project',TARGET,is_private=1)
     files=[]
