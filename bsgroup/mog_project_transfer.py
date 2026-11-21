@@ -291,8 +291,31 @@ def import_package(mode='preview'):
             for child in children:
                 if any(comparable(actual[child['name']].get(k))!=comparable(v) for k,v in child.items()):
                     frappe.throw('Transferred task dependency mismatch.')
-    from frappe.utils.nestedset import rebuild_tree
-    rebuild_tree('Task')
+    # Allocate tree positions only for this imported forest. A global rebuild can
+    # commit internally and alter unrelated tasks, defeating atomic rollback.
+    existing_tree=frappe.db.sql('select name, lft, rgt from `tabTask` for update',as_dict=True)
+    position=max([int(r.rgt or 0) for r in existing_tree]+[0])
+    task_docs={d['name']:d for d in docs if d['doctype']=='Task'}
+    children={name:[] for name in task_docs}
+    roots=[]
+    for name,item in task_docs.items():
+        parent=item.get('parent_task')
+        if parent:
+            if parent not in children:frappe.throw('Imported task has an external parent.')
+            children[parent].append(name)
+        else:roots.append(name)
+    visited=set()
+    def assign_tree(name):
+        nonlocal position
+        if name in visited:frappe.throw('Imported task hierarchy contains a cycle.')
+        visited.add(name)
+        position+=1
+        left=position
+        for child in sorted(children[name]):assign_tree(child)
+        position+=1
+        frappe.db.set_value('Task',name,dict(lft=left,rgt=position),update_modified=False)
+    for name in sorted(roots):assign_tree(name)
+    if len(visited)!=len(task_docs):frappe.throw('Imported task hierarchy is incomplete.')
     from frappe.utils.file_manager import save_file
     archive=save_file('MOG-Salalah-UAE-transfer-history.json',raw,'Project',TARGET,is_private=1)
     files=[]
