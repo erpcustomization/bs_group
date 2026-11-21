@@ -1,6 +1,7 @@
 """Audited, explicitly scoped MOG Salalah UAE -> Oman transfer tooling."""
 import hashlib
 import json
+import base64
 
 import frappe
 
@@ -85,3 +86,33 @@ def inventory():
     return dict(source=SOURCE, title=TITLE, counts=counts, fingerprint=digest(records),
                 related=[dict(doctype=d.doctype,name=d.name,docstatus=d.docstatus)
                          for d in records if d.doctype not in ('Task','Comment','Version','DocShare')])
+
+
+@frappe.whitelist(methods=['GET'])
+def export_package():
+    require_site(AE)
+    records = source_records()
+    files = []
+    for row in records:
+        if row.doctype != 'File' or row.is_folder:
+            continue
+        doc = frappe.get_doc('File', row.name)
+        if not str(doc.file_url).startswith(('/files/', '/private/files/')):
+            files.append(dict(name=doc.name, url=doc.file_url, external=True))
+            continue
+        content = doc.get_content()
+        if isinstance(content,str):
+            content = content.encode()
+        files.append(dict(name=doc.name, url=doc.file_url, sha256=hashlib.sha256(content).hexdigest(),
+                          content=base64.b64encode(content).decode()))
+    meta = {}
+    for record in records:
+        for doc in [record] + [c for v in record.values() if isinstance(v,list) for c in v if isinstance(c,dict) and c.get('doctype')]:
+            if doc.doctype not in meta:
+                meta[doc.doctype] = [dict(fieldname=f.fieldname,fieldtype=f.fieldtype,options=f.options)
+                                    for f in frappe.get_meta(doc.doctype).fields]
+    employee = frappe.get_doc('Employee', records[0].custom_project_manager)
+    return dict(source=SOURCE,source_site='https://erp.bitssecureit.com',title=TITLE,
+                fingerprint=digest(records),records=records,files=files,meta=meta,
+                project_manager=dict(name=employee.name,employee_name=employee.employee_name,user_id=employee.user_id),
+                customer=frappe.get_doc('Customer',records[0].customer).as_dict())
