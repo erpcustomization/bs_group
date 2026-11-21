@@ -43,7 +43,7 @@
                 .flatMap(([app,path])=>[
                     {label:app==='BS Project'?'BS Project Support':app,
                         href:path+(path.includes('?')?'&':'?')+'bs_app='+encodeURIComponent(app),
-                        ...(app==='BS Project' && supportLinks.length ? {children:supportLinks.filter(x=>!['Project','Task','Timesheet'].includes(x.label) && typeof x.href==='string' && x.href.startsWith('/desk/'))} : {})},
+                        ...(app==='BS Project' && supportLinks.length ? {children:supportLinks.filter(x=>!['Project','Task','Timesheet','Task Summary Report','Task Scheduler Report'].includes(x.label) && typeof x.href==='string' && x.href.startsWith('/desk/'))} : {})},
                     // Project is the first server destination only when Project read
                     // is allowed. A Task/Timesheet-only fallback must not add these.
                     ...(app==='BS Project' && path==='/desk/bs-group/project'
@@ -84,9 +84,9 @@
         const dashboard=isDashboard(current.pathname);
         // Navigation only. Keep category URLs, direct Project forms and permissions intact.
         for(const link of document.querySelectorAll('.body-sidebar[data-title="BS Group"] a[href]')) {
-            if(!['Project','Task','Timesheet'].map(x=>__(x)).includes(link.textContent.trim())) continue;
+            if(!['Project','Task','Timesheet','Task Summary Report','Task Scheduler Report'].map(x=>__(x)).includes(link.textContent.trim())) continue;
             const target=new URL(link.getAttribute('href'),location.origin);
-            if(/^\/desk\/(?:bs-group\/)?(?:project|task|timesheet)\/?$/.test(target.pathname))
+            if(/^\/desk\/(?:bs-group\/)?(?:project|task|timesheet|query-report\/(?:Task Summary Report|Task Scheduler Report))\/?$/.test(decodeURIComponent(target.pathname)))
                 link.closest('.standard-sidebar-item')?.classList.add('bs-general-project-hidden');
         }
         for(const host of document.querySelectorAll('.body-sidebar .sidebar-items, .desk-sidebar .sidebar-items')) {
