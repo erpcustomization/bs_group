@@ -64,6 +64,11 @@ def people():
 
 def collect(monday):
     start, end = period(monday)
+    return collect_range(start, end)
+
+
+def collect_range(start, end):
+    """Collect a half-open activity range; weekly callers retain their old dates."""
     records = {dt: {r.name: r for r in frappe.get_all(dt, fields=['*'], limit_page_length=0)} for dt in TYPES}
     # Trace test ancestry so renamed/ordinary-looking downstream records stay excluded.
     def parents(dt, r):
@@ -132,7 +137,7 @@ def table(headings, rows):
     return '<table style="border-collapse:collapse;width:100%"><tr>' + ''.join('<th>'+escape(h)+'</th>' for h in headings) + '</tr>' + ''.join('<tr>'+''.join(cell(x) for x in row)+'</tr>' for row in rows) + '</table>'
 
 
-def report(person, data):
+def report(person, data, cadence='Weekly'):
     user, kind = person['user'], person['kind']
     rows, selected = [], {}
     for (dt, name), events in data['events'].items():
@@ -153,13 +158,14 @@ def report(person, data):
         activity = '\n'.join(sorted({e['stamp'][:16] + ' — ' + e['label'] for e in events}))
         status = r.get('custom_pipeline_stage') or r.get('status') or r.get('workflow_state') or {0:'Draft',1:'Submitted',2:'Cancelled'}.get(r.docstatus)
         rows.append((dt, name, customer, activity, r.get('custom_dcs_revision_no') or r.get('custom_oman_revision_no') or '—', status))
-    start, last = data['start'], data['end'] - timedelta(days=1)
-    subject = f'Your Weekly {kind} Report | {start:%d %b}–{last:%d %b %Y}'
-    body = f'<p>Dear {escape(person["name"])},</p><p>Please find your weekly {kind.lower()} work summary for <b>{start:%d %B %Y}–{last:%d %B %Y}</b>.</p>'
+    start, last = data['start'], data.get('display_end', data['end'] - timedelta(days=1))
+    subject = f'Your {cadence} {kind} Report | {start:%d %b}–{last:%d %b %Y}'
+    body = f'<p>Dear {escape(person["name"])},</p><p>Please find your {escape(cadence.lower())} {kind.lower()} work summary for <b>{start:%d %B %Y}–{last:%d %B %Y}</b>.</p>'
+    work_heading = 'Work Recorded Last Week' if cadence == 'Weekly' else 'Work Recorded in This Period'
     if kind == 'Presales':
         for dt, heading in (('Presales Request','Presales Requests Worked On'), ('Deal Cost Sheet','Costing Sheets Worked On')):
             part = [r for r in rows if r[0] == dt]
-            body += f'<h3>{heading} ({len(part)})</h3>' + table(['Reference','Customer','Work Recorded Last Week','Revision','Current Status'], [r[1:] for r in part])
+            body += f'<h3>{heading} ({len(part)})</h3>' + table(['Reference','Customer',work_heading,'Revision','Current Status'], [r[1:] for r in part])
     else:
         def count(dt, predicate):
             return sum(any(predicate(e) for e in es) for (d, n), es in selected.items() if d == dt)
@@ -178,8 +184,8 @@ def report(person, data):
                 amounts[currency]=amounts.get(currency,0)+float(r.get('grand_total') or 0)
             stats.append(('Quotations '+outcome.lower(),str(len(matches))+' — '+(', '.join(f'{c} {v:,.2f}' for c,v in amounts.items()) or '—')))
         stats.append(('Quotations handed over to procurement',count('Quotation',lambda e:any(x[0]=='custom_bsp_material_request' and not x[1] and x[2] for x in e['changes']))))
-        body += '<h3>Your Weekly Summary</h3>'+table(['Activity','This week'],stats)
-        body += '<h3>Weekly Record Details</h3>'+table(['Type','Reference','Customer','Activity Recorded Last Week','Revision','Current Status'],rows)
+        body += '<h3>Your '+escape(cadence)+' Summary</h3>'+table(['Activity','This week' if cadence=='Weekly' else 'This period'],stats)
+        body += '<h3>'+escape(cadence)+' Record Details</h3>'+table(['Type','Reference','Customer','Activity Recorded Last Week' if cadence=='Weekly' else 'Activity Recorded in This Period','Revision','Current Status'],rows)
         # Outstanding work is a current snapshot, distinct from the week's activity.
         pending=[]
         for dt in ('Lead','Opportunity','Deal Cost Sheet','Quotation'):

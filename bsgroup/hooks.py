@@ -808,6 +808,8 @@ has_permission["Tech Task Scheduler"] = "bsgroup.project_support_access.schedule
 
 after_migrate.append("bsgroup.weekly_commercial_email.install")
 after_migrate.append("bsgroup.monthly_sales_targets_email.install")
+after_migrate.append("bsgroup.periodic_commercial_email.install")
+scheduler_events.setdefault("cron", {}).setdefault("*/5 17-18 * * *", []).append("bsgroup.periodic_commercial_email.send_reports")
 after_migrate.append("bsgroup.project_manager_access.install")
 after_migrate.append("bsgroup.quotation_preparer.install")
 jinja = {"methods": ["bsgroup.quotation_preparer.quotation_preparer"]}
