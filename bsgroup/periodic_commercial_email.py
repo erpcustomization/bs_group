@@ -42,7 +42,7 @@ def compose(person, data, cadence, end):
 
 def send_reports():
     now = datetime.now(TZ)
-    if not site_profile() or not frappe.db.get_single_value('Selling Settings', FLAG):
+    if not site_profile() or not frappe.get_meta('Selling Settings').has_field(FLAG) or not frappe.db.get_single_value('Selling Settings', FLAG):
         return 0
     anchor = frappe.db.get_single_value('Selling Settings', ANCHOR)
     if not anchor:
@@ -129,8 +129,9 @@ def preview():
 def page():
     frappe.only_for('System Manager')
     from frappe.sessions import get_csrf_token
-    enabled = frappe.db.get_single_value('Selling Settings', FLAG)
-    anchor = frappe.db.get_single_value('Selling Settings', ANCHOR)
+    meta = frappe.get_meta('Selling Settings')
+    enabled = frappe.db.get_single_value('Selling Settings', FLAG) if meta.has_field(FLAG) else False
+    anchor = frappe.db.get_single_value('Selling Settings', ANCHOR) if meta.has_field(ANCHOR) else None
     job = frappe.db.get_value('Scheduled Job Type', {'method':METHOD}, ['stopped','cron_format','last_execution'], as_dict=True)
     roster = ''.join(f'<li>{escape(p["name"])} — {p["kind"]}: {escape(p["user"])}; CC: {escape(", ".join(p["cc"]) or "none (self)")}</li>' for p in people())
     html = f'<h2>{escape(site_profile()["region"])} — Periodic sales and presales reports</h2><p>Enabled: {bool(enabled)} · Enabled from: {anchor} · Job: {escape(str(job))}</p><p>Weekly: Monday 09:30. Mid-month: 15th at 09:30, work from the 1st to the cutoff. Month-end: last day at 17:30, work from the 1st to the cutoff. All times UTC+4. Monthly target reports remain unchanged. Test transactions excluded. Current reporting manager in CC; Mohan fallback.</p><ul>{roster}</ul>'
