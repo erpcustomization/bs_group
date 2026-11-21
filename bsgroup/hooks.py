@@ -819,6 +819,8 @@ doctype_list_js["Employee Checkin"] = "public/js/employee_checkin_shift.js"
 scheduler_events.setdefault("cron", {}).setdefault("*/5 9-10 * * 1", []).append("bsgroup.weekly_commercial_email.send_reports")
 scheduler_events.setdefault("cron", {}).setdefault("*/5 10-11 1 * *", []).append("bsgroup.monthly_sales_targets_email.send_reports")
 after_migrate.append("bsgroup.approval_reminders.install")
+after_migrate.append("bsgroup.project_daily_emails.install")
+scheduler_events.setdefault("cron", {}).setdefault("*/5 9-10,17-19 * * *", []).append("bsgroup.project_daily_emails.run")
 scheduler_events.setdefault("cron", {}).setdefault("*/5 9 * * *", []).append("bsgroup.approval_reminders.send_reminder")
 
 # Late surveys are requested only from Opportunity; both linked forms show progress.
